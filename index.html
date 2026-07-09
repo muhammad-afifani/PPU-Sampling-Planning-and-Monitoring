@@ -1502,29 +1502,29 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
     <!-- DATA -->
     <div class="page" id="page-data">
       <div class="pagehead"><div><h2>Data — Import / Export / Reset</h2><div class="desc">Backup, restore, atau reset seluruh data tools</div></div></div>
-      <div class="card" style="background:#f7fbfb;border-color:#c9ece8;">
-        <h3 style="color:#0b6b66;">Update Data Referensi</h3>
-        <p class="hint">Sinkronkan titik/parameter REFERENSI (baku mutu, regulasi, frekuensi pantau) dari file update terbaru. Data operasional kamu sendiri — batch, tracking, hasil pemantauan, status wajib yang sudah kamu ubah manual — TIDAK ikut ditimpa; cuma field referensi teknis yang disegarkan, dan titik baru (kalau ada) ditambahkan.</p>
-        <div class="hint" id="refDataStatus" style="margin:8px 0;font-weight:600;color:var(--navy-900);"></div>
-        <div style="border-top:1px solid #c9ece8;margin:10px 0;padding-top:10px;">
-          <b style="font-size:12.5px;">1. Buat file paket update (dari tools ini)</b>
-          <p class="hint" style="margin-top:2px;">Kalau kamu di sini yang mengelola/mengupdate data referensi — klik ini utk bikin file .json berisi seluruh titik saat ini dalam format yang sudah benar, siap diupload ke GitHub. Tidak perlu tulis JSON manual.</p>
-          <button class="btn small" data-action="exportRefDataPackage">Export Paket Update Referensi (.json)</button>
+      <div class="card" style="background:#eafaf1;border-color:#3fb27f;border-width:2px;">
+        <h3 style="color:#1f7a4d;">📦 Backup Lengkap — pakai INI untuk share/pindah ke laptop lain</h3>
+        <p class="hint" style="font-weight:600;color:var(--navy-900);">Isinya SEMUA: titik pantau, personil, aturan, batch, JADWAL (termasuk yang sudah difinalisasi), tracking, running hour, hasil pemantauan — benar-benar seluruh isi tools ini.</p>
+        <div class="toolbar">
+          <button class="btn primary" data-action="exportAll">Export Semua Data (.json)</button>
         </div>
-        <div style="border-top:1px solid #c9ece8;margin:10px 0;padding-top:10px;">
-          <b style="font-size:12.5px;">2. Terapkan paket update (dari GitHub atau file)</b>
-          <div class="field" style="margin-top:6px;"><label>URL Data Referensi (isi sekali, utk Cek Update Online)</label><input type="text" id="refDataUrl" placeholder="https://raw.githubusercontent.com/user/repo/main/ref-data.json"></div>
+        <div class="filebox" style="margin-top:10px;">
+          <input type="file" id="importAllFile" accept=".json" style="width:100%;">
+          <div class="hint">Pilih file backup .json untuk restore (akan menimpa data saat ini)</div>
+        </div>
+        <div style="border-top:1px solid #3fb27f;margin:12px 0 0;padding-top:10px;">
+          <b style="font-size:12.5px;">Atau ambil langsung dari GitHub</b>
+          <p class="hint" style="margin-top:2px;">Upload file .json hasil "Export Semua Data" di atas ke repo GitHub-mu, ambil link Raw-nya, tempel di sini — orang lain tinggal klik "Cek Update" utk narik jadwal terbarumu tanpa perlu kamu kirim file manual tiap kali update.</p>
+          <div class="field" style="margin-top:6px;"><label>URL Backup Lengkap</label><input type="text" id="fullBackupUrl" placeholder="https://raw.githubusercontent.com/user/repo/main/phm_emisi_backup.json"></div>
           <div class="toolbar" style="margin-top:8px;">
-            <button class="btn primary" data-action="checkRefDataUpdate">Cek Update (Online)</button>
-            <button class="btn" data-action="importRefDataFile">Pilih File Update (Offline)</button>
-            <input type="file" id="hiddenRefDataFile" accept=".json" style="display:none;">
+            <button class="btn primary" data-action="checkFullBackupUpdate">Cek Update (Online)</button>
           </div>
-          <div class="hint" style="margin-top:8px;">"Cek Update (Online)" butuh file ini dibuka lewat alamat web (mis. GitHub Pages) — kalau dibuka dengan cara buka file HTML langsung (double-click) dari folder, browser akan menolak koneksi online-nya; pakai "Pilih File Update (Offline)" sebagai gantinya, hasilnya sama persis.</div>
+          <div class="hint" style="margin-top:8px;">"Cek Update (Online)" butuh tools ini dibuka lewat alamat web (mis. GitHub Pages), bukan double-click file HTML dari folder — browser akan menolak koneksi online-nya kalau dibuka lokal. Kalau offline, pakai file picker di atas.</div>
         </div>
       </div>
       <div class="card">
         <h3>Status Tiap Dataset</h3>
-        <div class="hint" style="margin-top:-6px;">Daftar seluruh dataset yang memiliki kebutuhan import atau export CSV pada tools ini, beserta jumlah data saat ini dan waktu terakhir dataset tersebut diperbarui, baik melalui import CSV maupun melalui penambahan atau perubahan data secara langsung. Gunakan tabel ini untuk mengetahui dataset mana yang sudah lama tidak disegarkan.</div>
+        <div class="hint" style="margin-top:-6px;">Daftar seluruh dataset yang memiliki kebutuhan import atau export CSV pada tools ini, beserta jumlah data saat ini dan waktu terakhir dataset tersebut diperbarui, baik melalui import CSV maupun melalui penambahan atau perubahan data secara langsung. Gunakan tabel ini untuk mengetahui dataset mana yang sudah lama tidak diperbarui.</div>
         <div class="tablewrap" style="max-height:none;margin-top:10px;">
           <table>
             <thead><tr><th>Dataset</th><th>Jumlah Data Saat Ini</th><th>Terakhir Diupdate</th><th>Halaman Terkait</th></tr></thead>
@@ -1532,25 +1532,12 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
           </table>
         </div>
       </div>
-      <div class="grid cols-2">
-        <div class="card">
-          <h3>Backup Lengkap (JSON)</h3>
-          <p class="hint">Simpan seluruh data (titik pantau, personil, aturan, batch, tracking) ke satu file JSON. Gunakan ini untuk pindah komputer atau backup rutin.</p>
-          <div class="toolbar">
-            <button class="btn primary" data-action="exportAll">Export Semua Data (.json)</button>
-          </div>
-          <div class="filebox" style="margin-top:10px;">
-            <input type="file" id="importAllFile" accept=".json" style="width:100%;">
-            <div class="hint">Pilih file backup .json untuk restore (akan menimpa data saat ini)</div>
-          </div>
-        </div>
-        <div class="card">
-          <h3>Reset Data</h3>
-          <p class="hint">Reset ke data awal (139 sumber emisi default PHM + titik ambient default), atau reset total ke kosong.</p>
-          <div class="toolbar">
-            <button class="btn" data-action="resetDefault">Reset ke Data Default</button>
-            <button class="btn danger" data-action="resetEmpty">Reset Total (Kosong)</button>
-          </div>
+      <div class="card">
+        <h3>Reset Data</h3>
+        <p class="hint">Reset ke data awal (139 sumber emisi default PHM + titik ambient default), atau reset total ke kosong.</p>
+        <div class="toolbar">
+          <button class="btn" data-action="resetDefault">Reset ke Data Default</button>
+          <button class="btn danger" data-action="resetEmpty">Reset Total (Kosong)</button>
         </div>
       </div>
       <div class="grid cols-2">
@@ -1925,7 +1912,7 @@ function updateStorageUsageBadge(){
 }
 // Pencatatan "terakhir diupdate" per kategori dataset yang punya kebutuhan CSV (import/export),
 // dipakai oleh daftar dataset di halaman Data (Import/Export) supaya terlihat mana yang sudah lama
-// tidak disegarkan. Dipanggil di titik mutasi utama tiap dataset (import CSV, tambah/ubah/hapus data,
+// tidak diperbarui. Dipanggil di titik mutasi utama tiap dataset (import CSV, tambah/ubah/hapus data,
 // atau reset), bukan pada setiap pemanggilan save() yang terlalu umum untuk kebutuhan ini.
 const DATASET_LABELS = {
   points: "Database Titik Pantau",
@@ -1964,7 +1951,7 @@ function datasetCount(key){
   return 0;
 }
 // Daftar status tiap dataset yang punya kebutuhan CSV (import/export), dipakai halaman Data
-// (Import/Export) supaya user tahu dataset mana yang sudah lama tidak disegarkan datanya.
+// (Import/Export) supaya user tahu dataset mana yang sudah lama tidak diperbarui datanya.
 function renderDataStatus(){
   const body = document.getElementById("dataStatusBody");
   if(!body) return;
@@ -2103,7 +2090,7 @@ function renderPage(p){
   if(p==="hasildb") renderHasilDb();
   if(p==="riwayat") renderRiwayat();
   if(p==="lokasi") renderMap();
-  if(p==="data"){ renderDataStatus(); renderRefDataStatus(); }
+  if(p==="data") renderDataStatus();
   if(p==="beritaacara") renderBeritaAcara();
   syncStickyOffset(p);
 }
@@ -6206,143 +6193,85 @@ async function printBeritaAcara(){
 /* =========================================================
    DATA PAGE
 ========================================================= */
-function exportAll(){ downloadBlob(JSON.stringify(DB,null,2), `phm_emisi_backup_${todayStr()}.json`, "application/json"); }
+// Ringkasan isi file SEBELUM di-download — supaya user bisa cek sendiri dgn mata "file yg baru
+// aku buat ini beneran isinya lengkap ya" TANPA harus kirim dulu ke laptop lain buat tahu, karena
+// mekanisme export/import-nya sendiri sudah diverifikasi benar berkali-kali; kalau ada yg hilang,
+// gejalanya akan kelihatan di ringkasan INI, bukan baru ketahuan pas dibuka di laptop lain.
+function exportAll(){
+  const finalizedCount = DB.batches.filter(b=>b.finalized).length;
+  const summary = `Mengekspor: ${DB.points.length} titik, ${DB.batches.length} batch (${finalizedCount} sudah final), ${DB.personil.length} personil, ${DB.hasilPemantauan.length} data hasil pemantauan, ${Object.keys(DB.tracking||{}).length} tracking. Dari session browser INI — cek angkanya sesuai yang kamu kerjakan sebelum dikirim ke laptop lain.`;
+  toast(summary, DB.batches.length ? "ok" : "err");
+  downloadBlob(JSON.stringify(DB,null,2), `phm_emisi_backup_${todayStr()}.json`, "application/json");
+}
+// Satu handler dipakai bareng utk 2 jalur backup-lengkap (pilih file, cek update online) — supaya
+// validasi & cara terapnya identik di manapun sumbernya. Selalu tampilkan perbandingan "punya kamu
+// vs isi file" dulu sebelum tombol tegas "Timpa" diklik — tidak ada auto-apply diam-diam, walaupun
+// datang dari fetch online.
+let pendingFullBackup = null;
+function handleFullBackupPackage(data, sourceLabel){
+  // Cek bentuknya benar-benar backup lengkap (bukan file lain yg kebetulan valid JSON) SEBELUM
+  // menimpa apapun — kalau field inti (batches/personil/meta) hilang, migrateDB() akan mengisinya
+  // dengan DEFAULT KOSONG, alias diam-diam MENGHAPUS semua batch/tracking yang ada tanpa peringatan
+  // sama sekali. Ditolak tegas di sini drpd nanti nyaring lewat gejala "kok data hilang" yang membingungkan.
+  const looksLikeFullBackup = data && typeof data==="object" && Array.isArray(data.points) && Array.isArray(data.batches) && Array.isArray(data.personil) && data.meta && typeof data.meta==="object";
+  if(!looksLikeFullBackup){
+    toast('File/link ini sepertinya bukan backup lengkap yang valid (field points/batches/personil/meta tidak lengkap) — import dibatalkan supaya data kamu saat ini tidak ikut hilang/tertimpa.',"err");
+    return;
+  }
+  pendingFullBackup = {data, sourceLabel};
+  const curFinalized = DB.batches.filter(b=>b.finalized).length;
+  const newFinalized = data.batches.filter(b=>b.finalized).length;
+  openModal(`
+    <h3>Restore Backup Lengkap</h3>
+    <p class="hint"><b>Data kamu SAAT INI</b> (akan hilang kalau lanjut): ${DB.points.length} titik, ${DB.batches.length} batch (${curFinalized} final), ${DB.personil.length} personil, ${Object.keys(DB.tracking||{}).length} tracking.</p>
+    <p class="hint"><b>Data DARI "${escHtml(sourceLabel)}"</b>: ${data.points.length} titik, ${data.batches.length} batch (${newFinalized} final), ${data.personil.length} personil, ${Object.keys(data.tracking||{}).length} tracking.</p>
+    <p style="font-weight:700;color:#a02a24;">Ini akan MENIMPA SELURUH data kamu saat ini dengan data di atas. Ada snapshot pengaman otomatis sebelum diterapkan (bisa di-undo lewat Riwayat &amp; Restore kalau salah pilih).</p>
+    <div class="actions">
+      <button class="btn ghost" data-action="closeModal">Batal</button>
+      <button class="btn danger" data-action="applyFullBackupImport">Timpa dengan Data Ini</button>
+    </div>
+  `);
+}
+function applyFullBackupImport(){
+  const pending = pendingFullBackup; if(!pending) return;
+  const {data, sourceLabel} = pending;
+  snapshotBefore(`Sebelum import backup "${sourceLabel}"`);
+  const keepSnapshots = DB.snapshots, keepLog = DB.activityLog;
+  DB = data;
+  migrateDB();
+  if(!DB.snapshots.length) DB.snapshots = keepSnapshots; else DB.snapshots = keepSnapshots.concat(DB.snapshots).slice(0,8);
+  if(!DB.activityLog.length) DB.activityLog = keepLog;
+  logChange(`Import backup dari "${sourceLabel}"`);
+  save();
+  closeModal();
+  // Ringkasan APA YANG BENERAN MASUK setelah restore — sama spt ringkasan di exportAll(), supaya
+  // kalau ada yang hilang/tidak sesuai harapan, kelihatan LANGSUNG di sini, bukan baru sadar
+  // belakangan pas buka halaman lain satu-satu.
+  const finalizedCount = DB.batches.filter(b=>b.finalized).length;
+  toast(`Restore berhasil dari "${sourceLabel}": ${DB.points.length} titik, ${DB.batches.length} batch (${finalizedCount} sudah final), ${DB.personil.length} personil, ${Object.keys(DB.tracking||{}).length} tracking.`,"ok");
+  showPage("dashboard");
+  pendingFullBackup = null;
+}
 document.getElementById("importAllFile").addEventListener("change", e=>{
   const file = e.target.files[0]; if(!file) return;
   const reader = new FileReader();
   reader.onload = ()=>{
-    try{
-      const data = JSON.parse(reader.result);
-      askConfirm("Ini akan menimpa seluruh data saat ini dengan isi file backup. Lanjutkan?", ()=>{
-        snapshotBefore(`Sebelum import backup "${file.name}"`);
-        const keepSnapshots = DB.snapshots, keepLog = DB.activityLog;
-        DB = data;
-        migrateDB();
-        if(!DB.snapshots.length) DB.snapshots = keepSnapshots; else DB.snapshots = keepSnapshots.concat(DB.snapshots).slice(0,8);
-        if(!DB.activityLog.length) DB.activityLog = keepLog;
-        logChange(`Import backup dari file "${file.name}"`);
-        save(); toast("Restore berhasil.","ok"); showPage("dashboard");
-      });
-    }catch(err){ toast("File tidak valid: "+err.message,"err"); }
+    try{ handleFullBackupPackage(JSON.parse(reader.result), file.name); }
+    catch(err){ toast("File tidak valid: "+err.message,"err"); }
   };
   reader.readAsText(file);
 });
-
-/* =========================================================
-   UPDATE DATA REFERENSI (online via fetch, atau offline via file picker)
-   ---------------------------------------------------------
-   Beda dari "Backup Lengkap" di atas (yang menimpa SELURUH DB), ini cuma menyegarkan field
-   REFERENSI teknis titik (kategoriSumber/regulasi/parameter/parameterCatatan/frekuensiBulan/
-   kategoriKapasitas) dari paket JSON versi-kan, sama seperti pola REG_DATA_VERSION/h2sDataMerged
-   di migrateDB() — titik yang id-nya belum ada ditambahkan, titik yang sudah ada field
-   OPERASIONALnya (status, batchId, wajib, tidakBeroperasi, tracking, dst) tidak disentuh sama
-   sekali. Dua jalur (fetch online / file picker offline) brmuara ke satu handler & satu logika
-   terap yang sama, supaya hasilnya identik apapun caranya.
-========================================================= */
-const REF_DATA_SYNC_FIELDS = ["kategoriSumber","regulasi","parameter","parameterCatatan","frekuensiBulan","kategoriKapasitas"];
-// Bikin file paket update yang bentuknya SUDAH BENAR ({version, points:[...]})  langsung dari data
-// titik yang sedang aktif di tools ini — supaya tidak perlu nulis JSON manual dari nol tiap mau
-// push update baru. BEDA dari "Export Semua Data" (yang isinya seluruh DB, tidak cocok dipakai
-// langsung sbg paket update krn strukturnya beda total) — ini cuma id + field referensi per titik.
-function exportRefDataPackage(){
-  const fields = ["id","site","kategori","nama", ...REF_DATA_SYNC_FIELDS];
-  const points = DB.points.map(p=>{
-    const out = {};
-    fields.forEach(f=>{ out[f] = p[f]!==undefined ? p[f] : ""; });
-    return out;
-  });
-  const pkg = {version: todayStr(), notes: "", points};
-  downloadBlob(JSON.stringify(pkg, null, 2), `ref-data-${todayStr()}.json`, "application/json");
-  toast(`File paket update dibuat (${points.length} titik, versi ${todayStr()}) — edit field "notes" kalau perlu, lalu upload ke GitHub.`,"ok");
-}
-let pendingRefDataPkg = null;
-function renderRefDataStatus(){
-  const el = document.getElementById("refDataStatus"); if(!el) return;
-  const v = DB.meta.refDataVersion;
-  const at = DB.meta.refDataAppliedAt;
-  el.textContent = v ? `Versi saat ini: ${v}${at?" — diterapkan "+fmtDateTimeId(at):""}` : "Belum pernah disinkron dari paket update manapun (masih data bawaan file ini).";
-}
-async function checkRefDataUpdate(){
-  const url = document.getElementById("refDataUrl").value.trim();
-  if(!url){ toast('Isi dulu URL data referensi (mis. link raw.githubusercontent.com ke file JSON-nya).',"err"); return; }
+async function checkFullBackupUpdate(){
+  const url = document.getElementById("fullBackupUrl").value.trim();
+  if(!url){ toast("Isi dulu URL backup lengkap.","err"); return; }
   try{
     const res = await fetch(url, {cache:"no-store"});
     if(!res.ok) throw new Error("HTTP "+res.status);
     const data = await res.json();
-    handleRefDataPackage(data);
+    handleFullBackupPackage(data, url.split("/").pop()||url);
   }catch(err){
-    toast('Gagal mengambil data online: '+err.message+'. Kalau file ini dibuka langsung dari folder (bukan lewat alamat web), browser memang menolak koneksi online-nya — pakai tombol "Pilih File Update (Offline)" sebagai gantinya.',"err");
+    toast('Gagal mengambil data online: '+err.message+'. Kalau file ini dibuka langsung dari folder (bukan lewat alamat web), browser menolak koneksi online-nya — pakai "Pilih File" sebagai gantinya.',"err");
   }
-}
-function importRefDataFile(){
-  const inp = document.getElementById("hiddenRefDataFile");
-  inp.onchange = ()=>{
-    const file = inp.files[0]; if(!file) return;
-    const reader = new FileReader();
-    reader.onload = ()=>{
-      try{ handleRefDataPackage(JSON.parse(reader.result)); }
-      catch(err){ toast("File update tidak valid: "+err.message,"err"); }
-    };
-    reader.readAsText(file);
-    inp.value = "";
-  };
-  inp.click();
-}
-function handleRefDataPackage(pkg){
-  if(!pkg || typeof pkg!=="object" || !pkg.version || !Array.isArray(pkg.points)){
-    toast('Format file update tidak valid — harus punya field "version" (teks) dan "points" (array).',"err");
-    return;
-  }
-  const current = DB.meta.refDataVersion || null;
-  if(current===pkg.version){ toast(`Sudah pakai versi terbaru (${pkg.version}) — tidak ada yang perlu diterapkan.`,"ok"); return; }
-  const existingIds = new Set(DB.points.map(p=>p.id));
-  const newCount = pkg.points.filter(p=>p.id && !existingIds.has(p.id)).length;
-  const updateCount = pkg.points.filter(p=>p.id && existingIds.has(p.id)).length;
-  pendingRefDataPkg = pkg;
-  openModal(`
-    <h3>Update Data Referensi Tersedia</h3>
-    <p>Versi saat ini: <b>${escHtml(current||"(belum pernah disinkron)")}</b> &rarr; Versi baru: <b>${escHtml(pkg.version)}</b></p>
-    ${pkg.notes?`<p class="hint">${escHtml(pkg.notes)}</p>`:""}
-    <p class="hint">${newCount} titik referensi baru akan ditambahkan, ${updateCount} titik yang sudah ada akan disegarkan field teknisnya (kategori sumber/regulasi/parameter/frekuensi). Data operasional kamu sendiri — batch, tracking, hasil pemantauan, status wajib yang sudah diubah manual — TIDAK ikut berubah.</p>
-    <div class="actions">
-      <button class="btn ghost" data-action="closeModal">Batal</button>
-      <button class="btn primary" data-action="applyRefDataUpdate">Terapkan Update</button>
-    </div>
-  `);
-}
-function applyRefDataUpdate(){
-  const pkg = pendingRefDataPkg; if(!pkg) return;
-  snapshotBefore(`Sebelum terapkan update data referensi versi ${pkg.version}`);
-  let added=0, updated=0;
-  pkg.points.forEach(def=>{
-    if(!def.id) return;
-    const existing = DB.points.find(p=>p.id===def.id);
-    if(existing){
-      REF_DATA_SYNC_FIELDS.forEach(f=>{ if(def[f]!==undefined) existing[f]=def[f]; });
-      updated++;
-    } else {
-      DB.points.push({
-        id: def.id, status:"pending", batchId:"", planStart:"", planEnd:"", actualStart:"", actualEnd:"",
-        team: def.kategori==="emisi"?"emisi":"ambient", keterangan:"", groupOverride:"", holdReason:"",
-        lastVerified:null, updatedAt:null, wajib:false, tidakBeroperasi:false, alasanTidakWajib:"",
-        pemantauanTerakhir:"", prediksiBerikutnya:"", lastSampling:"", runningHour:null, kapasitasKW:null,
-        site:"", nama:"", kategori:"emisi", kategoriSumber:"", regulasi:"", parameter:"", parameterCatatan:"",
-        frekuensiBulan:"", kapasitas:"", jenisBahanBakar:"",
-        ...def
-      });
-      added++;
-    }
-  });
-  DB.meta.refDataVersion = pkg.version;
-  DB.meta.refDataAppliedAt = new Date().toISOString();
-  logChange(`Update data referensi diterapkan: versi ${pkg.version} (${added} titik baru, ${updated} field titik existing disegarkan)`);
-  touchDataset("points");
-  save();
-  closeModal();
-  renderMaster();
-  renderRefDataStatus();
-  toast(`Update diterapkan: ${added} titik baru, ${updated} titik disegarkan.`,"ok");
-  pendingRefDataPkg = null;
 }
 
 function resetDefault(){
@@ -6941,7 +6870,7 @@ document.addEventListener("input", e=>{ if(e.target.id==="hdCorrCerobongSearch")
 // Checklist Titik/Cerobong pada bagian Simulasi bekerja terpisah dari checklist filter dashboard
 // di atas, mengikuti pola yang sama: centang memperbarui state tanpa menutup panel, mengetik pada
 // kotak cari hanya membangun ulang isi panel, dan mengganti lingkup (parameter, jenis sumber, dan
-// seterusnya) akan menyegarkan daftar titik yang tersedia.
+// seterusnya) akan memperbarui daftar titik yang tersedia.
 document.addEventListener("change", e=>{
   if(e.target.classList?.contains("simCerobongCheck")){
     const val = e.target.dataset.val;
@@ -7862,7 +7791,7 @@ const ACTIONS = {
     save(); refreshRouteViews();
   },
   exportAll, resetDefault, resetEmpty, downloadTemplatePoints, downloadTemplatePersonil,
-  checkRefDataUpdate, importRefDataFile, applyRefDataUpdate, exportRefDataPackage,
+  checkFullBackupUpdate, applyFullBackupImport,
   importHasilCsv, exportHasilCsv, downloadTemplateHasil, resetHasilData,
   hdChip:(t)=>{
     const field = t.dataset.field, val = t.dataset.val;
