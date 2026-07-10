@@ -57,6 +57,11 @@ nav .navbtn[data-group="admin"]{border-left-color:#64748b;}
 .storage-badge .bar-track{width:100%;height:4px;border-radius:2px;background:rgba(255,255,255,.12);margin-top:3px;overflow:hidden;}
 .storage-badge .bar-fill{height:100%;border-radius:2px;transition:width .2s ease;}
 .sidebar.collapsed .storage-badge{display:none;}
+.about-link{display:block;width:100%;margin-top:8px;background:none;border:none;border-top:1px solid rgba(255,255,255,.08);padding:8px 0 0;font-size:10px;color:#7f93a8;cursor:pointer;text-align:left;}
+.about-link:hover{color:var(--teal-400);}
+.sidebar.collapsed .about-link{text-align:center;}
+.sidebar.collapsed .about-link .label{display:none;}
+
 .storage-badge-riwayat{margin-top:4px;font-size:12.5px;color:var(--gray-700);max-width:360px;}
 .storage-badge-riwayat .bar-track{height:8px;background:var(--gray-200);}
 
@@ -598,6 +603,7 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
     <div class="sidebar-foot">
       <div class="savebadge"><span class="dot"></span><span>Data tersimpan di localStorage</span></div>
       <div class="storage-badge" id="storageUsageBadge" title="Perkiraan kapasitas localStorage terpakai"></div>
+      <button class="about-link" data-action="openAboutModal" title="Tentang tools ini">&#8505;&#65039; <span class="label">Tentang Tools Ini</span></button>
     </div>
   </div>
 
@@ -1738,7 +1744,7 @@ let DB = null;
 function freshDB(){
   const now = new Date();
   return {
-    meta:{semester: (now.getMonth()<6?"S1":"S2"), tahun: now.getFullYear(), lastBatchIdEmisi:0, lastBatchIdAmbient:0, regDataVersion:2},
+    meta:{semester: (now.getMonth()<6?"S1":"S2"), tahun: now.getFullYear(), lastBatchIdEmisi:0, lastBatchIdAmbient:0, regDataVersion:2, onboardingSeen:false},
     points: [...DEFAULT_ENGINES.map(e=>({...e, status:"pending", batchId:"", planStart:"", planEnd:"", actualStart:"", actualEnd:"", team:"emisi", keterangan:""})),
              ...DEFAULT_AMBIENT.map(a=>({...a}))],
     personil: [],
@@ -1781,6 +1787,11 @@ function migrateDB(){
   if(!DB.rhMonthly) DB.rhMonthly = JSON.parse(JSON.stringify(RH_MONTHLY_DEFAULT));
   if(!DB.meta) DB.meta = {semester:"S1", tahun:new Date().getFullYear(), lastBatchIdEmisi:0, lastBatchIdAmbient:0};
   if(DB.meta.currentPeriod!==undefined) delete DB.meta.currentPeriod; // field lama, tidak dipakai lagi — diganti meta.semester+meta.tahun
+  // Tur onboarding "pertama kali buka tools ini" cuma utk sesi yg BENAR2 baru (freshDB, belum
+  // pernah ada data sama sekali) — sesi yg sudah pernah jalan sebelumnya (lewat baris migrateDB
+  // manapun, termasuk yg baru pertama kali dapat field ini) dianggap "sudah pernah lihat", supaya
+  // tidak muncul tiba-tiba ke user yang sudah lama pakai tools ini.
+  if(DB.meta.onboardingSeen===undefined) DB.meta.onboardingSeen = true;
   DB.batches.forEach(b=>{ if(!b.assignedPersonil) b.assignedPersonil = []; });
   // Batch lama belum punya field period terstruktur — sebelumnya checklist Dashboard mencocokkan
   // batch ke periode dgn cara rapuh (cari substring "S2 2026" dst di dalam b.name bebas-teks), yang
@@ -6274,6 +6285,68 @@ async function checkFullBackupUpdate(){
   }
 }
 
+/* =========================================================
+   TUR ONBOARDING (pertama kali buka tools ini)
+   ---------------------------------------------------------
+   Tools ini masih prototipe — belum ada server pusat, jadi org yg baru pertama kali buka file
+   HTML-nya cuma lihat data kosong/bawaan sampai mereka manual narik backup terbaru lewat kartu
+   Backup Lengkap. Tur ini nuntun 1x saja (ditandai DB.meta.onboardingSeen, lihat migrateDB) supaya
+   user baru tidak bingung harus ngapain, tanpa ganggu user yg sudah pernah pakai.
+========================================================= */
+// Ganti nilai ini kalau link backup terbaru berubah (mis. export ulang dgn nama file baru).
+const ONBOARDING_BACKUP_URL = "https://raw.githubusercontent.com/muhammad-afifani/PPU-Sampling-Planning-and-Monitoring/refs/heads/main/phm_emisi_backup_2026-07-09.json";
+// Dipisah dari maybeShowOnboarding() supaya HTML-nya bisa dipakai ulang dari tombol "Lihat Panduan
+// Update Data" di modal Tentang (replayOnboarding) tanpa duplikasi isi.
+function renderOnboardingModal(){
+  openModal(`
+    <h3>👋 Selamat Datang di PHM Emission Sampling Planner</h3>
+    <p>Apakah ini pertama kali kamu mengakses tools prototipe ini?</p>
+    <p class="hint">Tools ini masih tahap pengembangan (prototipe) — belum ada server pusat yang otomatis menyinkronkan data ke semua orang. Supaya kamu langsung lihat jadwal &amp; data terbaru (bukan data kosong bawaan), perlu 1x update data manual dari file yang sudah disiapkan. Ikuti 3 langkah ini:</p>
+    <ol style="margin:10px 0 10px 20px;font-size:13px;line-height:1.9;">
+      <li>Klik <b>"Mulai Update Data"</b> di bawah — otomatis membuka halaman Data &amp; mengisi link update-nya.</li>
+      <li>Klik tombol hijau <b>"Cek Update (Online)"</b>.</li>
+      <li>Setelah muncul ringkasan perbandingan data, klik <b>"Timpa dengan Data Ini"</b> — selesai.</li>
+    </ol>
+    <div class="actions">
+      <button class="btn ghost" data-action="dismissOnboarding">Lewati (bukan pertama kali)</button>
+      <button class="btn primary" data-action="startOnboardingUpdate">Mulai Update Data</button>
+    </div>
+  `);
+}
+function maybeShowOnboarding(){
+  if(DB.meta.onboardingSeen) return;
+  renderOnboardingModal();
+}
+function dismissOnboarding(){ DB.meta.onboardingSeen = true; save(); closeModal(); }
+function replayOnboarding(){ renderOnboardingModal(); }
+function openAboutModal(){
+  openModal(`
+    <h3>&#8505;&#65039; Tentang Tools Ini</h3>
+    <p style="font-size:13px;line-height:1.7;">PHM Emission Sampling Planner &amp; Tracker adalah tools prototipe untuk membantu perencanaan, penjadwalan, dan pelacakan pemantauan emisi &amp; udara ambien di lingkungan kerja PHM — mulai dari database titik pantau, perencanaan batch &amp; jadwal Gantt, hingga Berita Acara. Tools ini masih dalam tahap pengembangan aktif.</p>
+    <p style="font-size:13px;">Dibuat oleh <b>Muhammad Afifani Romadhan</b>.</p>
+    <div class="actions" style="flex-wrap:wrap;">
+      <button class="btn ghost" data-action="closeModal">Tutup</button>
+      <button class="btn ghost" data-action="replayOnboarding">Lihat Panduan Update Data</button>
+      <a href="https://muhammad-afifani.github.io/PPU-Sampling-Planning-and-Monitoring/" target="_blank" rel="noopener" class="btn primary">Lihat Portofolio / CV &rarr;</a>
+    </div>
+  `);
+}
+function startOnboardingUpdate(){
+  DB.meta.onboardingSeen = true; save();
+  closeModal();
+  showPage("data");
+  document.getElementById("fullBackupUrl").value = ONBOARDING_BACKUP_URL;
+  // Sorotan sesaat di tombol "Cek Update (Online)" biar mata user langsung ketuju ke sana
+  // begitu field link-nya udah otomatis keisi, tanpa perlu nebak2 tombol mana yg diklik lanjut.
+  const btn = document.querySelector('[data-action="checkFullBackupUpdate"]');
+  if(btn){
+    btn.style.transition = "box-shadow .3s ease";
+    btn.style.boxShadow = "0 0 0 4px rgba(63,178,127,.5)";
+    setTimeout(()=>{ btn.style.boxShadow = ""; }, 2500);
+    btn.scrollIntoView({behavior:"smooth", block:"center"});
+  }
+}
+
 function resetDefault(){
   askConfirm("Reset ke data default (139 sumber emisi PHM + ambient default)? Data batch/tracking saat ini akan hilang.", ()=>{
     snapshotBefore("Sebelum reset ke data default");
@@ -7792,6 +7865,7 @@ const ACTIONS = {
   },
   exportAll, resetDefault, resetEmpty, downloadTemplatePoints, downloadTemplatePersonil,
   checkFullBackupUpdate, applyFullBackupImport,
+  dismissOnboarding, startOnboardingUpdate, replayOnboarding, openAboutModal,
   importHasilCsv, exportHasilCsv, downloadTemplateHasil, resetHasilData,
   hdChip:(t)=>{
     const field = t.dataset.field, val = t.dataset.val;
@@ -8045,6 +8119,7 @@ document.addEventListener("change", e=>{
 ========================================================= */
 load();
 showPage("dashboard");
+maybeShowOnboarding();
 </script>
 </body>
 </html>
