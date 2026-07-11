@@ -27,10 +27,16 @@ input,select,textarea{font-family:inherit;font-size:13px;}
    dari tepi kanan sidebar (right:-13px) ketutup/ketumpuk konten halaman saat discroll. */
 .sidebar{width:236px;flex-shrink:0;background:linear-gradient(180deg,var(--navy-950),var(--navy-900));color:#cdd9e6;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;transition:width .22s cubic-bezier(.4,0,.2,1);overflow:visible;z-index:40;}
 .brand{padding:18px 18px 14px;border-bottom:1px solid rgba(255,255,255,.08);transition:padding .22s ease;}
-.brand .tag{font-size:10px;letter-spacing:.14em;color:var(--teal-400);font-weight:700;}
-.brand h1{font-size:15px;margin:4px 0 2px;color:#fff;font-weight:700;line-height:1.3;}
+.brand h1{font-size:15px;margin:8px 0 2px;color:#fff;font-weight:700;line-height:1.3;}
 .brand .sub{font-size:11px;color:#7f93ab;}
 .brand-mark{display:none;font-weight:800;font-size:15px;color:#fff;text-align:center;letter-spacing:.03em;}
+/* Logo asli (PNG dgn teks hitam "PERTAMINA" + arrow mark berwarna) TIDAK kebaca di atas latar
+   sidebar navy gelap tanpa alas — dibungkus chip putih membulat spy tetap legible, sama seperti
+   logo ini dipakai di kop Berita Acara (kertas putih). Lebar dibatasi biar proporsional di sidebar
+   236px, tinggi ikut otomatis. */
+.brand-logo{background:#fff;border-radius:8px;padding:8px 10px;display:inline-block;max-width:100%;}
+.brand-logo img{display:block;width:100%;max-width:168px;height:auto;}
+.sidebar.collapsed .brand-logo{display:none;}
 nav{flex:1;padding:10px 8px;overflow-y:auto;overflow-x:hidden;}
 nav .navgroup-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#5f7085;padding:12px 10px 4px;white-space:nowrap;transition:opacity .15s ease;}
 nav .navgroup-label:first-child{padding-top:4px;}
@@ -57,10 +63,6 @@ nav .navbtn[data-group="admin"]{border-left-color:#64748b;}
 .storage-badge .bar-track{width:100%;height:4px;border-radius:2px;background:rgba(255,255,255,.12);margin-top:3px;overflow:hidden;}
 .storage-badge .bar-fill{height:100%;border-radius:2px;transition:width .2s ease;}
 .sidebar.collapsed .storage-badge{display:none;}
-.about-link{display:block;width:100%;margin-top:8px;background:none;border:none;border-top:1px solid rgba(255,255,255,.08);padding:8px 0 0;font-size:10px;color:#7f93a8;cursor:pointer;text-align:left;}
-.about-link:hover{color:var(--teal-400);}
-.sidebar.collapsed .about-link{text-align:center;}
-.sidebar.collapsed .about-link .label{display:none;}
 
 .storage-badge-riwayat{margin-top:4px;font-size:12.5px;color:var(--gray-700);max-width:360px;}
 .storage-badge-riwayat .bar-track{height:8px;background:var(--gray-200);}
@@ -571,10 +573,13 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
     <button class="sidebar-toggle" id="btnSidebarToggle" type="button" title="Collapse/expand menu">&#10094;</button>
     <div class="brand">
       <div class="brand-mark">PHM</div>
-      <div class="tag">PHM · ENV BPN</div>
+      <div class="brand-logo"><img id="brandLogoImg" alt="Pertamina Hulu Mahakam"></div>
       <h1>Emission Sampling<br>Planner &amp; Tracker</h1>
       <div class="sub" id="metaLine" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">Semester — · Tahun —</div>
-      <button class="btn small ghost" data-action="openPeriodModal" style="margin-top:6px;padding:3px 8px;font-size:10.5px;color:#7f93ab;border-color:rgba(255,255,255,.18);">Ubah Periode Aktif</button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+        <button class="btn small ghost" data-action="openPeriodModal" style="padding:3px 8px;font-size:10.5px;color:#7f93ab;border-color:rgba(255,255,255,.18);">Ubah Periode Aktif</button>
+        <button class="btn small" data-action="openAboutModal" style="padding:3px 8px;font-size:10.5px;background:var(--teal-500);color:#04211f;font-weight:700;border:none;">&#8505;&#65039; Info &amp; Panduan Setup</button>
+      </div>
     </div>
     <nav id="navMenu">
       <button class="navbtn" data-page="dashboard" title="Dashboard"><span class="ico">&#127968;</span><span class="label">Dashboard</span></button>
@@ -603,7 +608,6 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
     <div class="sidebar-foot">
       <div class="savebadge"><span class="dot"></span><span>Data tersimpan di localStorage</span></div>
       <div class="storage-badge" id="storageUsageBadge" title="Perkiraan kapasitas localStorage terpakai"></div>
-      <button class="about-link" data-action="openAboutModal" title="Tentang tools ini">&#8505;&#65039; <span class="label">Tentang Tools Ini</span></button>
     </div>
   </div>
 
@@ -6327,7 +6331,7 @@ function openAboutModal(){
     <div class="actions" style="flex-wrap:wrap;">
       <button class="btn ghost" data-action="closeModal">Tutup</button>
       <button class="btn ghost" data-action="replayOnboarding">Lihat Panduan Update Data</button>
-      <a href="https://muhammad-afifani.github.io/PPU-Sampling-Planning-and-Monitoring/" target="_blank" rel="noopener" class="btn primary">Lihat Portofolio / CV &rarr;</a>
+      <a href="https://muhammad-afifani.github.io/Portofolio/" target="_blank" rel="noopener" class="btn primary">Lihat Portofolio / CV &rarr;</a>
     </div>
   `);
 }
@@ -8119,7 +8123,13 @@ document.addEventListener("change", e=>{
 ========================================================= */
 load();
 showPage("dashboard");
-maybeShowOnboarding();
+// TIDAK auto-popup lagi (lihat catatan di renderOnboardingModal) — tools ini dibuka via file://
+// yang di-save-ulang berkala dgn nama baru (tanggal berubah tiap kali), dan localStorage file://
+// terikat ke PATH FILE PERSIS, bukan ke folder — jadi tiap file baru = origin kosong = "keliatan"
+// spt pertama kali buka terus-menerus walau sebenarnya bukan. Entry point-nya sekarang tombol
+// "Info & Panduan Setup" yg SELALU kelihatan di brand/logo area (bukan footer kecil yg gampang
+// kelewat), diklik kalau perlu, bukan dipaksa muncul sendiri.
+if(document.getElementById("brandLogoImg")) document.getElementById("brandLogoImg").src = LOGO_PHM_B64;
 </script>
 </body>
 </html>
