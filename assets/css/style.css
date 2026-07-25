@@ -1,0 +1,558 @@
+:root{
+  --navy-950:#0a1628; --navy-900:#0d1f38; --navy-800:#12294a; --navy-700:#1a3a63;
+  --navy-600:#254d7f; --teal-500:#0ea5a0; --teal-400:#2dd4c8; --teal-100:#d9f7f3;
+  --amber-500:#e8a33d; --red-500:#e0554f; --green-500:#3fb27f; --gray-100:#f4f6f8;
+  --gray-200:#e6eaee; --gray-300:#d3dae1; --gray-500:#7f8fa0; --gray-700:#465468; --gray-900:#1c2733;
+  --font-ui: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-mono: "SF Mono",Consolas,"Cascadia Code",monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;background:var(--gray-100);font-family:var(--font-ui);color:var(--gray-900);font-size:14px;}
+button{font-family:inherit;cursor:pointer;}
+input,select,textarea{font-family:inherit;font-size:13px;}
+::-webkit-scrollbar{width:9px;height:9px;}
+::-webkit-scrollbar-thumb{background:var(--gray-300);border-radius:5px;}
+.app{display:flex;min-height:100vh;}
+
+/* Sidebar */
+/* z-index eksplisit wajib di sini — tanpanya .sidebar (position:sticky tapi z-index:auto) kalah
+   stacking-order melawan .stickytop di .main (z-index:30), jadi tombol ciutkan yang nongol keluar
+   dari tepi kanan sidebar (right:-13px) ketutup/ketumpuk konten halaman saat discroll. */
+.sidebar{width:236px;flex-shrink:0;background:linear-gradient(180deg,var(--navy-950),var(--navy-900));color:#cdd9e6;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;transition:width .22s cubic-bezier(.4,0,.2,1);overflow:visible;z-index:40;}
+.brand{padding:18px 18px 14px;border-bottom:1px solid rgba(255,255,255,.08);transition:padding .22s ease;}
+.brand h1{font-size:15px;margin:8px 0 2px;color:#fff;font-weight:700;line-height:1.3;}
+.brand .sub{font-size:11px;color:#7f93ab;}
+.brand-mark{display:none;font-weight:800;font-size:15px;color:#fff;text-align:center;letter-spacing:.03em;}
+/* Logo asli (PNG dgn teks hitam "PERTAMINA" + arrow mark berwarna) TIDAK kebaca di atas latar
+   sidebar navy gelap tanpa alas — dibungkus chip putih membulat spy tetap legible, sama seperti
+   logo ini dipakai di kop Berita Acara (kertas putih). Lebar dibatasi biar proporsional di sidebar
+   236px, tinggi ikut otomatis. */
+.brand-logo{background:#fff;border-radius:8px;padding:8px 10px;display:inline-block;max-width:100%;}
+.brand-logo img{display:block;width:100%;max-width:168px;height:auto;}
+.sidebar.collapsed .brand-logo{display:none;}
+nav{flex:1;padding:10px 8px;overflow-y:auto;overflow-x:hidden;}
+nav .navgroup-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#5f7085;padding:12px 10px 4px;white-space:nowrap;transition:opacity .15s ease;}
+nav .navgroup-label:first-child{padding-top:4px;}
+nav .navbtn{display:flex;align-items:center;gap:9px;width:100%;padding:9px 10px;margin:2px 0;border:none;border-left:3px solid transparent;background:transparent;color:#aebdd0;text-align:left;border-radius:7px;font-size:13px;font-weight:500;transition:background .15s ease,color .15s ease,border-color .15s ease;}
+nav .navbtn:hover{background:rgba(255,255,255,.06);color:#fff;}
+nav .navbtn.active{background:var(--teal-500);color:#04211f;font-weight:700;}
+nav .navbtn .ico{width:16px;text-align:center;font-size:13px;flex-shrink:0;transition:transform .15s ease;}
+nav .navbtn:hover .ico{transform:scale(1.22);}
+nav .navbtn.active .ico{transform:scale(1.05);}
+nav .navbtn .label{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;transition:opacity .12s ease;}
+nav .navbtn[data-group="setup"]{border-left-color:#2b7fb0;}
+nav .navbtn[data-group="plan"]{border-left-color:var(--teal-500);}
+nav .navbtn[data-group="exec"]{border-left-color:var(--amber-500);}
+nav .navbtn[data-group="hasil"]{border-left-color:#3fb27f;}
+nav .navbtn[data-group="ref"]{border-left-color:#7c5cbf;}
+nav .navbtn[data-group="admin"]{border-left-color:#64748b;}
+.sidebar-foot{padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:10.5px;color:#5f7085;white-space:nowrap;overflow:hidden;}
+.savebadge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:var(--teal-400);}
+.savebadge .dot{width:6px;height:6px;border-radius:50%;background:var(--teal-400);}
+/* Indikator sisa kapasitas localStorage — ditaruh selalu-kelihatan di kaki sidebar (bukan cuma
+   notif pas kepenuhan) supaya user bisa lihat trennya lebih awal & bersihkan snapshot lama di
+   Riwayat sebelum benar-benar mentok error. Warna berubah bertahap sesuai ambang (lihat JS). */
+.storage-badge{margin-top:6px;font-size:9.5px;color:#5f7085;}
+.storage-badge .bar-track{width:100%;height:4px;border-radius:2px;background:rgba(255,255,255,.12);margin-top:3px;overflow:hidden;}
+.storage-badge .bar-fill{height:100%;border-radius:2px;transition:width .2s ease;}
+.sidebar.collapsed .storage-badge{display:none;}
+
+.storage-badge-riwayat{margin-top:4px;font-size:12.5px;color:var(--gray-700);max-width:360px;}
+.storage-badge-riwayat .bar-track{height:8px;background:var(--gray-200);}
+
+/* Sidebar collapse — tombol bulat kecil di tepi kanan sidebar, klik utk lock collapse/expand
+   (state disimpan di localStorage terpisah dari DB karena ini preferensi tampilan, bukan data).
+   Icon nav & tombol toggle sendiri sudah dianimasikan (scale/rotate) supaya interaksinya kerasa
+   hidup, bukan cuma lebar sidebar yang berubah tiba-tiba. */
+.sidebar-toggle{position:absolute;top:66px;right:-14px;width:28px;height:28px;border-radius:50%;background:var(--teal-500);color:#04211f;border:2.5px solid var(--navy-900);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;cursor:pointer;transition:transform .22s cubic-bezier(.4,0,.2,1),background .15s ease;z-index:5;padding:0;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,.35);}
+.sidebar-toggle:hover{background:var(--teal-400);transform:scale(1.15);}
+.sidebar.collapsed .sidebar-toggle{transform:rotate(180deg);}
+.sidebar.collapsed .sidebar-toggle:hover{transform:rotate(180deg) scale(1.15);}
+.sidebar.collapsed{width:60px;}
+.sidebar.collapsed .brand{padding:16px 4px;text-align:center;}
+.sidebar.collapsed .brand .tag,.sidebar.collapsed .brand h1,.sidebar.collapsed .brand .sub,.sidebar.collapsed .brand button{display:none;}
+.sidebar.collapsed .brand-mark{display:block;}
+.sidebar.collapsed nav .navgroup-label{opacity:0;height:0;padding:0;overflow:hidden;}
+.sidebar.collapsed nav .navbtn{justify-content:center;padding:9px 0;gap:0;}
+.sidebar.collapsed nav .navbtn .label{display:none;}
+.sidebar.collapsed .sidebar-foot{padding:12px 6px;text-align:center;}
+.sidebar.collapsed .sidebar-foot .savebadge span:not(.dot){display:none;}
+
+/* Main */
+.main{flex:1;min-width:0;padding:22px 26px 60px;}
+.pagehead{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+#plStickyBody.collapsed{display:none;}
+.pagehead h2{margin:0;font-size:19px;color:var(--navy-900);}
+.pagehead .desc{font-size:12.5px;color:var(--gray-500);margin-top:3px;}
+.page{display:none;}
+.page.active{display:block;}
+
+.card{background:#fff;border:1px solid var(--gray-200);border-radius:10px;padding:16px 18px;margin-bottom:16px;}
+.card h3{margin:0 0 12px;font-size:13.5px;color:var(--navy-800);text-transform:uppercase;letter-spacing:.03em;}
+
+/* Card section yang bisa di-collapse (native <details>, default terbuka) — beda dari details.guide
+   (itu utk panduan cara pakai, defaultnya tertutup); ini utk bagian tabel/data yg cuma ingin
+   diringkas sesekali, defaultnya tetap terbuka biar datanya langsung kelihatan. */
+details.collapse-section{padding:16px 18px;}
+details.collapse-section summary{margin:0 0 12px;font-size:13.5px;color:var(--navy-800);text-transform:uppercase;letter-spacing:.03em;cursor:pointer;list-style:none;user-select:none;}
+details.collapse-section summary::-webkit-details-marker{display:none;}
+details.collapse-section summary::before{content:"\25BE  ";display:inline-block;}
+details.collapse-section:not([open]) summary::before{content:"\25B8  ";}
+details.collapse-section:not([open]) summary{margin-bottom:0;}
+details.collapse-section summary:hover{color:var(--teal-600,#0b6b66);}
+.grid{display:grid;gap:14px;}
+.grid.cols-4{grid-template-columns:repeat(4,1fr);}
+.grid.cols-3{grid-template-columns:repeat(3,1fr);}
+.grid.cols-2{grid-template-columns:repeat(2,1fr);}
+@media(max-width:980px){.grid.cols-4,.grid.cols-3,.grid.cols-2{grid-template-columns:1fr 1fr;}}
+
+.stat{background:#fff;border:1px solid var(--gray-200);border-radius:10px;padding:14px 16px;}
+.stat .num{font-size:26px;font-weight:800;color:var(--navy-900);font-family:var(--font-mono);}
+.stat .lbl{font-size:11.5px;color:var(--gray-500);margin-top:2px;text-transform:uppercase;letter-spacing:.03em;}
+.stat.warn .num{color:var(--amber-500);}
+.stat.bad .num{color:var(--red-500);}
+.stat.good .num{color:var(--green-500);}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+thead th{text-align:left;background:var(--navy-900);color:#dbe6f0;font-weight:600;padding:8px 9px;position:sticky;top:0;white-space:nowrap;}
+tbody td{padding:7px 9px;border-bottom:1px solid var(--gray-200);vertical-align:middle;}
+tbody tr:hover{background:var(--gray-100);}
+/* Tabel Personil punya banyak kolom bertanda (badge+tanggal) yang gampang berdesakan — kasih
+   ruang lebih supaya tidak numpuk. */
+#personilTable td, #personilTable th{padding:9px 13px;}
+.tablewrap{overflow:auto;max-height:64vh;border:1px solid var(--gray-200);border-radius:8px;}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:700;letter-spacing:.02em;}
+.b-gray{background:var(--gray-200);color:var(--gray-700);}
+.b-teal{background:var(--teal-100);color:#0b6b66;}
+.b-amber{background:#fbeacb;color:#8a5c11;}
+.b-red{background:#fbdcda;color:#a02a24;}
+.b-green{background:#d7f0e2;color:#1c7a4f;}
+.b-blue{background:#dbe8fb;color:#1a4c8a;}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:7px;border:1px solid var(--gray-300);background:#fff;color:var(--gray-900);font-size:12.5px;font-weight:600;}
+.btn:hover{border-color:var(--gray-500);}
+.btn.primary{background:var(--teal-500);border-color:var(--teal-500);color:#fff;}
+.btn.primary:hover{background:#0c8f8a;}
+.btn.danger{background:#fff;border-color:var(--red-500);color:var(--red-500);}
+.btn.danger:hover{background:#fdeceb;}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--gray-700);}
+.btn.small{padding:4px 9px;font-size:11.5px;}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
+.toolbar .spacer{flex:1;}
+.field{display:flex;flex-direction:column;gap:4px;}
+.field label{font-size:11px;color:var(--gray-500);font-weight:600;text-transform:uppercase;letter-spacing:.02em;}
+.field input,.field select,.field textarea{padding:7px 9px;border:1px solid var(--gray-300);border-radius:6px;background:#fff;}
+.field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--teal-400);outline-offset:0;border-color:var(--teal-500);}
+
+/* Kotak cari — dibedakan dari dropdown filter di sekitarnya (border teal + ikon kaca pembesar)
+   soalnya sebelumnya nyaris tidak kelihatan, ketiban dropdown-dropdown lain di toolbar yang sama. */
+.search-wrap{position:relative;}
+.search-wrap .search-ico{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:12px;opacity:.5;pointer-events:none;}
+.search-wrap input{padding-left:27px!important;min-width:210px;border:1.5px solid var(--teal-500)!important;background:var(--teal-100)!important;}
+.search-wrap input:focus{background:#fff!important;}
+.th-help{border-bottom:1px dotted rgba(255,255,255,.6);cursor:help;}
+
+/* Dropdown hasil cari-&-zoom di peta Lokasi Titik Pantau */
+.map-search-results{position:absolute;top:100%;left:0;right:0;margin-top:4px;background:#fff;border:1px solid var(--gray-200);border-radius:8px;box-shadow:0 8px 22px rgba(11,31,56,.18);max-height:260px;overflow:auto;z-index:50;display:none;}
+.map-search-results.show{display:block;}
+.map-search-results .res-item{padding:7px 11px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--gray-100);}
+.map-search-results .res-item:last-child{border-bottom:none;}
+.map-search-results .res-item:hover{background:var(--teal-100);}
+.map-search-results .res-item b{color:var(--navy-800);}
+.map-search-results .res-empty{padding:10px 11px;font-size:12px;color:var(--gray-500);font-style:italic;}
+.inline-fields{display:flex;gap:10px;flex-wrap:wrap;}
+.checkline{display:flex;align-items:center;gap:6px;font-size:12.5px;}
+
+/* Modal */
+.overlay{position:fixed;inset:0;background:rgba(10,20,35,.55);display:none;align-items:flex-start;justify-content:center;z-index:5000;padding:40px 16px;overflow:auto;}
+.overlay.show{display:flex;}
+/* Modal formulir panjang (mis. Edit Titik Pantau) bisa lebih tinggi drpd layar laptop biasa —
+   sebelumnya tombol Simpan cuma bisa dicapai dgn scroll overlay di BELAKANG modal (tidak
+   intuitif, gampang terlewat/dikira hilang). Sekarang modal sendiri yg discroll (max-height +
+   overflow-y), dan footer Batal/Simpan dibikin sticky di dasar modal supaya selalu kelihatan
+   sambil scroll form-nya. */
+.modal{background:#fff;border-radius:12px;width:100%;max-width:640px;max-height:88vh;padding:20px 22px;box-shadow:0 20px 60px rgba(0,0,0,.3);display:flex;flex-direction:column;overflow-y:auto;}
+.modal h3{margin:0 0 14px;font-size:15px;}
+.modal .actions{display:flex;justify-content:flex-end;gap:8px;margin:16px -22px -20px;padding:12px 22px;position:sticky;bottom:0;background:#fff;border-top:1px solid var(--gray-200);border-radius:0 0 12px 12px;}
+.modal.wide{max-width:900px;}
+
+.tag-pill{padding:1px 7px;border-radius:5px;background:var(--navy-900);color:#fff;font-size:10px;font-weight:700;}
+.muted{color:var(--gray-500);}
+.hint{font-size:11.5px;color:var(--gray-500);margin-top:6px;line-height:1.5;}
+.progressbar{height:7px;border-radius:6px;background:var(--gray-200);overflow:hidden;}
+.progressbar > div{height:100%;background:var(--teal-500);}
+.section-note{background:#fbf8ee;border:1px solid #ecdfae;color:#7a5c10;padding:9px 12px;border-radius:7px;font-size:12px;margin-bottom:12px;}
+
+/* Halaman Baku Mutu & Periode Pantau — jump-nav chip (ikut sticky bareng pagehead) dan kartu
+   beraksen warna per regulasi supaya halaman referensi ini enak dipindai (tiap regulasi punya
+   identitas visual sendiri) dibanding sebelumnya cuma tumpukan kartu putih polos berurutan. */
+.reg-jump{display:flex;flex-wrap:wrap;gap:7px;}
+.reg-jump a{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:20px;font-size:11.5px;font-weight:700;text-decoration:none;color:#fff;opacity:.92;transition:transform .12s ease,opacity .12s ease;box-shadow:0 1px 4px rgba(0,0,0,.18);}
+.reg-jump a:hover{transform:translateY(-1.5px);opacity:1;}
+.reg-jump .grp-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--gray-500);align-self:center;margin-right:2px;}
+.reg-divider{display:flex;align-items:center;gap:10px;margin:22px 0 12px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--gray-500);}
+.reg-divider::after{content:"";flex:1;height:1px;background:var(--gray-200);}
+.reg-card{border-top:4px solid var(--gray-300);transition:box-shadow .15s ease,transform .15s ease;}
+.reg-card:hover{box-shadow:0 6px 18px rgba(11,31,56,.1);transform:translateY(-1px);}
+.reg-card.c-orange{border-top-color:#f59e0b;} .reg-card.c-orange h3{color:#b3690a;}
+.reg-card.c-blue{border-top-color:#2b7fb0;} .reg-card.c-blue h3{color:#215f85;}
+.reg-card.c-red{border-top-color:#e0554f;} .reg-card.c-red h3{color:#a02a24;}
+.reg-card.c-crimson{border-top-color:#a02a24;} .reg-card.c-crimson h3{color:#a02a24;}
+.reg-card.c-navy{border-top-color:var(--navy-600);} .reg-card.c-navy h3{color:var(--navy-800);}
+.reg-card.c-teal{border-top-color:var(--teal-500);} .reg-card.c-teal h3{color:#0b6b66;}
+.reg-card.c-purple{border-top-color:#7c5cbf;} .reg-card.c-purple h3{color:#5c3f9e;}
+.reg-card.c-pink{border-top-color:#c2478a;} .reg-card.c-pink h3{color:#9c3269;}
+.reg-card.c-slate{border-top-color:#64748b;} .reg-card.c-slate h3{color:#475569;}
+.reg-jump a.j-orange{background:#f59e0b;} .reg-jump a.j-blue{background:#2b7fb0;} .reg-jump a.j-red{background:#e0554f;}
+.reg-jump a.j-crimson{background:#a02a24;} .reg-jump a.j-navy{background:var(--navy-600);} .reg-jump a.j-teal{background:var(--teal-500);}
+.reg-jump a.j-purple{background:#7c5cbf;} .reg-jump a.j-pink{background:#c2478a;} .reg-jump a.j-slate{background:#64748b;}
+.reg-jump a.j-amber{background:#b3690a;}
+
+/* Tabel referensi baku mutu — rapi & tegas: angka rata kanan pakai tabular-nums biar sejajar,
+   baris punya bayangan halus + sedikit "terangkat" saat di-hover (bukan cuma ganti warna polos),
+   dan baris yang bisa di-hover utk lihat titik pantau match diberi cursor+aksen kiri supaya
+   kelihatan itu interaktif. */
+.bm-table{border-spacing:0;}
+.bm-table tbody tr{transition:box-shadow .15s ease,transform .12s ease;}
+.bm-table tbody td{padding:8px 10px;}
+.bm-table tbody td:last-child, .bm-table tbody td[style*="text-align:right"]{font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+.bm-table tbody tr:nth-child(even){background:#fafbfc;}
+.bm-table tbody tr[data-regkey]{cursor:pointer;border-left:3px solid transparent;}
+/* Sengaja TANPA transform/position/z-index di sini — baris tabel yang bertetangga dengan sel
+   rowspan (kolom Kapasitas) akan membuat browser salah menghitung stacking-nya kalau baris ini
+   diberi konteks stacking sendiri (transform), membuat teks sel rowspan itu seolah terpotong saat
+   baris kedua/ketiga dst dalam satu grup rowspan di-hover. Highlight cukup lewat background+border. */
+.bm-table tbody tr[data-regkey]:hover{background:var(--teal-100);border-left-color:var(--teal-500);}
+.bm-table tbody td.bm-rowspan-hover{background:var(--teal-100);}
+.bm-popover{position:fixed;z-index:200;background:#fff;border:1px solid var(--gray-200);border-radius:8px;box-shadow:0 10px 28px rgba(11,31,56,.22);padding:10px 12px;font-size:11.5px;max-width:340px;}
+.bm-popover .t{font-weight:700;color:var(--navy-800);margin-bottom:5px;font-size:11.5px;}
+.bm-popover ul{margin:0;padding-left:16px;max-height:180px;overflow:auto;}
+.bm-popover li{margin-bottom:2px;line-height:1.4;}
+.bm-popover .none{color:var(--gray-500);font-style:italic;}
+
+/* Panduan "cara pakai" — collapsed by default (native <details>) supaya tidak makan tempat */
+details.guide{padding:0;overflow:hidden;}
+details.guide summary{padding:14px 18px;cursor:pointer;font-weight:700;color:#0b6b66;font-size:13.5px;list-style:none;user-select:none;}
+details.guide summary::-webkit-details-marker{display:none;}
+details.guide summary::before{content:"\25B8  ";display:inline-block;}
+details.guide[open] summary::before{content:"\25BE  ";}
+details.guide summary:hover{background:rgba(14,165,160,.08);}
+details.guide .guide-body{padding:0 18px 16px;margin-top:2px;}
+
+/* Header sticky per halaman (judul + toolbar filter) supaya tetap kelihatan saat scroll ke bawah.
+   Margin negatif = lebar padding kiri/kanan .main, supaya background sticky menutup penuh lebar
+   kolom konten (bukan cuma area teks) saat konten lain scroll di baliknya. */
+.stickytop{position:sticky;top:0;z-index:30;background:var(--gray-100);margin:0 -26px 16px;padding:0 26px;}
+.stickytop > *:last-child{margin-bottom:16px;}
+@media(max-width:980px){.stickytop{margin:0 -16px 16px;padding:0 16px;}}
+
+svg text{font-family:var(--font-ui);}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;margin-top:8px;}
+.legend .item{display:flex;align-items:center;gap:5px;}
+.legend .sw{width:12px;height:12px;border-radius:3px;display:inline-block;}
+
+/* Dashboard Hasil Pemantauan — filter bar ringkas: chip toggle (multi-pilih Site & Jenis Sumber
+   tanpa ctrl-klik), checklist gaya Excel (Titik/Cerobong, centang + cari, bukan ctrl-klik di
+   listbox native yang gampang salah pencet), dan panel filter yang bisa diciutkan supaya tidak
+   makan tempat/menutupi chart di bawahnya. */
+.chipbar{display:flex;flex-wrap:wrap;gap:5px;}
+.chip-toggle{padding:4px 10px;border-radius:16px;border:1.5px solid var(--gray-300);background:#fff;color:var(--gray-700);font-size:11px;font-weight:600;cursor:pointer;transition:background .12s ease,border-color .12s ease,color .12s ease,transform .1s ease;line-height:1.5;}
+.chip-toggle:hover{border-color:var(--teal-500);color:#0b6b66;transform:translateY(-1px);}
+.chip-toggle.active{background:var(--teal-500);border-color:var(--teal-500);color:#fff;}
+.chip-toggle.all{border-style:dashed;}
+#hdFilterBarWrap.collapsed{display:none;}
+#hdFilterBarWrap .card{padding:10px 12px;}
+#hdFilterBarWrap .field{gap:2px;margin-bottom:7px;}
+#hdFilterBarWrap .field:last-child{margin-bottom:0;}
+#hdFilterBarWrap .field label{font-size:10px;}
+#hdFilterBarWrap .toolbar{margin-bottom:8px;gap:6px;}
+#hdFilterBarWrap .toolbar .field select{padding:5px 7px;font-size:12px;}
+/* Checklist gaya Excel: tombol ringkas ("N dipilih") yang membuka panel centang+cari — dipakai
+   utk Titik/Cerobong (61 opsi, ctrl-klik pada listbox native gampang keliru pencet/hilang pilihan
+   sebelumnya). Posisi panel absolute supaya tidak mendorong layout lain saat dibuka. */
+.xsel{position:relative;max-width:440px;}
+.xsel-btn{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--gray-300);border-radius:6px;background:#fff;font-size:12px;text-align:left;}
+.xsel-btn:hover{border-color:var(--teal-500);}
+.xsel-panel{position:absolute;top:calc(100% + 4px);left:0;right:0;min-width:300px;background:#fff;border:1px solid var(--gray-200);border-radius:8px;box-shadow:0 12px 30px rgba(11,31,56,.2);z-index:60;padding:8px;}
+.xsel-panel input[type="text"]{width:100%;padding:6px 8px;border:1px solid var(--gray-300);border-radius:6px;margin-bottom:6px;}
+.xsel-toolbar{display:flex;gap:6px;margin-bottom:6px;}
+.xsel-list{max-height:230px;overflow:auto;display:flex;flex-direction:column;}
+.xsel-opt{display:flex;align-items:center;gap:7px;padding:4px 6px;border-radius:5px;font-size:12px;cursor:pointer;}
+.xsel-opt:hover{background:var(--gray-100);}
+.xsel-opt input{margin:0;flex-shrink:0;}
+.xsel-empty{padding:8px;font-size:11.5px;color:var(--gray-500);font-style:italic;}
+.hd-profile-card{border:1px solid var(--gray-200);border-radius:9px;padding:10px 12px;margin-bottom:10px;}
+.hd-profile-card:last-child{margin-bottom:0;}
+.hd-profile-head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px;font-weight:700;font-size:12.5px;color:var(--navy-800);}
+.hd-profile-sub{font-size:11px;color:var(--gray-500);margin-top:1px;}
+.hd-param-pill{min-width:112px;border:1px solid var(--gray-200);border-radius:8px;padding:6px 9px;background:#fbfcfd;}
+.hd-param-pill .lbl{font-size:9.5px;color:var(--gray-500);text-transform:uppercase;letter-spacing:.03em;}
+.hd-param-pill .val{font-family:var(--font-mono);font-weight:700;font-size:13.5px;color:var(--navy-900);}
+.hd-param-pill .meta{font-size:9.5px;color:var(--gray-500);margin-top:2px;}
+.hd-engine-count-badge{display:inline-block;padding:2px 9px;border-radius:14px;font-size:11px;font-weight:700;background:var(--gray-100);color:var(--navy-800);border:1px solid var(--gray-200);margin:2px 4px 2px 0;}
+.cardhead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:0;}
+.cardhead h3{margin-bottom:12px;}
+.calc-table{font-size:11.5px;}
+.calc-table th,.calc-table td{padding:4px 8px;}
+.calc-formula{font-family:var(--font-mono);background:var(--gray-100);border-radius:6px;padding:8px 10px;font-size:12px;line-height:1.6;margin-top:6px;}
+
+.route-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;}
+.route-list li{display:flex;align-items:center;gap:8px;background:var(--gray-100);border:1px solid var(--gray-200);border-radius:7px;padding:6px 10px;font-size:12.5px;cursor:grab;}
+.route-list li span:nth-child(2){flex:1;}
+.route-list li.dragover{outline:2px dashed var(--teal-500);background:var(--teal-100);}
+.route-list .rbtns{display:flex;gap:4px;}
+.route-drag-handle{color:var(--gray-500);font-weight:700;letter-spacing:-2px;}
+
+.filebox{border:1.5px dashed var(--gray-300);border-radius:8px;padding:16px;text-align:center;font-size:12.5px;color:var(--gray-500);}
+
+textarea.mono{font-family:var(--font-mono);font-size:11.5px;}
+
+/* Panduan Sampling A4 (cetak) — dibangun di kontainer terpisah yang selalu ada di DOM tapi
+   disembunyikan di layar biasa (display:none), lalu ditampilkan HANYA saat mode cetak lewat
+   trik "visibility" (bukan toggle display seluruh app) supaya tata letak sisa halaman tidak
+   perlu diutak-atik bolak-balik. Dirancang ringkas & padat khusus utk kertas A4 potret. */
+#printGuideArea{display:none;}
+/* Sama seperti .pg-ba-page (lihat catatan di bawah): dibungkus SATU <table> supaya header
+   (judul+meta) & footer ikut TERULANG di setiap halaman cetak kalau isi batch itu meluber
+   lebih dari 1 halaman, bukan cuma nempel sekali di halaman pertama. Tiap site jadi <tr> tbody
+   sendiri (bukan digabung 1 blok raksasa) supaya batas antar-halaman jatuh rapi di antar-site. */
+.pg-guide-page{width:100%;border-collapse:collapse;}
+.pg-guide-page>thead>tr>td,.pg-guide-page>tfoot>tr>td,.pg-guide-page>tbody>tr>td{border:none;padding:0;}
+.pg-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1.5px solid #000;padding-bottom:4px;margin-bottom:6px;}
+.pg-header h1{font-size:13px;margin:0;}
+.pg-header .sub{font-size:9.5px;color:#333;margin-top:2px;}
+.pg-meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px 14px;font-size:9.5px;margin-bottom:7px;}
+.pg-meta div b{display:block;font-size:8.5px;text-transform:uppercase;color:#555;letter-spacing:.03em;}
+.pg-site{page-break-inside:avoid;margin-bottom:10px;border:1px solid #999;border-radius:4px;overflow:hidden;}
+.pg-site-head{background:#fff;padding:4px 7px 4px 9px;font-size:10.5px;font-weight:700;display:flex;justify-content:space-between;border-bottom:1.3px solid #333;border-left:4px solid #a02a24;}
+.pg-table{width:100%;border-collapse:collapse;font-size:9px;}
+.pg-table th,.pg-table td{border:1px solid #ccc;padding:3px 5px;text-align:left;vertical-align:top;}
+/* color & position:static WAJIB ditulis ulang di sini — <thead th> global punya warna terang
+   (dibuat utk latar navy gelap di tabel layar biasa) & position:sticky yang tidak relevan/berguna
+   di kertas cetak, tanpa override ini teks header kolom di tiap blok site jadi putih tak
+   terbaca di atas latar putih tabel cetak ini. */
+.pg-table th{background:#fff;color:#000;border-bottom:1.3px solid #333;position:static;}
+/* Baris pemisah hari di dalam tabel per-site (hasil dailyAssignmentForRow, ikut custom manual dari
+   papan Detail Harian di Gantt) — aksen kiri merah tipis spt .pg-ba-kategori-row, konsisten sama
+   gaya "banner section" yang dipakai di Berita Acara. Hari buffer dibedakan warna teks abu (bukan
+   latar abu, tetap patuh "jangan ada latar warna abu2") supaya tetap kelihatan sbg cadangan. */
+.pg-table tr.pg-day-row td{background:#fff;font-weight:700;padding:3px 5px 3px 8px;border-top:1.3px solid #333;border-left:3px solid #a02a24;}
+.pg-table tr.pg-day-row.pg-day-buffer td{color:#777;font-style:italic;border-left-color:#bbb;}
+.pg-table tr.pg-day-empty td{color:#999;font-style:italic;}
+.pg-box{display:inline-block;width:10px;height:10px;border:1px solid #333;vertical-align:middle;}
+.pg-batch{page-break-before:always;}
+.pg-batch:first-child{page-break-before:auto;}
+.pg-foot{font-size:8px;color:#666;margin-top:6px;padding-top:4px;border-top:1.5px solid #a02a24;}
+/* Berita Acara, dokumen resmi bertanda tangan — dibikin lebih lega drpd Panduan Sampling A4 di
+   atas (yang memang sengaja padat karena isinya banyak site/tanggal). Logo di sini masih
+   placeholder teks; kalau file logo SKK Migas & PHM sudah tersedia, tinggal ganti
+   .pg-ba-logo-left/right jadi <img>.
+   Kepala dokumen (.pg-ba-header-once: logo+judul+pembuka) SENGAJA di luar <table class="pg-ba-page">
+   supaya jadi konten alir biasa yang cuma tampil SEKALI di halaman pertama, TIDAK ikut terulang.
+   .pg-ba-page sendiri cuma berisi <tfoot> (pita merah dekoratif, .pg-ba-footer-band) yang otomatis
+   diulang browser di SETIAP halaman cetak kalau <tbody>-nya (tabel titik sampling) meluber lebih
+   dari 1 halaman — header KOLOM tabel (No/Lokasi/Kategori/dst) tetap terulang sendiri krn itu
+   <thead> milik .pg-ba-table yang nested di dalam tbody, mekanisme terpisah dari thead/tfoot besar
+   ini. Blok tanda tangan (.pg-ba-closing-block) DILUAR tabel ini & diberi page-break-inside:avoid
+   supaya "Demikian...” s/d nama terang tidak pernah kepotong di sambungan halaman. */
+.pg-ba{font-size:11.5px;line-height:1.55;color:#1a1a1a;}
+.pg-ba-header-once{margin-bottom:4px;}
+.pg-ba-page{width:100%;border-collapse:collapse;}
+.pg-ba-page > thead > tr > td, .pg-ba-page > tfoot > tr > td, .pg-ba-page > tbody > tr > td{border:none;padding:0;}
+/* Ekstra jarak (turun+kedalam) DI ATAS margin @page 18mm yang sudah ada, khusus baris logo —
+   supaya walau pengaturan margin printer/dialog cetak user beda-beda, logo tidak pernah nempel
+   ke tepi kertas. */
+.pg-ba-logos{display:flex;justify-content:space-between;align-items:center;gap:14px;min-height:60px;margin:6px 6mm 16px;overflow:visible;}
+.pg-ba-logo-left{flex-shrink:0;font-weight:800;font-size:14px;letter-spacing:-.02em;color:#444;}
+.pg-ba-logo-left span{color:#a02a24;}
+.pg-ba-logo-right{flex-shrink:0;font-weight:800;font-size:14px;text-align:right;color:#222;}
+.pg-ba-logo-right .sub{font-weight:600;font-size:10px;color:#555;letter-spacing:.06em;}
+/* Tinggi logo dibesarkan dari 40px -> 60px (kekecilan/kurang proper di ukuran semula) — tinggi
+   dibatasi, lebar menyesuaikan sendiri, tidak pernah gepeng/kepotong. */
+.pg-ba-logo-left img,.pg-ba-logo-right img{max-height:60px;width:auto;display:block;object-fit:contain;}
+.pg-ba-title{text-align:center;margin-bottom:14px;padding-bottom:8px;border-bottom:1.5px solid #333;}
+.pg-ba-title h1{font-size:14.5px;margin:0 0 3px;letter-spacing:.04em;}
+.pg-ba-title .sub{font-size:11.5px;font-weight:700;letter-spacing:.02em;}
+.pg-ba-meta{font-size:11.5px;margin:10px 0;border-collapse:collapse;}
+.pg-ba-meta td{border:none;padding:2px 0;vertical-align:top;}
+.pg-ba-intro{margin-bottom:6px;}
+/* Tabel titik sampling: putih polos (tanpa zebra abu-abu), header cuma bold+garis bawah tebal
+   supaya tetap terbaca tanpa perlu latar warna. Baris judul kelompok kategori (lihat
+   .pg-ba-kategori-row) memisahkan tiap jenis sumber emisi tanpa perlu tabel terpisah-pisah. */
+.pg-ba-table{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:6px;background:#fff;}
+.pg-ba-table th,.pg-ba-table td{border:1px solid #999;padding:5px 7px;text-align:left;vertical-align:middle;background:#fff;}
+.pg-ba-table th{background:#fff;color:#000;font-weight:700;font-size:10.5px;border-bottom:1.5px solid #333;position:static;}
+.pg-ba-kategori-row td{background:#fff;font-weight:700;font-size:10.5px;padding:5px 7px 5px 10px;border-top:1.5px solid #333;border-bottom:1px solid #999;border-left:4px solid #a02a24;}
+.pg-ba-foot-note{font-size:9.5px;color:#555;margin-top:6px;font-style:italic;}
+/* Blok penutup (kalimat "Demikian...", tempat/tanggal, "Mengetahui,", tabel tanda tangan) dibikin
+   1 unit utuh — page-break-inside:avoid bikin browser TIDAK PERNAH memotongnya di sambungan
+   halaman; kalau sisa halaman berjalan tidak cukup, seluruh blok otomatis didorong ke halaman baru. */
+.pg-ba-closing-block{page-break-inside:avoid;}
+.pg-ba-closing{margin-top:26px;font-size:11.5px;}
+.pg-ba-sign{width:100%;border-collapse:collapse;margin-top:10px;font-size:11.5px;}
+.pg-ba-sign td{border:none;text-align:center;padding:4px;vertical-align:top;}
+.pg-ba-sign .sign-space{height:64px;}
+.pg-ba-sign .sign-name{text-decoration:underline;font-weight:600;}
+/* Pita kaki halaman berulang — grafis resmi (FOOTER BA.png dari folder referensi, di-embed base64
+   di FOOTER_BAND_B64 spy file tetap 1-file/portable), dicetak di dasar SETIAP halaman (bukan cuma
+   halaman terakhir) krn ini isi <tfoot> pada .pg-ba-page. height:auto (bukan dipaksa fix) supaya
+   rasio asli gambar terjaga & lengkungannya tidak gepeng/distorsi walau lebar kertas beda-beda. */
+.pg-ba-footer-band{display:block;width:100%;height:auto;margin-top:12px;}
+/* Tabel Gantt ringkas per hari (opsional, lihat preferensi cetak) — kotak-kotak kecil per tanggal,
+   jauh lebih informatif drpd cuma daftar titik & rentang tanggal polos, tapi tetap dibikin padat
+   (font & sel kecil) supaya banyak site/tanggal tetap muat di lebar kertas A4. */
+.pg-gantt{margin-bottom:10px;overflow:visible;}
+.pg-gantt table{border-collapse:collapse;font-size:7px;}
+.pg-gantt th,.pg-gantt td{border:1px solid #ddd;width:12px;height:13px;padding:0;text-align:center;}
+.pg-gantt th{background:#333;color:#fff;font-weight:400;}
+.pg-gantt th.pg-gantt-site,.pg-gantt td.pg-gantt-site{width:auto;min-width:64px;max-width:110px;text-align:left;padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pg-gantt td.pg-gantt-site{font-weight:700;background:#fafafa;}
+.pg-gantt-work{background:#0ea5a0;}
+.pg-gantt-buffer{background:#bfe9e4;}
+.pg-gantt-off{background:#eee;}
+@media print{
+  /* html,body punya background abu-abu (var(--gray-100)) utk tampilan layar biasa aplikasi ini.
+     visibility:hidden pada anak-anaknya TIDAK menghapus cat latar milik body/html itu sendiri,
+     jadi tanpa override ini abu-abu itu tetap jadi kanvas halaman cetak yang sebenarnya, mengintip
+     di balik/celah konten putih #printGuideArea — inilah sumber asli semua keluhan "latar abu-abu"
+     sebelumnya, bukan cuma dari elemen individual seperti .pg-table th atau .pg-site-head saja. */
+  html,body{background:#fff !important;}
+  body *{visibility:hidden;}
+  #printGuideArea, #printGuideArea *{visibility:visible;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  #printGuideArea{display:block;position:absolute;left:0;top:0;width:100%;background:#fff;color:#000;}
+  @page{size:A4;margin:12mm;}
+}
+
+/* Toast notifications (replace native alert/confirm — some corporate browsers block JS dialogs) */
+#toastStack{position:fixed;top:16px;right:16px;z-index:5100;display:flex;flex-direction:column;gap:8px;max-width:340px;}
+.toast{background:var(--navy-900);color:#fff;padding:11px 14px;border-radius:9px;font-size:12.5px;box-shadow:0 8px 24px rgba(0,0,0,.25);border-left:4px solid var(--teal-400);animation:toastin .18s ease-out;}
+.toast.err{border-left-color:var(--red-500);}
+.toast.ok{border-left-color:var(--green-500);}
+@keyframes toastin{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+
+/* Master tree view — tree-head & tree-subhead sticky: nempel di atas selama masih scroll di
+   dalam site/grup itu, lalu otomatis lepas & digantikan header berikutnya (perilaku bawaan
+   position:sticky, dibatasi otomatis oleh box parent-nya). "overflow:hidden" SENGAJA tidak
+   dipakai di .tree-site karena itu mematikan position:sticky pada anaknya. */
+.tree-toolbar{display:flex;gap:6px;margin-bottom:10px;}
+.tree-site{border:1px solid var(--gray-200);border-radius:8px;margin-bottom:8px;background:#fff;}
+.tree-head{display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--navy-900);color:#fff;font-size:13px;user-select:none;border-radius:8px 8px 0 0;position:sticky;top:var(--stickyoffset,0px);z-index:12;}
+.tree-caret{width:12px;display:inline-block;color:var(--teal-400);}
+.tree-sub{border-top:1px solid var(--gray-200);}
+.tree-subhead{display:flex;align-items:center;gap:7px;padding:5px 10px 5px 22px;background:var(--gray-100);font-size:12px;font-weight:700;color:var(--navy-800);user-select:none;position:sticky;top:calc(var(--stickyoffset,0px) + 34px);z-index:11;}
+.tree-toggle{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;flex:1;min-width:0;}
+.tree-head .tree-toggle:hover{background:rgba(255,255,255,.14);}
+.tree-subhead .tree-toggle:hover{background:var(--gray-200);}
+.tree-table{width:100%;border-collapse:collapse;}
+.tree-table td{padding:6px 12px 6px 34px;border-bottom:1px solid var(--gray-200);font-size:12.5px;}
+.tree-table tr:last-child td{border-bottom:none;}
+.tree-table tr:hover td{background:var(--gray-100);}
+
+/* Day-grid Gantt view — one row per site, one column per calendar day, whole
+   schedule span visible at once (no month pagination) with drag-to-reschedule. */
+.daygrid-scroll{overflow-x:auto;padding-bottom:8px;border:1px solid var(--gray-200);border-radius:10px;}
+table.daygrid{border-collapse:separate;border-spacing:3px;min-width:max-content;background:var(--gray-100);}
+.dg-th-label{text-align:left;font-size:11.5px;font-weight:700;color:#dbe6f0;min-width:190px;padding:8px 10px;white-space:nowrap;vertical-align:middle;}
+.dg-th-month{text-align:center;font-size:10.5px;font-weight:700;color:#04211f;background:var(--teal-400);padding:4px 0;letter-spacing:.03em;border-radius:4px;white-space:nowrap;}
+.dg-th-date{text-align:center;width:28px;min-width:28px;padding:5px 0;line-height:1.15;vertical-align:middle;}
+.dg-th-date .dd{display:block;font-size:11.5px;font-weight:700;color:#dbe6f0;}
+.dg-th-date.weekend{background:var(--navy-700);}
+.dg-th-date.weekend .dd{opacity:.6;}
+.dg-th-date.today{background:var(--teal-500);border-radius:5px;}
+.dg-th-date.today .dd{color:#04211f;}
+/* Kolom Site dibekukan (sticky) horizontal supaya tetap kelihatan saat scroll ke kanan */
+.dg-col-sticky{position:sticky;left:0;z-index:2;}
+thead .dg-col-sticky{z-index:3;}
+.dg-td-label{padding:7px 10px;vertical-align:middle;background:#fff;border-radius:6px;box-shadow:2px 0 3px -2px rgba(0,0,0,.12);}
+.dg-td-label[draggable="true"]{cursor:grab;}
+.dg-td-label[draggable="true"]:active{cursor:grabbing;}
+.dg-td-label.dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
+.dg-td-label b{font-size:12.5px;color:var(--navy-900);}
+.dg-td-label .sub{font-size:10.5px;font-weight:500;color:var(--gray-500);margin-top:2px;white-space:nowrap;}
+.dg-td-detail{white-space:normal;font-size:11px;color:var(--gray-700);min-width:200px;max-width:280px;vertical-align:middle;padding:7px 8px;background:#fff;border-radius:6px;}
+.daygrid tbody tr:nth-child(even) .dg-day-cell.dg-empty{background:rgba(0,0,0,.025);}
+.daygrid tbody tr:hover .dg-day-cell.dg-empty{background:rgba(14,165,160,.08);}
+.daygrid tbody tr:hover .dg-td-label,.daygrid tbody tr:hover .dg-td-detail{background:#f3fbfa;}
+.dg-day-cell{width:28px;height:28px;border-radius:5px;text-align:center;vertical-align:middle;font-size:10px;font-weight:700;color:#fff;box-shadow:0 1px 2px rgba(0,0,0,.12);transition:transform .08s;}
+.dg-day-cell.dg-empty{background:#fff;color:transparent;box-shadow:none;border:1px solid var(--gray-200);}
+.dg-day-cell.dg-buffer{opacity:.55;}
+.dg-day-cell.dg-cc{box-shadow:inset 0 0 0 2px #e0554f;}
+.dg-day-cell.dg-today-col{outline:2px solid #e0a53d;outline-offset:-2px;}
+.dg-day-cell[draggable="true"]:hover{transform:scale(1.12);z-index:1;position:relative;}
+.dg-day-cell[draggable="true"]{cursor:grab;}
+.dg-day-cell[draggable="true"]:active{cursor:grabbing;}
+td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
+.dg-team-divider td{background:var(--navy-900);color:#fff;font-weight:700;font-size:11.5px;padding:5px 10px;text-transform:uppercase;letter-spacing:.04em;}
+.pt-pill{display:inline-block;padding:1px 7px;margin:1px 3px 1px 0;border-radius:10px;font-size:10.5px;cursor:pointer;background:var(--gray-100);border:1px solid var(--gray-300);color:var(--gray-900);}
+.pt-pill:hover{border-color:var(--teal-500);background:var(--teal-100);}
+.pt-pill.excluded{background:#fdeceb;border-color:#e0554f;color:#a02a24;text-decoration:line-through;opacity:.85;}
+
+/* Papan "Detail Harian" (modal, dibuka dari tombol per-baris site di Gantt) — satu kolom per
+   tanggal valid di rentang site itu (kerja + buffer), kartu titik/grup bisa digeser drag-drop
+   antar kolom utk override manual dari pembagian rata otomatis. */
+.daydetail-scroll{overflow-x:auto;padding-bottom:8px;margin:0 -2px;}
+.daydetail-cols{display:flex;gap:8px;min-width:max-content;}
+.daydetail-col{width:150px;flex-shrink:0;border:1px solid var(--gray-300);border-radius:8px;background:var(--gray-100);display:flex;flex-direction:column;}
+.daydetail-col.buffer{background:repeating-linear-gradient(135deg,var(--gray-100),var(--gray-100) 8px,#eef1f4 8px,#eef1f4 16px);}
+.daydetail-col.cc{box-shadow:inset 0 0 0 2px #e0554f;}
+.daydetail-col.dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
+.daydetail-col-head{padding:6px 8px;text-align:center;border-bottom:1px solid var(--gray-300);}
+.daydetail-col-head .dow{font-size:9.5px;text-transform:uppercase;color:var(--gray-500);letter-spacing:.03em;}
+.daydetail-col-head .dnum{font-size:16px;font-weight:800;color:var(--navy-900);line-height:1.2;}
+.daydetail-col-head .mon{font-size:9.5px;color:var(--gray-500);}
+.daydetail-col-head .tag{display:inline-block;margin-top:3px;font-size:8.5px;font-weight:700;padding:1px 6px;border-radius:8px;text-transform:uppercase;letter-spacing:.02em;}
+.daydetail-col-head .tag.buffer{background:var(--gray-200);color:var(--gray-700);}
+.daydetail-col-head .tag.cc{background:#fdeceb;color:#a02a24;}
+.daydetail-col-body{padding:6px;flex:1;min-height:60px;display:flex;flex-direction:column;gap:5px;}
+.daydetail-card{background:#fff;border:1px solid var(--gray-300);border-radius:6px;padding:5px 7px;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.08);}
+.daydetail-card:active{cursor:grabbing;}
+.daydetail-card:hover{border-color:var(--teal-500);}
+.daydetail-card b{font-size:11px;display:block;color:var(--navy-900);}
+.daydetail-card .sub{font-size:9.5px;color:var(--gray-500);margin-top:1px;}
+
+/* Tracking checklist columns */
+.trk-cell{transition:background .15s;}
+.trk-cell.done{background:#e2f7ec;}
+.trk-cell input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--teal-500);}
+
+/* Rincian titik tercentang per site (Perencanaan Batch) — biar keliatan sebelum generate jadwal
+   sebarannya per site kayak apa, bukan cuma total angka polos. */
+.pl-breakdown{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+.pl-breakdown .site-chip{display:flex;align-items:center;gap:7px;background:var(--gray-100);border:1px solid var(--gray-200);border-radius:8px;padding:6px 11px;font-size:11.5px;}
+.pl-breakdown .site-chip b{color:var(--navy-800);}
+.pl-breakdown .cnt{display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;font-weight:700;}
+.pl-breakdown .cnt.b-emisi{background:var(--teal-100);color:#0b6b66;}
+.pl-breakdown .cnt.b-flare{background:#fbdcda;color:#a02a24;}
+.pl-breakdown .cnt.b-ambient{background:#dce9fb;color:#215f85;}
+
+/* Peta lokasi */
+/* Leaflet men-set position:relative di container ini tapi TIDAK men-set z-index — tanpa z-index,
+   position:relative saja tidak membuat stacking context baru, jadi pane internal Leaflet (tile,
+   marker, popup dst — z-index bawaannya 200-700) "bocor" dan tampil DI ATAS .stickytop (z-index:30)
+   saat scroll, walau posisi peta di DOM ada di bawah header. Kasih z-index eksplisit (nilainya
+   berapa saja asal bukan "auto") di container ini supaya Leaflet ngunci semua pane-nya di
+   stacking context sendiri dan tidak lagi menembus ke atas header sticky. */
+#siteMap{height:70vh;min-height:480px;border-radius:10px;border:1px solid var(--gray-200);position:relative;z-index:0;}
+.map-legend-dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:4px;vertical-align:middle;}
+.leaflet-popup-content b{color:var(--navy-900);}
+.map-pin{border-radius:50%;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);transition:transform .12s ease;}
+.leaflet-marker-icon:hover .map-pin{transform:scale(1.18);}
+.muted-tooltip{background:rgba(13,31,56,.9)!important;color:#fff!important;border:none!important;font-size:10.5px!important;font-weight:600;padding:3px 7px!important;border-radius:5px!important;box-shadow:0 2px 6px rgba(0,0,0,.25)!important;}
+.muted-tooltip::before{display:none!important;}
+/* Notasi nama titik — dibikin ringkas (bukan pakai style tooltip Leaflet bawaan) supaya kotaknya
+   kecil & gampang dihitung tabrakannya (lihat labelSize() di JS, angkanya harus selaras sama
+   style di sini). !important dipasang karena elemen ini duduk di dalam wrapper ikon Leaflet yang
+   punya CSS bawaan sendiri — tanpa !important, background gelapnya bisa ketiban jadi transparan. */
+.map-label{position:relative;display:inline-block;background:#0d1f38!important;color:#fff!important;font-size:10px!important;font-weight:700!important;line-height:1.2!important;padding:3.5px 6px!important;border-radius:4px!important;white-space:nowrap;box-shadow:0 1px 5px rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.25);cursor:pointer;pointer-events:auto;}
+/* Cluster kustom (titik yang berdekatan digabung jadi satu bubble, otomatis pecah lagi begitu
+   di-zoom/di-klik) — warna & ukuran mengikuti jumlah anggota, dengan animasi pop-in supaya
+   terasa hidup/eye-catching tanpa berlebihan. */
+@keyframes mapClusterPop{from{transform:scale(.5);opacity:0;}to{transform:scale(1);opacity:1;}}
+.map-cluster{display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-weight:800;font-family:var(--font-mono);border:3px solid rgba(255,255,255,.9);box-shadow:0 3px 10px rgba(0,0,0,.4),0 0 0 5px rgba(14,165,160,.18);animation:mapClusterPop .18s ease-out;transition:transform .12s ease;}
+.leaflet-marker-icon:hover .map-cluster{transform:scale(1.08);}
+.map-cluster .n{line-height:1;}
+.map-cluster .lbl{display:block;font-size:8px;font-weight:600;opacity:.85;letter-spacing:.02em;margin-top:1px;}
+.coord-row{cursor:pointer;}
+.coord-row:hover td{background:var(--teal-100);}
+.coord-tbl{table-layout:fixed;width:100%;}
+.coord-tbl .coord-nama{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
