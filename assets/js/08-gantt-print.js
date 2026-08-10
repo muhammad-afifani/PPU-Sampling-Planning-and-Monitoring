@@ -147,14 +147,15 @@ function renderDayDetailModal(b, row){
       }).join("")}
     </div>` : "";
   // Struktur header/body-scroll/footer EKSPLISIT (bukan mengandalkan position:sticky di tengah
-  // konten) — modal ini bisa jadi panjang (banyak kolom hari + daftar titik dikeluarkan), dan
-  // sticky di tengah konten scroll gampang numpuk/menutupi elemen lain begitu ada lebih dari satu
-  // baris tombol. Cuma h3+hint (kepala) & tombol Tutup (kaki) yang TIDAK ikut discroll; sisanya
-  // (Reset, catatan, kolom hari, daftar dikeluarkan, Jalankan Ulang Jadwal) ada di ${"daydetail-modal-body"}
-  // yang scroll sendiri, jadi kaki modal selalu kelihatan tanpa perlu trik sticky sama sekali.
+  // konten) — modal ini bisa jadi panjang (banyak kolom hari + daftar titik dikeluarkan). Cuma
+  // h3+hint (kepala) & tombol Tutup (kaki) yang TIDAK ikut discroll; sisanya (Reset, catatan,
+  // kolom hari, daftar dikeluarkan, Jalankan Ulang Jadwal) ada di .daydetail-modal-body yang
+  // scroll sendiri (CSS grid lewat class scrollbody — lihat style.css), jadi kaki modal selalu
+  // kelihatan. wireScrollShadow dipanggil di bawah supaya ada bayangan visual yang jelas kalau
+  // body ini masih bisa discroll lebih jauh, bukan cuma mengandalkan user coba-coba scroll sendiri.
   openModal(`
     <h3>Detail Harian — ${escHtml(row.site)} <span class="muted" style="font-weight:400;font-size:12px;">(${escHtml(b.name)})</span></h3>
-    <div class="hint" style="margin-bottom:10px;">Tarik (drag) kartu titik ke kolom hari lain utk custom manual — sisanya tetap terbagi rata otomatis. Kolom bergaris miring = hari buffer/cadangan (boleh diisi kalau memang mau dipakai). Klik &times; di pojok kartu utk keluarkan titik itu dari batch ini (mis. jadwal kepanjangan/melebihi periode). Perubahan tersimpan otomatis.</div>
+    <div class="hint" style="margin-bottom:10px;">Tarik (drag) kartu titik ke kolom hari lain utk custom manual — sisanya tetap terbagi rata otomatis. Kolom bergaris miring = hari buffer/cadangan (boleh diisi kalau memang mau dipakai). Klik &times; di pojok kartu utk keluarkan titik itu dari batch ini (mis. jadwal kepanjangan/melebihi periode). Perubahan tersimpan otomatis. &#8595; Scroll ke bawah utk lihat titik yang dikeluarkan &amp; tombol jalankan ulang jadwal.</div>
     <div class="daydetail-modal-body">
       <div class="daydetail-actionbar" style="margin-bottom:10px;">
         <button class="btn small ghost" data-action="resetDayOverrides" data-batch-id="${b.id}" data-row-idx="${rowIdx}" ${hasOverride?"":"disabled"}>Reset ke Otomatis</button>
@@ -171,7 +172,8 @@ function renderDayDetailModal(b, row){
       </div>
     </div>
     <div class="actions"><button class="btn ghost" data-action="closeModal">Tutup</button></div>
-  `, {wide:true});
+  `, {wide:true, scrollBody:true});
+  wireScrollShadow(document.querySelector(".daydetail-modal-body"));
 }
 // Catatan Saat Sampling (field di atas; nama field internal dayDetailNote dipertahankan biar tidak
 // perlu migrasi data lagi) dikumpulkan lintas-halaman lewat fungsi ini — dipakai KOM per Site

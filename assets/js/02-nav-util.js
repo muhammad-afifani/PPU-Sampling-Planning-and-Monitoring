@@ -140,10 +140,31 @@ function distributionBarRow(label, count, grandTotal, color){
 function openModal(html, opts){
   document.getElementById("modalBox").innerHTML = html;
   document.getElementById("modalBox").classList.toggle("wide", !!(opts&&opts.wide));
+  // scrollBody: modal ini punya struktur header/body-scroll/footer eksplisit (lihat .modal.scrollbody
+  // di style.css) — dipakai opt-in per modal krn modal lain (form sederhana dll) masih mengandalkan
+  // .modal bawaan (overflow-y:auto di elemen itu sendiri), bukan body scroll terpisah.
+  document.getElementById("modalBox").classList.toggle("scrollbody", !!(opts&&opts.scrollBody));
   document.getElementById("overlay").classList.add("show");
 }
-function closeModal(){ document.getElementById("overlay").classList.remove("show"); document.getElementById("modalBox").innerHTML=""; document.getElementById("modalBox").classList.remove("wide"); }
+function closeModal(){ document.getElementById("overlay").classList.remove("show"); document.getElementById("modalBox").innerHTML=""; document.getElementById("modalBox").classList.remove("wide","scrollbody"); }
 document.getElementById("overlay").addEventListener("click", e=>{ if(e.target.id==="overlay") closeModal(); });
+// Bayangan "masih ada konten di atas/bawah" utk elemen body yang scroll sendiri di dalam modal
+// (lihat .has-more-above/.has-more-below di style.css) — supaya user tidak perlu menebak apakah
+// area itu bisa discroll lagi atau sudah mentok. Dipanggil ulang tiap modal itu di-render ulang
+// (bukan cuma sekali saat dibuka) krn kontennya bisa berubah ukuran (mis. tambah/kurang kartu);
+// tiap render bikin elemen body baru (innerHTML diganti) jadi listener lama otomatis lepas
+// bareng elemen lamanya — sengaja TIDAK didaftarkan lewat document-level delegation (event
+// "scroll" pada elemen non-window/document tidak reliable bubbling-nya lintas browser).
+function wireScrollShadow(el){
+  if(!el) return;
+  const update = ()=>{
+    el.classList.toggle("has-more-above", el.scrollTop > 2);
+    el.classList.toggle("has-more-below", el.scrollTop < el.scrollHeight - el.clientHeight - 2);
+  };
+  update();
+  el.addEventListener("scroll", update);
+  window.addEventListener("resize", update);
+}
 
 /* Custom toast/confirm — native alert()/confirm() can be blocked by locked-down corporate browser policies */
 function toast(msg, type){
