@@ -102,13 +102,16 @@ function isCrewChange(site, dateStr){
   const r = DB.siteRules[site]; if(!r || r.crewChangeDay==="" || r.crewChangeDay==null) return false;
   return dayOfWeek(dateStr) === Number(r.crewChangeDay);
 }
-// Crew change hanya masalah kalau jatuh di hari PERTAMA tim datang ke site (belum ada
-// orang di sana untuk terima kedatangan). Kalau jatuh di tengah kunjungan, tim sudah di
-// lokasi sehingga sampling tetap jalan seperti biasa — hanya "Hari Terhold" (site benar-benar
-// tutup/shutdown) yang menghentikan hitungan hari kerja di tengah kunjungan.
-function findValidStart(site, fromDateStr){
+// Crew change adalah soal TRANSPORTASI: di hari itu, angkutan site yang crew change-nya lagi
+// dipakai buat rotasi kru, jadi tim TIDAK BISA DIBERANGKATKAN KELUAR dari site tsb hari itu.
+// Kedatangan ke site yang SEDANG crew change tetap aman — tim datang dari site LAIN, bukan minta
+// transport dari site ini, jadi tidak konflik sama sekali. Makanya constraint-nya dicek di site yang
+// DITINGGALKAN (departFromSite, opsional — kosong utk site pertama tanpa asal), BUKAN di site yang
+// dituju. "Hari Terhold" (site benar-benar tutup/shutdown) beda lagi — itu tetap dicek di site
+// tujuan sendiri (isBlocked), karena itu soal site-nya tutup, bukan soal transportasinya.
+function findValidStart(site, fromDateStr, departFromSite){
   let d = fromDateStr, iterations = 0;
-  while((isBlocked(site,d) || isCrewChange(site,d)) && iterations < 730){ d = addDays(d,1); iterations++; }
+  while((isBlocked(site,d) || (departFromSite && isCrewChange(departFromSite,d))) && iterations < 730){ d = addDays(d,1); iterations++; }
   return d;
 }
 function daysBetweenInclusive(start,end){

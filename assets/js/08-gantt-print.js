@@ -30,7 +30,11 @@ function groupSiblingsFor(p){
   const key = schedulingGroupKey(p);
   return key===p.id ? [p] : DB.points.filter(x=>schedulingGroupKey(x)===key);
 }
-const EXCLUDE_REASON_LABELS = {batch2:"Masuk Batch Berikutnya", tbc:"Tidak Beroperasi (TBC — belum pasti kapan tersedia)"};
+const EXCLUDE_REASON_LABELS = {
+  batch2: "Masuk Batch Berikutnya",
+  notdue: "Belum Masuk Periode Sampling",
+  tbc: "Tidak Beroperasi (TBC — belum pasti kapan tersedia)"
+};
 // Keluarkan/sertakan-lagi 1 titik (+ semua sibling separuh penjadwalan yg sama) dari batch ini —
 // dipanggil dari tombol "x" di kartu Detail Harian. BEDA dgn toggleExcludePoint (dipakai pill di
 // kolom "Titik Pantau" day-grid, yg langsung recompute+reschedule OTOMATIS tiap klik): di sini
@@ -134,6 +138,7 @@ function renderDayDetailModal(b, row){
           <div class="name"><b>${escHtml(p.nama)}</b></div>
           <select data-action="setExcludeReason" data-batch-id="${b.id}" data-point-id="${p.id}">
             <option value="batch2" ${r.reason==="batch2"?"selected":""}>${EXCLUDE_REASON_LABELS.batch2}</option>
+            <option value="notdue" ${r.reason==="notdue"?"selected":""}>${EXCLUDE_REASON_LABELS.notdue}</option>
             <option value="tbc" ${r.reason==="tbc"?"selected":""}>${EXCLUDE_REASON_LABELS.tbc}</option>
           </select>
           ${r.reason==="tbc" ? `<input type="text" data-action="setExcludeNote" data-batch-id="${b.id}" data-point-id="${p.id}" value="${escHtml(r.note||"")}" placeholder="Catatan / perkiraan tersedia kapan">` : ""}
@@ -141,21 +146,29 @@ function renderDayDetailModal(b, row){
         </div>`;
       }).join("")}
     </div>` : "";
+  // Struktur header/body-scroll/footer EKSPLISIT (bukan mengandalkan position:sticky di tengah
+  // konten) — modal ini bisa jadi panjang (banyak kolom hari + daftar titik dikeluarkan), dan
+  // sticky di tengah konten scroll gampang numpuk/menutupi elemen lain begitu ada lebih dari satu
+  // baris tombol. Cuma h3+hint (kepala) & tombol Tutup (kaki) yang TIDAK ikut discroll; sisanya
+  // (Reset, catatan, kolom hari, daftar dikeluarkan, Jalankan Ulang Jadwal) ada di ${"daydetail-modal-body"}
+  // yang scroll sendiri, jadi kaki modal selalu kelihatan tanpa perlu trik sticky sama sekali.
   openModal(`
     <h3>Detail Harian — ${escHtml(row.site)} <span class="muted" style="font-weight:400;font-size:12px;">(${escHtml(b.name)})</span></h3>
     <div class="hint" style="margin-bottom:10px;">Tarik (drag) kartu titik ke kolom hari lain utk custom manual — sisanya tetap terbagi rata otomatis. Kolom bergaris miring = hari buffer/cadangan (boleh diisi kalau memang mau dipakai). Klik &times; di pojok kartu utk keluarkan titik itu dari batch ini (mis. jadwal kepanjangan/melebihi periode). Perubahan tersimpan otomatis.</div>
-    <div class="actions" style="justify-content:flex-start;margin-bottom:10px;">
-      <button class="btn small ghost" data-action="resetDayOverrides" data-batch-id="${b.id}" data-row-idx="${rowIdx}" ${hasOverride?"":"disabled"}>Reset ke Otomatis</button>
-    </div>
-    <div class="field" style="margin-bottom:10px;">
-      <label>Catatan Saat Sampling utk Site Ini <span class="muted" style="font-weight:400;">(otomatis muncul di Tracking BA/CoA &rarr; KOM per Site, dan di Panduan Sampling A4 saat dicetak)</span></label>
-      <textarea data-action="setDayDetailNote" data-batch-id="${b.id}" data-row-idx="${rowIdx}" rows="2" style="width:100%;padding:7px 9px;border:1px solid var(--gray-300);border-radius:6px;" placeholder="mis. Akses site perlu izin masuk H-3, kontak PIC lapangan: ...">${escHtml(row.dayDetailNote||"")}</textarea>
-    </div>
-    <div class="daydetail-scroll"><div class="daydetail-cols">${cols}</div></div>
-    ${excludedHtml}
-    <div class="actions" style="justify-content:flex-start;margin-top:10px;flex-wrap:wrap;">
-      <button class="btn primary" data-action="applyExcludeReschedule" data-batch-id="${b.id}" data-row-idx="${rowIdx}">&#128260; Jalankan Ulang Jadwal Site Ini</button>
-      <span class="hint" style="align-self:center;max-width:360px;">Menghitung ulang hari kerja site ini dari titik yang masih aktif, lalu menggeser tanggal site-site setelahnya di batch ini kalau perlu.</span>
+    <div class="daydetail-modal-body">
+      <div class="daydetail-actionbar" style="margin-bottom:10px;">
+        <button class="btn small ghost" data-action="resetDayOverrides" data-batch-id="${b.id}" data-row-idx="${rowIdx}" ${hasOverride?"":"disabled"}>Reset ke Otomatis</button>
+      </div>
+      <div class="field" style="margin-bottom:10px;">
+        <label>Catatan Saat Sampling utk Site Ini <span class="muted" style="font-weight:400;">(otomatis muncul di Tracking BA/CoA &rarr; KOM per Site, dan di Panduan Sampling A4 saat dicetak)</span></label>
+        <textarea data-action="setDayDetailNote" data-batch-id="${b.id}" data-row-idx="${rowIdx}" rows="2" style="width:100%;padding:7px 9px;border:1px solid var(--gray-300);border-radius:6px;" placeholder="mis. Akses site perlu izin masuk H-3, kontak PIC lapangan: ...">${escHtml(row.dayDetailNote||"")}</textarea>
+      </div>
+      <div class="daydetail-scroll"><div class="daydetail-cols">${cols}</div></div>
+      ${excludedHtml}
+      <div class="daydetail-actionbar" style="margin-top:10px;">
+        <button class="btn primary" data-action="applyExcludeReschedule" data-batch-id="${b.id}" data-row-idx="${rowIdx}">&#128260; Jalankan Ulang Jadwal Site Ini</button>
+        <span class="hint" style="align-self:center;max-width:360px;">Menghitung ulang hari kerja site ini dari titik yang masih aktif, lalu menggeser tanggal site-site setelahnya di batch ini kalau perlu.</span>
+      </div>
     </div>
     <div class="actions"><button class="btn ghost" data-action="closeModal">Tutup</button></div>
   `, {wide:true});
@@ -344,9 +357,22 @@ function buildPrintGuideHtml(includeGantt){
     // titik ke hari lain), hasil cetak ini otomatis ikut mencerminkan susunan finalnya, bukan cuma
     // pembagian rata generik. Baris pemisah hari (mirip kategori-row di Berita Acara) diberi aksen
     // merah tipis; hari buffer tetap ditampilkan (supaya kelihatan sbg cadangan) walau kosong.
-    const siteRows = (b.schedule||[]).map(row=>{
+    const siteRows = (b.schedule||[]).map((row, rowIdx)=>{
       const sitePts = pts.filter(p=>p.site===row.site);
       if(!sitePts.length) return "";
+      // Site berikutnya yang BENERAN tercetak (bukan cuma entri berikutnya di b.schedule mentah) —
+      // discan maju krn ada kemungkinan 1+ site di antaranya kosong utk konteks cetak ini (mis.
+      // semua titiknya kebetulan dikeluarkan dari batch, lihat fitur exclude di Detail Harian).
+      let nextPrintedRow = null;
+      for(let j=rowIdx+1;j<(b.schedule||[]).length;j++){
+        const candidate = b.schedule[j];
+        if(pts.some(p=>p.site===candidate.site)){ nextPrintedRow = candidate; break; }
+      }
+      // Info perpindahan — jam bukan data tersimpan (jadwal cuma per-tanggal), jadi ditulis sbg
+      // panduan umum sesuai kebiasaan lapangan yang diberitahukan, bukan jam presisi per kejadian.
+      const transitionNote = nextPrintedRow ? `<tr><td>
+        <div class="pg-transition-note">&#8594; <b>Pindah ke Site ${escHtml(nextPrintedRow.site)}</b> &mdash; ${escHtml(fmtHariTanggalIndo(nextPrintedRow.start))}. Umumnya berangkat pagi (&plusmn;07:00&ndash;08:00 WIB) atau siang usai istirahat (&plusmn;13:00 WIB); perjalanan antar site sekitar 1&ndash;2 jam.</div>
+      </td></tr>` : "";
       const rangeLabel = row.start===row.end ? row.start : `${row.start} s.d. ${row.end}`;
       const asg = dailyAssignmentForRow(b, row);
       let rowNum = 0;
@@ -388,7 +414,7 @@ function buildPrintGuideHtml(includeGantt){
             <tbody>${dayBlocks}</tbody>
           </table>
         </div>
-      </td></tr>`;
+      </td></tr>${transitionNote}`;
     }).join("");
     return `<table class="pg-guide-page pg-batch">
       <thead><tr><td>
@@ -614,6 +640,12 @@ function buildDayGridView(rows){
     const excludedBadge = excludedCount ? `<span class="badge b-red" style="font-size:9.5px;padding:1px 6px;" title="Titik yang dikeluarkan dari batch ini di site ${escHtml(r.site)} — buka Detail Harian utk lihat/kelola">&#9888; ${excludedCount} dikeluarkan</span>` : "";
     const dragHandle = r.batch ? `<span class="route-drag-handle" title="Tarik untuk ubah urutan site di batch ini">&#8942;&#8942;</span>` : "";
     html += `<tr><td class="dg-td-label dg-col-sticky" draggable="${r.batch?"true":"false"}" data-batch-id="${r.batch?r.batch.id:""}" data-row-idx="${r.rowIdx}"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${dragHandle}<b>${escHtml(r.site)}</b>${adjustBtn}${dayDetailBtn}${excludedBadge}</div><div class="sub">${escHtml(r.batchName)} &middot; ${r.workDays} hari kerja${r.bufferDays?" + "+r.bufferDays+" buffer":""} &middot; ${r.start} &rarr; ${r.end}${r.adjustNote?`<br><span style="color:#a02a24;">&#9998; ${escHtml(r.adjustNote)}</span>`:""}</div></td>`;
+    // Tanggal tim pindah dari site INI ke site berikutnya di batch yang sama (kalau ada) — dipakai
+    // menandai kolom perpindahan dgn anak panah di bawah. Diambil dari tanggal mulai site
+    // berikutnya (bukan field terpisah) supaya OTOMATIS ikut kalau site manapun digeser drag-drop,
+    // tidak perlu disinkronkan manual.
+    const nextRow = (r.batch && r.rowIdx!=null) ? r.batch.schedule[r.rowIdx+1] : null;
+    const transitionDate = nextRow ? nextRow.start : null;
     for(let i=0;i<totalDays;i++){
       const dt = addDays(minDate,i);
       const inRange = dt>=r.start && dt<=r.end;
@@ -623,8 +655,16 @@ function buildDayGridView(rows){
         // kebetulan lagi dalam rentang jadwal aktif) — supaya pola "site X selalu crew change tiap
         // hari Y" langsung kelihatan di sepanjang kalender, bukan cuma pas ada jadwal jalan.
         const ccEmpty = isCrewChange(r.site, dt);
-        const title = ccEmpty ? `${r.site} — ${dt} (hari crew change)` : "";
-        html += `<td class="dg-day-cell dg-empty${isToday?" dg-today-col":""}${ccEmpty?" dg-cc-empty":""}" data-date="${dt}" title="${escHtml(title)}"></td>`;
+        if(dt===transitionDate){
+          // Kotak "pindah ke site berikutnya" — transisi selalu jatuh SETELAH r.end (dicek lewat
+          // minAllowed di handleScheduleDrop & cursor di recalcScheduleFrom), jadi selalu masuk
+          // cabang !inRange ini, tidak pernah bentrok sama kotak kerja aktif site ini sendiri.
+          const title = `Pindah ke ${nextRow.site} — mulai ${nextRow.start}${ccEmpty?` (${r.site}: hari crew change)`:""}`;
+          html += `<td class="dg-day-cell dg-empty dg-transition${isToday?" dg-today-col":""}${ccEmpty?" dg-cc-empty":""}" data-date="${dt}" title="${escHtml(title)}"><span class="dg-transition-arrow">&#8594;</span></td>`;
+        } else {
+          const title = ccEmpty ? `${r.site} — ${dt} (hari crew change)` : "";
+          html += `<td class="dg-day-cell dg-empty${isToday?" dg-today-col":""}${ccEmpty?" dg-cc-empty":""}" data-date="${dt}" title="${escHtml(title)}"></td>`;
+        }
       } else {
         const a = asg[dt] || {points:[], isBuffer:false};
         const names = a.points.map(p=>p.nama).join(", ");
@@ -650,7 +690,8 @@ function buildDayGridView(rows){
     <span class="item"><span class="sw" style="background:#0ea5a0"></span> Sampling Emisi</span>
     <span class="item"><span class="sw" style="background:#3d78c9"></span> Sampling Ambient</span>
     <span class="item"><span class="sw" style="background:#0ea5a0;opacity:.5;"></span> Hari Buffer (pudar)</span>
-    <span class="item"><span class="sw" style="background:#fff;box-shadow:inset 0 0 0 2px #e0554f;"></span> Hari Crew Change (info)</span>
+    <span class="item"><span class="sw" style="background:#fff;box-shadow:inset 0 0 0 2px #e0554f;"></span> Hari Crew Change (info — larangan cuma berlaku utk BERANGKAT dari site itu, datang tetap aman)</span>
+    <span class="item"><span class="sw" style="background:#fdf3e3;box-shadow:inset 0 0 0 2px #c98a1a;"></span> &#8594; Pindah ke Site Berikutnya</span>
   </div>`;
   return html;
 }

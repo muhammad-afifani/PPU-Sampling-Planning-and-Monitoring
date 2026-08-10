@@ -327,6 +327,7 @@ textarea.mono{font-family:var(--font-mono);font-size:11.5px;}
 .pg-site-head{background:#fff;padding:4px 7px 4px 9px;font-size:10.5px;font-weight:700;display:flex;justify-content:space-between;border-bottom:1.3px solid #333;border-left:4px solid #a02a24;}
 .pg-site-note{background:#fdeceb;padding:3px 9px;font-size:8.5px;font-weight:400;border-bottom:1px solid #999;border-left:4px solid #a02a24;}
 .pg-site-note-excluded{background:#fdf3e3;border-left-color:#c98a1a;}
+.pg-transition-note{background:#fdf3e3;color:#7a5209;padding:5px 9px;font-size:8.5px;font-weight:400;border:1px dashed #c98a1a;border-radius:4px;margin:4px 0 10px;}
 .pg-mom-body{padding:7px 10px;font-size:9.5px;line-height:1.5;}
 .pg-mom-body>div{margin-bottom:5px;}
 .pg-mom-body ul{margin:3px 0 0 16px;padding:0;}
@@ -512,6 +513,11 @@ thead .pz-nama,thead .pz-role{z-index:3;background:var(--navy-900);box-shadow:no
    dgn 3 kelas sekaligus supaya spesifisitasnya menang & bordernya diwarnai merah juga, bukan cuma
    box-shadow (kalau cuma box-shadow, border abu2 .dg-empty di luarnya bikin outline merah kurang jelas). */
 .dg-day-cell.dg-empty.dg-cc-empty{box-shadow:inset 0 0 0 2px #e0554f;border-color:#e0554f;}
+/* Kotak "pindah ke site berikutnya" (lihat transitionDate di buildDayGridView) — 3 kelas sekaligus
+   dgn alasan spesifisitas yang sama seperti dg-cc-empty di atas. Warna amber (beda dari merah
+   crew-change) supaya keduanya tetap kebeda kalau kebetulan jatuh di tanggal yang sama. */
+.dg-day-cell.dg-empty.dg-transition{background:#fdf3e3;box-shadow:inset 0 0 0 2px #c98a1a;border-color:#c98a1a;}
+.dg-transition-arrow{color:#c98a1a;font-weight:800;font-size:13px;}
 .dg-day-cell.dg-today-col{outline:2px solid #e0a53d;outline-offset:-2px;}
 .dg-day-cell[draggable="true"]:hover{transform:scale(1.12);z-index:1;position:relative;}
 .dg-day-cell[draggable="true"]{cursor:grab;}
@@ -525,6 +531,17 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 /* Papan "Detail Harian" (modal, dibuka dari tombol per-baris site di Gantt) — satu kolom per
    tanggal valid di rentang site itu (kerja + buffer), kartu titik/grup bisa digeser drag-drop
    antar kolom utk override manual dari pembagian rata otomatis. */
+/* Modal ini dibagi header (h3+hint, di luar) / body (scroll sendiri) / footer (tombol Tutup, di
+   luar) — BUKAN mengandalkan position:sticky di tengah konten scroll. .modal sendiri sudah
+   flex-column+overflow-y:auto, jadi .daydetail-modal-body cukup diberi flex:1+min-height:0+
+   overflow-y:auto supaya dialah yang scroll (bukan seluruh modal), sementara h3/hint di atas &
+   tombol Tutup di bawah tetap selalu kelihatan tanpa perlu discroll. min-height:0 WAJIB ada —
+   tanpa itu flex child tidak akan menyusut di bawah tinggi natural kontennya, jadi overflow-nya
+   malah "bocor" ke .modal luar alih-alih discroll sendiri di sini. */
+.daydetail-modal-body{flex:1;min-height:0;overflow-y:auto;margin:0 -2px;padding:0 2px;}
+/* Baris tombol di dalam body (Reset ke Otomatis, Jalankan Ulang Jadwal) — SENGAJA bukan pakai
+   class .actions (itu sticky, dipakai KHUSUS tombol Tutup di footer). */
+.daydetail-actionbar{display:flex;justify-content:flex-start;align-items:center;gap:8px;flex-wrap:wrap;}
 .daydetail-scroll{overflow-x:auto;padding-bottom:8px;margin:0 -2px;}
 .daydetail-cols{display:flex;gap:8px;min-width:max-content;}
 .daydetail-col{width:150px;flex-shrink:0;border:1px solid var(--gray-300);border-radius:8px;background:var(--gray-100);display:flex;flex-direction:column;}

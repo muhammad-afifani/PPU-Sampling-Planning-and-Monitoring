@@ -436,7 +436,7 @@ function generateSchedule(){
   const schedule = [];
   let safetyTripped = false;
   const trippedSites = [];
-  orderedSites.forEach(site=>{
+  orderedSites.forEach((site, siteIdx)=>{
     // Hitung per kelompok kunjungan (ambient-family di lokasi sama = 1, Flare-gabung kalau
     // diaktifkan = 1 juga), bukan per record mentah — lihat dayCountGroupKey.
     const count = new Set(bySite[site].map(dayCountGroupKey)).size;
@@ -448,7 +448,11 @@ function generateSchedule(){
     const workDays = Math.max(1, Math.ceil(count/ratio));
     const bufferDays = b.buffer;
     const totalWorkNeeded = workDays + bufferDays;
-    let start = findValidStart(site, cursor);
+    // Crew change yang dicek di sini adalah milik site SEBELUMNYA di rute ini (yang mau
+    // ditinggalkan) — lihat catatan di findValidStart. Site pertama di rute tidak punya "asal",
+    // jadi tidak ada constraint crew change sama sekali (cuma isBlocked/Hari Terhold miliknya sendiri).
+    const departFromSite = siteIdx>0 ? orderedSites[siteIdx-1] : null;
+    let start = findValidStart(site, cursor, departFromSite);
     let d = start;
     let counted = 0;
     let lastDate = start;
@@ -488,9 +492,13 @@ function recalcScheduleFrom(b, idx, forcedStart){
     const row = b.schedule[i];
     const totalNeeded = Number(row.workDays)+Number(row.bufferDays);
     // Baris yang sengaja digeser/di-drag (i===idx) dihormati apa adanya (biar keliatan
-    // kalau start-nya kebetulan pas crew change). Baris setelahnya (cascade otomatis)
-    // dicarikan hari mulai yang valid seperti saat generate pertama kali.
-    let start = (i===idx) ? cursor : findValidStart(row.site, cursor);
+    // kalau start-nya kebetulan pas crew change). Baris setelahnya (cascade otomatis) dicarikan
+    // hari mulai yang valid seperti saat generate pertama kali — crew change yang dicek adalah
+    // milik site SEBELUMNYA (i-1, yang ditinggalkan), bukan site baris ini sendiri (lihat
+    // findValidStart). Baris pertama di batch (i===0, tidak lewat cabang ini krn selalu ===idx
+    // pada pemanggilan awal) tidak punya "asal" di dalam batch ini.
+    const departFromSite = i>0 ? b.schedule[i-1].site : null;
+    let start = (i===idx) ? cursor : findValidStart(row.site, cursor, departFromSite);
     let d = start, counted=0, lastDate=start, iterations=0;
     while(counted < totalNeeded && iterations<730){
       if(!isBlocked(row.site,d)){ counted++; lastDate=d; }
