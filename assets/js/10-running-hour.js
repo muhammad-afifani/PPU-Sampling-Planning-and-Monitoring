@@ -218,6 +218,7 @@ function doImportRhMonthlyCsv(){
 }
 function renderTracking(){
   refreshTrackingBatchSelect();
+  refreshTrackingSiteSelect();
   const {pts, beforeStatus} = getFilteredTrackingPoints();
   renderKomSiteTable(beforeStatus);
   renderSamplingEmisiTable(beforeStatus);

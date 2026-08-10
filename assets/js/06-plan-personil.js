@@ -118,18 +118,27 @@ function renderRencana(){
     <div class="stat ${emgTrigCount?"bad":""}"><div class="num">${emgTrigCount}</div><div class="lbl">Termasuk Emergency (RH&gt;200j)</div></div>
   `;
 
-  // Resume per grup sumber (Turbin/Gas Engine/Emergency/Flare/dst) — dihitung dari `rows`, yaitu
-  // set yang SAMA dipakai tabel di bawah (sudah kena filter periode+site+cari), jadi otomatis
-  // ikut berubah begitu filter di atas diganti. Pola & urutan grup sama persis dengan panel
-  // "Progress per Grup Sumber" di Dashboard supaya istilahnya konsisten se-tools.
-  const rcGroupRows = KATEGORI_SUMBER_ORDER.map(g=>{
-    const gp = rows.filter(p=>subgroupOf(p)===g);
-    const d = gp.filter(p=>periodOfPointStatus(p,period).startsWith("done")).length;
-    return {label:g, done:d, total:gp.length};
-  }).filter(g=>g.total>0);
-  document.getElementById("rcGroupBars").innerHTML = rcGroupRows.length
-    ? rcGroupRows.map(g=>progressBarRow(g.label, g.done, g.total)).join("")
-    : "<div class='hint'>Tidak ada titik wajib pantau yang cocok filter saat ini.</div>";
+  // Resume Titik Emisi vs Ambient — dihitung dari `rows`, set yang SAMA dipakai tabel di bawah
+  // (sudah kena filter periode+site+cari), jadi otomatis ikut berubah begitu filter di atas
+  // diganti. Angka besar (kartu .stat, bukan bar tipis) + rincian per site supaya langsung
+  // kebaca tanpa harus menyipitkan mata.
+  const rcEmisiCount = rows.filter(p=>p.kategori==="emisi").length;
+  const rcAmbientCount = rows.length - rcEmisiCount;
+  const rcSites = [...new Set(rows.map(p=>p.site))].sort();
+  document.getElementById("rcGroupBars").innerHTML = `
+    <div class="grid cols-2" style="margin-bottom:12px;">
+      <div class="stat"><div class="num">${rcEmisiCount}</div><div class="lbl">Titik Emisi</div></div>
+      <div class="stat"><div class="num">${rcAmbientCount}</div><div class="lbl">Titik Ambient (Ambient/Kebisingan/Kebauan/Getaran)</div></div>
+    </div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Site</th><th style="text-align:right;">Emisi</th><th style="text-align:right;">Ambient</th><th style="text-align:right;">Total</th></tr></thead>
+      <tbody>${rcSites.map(s=>{
+        const sp = rows.filter(p=>p.site===s);
+        const e = sp.filter(p=>p.kategori==="emisi").length;
+        const a = sp.length - e;
+        return `<tr><td>${escHtml(s)}</td><td style="text-align:right;">${e}</td><td style="text-align:right;">${a}</td><td style="text-align:right;"><b>${sp.length}</b></td></tr>`;
+      }).join("") || `<tr><td colspan="4" class="hint" style="padding:10px;">Tidak ada titik wajib pantau yang cocok filter saat ini.</td></tr>`}</tbody>
+    </table></div>`;
 
   document.getElementById("rcTable").innerHTML = `
     <thead><tr><th style="width:26px;"></th><th>Site</th><th>Nama Titik</th><th>Grup</th><th>Dasar Wajib</th><th>Status</th><th>Progress Periode Ini</th></tr></thead>
@@ -257,12 +266,15 @@ function batchesForPersonil(personilId){
     .map(b=>({batch:b, lead:b.assignedPersonil.find(a=>a.id===personilId).lead}));
 }
 function renderPersonil(){
+  // Nama & Role dibekukan (sticky) horizontal — tabel ini lebar (10 kolom dokumen + dst), tanpa ini
+  // dua kolom identitas itu ikut hilang begitu discroll ke kanan, jadi susah tahu baris siapa yang
+  // lagi dilihat. Pola & lebar sama dgn .dg-col-sticky di Gantt (kolom Site).
   document.getElementById("personilTable").innerHTML = `
-  <thead><tr><th style="min-width:120px;">Nama</th><th style="min-width:90px;">Role</th>${PERSONIL_ITEMS.map(it=>`<th style="min-width:104px;white-space:nowrap;">${PERSONIL_LABELS[it]}</th>`).join("")}<th style="min-width:120px;">Kelengkapan</th><th style="min-width:100px;">Dokumentasi</th><th style="min-width:170px;">Ditugaskan di Batch</th><th style="min-width:130px;">Aksi</th></tr></thead>
+  <thead><tr><th class="pz-nama">Nama</th><th class="pz-role">Role</th>${PERSONIL_ITEMS.map(it=>`<th style="min-width:104px;white-space:nowrap;">${PERSONIL_LABELS[it]}</th>`).join("")}<th style="min-width:120px;">Kelengkapan</th><th style="min-width:100px;">Dokumentasi</th><th style="min-width:170px;">Ditugaskan di Batch</th><th style="min-width:130px;">Aksi</th></tr></thead>
   <tbody>${DB.personil.map(p=>{
     const pct = completenessPct(p);
     const assignments = batchesForPersonil(p.id);
-    return `<tr><td><b>${escHtml(p.nama)}</b></td><td>${p.role}</td>
+    return `<tr><td class="pz-nama" title="${escHtml(p.nama)}"><b>${escHtml(p.nama)}</b></td><td class="pz-role">${p.role}</td>
       ${PERSONIL_ITEMS.map(it=>{
         const rec = p.items[it]||{};
         if(it===PERSONIL_NUMBER_FIELD){
@@ -283,6 +295,38 @@ function renderPersonil(){
           <button class="btn small danger" data-action="deletePersonil" data-id="${p.id}">Hapus</button></td>
     </tr>`;
   }).join("")}</tbody>`;
+  renderPersonilAlokasi();
+}
+// Timeline "personil X pindah dari site A (tgl) ke site B (tgl)" — dihitung dari batch yang sudah
+// ditunjuk (assignedPersonil, lihat Perencanaan Batch) beserta jadwal per-site batch itu
+// (b.schedule), BUKAN data terpisah, jadi otomatis ikut kalau penunjukan/jadwal berubah.
+function renderPersonilAlokasi(){
+  const el = document.getElementById("personilAlokasi");
+  if(!el) return;
+  const rows = DB.personil.map(p=>{
+    const items = [];
+    batchesForPersonil(p.id).forEach(({batch, lead})=>{
+      (batch.schedule||[]).forEach(row=>{
+        items.push({site: row.site, start: row.start, end: row.end, batchName: batch.name, team: batch.team, lead});
+      });
+    });
+    items.sort((a,b)=> (a.start||"").localeCompare(b.start||""));
+    return {p, items};
+  }).filter(r=>r.items.length);
+
+  el.innerHTML = rows.length ? rows.map(r=>`
+    <div class="pal-card">
+      <div class="pal-name"><b>${escHtml(r.p.nama)}</b> <span class="muted" style="font-weight:400;">(${escHtml(r.p.role)})</span></div>
+      <div class="pal-timeline">
+        ${r.items.map((it,i)=>`
+          ${i>0?'<span class="pal-arrow">&rarr;</span>':""}
+          <div class="pal-item" title="${escHtml(it.batchName)}${it.lead?" — Ketua Tim":""}">
+            <span class="badge ${it.team==="emisi"?"b-teal":"b-blue"}">${escHtml(it.site)}</span>
+            <span class="pal-date">${escHtml(it.start||"?")} &rarr; ${escHtml(it.end||"?")}</span>
+          </div>`).join("")}
+      </div>
+    </div>`).join("")
+    : "<div class='hint' style='padding:10px;'>Belum ada personil yang ditugaskan ke batch manapun — tunjuk dulu di Perencanaan Batch.</div>";
 }
 function personilFormHtml(p){
   p = p || {id:"", nama:"", role:"PPC Udara", items:{}, dokumentasiLink:""};
@@ -366,7 +410,7 @@ function importPersonilCsv(){
 }
 
 /* =========================================================
-   ROSTER PERSONIL (CETAK A4) — utk dibagikan ke ENV site
+   KELENGKAPAN DATA PERSONIL (CETAK A4) — utk dibagikan ke ENV site
    ---------------------------------------------------------
    QR code di-generate lokal (vendor/qrcode-generator.js, murni JS tanpa dependensi jaringan)
    supaya tetap jalan walau tools ini dibuka offline via file:// — bukan dari layanan pembuat
@@ -381,21 +425,35 @@ function personilDocQrSvg(url){
     return qr.createSvgTag({cellSize:2, margin:1});
   }catch(e){ console.error("Gagal membuat QR dokumentasi personil:", e); return ""; }
 }
+// Baris "Label: nilai" per item (KTP/MCU/dst) LENGKAP dgn tanggal kedaluwarsanya — beda dari badge
+// ringkas di tabel layar (yang cuma nunjukin status), di sini semua item ditulis apa adanya
+// (termasuk yg masih berlaku) supaya kelengkapan datanya kelihatan utuh begitu dicetak di kertas.
+function personilItemDetailHtml(p){
+  return PERSONIL_ITEMS.map(it=>{
+    const rec = p.items[it]||{};
+    let text, color;
+    if(it===PERSONIL_NUMBER_FIELD){
+      if(rec.exp){ text = "No. "+rec.exp; color = "#333"; } else { text = "kosong"; color = "#c0392b"; }
+    } else if(PERSONIL_DATED[it]){
+      if(!rec.exp){ text = "kosong"; color = "#c0392b"; }
+      else {
+        const days = Math.round((new Date(rec.exp)-new Date())/86400000);
+        text = "s.d. "+rec.exp;
+        color = days<0 ? "#c0392b" : days<=30 ? "#c98a1a" : "#2f9e5b";
+      }
+    } else {
+      text = rec.ada ? "Ada" : "Tidak ada";
+      color = rec.ada ? "#2f9e5b" : "#c0392b";
+    }
+    return `<div class="pg-pi-item"><b>${escHtml(PERSONIL_LABELS[it])}:</b> <span style="color:${color};">${escHtml(text)}</span></div>`;
+  }).join("");
+}
 function buildPersonilPrintHtml(){
   const printedAt = new Date().toLocaleString("id-ID", {dateStyle:"long", timeStyle:"short"});
   const rows = DB.personil.slice().sort((a,b)=>a.nama.localeCompare(b.nama));
   const rowsHtml = rows.map((p,i)=>{
     const pct = completenessPct(p);
     const pctColor = pct===100?"#2f9e5b":pct>=70?"#c98a1a":"#c0392b";
-    const missing = [];
-    PERSONIL_ITEMS.forEach(it=>{
-      const rec = p.items[it]||{};
-      if(it===PERSONIL_NUMBER_FIELD){ if(!rec.exp) missing.push(PERSONIL_LABELS[it]+" kosong"); }
-      else if(PERSONIL_DATED[it]){
-        if(!rec.exp) missing.push(PERSONIL_LABELS[it]+" kosong");
-        else if(rec.exp < todayStr()) missing.push(PERSONIL_LABELS[it]+" expired ("+rec.exp+")");
-      } else if(!rec.ada) missing.push(PERSONIL_LABELS[it]+" tidak ada");
-    });
     const qr = personilDocQrSvg(p.dokumentasiLink);
     const docCell = qr
       ? `<div class="pg-qr">${qr}</div><div class="pg-qr-url">${escHtml(p.dokumentasiLink)}</div>`
@@ -405,14 +463,14 @@ function buildPersonilPrintHtml(){
       <td><b>${escHtml(p.nama)}</b></td>
       <td>${escHtml(p.role)}</td>
       <td style="text-align:center;"><b style="color:${pctColor};">${pct}%</b></td>
-      <td style="font-size:8.5px;">${missing.length ? missing.map(escHtml).join("<br>") : '<span style="color:#2f9e5b;">Lengkap</span>'}</td>
+      <td><div class="pg-pi-grid">${personilItemDetailHtml(p)}</div></td>
       <td style="text-align:center;">${docCell}</td>
     </tr>`;
   }).join("");
   return `<table class="pg-guide-page pg-batch">
     <thead><tr><td>
       <div class="pg-header">
-        <div><h1>Roster Personil PPC &amp; Observer</h1><div class="sub">Kelengkapan dokumen &amp; akses dokumentasi pendukung — bahan persiapan &amp; perizinan akses site</div></div>
+        <div><h1>Kelengkapan Data Personil</h1><div class="sub">PPC Udara &amp; Observer — rincian dokumen beserta tanggal kedaluwarsa, bahan persiapan &amp; perizinan akses site</div></div>
         <div class="sub" style="text-align:right;">Dicetak ${escHtml(printedAt)}</div>
       </div>
     </td></tr></thead>
@@ -421,7 +479,7 @@ function buildPersonilPrintHtml(){
     </td></tr></tfoot>
     <tbody><tr><td>
       <table class="pg-table pg-personil-table">
-        <thead><tr><th style="width:16px;">No</th><th>Nama</th><th style="width:90px;">Role</th><th style="width:56px;">Kelengkapan</th><th>Dokumen Perlu Perhatian</th><th style="width:110px;">Link Dokumentasi</th></tr></thead>
+        <thead><tr><th style="width:16px;">No</th><th>Nama</th><th style="width:90px;">Role</th><th style="width:56px;">Kelengkapan</th><th>Rincian Dokumen &amp; Tanggal Kedaluwarsa</th><th style="width:110px;">Link Dokumentasi</th></tr></thead>
         <tbody>${rowsHtml || `<tr><td colspan="6">Belum ada data personil.</td></tr>`}</tbody>
       </table>
     </td></tr></tbody>
@@ -431,6 +489,11 @@ function printPersonilRoster(){
   if(!DB.personil.length){ toast("Belum ada data personil untuk dicetak.","err"); return; }
   setPrintOrientation("portrait");
   document.getElementById("printGuideArea").innerHTML = buildPersonilPrintHtml();
+  // document.title dipakai browser sbg nama file bawaan di dialog "Simpan sebagai PDF" — pola sama
+  // dengan baExportFilename() di Berita Acara, diset sementara lalu dikembalikan lagi sesudahnya.
+  const originalTitle = document.title;
+  document.title = `Kelengkapan Data Personil_${DB.meta.semester} ${DB.meta.tahun}`;
   window.print();
+  document.title = originalTitle;
 }
 
