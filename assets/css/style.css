@@ -326,6 +326,7 @@ textarea.mono{font-family:var(--font-mono);font-size:11.5px;}
 .pg-site{page-break-inside:avoid;margin-bottom:10px;border:1px solid #999;border-radius:4px;overflow:hidden;}
 .pg-site-head{background:#fff;padding:4px 7px 4px 9px;font-size:10.5px;font-weight:700;display:flex;justify-content:space-between;border-bottom:1.3px solid #333;border-left:4px solid #a02a24;}
 .pg-site-note{background:#fdeceb;padding:3px 9px;font-size:8.5px;font-weight:400;border-bottom:1px solid #999;border-left:4px solid #a02a24;}
+.pg-site-note-excluded{background:#fdf3e3;border-left-color:#c98a1a;}
 .pg-mom-body{padding:7px 10px;font-size:9.5px;line-height:1.5;}
 .pg-mom-body>div{margin-bottom:5px;}
 .pg-mom-body ul{margin:3px 0 0 16px;padding:0;}
@@ -538,11 +539,24 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 .daydetail-col-head .tag.buffer{background:var(--gray-200);color:var(--gray-700);}
 .daydetail-col-head .tag.cc{background:#fdeceb;color:#a02a24;}
 .daydetail-col-body{padding:6px;flex:1;min-height:60px;display:flex;flex-direction:column;gap:5px;}
-.daydetail-card{background:#fff;border:1px solid var(--gray-300);border-radius:6px;padding:5px 7px;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.08);}
+.daydetail-card{position:relative;background:#fff;border:1px solid var(--gray-300);border-radius:6px;padding:5px 20px 5px 7px;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.08);}
 .daydetail-card:active{cursor:grabbing;}
 .daydetail-card:hover{border-color:var(--teal-500);}
 .daydetail-card b{font-size:11px;display:block;color:var(--navy-900);}
 .daydetail-card .sub{font-size:9.5px;color:var(--gray-500);margin-top:1px;}
+/* Tombol "x" keluarkan titik dari batch — pojok kanan-atas kartu, cuma jelas kelihatan pas hover
+   supaya tidak mengganggu tampilan normal (kartu ini padat, banyak per kolom hari). */
+.daydetail-card-x{position:absolute;top:2px;right:2px;width:16px;height:16px;line-height:14px;padding:0;border:none;background:transparent;color:var(--gray-400);font-size:15px;font-weight:700;cursor:pointer;border-radius:4px;}
+.daydetail-card-x:hover{background:#fdeceb;color:#a02a24;}
+/* Seksi "Titik Dikeluarkan dari Batch Ini" — di bawah papan kolom hari, daftar vertikal biasa
+   (bukan grid kolom hari) krn titik di sini sengaja TIDAK terikat ke tanggal manapun lagi. */
+.daydetail-excluded{margin-top:14px;padding-top:12px;border-top:1px dashed var(--gray-300);}
+.daydetail-excluded h4{font-size:12.5px;margin:0 0 4px;color:#a02a24;}
+.daydetail-excluded-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--gray-200);}
+.daydetail-excluded-row:last-child{border-bottom:none;}
+.daydetail-excluded-row .name{min-width:160px;font-size:12px;}
+.daydetail-excluded-row select{font-size:11.5px;padding:4px 6px;border:1px solid var(--gray-300);border-radius:6px;}
+.daydetail-excluded-row input[type="text"]{font-size:11.5px;padding:4px 7px;border:1px solid var(--gray-300);border-radius:6px;flex:1;min-width:180px;}
 
 /* Tracking checklist columns */
 .trk-cell{transition:background .15s;}

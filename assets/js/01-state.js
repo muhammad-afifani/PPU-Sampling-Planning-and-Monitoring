@@ -72,6 +72,12 @@ function migrateDB(){
     if(b.finalized===undefined) b.finalized = false;
     if(b.finalizedAt===undefined) b.finalizedAt = null;
     if(!b.baStatusOverrides) b.baStatusOverrides = {};
+    if(!b.excluded) b.excluded = [];
+    // Alasan titik dikeluarkan dari batch ini (lihat papan Detail Harian di Gantt) — terpisah dari
+    // b.excluded (yang cuma daftar ID) supaya bisa dicatat KENAPA: masuk batch berikutnya, atau
+    // sumbernya sendiri tidak beroperasi (TBC kapan tersedia lagi). Murni catatan/dokumentasi,
+    // tidak memengaruhi logika penjadwalan.
+    if(!b.excludeReasons) b.excludeReasons = {};
     (b.schedule||[]).forEach(row=>{ if(row.dayDetailNote===undefined) row.dayDetailNote = ""; });
   });
   // Migrasi sekali: KOM dulu di-key per (batchId,site) — diganti ke (periode,site) supaya batch

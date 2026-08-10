@@ -30,6 +30,57 @@ function groupSiblingsFor(p){
   const key = schedulingGroupKey(p);
   return key===p.id ? [p] : DB.points.filter(x=>schedulingGroupKey(x)===key);
 }
+const EXCLUDE_REASON_LABELS = {batch2:"Masuk Batch Berikutnya", tbc:"Tidak Beroperasi (TBC — belum pasti kapan tersedia)"};
+// Keluarkan/sertakan-lagi 1 titik (+ semua sibling separuh penjadwalan yg sama) dari batch ini —
+// dipanggil dari tombol "x" di kartu Detail Harian. BEDA dgn toggleExcludePoint (dipakai pill di
+// kolom "Titik Pantau" day-grid, yg langsung recompute+reschedule OTOMATIS tiap klik): di sini
+// perubahan cuma DISIMPAN (staged) — jadwal (row.count/workDays/tanggal) BARU dihitung ulang saat
+// user eksplisit klik "Jalankan Ulang Jadwal" (lihat applyExcludeReschedule), supaya beberapa titik
+// bisa dikeluarkan dulu (dgn alasannya masing2) sebelum jadwalnya "diguncang" sekali jalan.
+function stageExcludePoint(batchId, pointId){
+  const b = DB.batches.find(x=>x.id===batchId); if(!b) return;
+  if(!b.excluded) b.excluded = [];
+  if(!b.excludeReasons) b.excludeReasons = {};
+  const point = DB.points.find(x=>x.id===pointId); if(!point) return;
+  const nowExcluded = b.excluded.indexOf(pointId)<0;
+  siblingIdsInBatch(b, point).forEach(id=>{
+    const idx = b.excluded.indexOf(id);
+    if(nowExcluded && idx<0) b.excluded.push(id);
+    if(!nowExcluded && idx>=0) b.excluded.splice(idx,1);
+    if(nowExcluded) b.excludeReasons[id] = b.excludeReasons[id] || {reason:"batch2", note:""};
+    else delete b.excludeReasons[id];
+  });
+  logChange(`${point.nama} (${point.site}) ${nowExcluded?"dikeluarkan dari":"disertakan lagi ke"} batch "${b.name}" — jadwal belum dihitung ulang`);
+  save();
+  const row = b.schedule.find(r=>r.site===point.site);
+  if(row) renderDayDetailModal(b, row);
+  renderGantt();
+}
+// Tombol "Jalankan Ulang Jadwal Site Ini" — hitung ulang hari kerja site ini dari titik yang MASIH
+// aktif (b.items dikurangi b.excluded), lalu recalcScheduleFrom menggeser tanggal site ini &
+// seluruh site SETELAHNYA di batch yang sama supaya tetap berurutan tanpa celah/tabrakan. Logikanya
+// sama persis dgn recomputeSiteForPoint (dipakai toggleExcludePoint), cuma dipanggil manual di sini
+// alih-alih otomatis tiap klik, sesuai alur "keluarkan beberapa titik dulu, baru terapkan sekali".
+function applyExcludeReschedule(batchId, rowIdx){
+  const b = DB.batches.find(x=>x.id===batchId); if(!b) return;
+  const row = b.schedule[rowIdx]; if(!row) return;
+  const excluded = b.excluded||[];
+  const activePts = b.items.map(id=>DB.points.find(x=>x.id===id)).filter(pt=>pt && pt.site===row.site && !excluded.includes(pt.id));
+  const activeCount = new Set(activePts.map(dayCountGroupKey)).size;
+  const rule = DB.siteRules[row.site];
+  const perSiteRatio = rule ? Number(b.team==="emisi"?rule.ratioEmisi:rule.ratioAmbient) : 0;
+  const ratio = perSiteRatio>0 ? perSiteRatio : b.ratio;
+  row.count = activeCount;
+  row.workDays = activeCount>0 ? Math.max(1, Math.ceil(activeCount/ratio)) : 0;
+  recalcScheduleFrom(b, rowIdx);
+  applyScheduleToPoints(b, b.team);
+  logChange(`Jadwal site ${row.site} (${b.name}) dihitung ulang — ${activeCount} titik aktif setelah pengurangan`);
+  save();
+  renderDayDetailModal(b, row);
+  renderGantt();
+  renderMaster();
+  toast(`Jadwal site ${row.site} dihitung ulang: ${row.workDays} hari kerja utk ${activeCount} titik aktif.`,"ok");
+}
 // Papan "Detail Harian" per site — tiap kolom 1 tanggal valid (kerja+buffer) di rentang site itu,
 // kartu titik/grup bisa di-drag antar kolom utk override manual pembagian rata otomatis (lihat
 // dailyAssignmentForRow & b.dayOverrides). Dibuka dari tombol di baris site pada Gantt (day-grid).
@@ -53,6 +104,7 @@ function renderDayDetailModal(b, row){
         ? (NONEMISI_LABEL[p.kategori]||p.kategori) + (siblings.length>1?` (${siblings.length} parameter digabung)`:"")
         : (p.kategoriSumber||p.parameter||"-");
       return `<div class="daydetail-card" draggable="true" data-batch-id="${b.id}" data-site="${row.site}" data-group-key="${escHtml(dayCountGroupKey(p))}" title="Tarik ke kolom hari lain utk custom manual${isFlareGrp?" — semua titik Flare lain yg digabung ikut pindah bersama":""}">
+        <button class="daydetail-card-x" data-action="stageExcludePoint" data-batch-id="${b.id}" data-point-id="${p.id}" title="Keluarkan dari batch ini (mis. melebihi periode) — masuk ke daftar Titik Dikeluarkan di bawah">&times;</button>
         <b>${escHtml(p.nama)}</b><div class="sub">${escHtml(sub)}</div>${isFlareGrp?`<div class="sub" style="color:#a02a24;">&#128293; Digabung 1 hari</div>`:""}
       </div>`;
     }).join("");
@@ -67,17 +119,44 @@ function renderDayDetailModal(b, row){
       <div class="daydetail-col-body">${cards}</div>
     </div>`;
   }).join("");
+  const rowIdx = b.schedule.indexOf(row);
+  // Titik yang sudah dikeluarkan dari batch ini (klik "x" di kartu) — dideduplikasi per grup
+  // penjadwalan sama seperti kartu aktif, supaya 1 kunjungan ambient-family cuma tampil 1 baris
+  // biar tidak ganda utk tiap parameternya.
+  const excludedForSite = dedupeByGroup((b.excluded||[]).map(id=>DB.points.find(p=>p.id===id)).filter(p=>p && p.site===row.site));
+  const excludedHtml = excludedForSite.length ? `
+    <div class="daydetail-excluded">
+      <h4>Titik Dikeluarkan dari Batch Ini (${excludedForSite.length})</h4>
+      <div class="hint" style="margin-bottom:8px;">Belum ikut dihitung dalam jadwal site ini sampai kamu klik "Jalankan Ulang Jadwal" di bawah. Statusnya balik jadi Belum Direncanakan — siap dipilih lagi utk batch berikutnya di halaman Plan Pemantauan.</div>
+      ${excludedForSite.map(p=>{
+        const r = (b.excludeReasons||{})[p.id] || {reason:"batch2", note:""};
+        return `<div class="daydetail-excluded-row">
+          <div class="name"><b>${escHtml(p.nama)}</b></div>
+          <select data-action="setExcludeReason" data-batch-id="${b.id}" data-point-id="${p.id}">
+            <option value="batch2" ${r.reason==="batch2"?"selected":""}>${EXCLUDE_REASON_LABELS.batch2}</option>
+            <option value="tbc" ${r.reason==="tbc"?"selected":""}>${EXCLUDE_REASON_LABELS.tbc}</option>
+          </select>
+          ${r.reason==="tbc" ? `<input type="text" data-action="setExcludeNote" data-batch-id="${b.id}" data-point-id="${p.id}" value="${escHtml(r.note||"")}" placeholder="Catatan / perkiraan tersedia kapan">` : ""}
+          <button class="btn small ghost" data-action="stageExcludePoint" data-batch-id="${b.id}" data-point-id="${p.id}">&#8635; Sertakan Lagi</button>
+        </div>`;
+      }).join("")}
+    </div>` : "";
   openModal(`
     <h3>Detail Harian — ${escHtml(row.site)} <span class="muted" style="font-weight:400;font-size:12px;">(${escHtml(b.name)})</span></h3>
-    <div class="hint" style="margin-bottom:10px;">Tarik (drag) kartu titik ke kolom hari lain utk custom manual — sisanya tetap terbagi rata otomatis. Kolom bergaris miring = hari buffer/cadangan (boleh diisi kalau memang mau dipakai). Perubahan tersimpan otomatis.</div>
+    <div class="hint" style="margin-bottom:10px;">Tarik (drag) kartu titik ke kolom hari lain utk custom manual — sisanya tetap terbagi rata otomatis. Kolom bergaris miring = hari buffer/cadangan (boleh diisi kalau memang mau dipakai). Klik &times; di pojok kartu utk keluarkan titik itu dari batch ini (mis. jadwal kepanjangan/melebihi periode). Perubahan tersimpan otomatis.</div>
     <div class="actions" style="justify-content:flex-start;margin-bottom:10px;">
-      <button class="btn small ghost" data-action="resetDayOverrides" data-batch-id="${b.id}" data-row-idx="${b.schedule.indexOf(row)}" ${hasOverride?"":"disabled"}>Reset ke Otomatis</button>
+      <button class="btn small ghost" data-action="resetDayOverrides" data-batch-id="${b.id}" data-row-idx="${rowIdx}" ${hasOverride?"":"disabled"}>Reset ke Otomatis</button>
     </div>
     <div class="field" style="margin-bottom:10px;">
       <label>Catatan Saat Sampling utk Site Ini <span class="muted" style="font-weight:400;">(otomatis muncul di Tracking BA/CoA &rarr; KOM per Site, dan di Panduan Sampling A4 saat dicetak)</span></label>
-      <textarea data-action="setDayDetailNote" data-batch-id="${b.id}" data-row-idx="${b.schedule.indexOf(row)}" rows="2" style="width:100%;padding:7px 9px;border:1px solid var(--gray-300);border-radius:6px;" placeholder="mis. Akses site perlu izin masuk H-3, kontak PIC lapangan: ...">${escHtml(row.dayDetailNote||"")}</textarea>
+      <textarea data-action="setDayDetailNote" data-batch-id="${b.id}" data-row-idx="${rowIdx}" rows="2" style="width:100%;padding:7px 9px;border:1px solid var(--gray-300);border-radius:6px;" placeholder="mis. Akses site perlu izin masuk H-3, kontak PIC lapangan: ...">${escHtml(row.dayDetailNote||"")}</textarea>
     </div>
     <div class="daydetail-scroll"><div class="daydetail-cols">${cols}</div></div>
+    ${excludedHtml}
+    <div class="actions" style="justify-content:flex-start;margin-top:10px;flex-wrap:wrap;">
+      <button class="btn primary" data-action="applyExcludeReschedule" data-batch-id="${b.id}" data-row-idx="${rowIdx}">&#128260; Jalankan Ulang Jadwal Site Ini</button>
+      <span class="hint" style="align-self:center;max-width:360px;">Menghitung ulang hari kerja site ini dari titik yang masih aktif, lalu menggeser tanggal site-site setelahnya di batch ini kalau perlu.</span>
+    </div>
     <div class="actions"><button class="btn ghost" data-action="closeModal">Tutup</button></div>
   `, {wide:true});
 }
@@ -94,12 +173,44 @@ function dayDetailNotesForSite(site, period){
   });
   return notes;
 }
+// Titik-titik yg 1 unit penjadwalan sama dgn point (lihat schedulingGroupKey) — dipakai supaya
+// alasan/catatan yg diisi utk 1 kartu ambient-family kegabung otomatis nempel ke semua parameter
+// pasangannya juga, konsisten dgn cara b.excluded sendiri sudah memperlakukan grup ini (stageExcludePoint).
+function siblingIdsInBatch(b, point){
+  const groupKey = schedulingGroupKey(point);
+  return b.items.filter(id=>{
+    const pt = DB.points.find(x=>x.id===id);
+    return pt && schedulingGroupKey(pt)===groupKey;
+  });
+}
 document.addEventListener("change", e=>{
   if(e.target.dataset.action==="setDayDetailNote"){
     const b = DB.batches.find(x=>x.id===e.target.dataset.batchId); if(!b) return;
     const row = b.schedule[Number(e.target.dataset.rowIdx)]; if(!row) return;
     row.dayDetailNote = e.target.value.trim();
     logChange(`Catatan saat sampling site ${row.site} (${b.name}) diperbarui`);
+    save();
+  }
+  if(e.target.dataset.action==="setExcludeReason"){
+    const b = DB.batches.find(x=>x.id===e.target.dataset.batchId); if(!b) return;
+    const point = DB.points.find(x=>x.id===e.target.dataset.pointId); if(!point) return;
+    if(!b.excludeReasons) b.excludeReasons = {};
+    siblingIdsInBatch(b, point).forEach(id=>{
+      b.excludeReasons[id] = b.excludeReasons[id] || {reason:"batch2", note:""};
+      b.excludeReasons[id].reason = e.target.value;
+    });
+    save();
+    const row = b.schedule.find(r=>r.site===point.site);
+    if(row) renderDayDetailModal(b, row);
+  }
+  if(e.target.dataset.action==="setExcludeNote"){
+    const b = DB.batches.find(x=>x.id===e.target.dataset.batchId); if(!b) return;
+    const point = DB.points.find(x=>x.id===e.target.dataset.pointId); if(!point) return;
+    if(!b.excludeReasons) b.excludeReasons = {};
+    siblingIdsInBatch(b, point).forEach(id=>{
+      b.excludeReasons[id] = b.excludeReasons[id] || {reason:"tbc", note:""};
+      b.excludeReasons[id].note = e.target.value.trim();
+    });
     save();
   }
 });
@@ -258,10 +369,20 @@ function buildPrintGuideHtml(includeGantt){
         }).join("");
         return `<tr class="pg-day-row${a.isBuffer?" pg-day-buffer":""}"><td colspan="7">${escHtml(dayLabel)}</td></tr>${ptRows || `<tr class="pg-day-empty"><td colspan="7">Belum ada titik dialokasikan ke hari ini.</td></tr>`}`;
       }).join("");
+      // Titik yang dikeluarkan dari batch ini (lihat Detail Harian di Gantt) ikut dicetak di sini
+      // supaya tim lapangan & yang menyusun batch berikutnya sama-sama lihat catatannya di kertas,
+      // bukan cuma di layar.
+      const excludedForSite = dedupeByGroup((b.excluded||[]).map(id=>DB.points.find(p=>p.id===id)).filter(p=>p && p.site===row.site));
+      const excludedNote = excludedForSite.length ? `<div class="pg-site-note pg-site-note-excluded"><b>Tidak Ikut Batch Ini (${excludedForSite.length}):</b> ${excludedForSite.map(p=>{
+        const r = (b.excludeReasons||{})[p.id] || {reason:"batch2", note:""};
+        const reasonLabel = EXCLUDE_REASON_LABELS[r.reason] || r.reason;
+        return `${escHtml(p.nama)} (${escHtml(reasonLabel)}${r.note?": "+escHtml(r.note):""})`;
+      }).join("; ")}</div>` : "";
       return `<tr><td>
         <div class="pg-site">
           <div class="pg-site-head"><span>Site ${escHtml(row.site)} (${sitePts.length} titik)</span><span>Jadwal: ${escHtml(rangeLabel)}</span></div>
           ${row.dayDetailNote ? `<div class="pg-site-note"><b>Catatan Saat Sampling:</b> ${escHtml(row.dayDetailNote)}</div>` : ""}
+          ${excludedNote}
           <table class="pg-table">
             <thead><tr><th style="width:16px;">No</th><th>Nama Titik / Cerobong</th><th>Jenis Sumber</th><th>Parameter Wajib</th><th>Kapasitas / Bahan Bakar</th><th style="width:40px;">Selesai</th><th style="width:110px;">Catatan Lapangan</th></tr></thead>
             <tbody>${dayBlocks}</tbody>
@@ -485,9 +606,14 @@ function buildDayGridView(rows){
     const asg = asgByRow.get(r) || {};
     const color = r.team==="emisi" ? "#0ea5a0" : "#3d78c9";
     const adjustBtn = r.batch ? `<button class="btn small ghost" data-action="openAdjustDuration" data-batch-id="${r.batch.id}" data-row-idx="${r.rowIdx}" title="Adjust durasi manual (percepat/perpanjang) + catatan" style="padding:1px 6px;font-size:10px;">&#9998; Adjust</button>` : "";
-    const dayDetailBtn = r.batch ? `<button class="btn small ghost" data-action="openDayDetail" data-batch-id="${r.batch.id}" data-row-idx="${r.rowIdx}" title="Custom manual: titik mana masuk hari mana (drag-drop)" style="padding:1px 6px;font-size:10px;">&#128203; Detail Harian</button>` : "";
+    const dayDetailBtn = r.batch ? `<button class="btn small ghost" data-action="openDayDetail" data-batch-id="${r.batch.id}" data-row-idx="${r.rowIdx}" title="Custom manual: titik mana masuk hari mana (drag-drop), atau keluarkan titik dari batch ini" style="padding:1px 6px;font-size:10px;">&#128203; Detail Harian</button>` : "";
+    // Badge "N dikeluarkan" — ringkasan cepat supaya kelihatan tanpa perlu buka Detail Harian dulu;
+    // dedupeByGroup sama seperti daftar di modalnya, biar angkanya konsisten (1 kunjungan
+    // ambient-family = 1 hitungan, bukan per parameter).
+    const excludedCount = r.batch ? dedupeByGroup((r.batch.excluded||[]).map(id=>DB.points.find(p=>p.id===id)).filter(p=>p && p.site===r.site)).length : 0;
+    const excludedBadge = excludedCount ? `<span class="badge b-red" style="font-size:9.5px;padding:1px 6px;" title="Titik yang dikeluarkan dari batch ini di site ${escHtml(r.site)} — buka Detail Harian utk lihat/kelola">&#9888; ${excludedCount} dikeluarkan</span>` : "";
     const dragHandle = r.batch ? `<span class="route-drag-handle" title="Tarik untuk ubah urutan site di batch ini">&#8942;&#8942;</span>` : "";
-    html += `<tr><td class="dg-td-label dg-col-sticky" draggable="${r.batch?"true":"false"}" data-batch-id="${r.batch?r.batch.id:""}" data-row-idx="${r.rowIdx}"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${dragHandle}<b>${escHtml(r.site)}</b>${adjustBtn}${dayDetailBtn}</div><div class="sub">${escHtml(r.batchName)} &middot; ${r.workDays} hari kerja${r.bufferDays?" + "+r.bufferDays+" buffer":""} &middot; ${r.start} &rarr; ${r.end}${r.adjustNote?`<br><span style="color:#a02a24;">&#9998; ${escHtml(r.adjustNote)}</span>`:""}</div></td>`;
+    html += `<tr><td class="dg-td-label dg-col-sticky" draggable="${r.batch?"true":"false"}" data-batch-id="${r.batch?r.batch.id:""}" data-row-idx="${r.rowIdx}"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${dragHandle}<b>${escHtml(r.site)}</b>${adjustBtn}${dayDetailBtn}${excludedBadge}</div><div class="sub">${escHtml(r.batchName)} &middot; ${r.workDays} hari kerja${r.bufferDays?" + "+r.bufferDays+" buffer":""} &middot; ${r.start} &rarr; ${r.end}${r.adjustNote?`<br><span style="color:#a02a24;">&#9998; ${escHtml(r.adjustNote)}</span>`:""}</div></td>`;
     for(let i=0;i<totalDays;i++){
       const dt = addDays(minDate,i);
       const inRange = dt>=r.start && dt<=r.end;

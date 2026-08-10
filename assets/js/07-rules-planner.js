@@ -138,7 +138,8 @@ function newBatch(){
   const n = DB.meta[key];
   const b = {id: uid("B"), team, name: `Batch ${n} - ${team==="emisi"?"Emisi":"Ambient"} ${DB.meta.semester} ${DB.meta.tahun}`,
     period: currentPeriodStr(), dayOverrides:{}, finalized:false, finalizedAt:null, baStatusOverrides:{},
-    start:"", end:"", ratio: team==="emisi"?4:2, buffer:1, items:[], schedule:[], assignedPersonil:[]};
+    start:"", end:"", ratio: team==="emisi"?4:2, buffer:1, items:[], schedule:[], assignedPersonil:[],
+    excluded:[], excludeReasons:{}};
   DB.batches.push(b); save();
   logChange(`Batch baru dibuat: "${b.name}"`);
   refreshBatchSelect();

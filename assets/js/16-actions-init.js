@@ -158,6 +158,8 @@ const ACTIONS = {
   openAdjustDuration:(t)=>{ openAdjustDurationModal(t.dataset.batchId, Number(t.dataset.rowIdx)); },
   openDayDetail:(t)=>{ openDayDetailModal(t.dataset.batchId, Number(t.dataset.rowIdx)); },
   resetDayOverrides:(t)=>{ resetDayOverrides(t.dataset.batchId, Number(t.dataset.rowIdx)); },
+  stageExcludePoint:(t)=>{ stageExcludePoint(t.dataset.batchId, t.dataset.pointId); },
+  applyExcludeReschedule:(t)=>{ applyExcludeReschedule(t.dataset.batchId, Number(t.dataset.rowIdx)); },
   saveAdjustDuration:(t)=>{
     const b = DB.batches.find(x=>x.id===t.dataset.batchId); if(!b) return;
     const rowIdx = Number(t.dataset.rowIdx);
