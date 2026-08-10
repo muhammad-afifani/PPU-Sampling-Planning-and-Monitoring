@@ -7,12 +7,21 @@ function refreshTrackingBatchSelect(){
   const list = team? DB.batches.filter(b=>b.team===team) : DB.batches;
   sel.innerHTML = `<option value="">Semua</option>`+list.map(b=>`<option value="${b.id}">${b.name}</option>`).join("");
 }
+// Diisi sekali (bukan tiap render, beda dgn batch di atas) — daftar site jarang berubah dalam satu
+// sesi, sama seperti pola filter Site di halaman Plan Pemantauan.
+function refreshTrackingSiteSelect(){
+  const sel = document.getElementById("trkFltSite");
+  if(sel.dataset.filled) return;
+  sel.innerHTML = `<option value="">Semua</option>` + allSites().map(s=>`<option value="${escHtml(s)}">${s}</option>`).join("");
+  sel.dataset.filled = "1";
+}
 document.getElementById("trkTeam").addEventListener("change", ()=>{ refreshTrackingBatchSelect(); renderTracking(); });
 // Dibungkus arrow (bukan diarahkan langsung ke renderTracking) karena fungsi itu didefinisikan
 // di file assets/js/10-running-hour.js, yang baru dimuat SETELAH file ini — referensi langsung
 // di top-level di sini akan dievaluasi sebelum sempat terdefinisi. Dibungkus supaya baru
 // dicari saat event "change" beneran terjadi (setelah semua file <script> selesai dimuat).
 document.getElementById("trkBatch").addEventListener("change", ()=>renderTracking());
+document.getElementById("trkFltSite").addEventListener("change", ()=>renderTracking());
 document.getElementById("trkStatus").addEventListener("change", ()=>renderTracking());
 
 // KOM tidak lagi di sini — dipindah jadi status per (batch,site) di tabel "KOM per Site"
@@ -82,10 +91,12 @@ function trackingOverallStatus(t, p){
 function getFilteredTrackingPoints(){
   const team = document.getElementById("trkTeam").value;
   const batchId = document.getElementById("trkBatch").value;
+  const site = document.getElementById("trkFltSite").value;
   const statusF = document.getElementById("trkStatus").value;
   let pts = DB.points.filter(p=>p.batchId);
   if(team) pts = pts.filter(p=> team==="emisi"? p.kategori==="emisi" : p.kategori!=="emisi");
   if(batchId) pts = pts.filter(p=>p.batchId===batchId);
+  if(site) pts = pts.filter(p=>p.site===site);
   const beforeStatus = pts;
   if(statusF) pts = pts.filter(p=>trackingOverallStatus(DB.tracking[p.id],p)===statusF);
   return {pts, beforeStatus};
@@ -102,13 +113,13 @@ function renderKomSiteTable(scopePts){
   });
   const rows = Object.values(pairs).sort((a,c)=> a.site===c.site ? a.period.localeCompare(c.period) : a.site.localeCompare(c.site));
   document.getElementById("komSiteTable").innerHTML = rows.length ? `
-    <thead><tr><th>Site</th><th>Periode</th><th>Batch (Emisi/Ambient)</th><th>Jml Titik</th><th>Catatan Hari-H</th><th>KOM (Kick Off Meeting)</th></tr></thead>
+    <thead><tr><th>Site</th><th>Periode</th><th>Batch (Emisi/Ambient)</th><th>Jml Titik</th><th>Catatan Sampling</th><th>KOM (Kick Off Meeting)</th></tr></thead>
     <tbody>${rows.map(r=>{
       const key = komKey(r.period, r.site);
       const k = DB.komStatus[key] || {done:false, date:"", attendees:"", notes:""};
       const nPeserta = (k.attendees||"").split("\n").map(s=>s.trim()).filter(Boolean).length;
-      // Catatan "Hari-H" diisi dari modal Detail Harian di Gantt (per site, per batch) — dikumpulkan
-      // di sini supaya tim yang menyiapkan KOM lihat langsung tanpa bolak-balik ke halaman Gantt.
+      // Catatan Saat Sampling diisi dari modal Detail Harian di Gantt (per site, per batch) —
+      // dikumpulkan di sini supaya tim yang menyiapkan KOM lihat langsung tanpa bolak-balik ke Gantt.
       const dayNotes = dayDetailNotesForSite(r.site, r.period);
       return `<tr>
         <td><b>${escHtml(r.site)}</b></td>
@@ -123,6 +134,68 @@ function renderKomSiteTable(scopePts){
         </td>
       </tr>`;
     }).join("")}</tbody>` : "<div class='hint' style='padding:10px;'>Belum ada titik yang masuk batch untuk filter ini.</div>";
+}
+/* =========================================================
+   EXPORT MoM (Minutes of Meeting) — KOM + Catatan Saat Sampling per site
+   ---------------------------------------------------------
+   Dokumen cetak gabungan dari data yang sudah ada di tabel KOM per Site di atas (mengikuti filter
+   Tim/Batch/Site/Status yang aktif di halaman ini) — bukan data terpisah, jadi selalu konsisten
+   dengan apa yang lagi tampil di layar.
+========================================================= */
+function buildMomHtml(){
+  const {beforeStatus} = getFilteredTrackingPoints();
+  const pairs = {};
+  beforeStatus.forEach(p=>{
+    const b = DB.batches.find(x=>x.id===p.batchId);
+    const period = b ? b.period : "(periode tidak diketahui)";
+    const k = komKey(period, p.site);
+    if(!pairs[k]) pairs[k] = {period, site:p.site, batchNames:new Set()};
+    if(b) pairs[k].batchNames.add(b.name);
+  });
+  const rows = Object.values(pairs).sort((a,c)=> a.site===c.site ? a.period.localeCompare(c.period) : a.site.localeCompare(c.site));
+  if(!rows.length) return null;
+
+  const printedAt = new Date().toLocaleString("id-ID", {dateStyle:"long", timeStyle:"short"});
+  const sections = rows.map(r=>{
+    const key = komKey(r.period, r.site);
+    const k = DB.komStatus[key] || {done:false, date:"", attendees:"", notes:""};
+    const attendeesList = (k.attendees||"").split("\n").map(s=>s.trim()).filter(Boolean);
+    const dayNotes = dayDetailNotesForSite(r.site, r.period);
+    return `<div class="pg-site" style="margin-bottom:12px;">
+      <div class="pg-site-head"><span>Site ${escHtml(r.site)}</span><span>${escHtml(r.period)}</span></div>
+      <div class="pg-mom-body">
+        <div><b>Batch:</b> ${[...r.batchNames].map(escHtml).join(", ")||"-"}</div>
+        <div><b>Kick Off Meeting:</b> ${k.done ? `dilaksanakan ${escHtml(k.date||"-")}` : `<span style="color:#a02a24;">belum dicatat</span>`}</div>
+        ${attendeesList.length ? `<div><b>Peserta:</b><ul>${attendeesList.map(a=>`<li>${escHtml(a)}</li>`).join("")}</ul></div>` : ""}
+        ${k.notes ? `<div><b>Materi KOM:</b> ${escHtml(k.notes).replace(/\n/g,"<br>")}</div>` : ""}
+        ${dayNotes.length ? `<div><b>Catatan Saat Sampling:</b><ul>${dayNotes.map(n=>`<li>[${n.team==="emisi"?"Emisi":"Ambient"} &middot; ${escHtml(n.batchName)}] ${escHtml(n.note)}</li>`).join("")}</ul></div>` : ""}
+        ${!attendeesList.length && !k.notes && !dayNotes.length ? `<div class="muted">Belum ada catatan KOM maupun catatan sampling untuk site ini.</div>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+
+  return `<table class="pg-guide-page pg-batch">
+    <thead><tr><td>
+      <div class="pg-header">
+        <div><h1>Minutes of Meeting (MoM)</h1><div class="sub">Kick Off Meeting &amp; Catatan Saat Sampling per Site</div></div>
+        <div class="sub" style="text-align:right;">Dicetak ${escHtml(printedAt)}</div>
+      </div>
+    </td></tr></thead>
+    <tfoot><tr><td>
+      <div class="pg-foot">Dicetak otomatis dari PHM Emission Sampling Planner &amp; Tracker, mengikuti filter Tim/Batch/Site/Status yang aktif di halaman Tracking BA/CoA saat dicetak.</div>
+    </td></tr></tfoot>
+    <tbody><tr><td>${sections}</td></tr></tbody>
+  </table>`;
+}
+function exportMomPdf(){
+  const html = buildMomHtml();
+  if(!html){ toast("Tidak ada site pada filter Tim/Batch/Site/Status saat ini untuk diekspor.","err"); return; }
+  setPrintOrientation("portrait");
+  document.getElementById("printGuideArea").innerHTML = html;
+  const originalTitle = document.title;
+  document.title = `MoM KOM dan Catatan Sampling_${DB.meta.semester} ${DB.meta.tahun}`;
+  window.print();
+  document.title = originalTitle;
 }
 
 /* =========================================================

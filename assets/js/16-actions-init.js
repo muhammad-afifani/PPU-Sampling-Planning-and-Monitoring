@@ -314,7 +314,26 @@ const ACTIONS = {
       save(); renderTracking();
       toast("Data sampling titik ini dikosongkan.","ok");
     });
-  }
+  },
+  // Reset borongan — cakupannya persis baris yang lagi tampil di tabel Tahap 1 (ikut filter
+  // Tim/Batch/Site di atas): kosongkan Site di filter = reset semua site sekaligus, isi Site
+  // tertentu = reset cuma site itu. Satu mekanisme utk dua kebutuhan ("per site" & "semua data"),
+  // tanpa perlu tombol/UI terpisah.
+  resetSamplingRecordsBulk:()=>{
+    const {beforeStatus} = getFilteredTrackingPoints();
+    const filled = beforeStatus.filter(p=>{ const t=ensureTracking(p.id); return t.samplingStatus || t.dates.actual || t.samplingNote; });
+    if(!filled.length){ toast("Tidak ada data sampling terisi pada baris yang sedang tampil.","err"); return; }
+    askConfirm(`Kosongkan status, tanggal, dan catatan sampling utk ${filled.length} titik yang sedang tampil (sesuai filter Tim/Batch/Site/Status aktif)?`, ()=>{
+      filled.forEach(p=>{
+        const tr = ensureTracking(p.id);
+        tr.samplingStatus = ""; tr.actual = false; tr.dates.actual = ""; tr.samplingNote = "";
+      });
+      logChange(`Reset massal status/tanggal/catatan sampling utk ${filled.length} titik (sesuai filter Tracking aktif)`);
+      save(); renderTracking();
+      toast(`${filled.length} titik direset.`,"ok");
+    });
+  },
+  exportMomPdf
 };
 function save2LocalUiState(){ /* view preference kept in-memory only, resets on reload */ }
 document.addEventListener("click", e=>{

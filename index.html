@@ -155,8 +155,8 @@
       </div>
       <div class="grid cols-4" id="rcStats" style="margin-bottom:16px;"></div>
       <div class="card">
-        <h3>Resume per Grup Sumber</h3>
-        <div class="hint" style="margin-bottom:8px;">Mengikuti filter Periode/Site/Cari Titik di atas — total titik wajib pantau tiap grup (Turbin, Flare, Gas Engine, dst) untuk cakupan yang sedang ditampilkan.</div>
+        <h3>Resume Titik Pantau Emisi &amp; Ambient</h3>
+        <div class="hint" style="margin-bottom:8px;">Mengikuti filter Periode/Site/Cari Titik di atas — total titik wajib pantau, dan rinciannya per site.</div>
         <div id="rcGroupBars"></div>
       </div>
       <div class="card" id="rcTableCard">
@@ -197,9 +197,14 @@
       <div class="section-note">Kelengkapan dihitung dari 10 item: KTP, MCU, SPK, Medpass, CLSR, Sertifikat PPC Udara, Foto Background Biru, BOSIET/BST, Vaksin Booster 3, PTS ID. Item bertanggal dianggap tidak valid jika sudah lewat tanggal expired.</div>
       <div class="tablewrap"><table id="personilTable"></table></div>
       <div class="card">
-        <h3>Roster Personil untuk Persiapan Akses Site (Cetak A4)</h3>
-        <div class="hint" style="margin-bottom:10px;">Ringkasan nama, role, dan kelengkapan dokumen tiap personil — dilengkapi QR code &amp; tautan ke folder dokumentasi (isi lewat "Link Dokumentasi" di form Edit Personil) supaya ENV site bisa langsung scan/buka untuk verifikasi saat mengatur persiapan dan perizinan akses site. Personil tanpa Link Dokumentasi tetap tampil, kolom itu cuma kosong.</div>
-        <button class="btn primary" data-action="printPersonilRoster">Cetak Roster Personil (A4)</button>
+        <h3>Alokasi Site &amp; Jadwal Pindah per Personil</h3>
+        <div class="hint" style="margin-bottom:10px;">Site mana saja tiap personil ditugaskan (dari Perencanaan Batch) beserta tanggal-tanggal perpindahannya, diurut dari yang paling awal.</div>
+        <div id="personilAlokasi"></div>
+      </div>
+      <div class="card">
+        <h3>Kelengkapan Data Personil (Cetak A4)</h3>
+        <div class="hint" style="margin-bottom:10px;">Ringkasan nama, role, dan kelengkapan dokumen tiap personil (termasuk tanggal kedaluwarsa tiap item) — dilengkapi QR code &amp; tautan ke folder dokumentasi (isi lewat "Link Dokumentasi" di form Edit Personil) supaya ENV site bisa langsung scan/buka untuk verifikasi saat mengatur persiapan dan perizinan akses site. Personil tanpa Link Dokumentasi tetap tampil, kolom itu cuma kosong.</div>
+        <button class="btn primary" data-action="printPersonilRoster">Cetak Kelengkapan Data Personil (A4)</button>
       </div>
     </div>
 
@@ -361,16 +366,27 @@
       <div class="toolbar card" style="padding:12px 14px;">
         <div class="field"><label>Tim</label><select id="trkTeam"><option value="">Semua</option><option value="emisi">Emisi</option><option value="ambient">Ambient</option></select></div>
         <div class="field"><label>Batch</label><select id="trkBatch"><option value="">Semua</option></select></div>
+        <div class="field"><label>Site</label><select id="trkFltSite"><option value="">Semua</option></select></div>
         <div class="field"><label>Status</label><select id="trkStatus"><option value="">Semua</option><option value="ontrack">On Track</option><option value="overdue">Overdue</option><option value="done">Selesai</option></select></div>
       </div>
       </div>
       <details class="card collapse-section" open>
         <summary>KOM (Kick Off Meeting) per Site</summary>
+        <div class="toolbar" style="margin-bottom:10px;">
+          <span class="hint" style="max-width:480px;">Export MoM mengikuti filter Tim/Batch/Site/Status di atas — kosongkan Site utk semua site sekaligus.</span>
+          <span class="spacer"></span>
+          <button class="btn ghost" data-action="exportMomPdf">Export MoM (PDF)</button>
+        </div>
         <div class="tablewrap"><table id="komSiteTable"></table></div>
       </details>
       <div class="reg-divider">Tahap 1, Sampling Emisi di Lapangan</div>
       <div class="card">
         <div class="hint" style="margin-top:-6px;">Isi tanggal aktual saat titik ini benar benar disampling. Untuk titik yang sudah direncanakan pada batch ini tetapi ternyata belum dapat disampling, pilih status "Direncanakan Batch Berikutnya" dan tuliskan catatannya (misalnya nomor batch tujuan). Untuk titik yang tidak disampling karena sebab lain (perbaikan, tidak beroperasi, dan sejenisnya), pilih "Tidak Disampling, Sebab Lain" dan isi catatannya. Status ini yang nantinya dipakai untuk menyusun Berita Acara per site.</div>
+        <div class="toolbar" style="margin-bottom:10px;">
+          <span class="hint" style="max-width:480px;">Reset berlaku utk semua baris yang sedang tampil (ikut filter Tim/Batch/Site/Status di atas) — kosongkan Site utk reset per site, atau semua filter utk reset semua data.</span>
+          <span class="spacer"></span>
+          <button class="btn danger" data-action="resetSamplingRecordsBulk">Reset Semua yang Tampil</button>
+        </div>
         <div class="tablewrap"><table id="samplingEmisiTable"></table></div>
       </div>
       <div class="reg-divider">Tahap 2, Dokumen dan Pelaporan sampai SIMPEL PPU</div>

@@ -74,21 +74,22 @@ function renderDayDetailModal(b, row){
       <button class="btn small ghost" data-action="resetDayOverrides" data-batch-id="${b.id}" data-row-idx="${b.schedule.indexOf(row)}" ${hasOverride?"":"disabled"}>Reset ke Otomatis</button>
     </div>
     <div class="field" style="margin-bottom:10px;">
-      <label>Catatan Hari-H utk Site Ini <span class="muted" style="font-weight:400;">(otomatis muncul di Tracking BA/CoA &rarr; KOM per Site, dan di Panduan Sampling A4 saat dicetak)</span></label>
+      <label>Catatan Saat Sampling utk Site Ini <span class="muted" style="font-weight:400;">(otomatis muncul di Tracking BA/CoA &rarr; KOM per Site, dan di Panduan Sampling A4 saat dicetak)</span></label>
       <textarea data-action="setDayDetailNote" data-batch-id="${b.id}" data-row-idx="${b.schedule.indexOf(row)}" rows="2" style="width:100%;padding:7px 9px;border:1px solid var(--gray-300);border-radius:6px;" placeholder="mis. Akses site perlu izin masuk H-3, kontak PIC lapangan: ...">${escHtml(row.dayDetailNote||"")}</textarea>
     </div>
     <div class="daydetail-scroll"><div class="daydetail-cols">${cols}</div></div>
     <div class="actions"><button class="btn ghost" data-action="closeModal">Tutup</button></div>
   `, {wide:true});
 }
-// Catatan Hari-H (field di atas) dikumpulkan lintas-halaman lewat fungsi ini — dipakai KOM per
-// Site (Tracking) & Panduan Sampling A4 (cetak), supaya sekali isi di sini otomatis muncul di
-// kedua tempat tanpa perlu diketik ulang.
+// Catatan Saat Sampling (field di atas; nama field internal dayDetailNote dipertahankan biar tidak
+// perlu migrasi data lagi) dikumpulkan lintas-halaman lewat fungsi ini — dipakai KOM per Site
+// (Tracking), Panduan Sampling A4 (cetak), dan Export MoM, supaya sekali isi di sini otomatis
+// muncul di semua tempat itu tanpa perlu diketik ulang.
 function dayDetailNotesForSite(site, period){
   const notes = [];
   DB.batches.filter(b=>b.period===period).forEach(b=>{
     (b.schedule||[]).forEach(row=>{
-      if(row.site===site && row.dayDetailNote) notes.push({team:b.team, note:row.dayDetailNote});
+      if(row.site===site && row.dayDetailNote) notes.push({team:b.team, note:row.dayDetailNote, batchName:b.name});
     });
   });
   return notes;
@@ -98,7 +99,7 @@ document.addEventListener("change", e=>{
     const b = DB.batches.find(x=>x.id===e.target.dataset.batchId); if(!b) return;
     const row = b.schedule[Number(e.target.dataset.rowIdx)]; if(!row) return;
     row.dayDetailNote = e.target.value.trim();
-    logChange(`Catatan Hari-H site ${row.site} (${b.name}) diperbarui`);
+    logChange(`Catatan saat sampling site ${row.site} (${b.name}) diperbarui`);
     save();
   }
 });
@@ -260,7 +261,7 @@ function buildPrintGuideHtml(includeGantt){
       return `<tr><td>
         <div class="pg-site">
           <div class="pg-site-head"><span>Site ${escHtml(row.site)} (${sitePts.length} titik)</span><span>Jadwal: ${escHtml(rangeLabel)}</span></div>
-          ${row.dayDetailNote ? `<div class="pg-site-note"><b>Catatan Hari-H:</b> ${escHtml(row.dayDetailNote)}</div>` : ""}
+          ${row.dayDetailNote ? `<div class="pg-site-note"><b>Catatan Saat Sampling:</b> ${escHtml(row.dayDetailNote)}</div>` : ""}
           <table class="pg-table">
             <thead><tr><th style="width:16px;">No</th><th>Nama Titik / Cerobong</th><th>Jenis Sumber</th><th>Parameter Wajib</th><th>Kapasitas / Bahan Bakar</th><th style="width:40px;">Selesai</th><th style="width:110px;">Catatan Lapangan</th></tr></thead>
             <tbody>${dayBlocks}</tbody>
@@ -492,7 +493,12 @@ function buildDayGridView(rows){
       const inRange = dt>=r.start && dt<=r.end;
       const isToday = dt===today;
       if(!inRange){
-        html += `<td class="dg-day-cell dg-empty${isToday?" dg-today-col":""}" data-date="${dt}"></td>`;
+        // Outline merah crew change ditandai di SELURUH kolom tanggal site ini (bukan cuma yang
+        // kebetulan lagi dalam rentang jadwal aktif) — supaya pola "site X selalu crew change tiap
+        // hari Y" langsung kelihatan di sepanjang kalender, bukan cuma pas ada jadwal jalan.
+        const ccEmpty = isCrewChange(r.site, dt);
+        const title = ccEmpty ? `${r.site} — ${dt} (hari crew change)` : "";
+        html += `<td class="dg-day-cell dg-empty${isToday?" dg-today-col":""}${ccEmpty?" dg-cc-empty":""}" data-date="${dt}" title="${escHtml(title)}"></td>`;
       } else {
         const a = asg[dt] || {points:[], isBuffer:false};
         const names = a.points.map(p=>p.nama).join(", ");

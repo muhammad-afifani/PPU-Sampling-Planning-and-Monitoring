@@ -326,6 +326,9 @@ textarea.mono{font-family:var(--font-mono);font-size:11.5px;}
 .pg-site{page-break-inside:avoid;margin-bottom:10px;border:1px solid #999;border-radius:4px;overflow:hidden;}
 .pg-site-head{background:#fff;padding:4px 7px 4px 9px;font-size:10.5px;font-weight:700;display:flex;justify-content:space-between;border-bottom:1.3px solid #333;border-left:4px solid #a02a24;}
 .pg-site-note{background:#fdeceb;padding:3px 9px;font-size:8.5px;font-weight:400;border-bottom:1px solid #999;border-left:4px solid #a02a24;}
+.pg-mom-body{padding:7px 10px;font-size:9.5px;line-height:1.5;}
+.pg-mom-body>div{margin-bottom:5px;}
+.pg-mom-body ul{margin:3px 0 0 16px;padding:0;}
 .pg-table{width:100%;border-collapse:collapse;font-size:9px;}
 .pg-table th,.pg-table td{border:1px solid #ccc;padding:3px 5px;text-align:left;vertical-align:top;}
 /* color & position:static WAJIB ditulis ulang di sini — <thead th> global punya warna terang
@@ -342,6 +345,8 @@ textarea.mono{font-family:var(--font-mono);font-size:11.5px;}
 .pg-table tr.pg-day-empty td{color:#999;font-style:italic;}
 .pg-box{display:inline-block;width:10px;height:10px;border:1px solid #333;vertical-align:middle;}
 .pg-personil-table td{vertical-align:middle;}
+.pg-pi-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px 10px;}
+.pg-pi-item{font-size:7.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:1px 0;}
 .pg-qr{line-height:0;}
 .pg-qr svg{width:56px;height:56px;display:block;margin:0 auto;}
 .pg-qr-url{font-size:6.5px;word-break:break-all;text-align:center;margin-top:2px;color:#333;}
@@ -471,6 +476,22 @@ table.daygrid{border-collapse:separate;border-spacing:3px;min-width:max-content;
 /* Kolom Site dibekukan (sticky) horizontal supaya tetap kelihatan saat scroll ke kanan */
 .dg-col-sticky{position:sticky;left:0;z-index:2;}
 thead .dg-col-sticky{z-index:3;}
+/* Nama & Role di tabel Personil dibekukan (sticky) horizontal dgn alasan sama seperti kolom Site
+   di Gantt — tabel ini lebar (10 kolom dokumen + dst), tanpa ini identitas baris hilang saat
+   discroll ke kanan. Lebar KEDUANYA fixed (bukan cuma min-width) supaya offset left Role selalu
+   pas persis di tepi kanan Nama, tidak peduli isi kolom lain. */
+.pz-nama{position:sticky;left:0;z-index:2;min-width:150px;max-width:150px;width:150px;background:#fff;box-shadow:2px 0 3px -2px rgba(0,0,0,.15);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pz-role{position:sticky;left:150px;z-index:2;min-width:92px;max-width:92px;width:92px;background:#fff;box-shadow:2px 0 3px -2px rgba(0,0,0,.15);}
+thead .pz-nama,thead .pz-role{z-index:3;background:var(--navy-900);box-shadow:none;}
+/* Timeline alokasi site per personil (halaman Personil) — satu baris flow per orang, panah antar
+   kartu site menandakan urutan kronologis (sudah diurutkan naik dari tanggal mulai). */
+.pal-card{padding:10px 0;border-bottom:1px solid var(--gray-200);}
+.pal-card:last-child{border-bottom:none;}
+.pal-name{font-size:13px;margin-bottom:6px;}
+.pal-timeline{display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
+.pal-item{display:inline-flex;align-items:center;gap:7px;background:var(--gray-100);border-radius:7px;padding:5px 10px;}
+.pal-date{font-size:11px;color:var(--gray-700);white-space:nowrap;}
+.pal-arrow{color:var(--gray-400);font-weight:700;font-size:13px;}
 .dg-td-label{padding:7px 10px;vertical-align:middle;background:#fff;border-radius:6px;box-shadow:2px 0 3px -2px rgba(0,0,0,.12);}
 .dg-td-label[draggable="true"]{cursor:grab;}
 .dg-td-label[draggable="true"]:active{cursor:grabbing;}
@@ -485,6 +506,11 @@ thead .dg-col-sticky{z-index:3;}
 .dg-day-cell.dg-empty{background:#fff;color:transparent;box-shadow:none;border:1px solid var(--gray-200);}
 .dg-day-cell.dg-buffer{opacity:.55;}
 .dg-day-cell.dg-cc{box-shadow:inset 0 0 0 2px #e0554f;}
+/* Sama seperti .dg-cc, tapi utk sel di LUAR rentang jadwal aktif (lihat catatan di buildDayGridView)
+   — .dg-empty menimpa box-shadow jadi none & warna border ke abu2, jadi ditulis ulang lagi di sini
+   dgn 3 kelas sekaligus supaya spesifisitasnya menang & bordernya diwarnai merah juga, bukan cuma
+   box-shadow (kalau cuma box-shadow, border abu2 .dg-empty di luarnya bikin outline merah kurang jelas). */
+.dg-day-cell.dg-empty.dg-cc-empty{box-shadow:inset 0 0 0 2px #e0554f;border-color:#e0554f;}
 .dg-day-cell.dg-today-col{outline:2px solid #e0a53d;outline-offset:-2px;}
 .dg-day-cell[draggable="true"]:hover{transform:scale(1.12);z-index:1;position:relative;}
 .dg-day-cell[draggable="true"]{cursor:grab;}
