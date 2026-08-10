@@ -525,11 +525,16 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 /* Papan "Detail Harian" (modal, dibuka dari tombol per-baris site di Gantt) — satu kolom per
    tanggal valid di rentang site itu (kerja + buffer), kartu titik/grup bisa digeser drag-drop
    antar kolom utk override manual dari pembagian rata otomatis. */
-/* Baris tombol di TENGAH modal (Reset ke Otomatis, Jalankan Ulang Jadwal) — SENGAJA bukan pakai
-   class .actions: itu sticky ke bawah modal (lihat aturan .modal .actions), pas dipakai lebih dari
-   sekali dalam 1 modal bikin baris tengah ikut "nempel" ke bawah pas discroll & menutupi konten
-   setelahnya (termasuk tombol Tutup, jadi kelihatan "kepotong"/tidak bisa di-scroll). Hanya baris
-   PALING BAWAH modal (tombol Tutup) yang boleh pakai .actions.*/
+/* Modal ini dibagi header (h3+hint, di luar) / body (scroll sendiri) / footer (tombol Tutup, di
+   luar) — BUKAN mengandalkan position:sticky di tengah konten scroll. .modal sendiri sudah
+   flex-column+overflow-y:auto, jadi .daydetail-modal-body cukup diberi flex:1+min-height:0+
+   overflow-y:auto supaya dialah yang scroll (bukan seluruh modal), sementara h3/hint di atas &
+   tombol Tutup di bawah tetap selalu kelihatan tanpa perlu discroll. min-height:0 WAJIB ada —
+   tanpa itu flex child tidak akan menyusut di bawah tinggi natural kontennya, jadi overflow-nya
+   malah "bocor" ke .modal luar alih-alih discroll sendiri di sini. */
+.daydetail-modal-body{flex:1;min-height:0;overflow-y:auto;margin:0 -2px;padding:0 2px;}
+/* Baris tombol di dalam body (Reset ke Otomatis, Jalankan Ulang Jadwal) — SENGAJA bukan pakai
+   class .actions (itu sticky, dipakai KHUSUS tombol Tutup di footer). */
 .daydetail-actionbar{display:flex;justify-content:flex-start;align-items:center;gap:8px;flex-wrap:wrap;}
 .daydetail-scroll{overflow-x:auto;padding-bottom:8px;margin:0 -2px;}
 .daydetail-cols{display:flex;gap:8px;min-width:max-content;}

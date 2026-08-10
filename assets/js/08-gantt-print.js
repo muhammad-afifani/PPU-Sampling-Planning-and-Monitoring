@@ -30,7 +30,11 @@ function groupSiblingsFor(p){
   const key = schedulingGroupKey(p);
   return key===p.id ? [p] : DB.points.filter(x=>schedulingGroupKey(x)===key);
 }
-const EXCLUDE_REASON_LABELS = {batch2:"Masuk Batch Berikutnya", tbc:"Tidak Beroperasi (TBC — belum pasti kapan tersedia)"};
+const EXCLUDE_REASON_LABELS = {
+  batch2: "Masuk Batch Berikutnya",
+  notdue: "Belum Masuk Periode Sampling",
+  tbc: "Tidak Beroperasi (TBC — belum pasti kapan tersedia)"
+};
 // Keluarkan/sertakan-lagi 1 titik (+ semua sibling separuh penjadwalan yg sama) dari batch ini —
 // dipanggil dari tombol "x" di kartu Detail Harian. BEDA dgn toggleExcludePoint (dipakai pill di
 // kolom "Titik Pantau" day-grid, yg langsung recompute+reschedule OTOMATIS tiap klik): di sini
@@ -134,6 +138,7 @@ function renderDayDetailModal(b, row){
           <div class="name"><b>${escHtml(p.nama)}</b></div>
           <select data-action="setExcludeReason" data-batch-id="${b.id}" data-point-id="${p.id}">
             <option value="batch2" ${r.reason==="batch2"?"selected":""}>${EXCLUDE_REASON_LABELS.batch2}</option>
+            <option value="notdue" ${r.reason==="notdue"?"selected":""}>${EXCLUDE_REASON_LABELS.notdue}</option>
             <option value="tbc" ${r.reason==="tbc"?"selected":""}>${EXCLUDE_REASON_LABELS.tbc}</option>
           </select>
           ${r.reason==="tbc" ? `<input type="text" data-action="setExcludeNote" data-batch-id="${b.id}" data-point-id="${p.id}" value="${escHtml(r.note||"")}" placeholder="Catatan / perkiraan tersedia kapan">` : ""}
@@ -141,21 +146,29 @@ function renderDayDetailModal(b, row){
         </div>`;
       }).join("")}
     </div>` : "";
+  // Struktur header/body-scroll/footer EKSPLISIT (bukan mengandalkan position:sticky di tengah
+  // konten) — modal ini bisa jadi panjang (banyak kolom hari + daftar titik dikeluarkan), dan
+  // sticky di tengah konten scroll gampang numpuk/menutupi elemen lain begitu ada lebih dari satu
+  // baris tombol. Cuma h3+hint (kepala) & tombol Tutup (kaki) yang TIDAK ikut discroll; sisanya
+  // (Reset, catatan, kolom hari, daftar dikeluarkan, Jalankan Ulang Jadwal) ada di ${"daydetail-modal-body"}
+  // yang scroll sendiri, jadi kaki modal selalu kelihatan tanpa perlu trik sticky sama sekali.
   openModal(`
     <h3>Detail Harian — ${escHtml(row.site)} <span class="muted" style="font-weight:400;font-size:12px;">(${escHtml(b.name)})</span></h3>
     <div class="hint" style="margin-bottom:10px;">Tarik (drag) kartu titik ke kolom hari lain utk custom manual — sisanya tetap terbagi rata otomatis. Kolom bergaris miring = hari buffer/cadangan (boleh diisi kalau memang mau dipakai). Klik &times; di pojok kartu utk keluarkan titik itu dari batch ini (mis. jadwal kepanjangan/melebihi periode). Perubahan tersimpan otomatis.</div>
-    <div class="daydetail-actionbar" style="margin-bottom:10px;">
-      <button class="btn small ghost" data-action="resetDayOverrides" data-batch-id="${b.id}" data-row-idx="${rowIdx}" ${hasOverride?"":"disabled"}>Reset ke Otomatis</button>
-    </div>
-    <div class="field" style="margin-bottom:10px;">
-      <label>Catatan Saat Sampling utk Site Ini <span class="muted" style="font-weight:400;">(otomatis muncul di Tracking BA/CoA &rarr; KOM per Site, dan di Panduan Sampling A4 saat dicetak)</span></label>
-      <textarea data-action="setDayDetailNote" data-batch-id="${b.id}" data-row-idx="${rowIdx}" rows="2" style="width:100%;padding:7px 9px;border:1px solid var(--gray-300);border-radius:6px;" placeholder="mis. Akses site perlu izin masuk H-3, kontak PIC lapangan: ...">${escHtml(row.dayDetailNote||"")}</textarea>
-    </div>
-    <div class="daydetail-scroll"><div class="daydetail-cols">${cols}</div></div>
-    ${excludedHtml}
-    <div class="daydetail-actionbar" style="margin-top:10px;">
-      <button class="btn primary" data-action="applyExcludeReschedule" data-batch-id="${b.id}" data-row-idx="${rowIdx}">&#128260; Jalankan Ulang Jadwal Site Ini</button>
-      <span class="hint" style="align-self:center;max-width:360px;">Menghitung ulang hari kerja site ini dari titik yang masih aktif, lalu menggeser tanggal site-site setelahnya di batch ini kalau perlu.</span>
+    <div class="daydetail-modal-body">
+      <div class="daydetail-actionbar" style="margin-bottom:10px;">
+        <button class="btn small ghost" data-action="resetDayOverrides" data-batch-id="${b.id}" data-row-idx="${rowIdx}" ${hasOverride?"":"disabled"}>Reset ke Otomatis</button>
+      </div>
+      <div class="field" style="margin-bottom:10px;">
+        <label>Catatan Saat Sampling utk Site Ini <span class="muted" style="font-weight:400;">(otomatis muncul di Tracking BA/CoA &rarr; KOM per Site, dan di Panduan Sampling A4 saat dicetak)</span></label>
+        <textarea data-action="setDayDetailNote" data-batch-id="${b.id}" data-row-idx="${rowIdx}" rows="2" style="width:100%;padding:7px 9px;border:1px solid var(--gray-300);border-radius:6px;" placeholder="mis. Akses site perlu izin masuk H-3, kontak PIC lapangan: ...">${escHtml(row.dayDetailNote||"")}</textarea>
+      </div>
+      <div class="daydetail-scroll"><div class="daydetail-cols">${cols}</div></div>
+      ${excludedHtml}
+      <div class="daydetail-actionbar" style="margin-top:10px;">
+        <button class="btn primary" data-action="applyExcludeReschedule" data-batch-id="${b.id}" data-row-idx="${rowIdx}">&#128260; Jalankan Ulang Jadwal Site Ini</button>
+        <span class="hint" style="align-self:center;max-width:360px;">Menghitung ulang hari kerja site ini dari titik yang masih aktif, lalu menggeser tanggal site-site setelahnya di batch ini kalau perlu.</span>
+      </div>
     </div>
     <div class="actions"><button class="btn ghost" data-action="closeModal">Tutup</button></div>
   `, {wide:true});
