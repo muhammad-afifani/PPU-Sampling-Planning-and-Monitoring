@@ -72,7 +72,31 @@ function migrateDB(){
     if(b.finalized===undefined) b.finalized = false;
     if(b.finalizedAt===undefined) b.finalizedAt = null;
     if(!b.baStatusOverrides) b.baStatusOverrides = {};
+    (b.schedule||[]).forEach(row=>{ if(row.dayDetailNote===undefined) row.dayDetailNote = ""; });
   });
+  // Migrasi sekali: KOM dulu di-key per (batchId,site) — diganti ke (periode,site) supaya batch
+  // Emisi & Ambient yang mengunjungi site sama di periode sama otomatis gabung jadi 1 baris/catatan
+  // KOM (lihat komKey di tracking). Entry lama dipetakan ke periode batch aslinya; kalau 2 entry
+  // lama kebetulan jatuh ke key baru yang sama (batch Emisi & Ambient sama-sama sudah dicatat
+  // KOM-nya terpisah), digabung — bukan saling timpa.
+  if(!DB.meta.komMigratedV2){
+    const migrated = {};
+    Object.keys(DB.komStatus).forEach(oldKey=>{
+      const [batchId, site] = oldKey.split("::");
+      const b = DB.batches.find(x=>x.id===batchId);
+      const newKey = komKey(b ? b.period : "(periode tidak diketahui)", site);
+      const entry = DB.komStatus[oldKey];
+      const existing = migrated[newKey];
+      migrated[newKey] = existing ? {
+        done: existing.done || entry.done,
+        date: [existing.date, entry.date].filter(Boolean).sort().pop() || "",
+        attendees: [existing.attendees, entry.attendees].filter(Boolean).join("\n"),
+        notes: [existing.notes, entry.notes].filter(Boolean).join("\n")
+      } : entry;
+    });
+    DB.komStatus = migrated;
+    DB.meta.komMigratedV2 = true;
+  }
   DB.personil.forEach(p=>{ if(p.dokumentasiLink===undefined) p.dokumentasiLink = ""; });
   DB.points.forEach(p=>{
     if(p.groupOverride===undefined) p.groupOverride = "";

@@ -118,6 +118,19 @@ function renderRencana(){
     <div class="stat ${emgTrigCount?"bad":""}"><div class="num">${emgTrigCount}</div><div class="lbl">Termasuk Emergency (RH&gt;200j)</div></div>
   `;
 
+  // Resume per grup sumber (Turbin/Gas Engine/Emergency/Flare/dst) — dihitung dari `rows`, yaitu
+  // set yang SAMA dipakai tabel di bawah (sudah kena filter periode+site+cari), jadi otomatis
+  // ikut berubah begitu filter di atas diganti. Pola & urutan grup sama persis dengan panel
+  // "Progress per Grup Sumber" di Dashboard supaya istilahnya konsisten se-tools.
+  const rcGroupRows = KATEGORI_SUMBER_ORDER.map(g=>{
+    const gp = rows.filter(p=>subgroupOf(p)===g);
+    const d = gp.filter(p=>periodOfPointStatus(p,period).startsWith("done")).length;
+    return {label:g, done:d, total:gp.length};
+  }).filter(g=>g.total>0);
+  document.getElementById("rcGroupBars").innerHTML = rcGroupRows.length
+    ? rcGroupRows.map(g=>progressBarRow(g.label, g.done, g.total)).join("")
+    : "<div class='hint'>Tidak ada titik wajib pantau yang cocok filter saat ini.</div>";
+
   document.getElementById("rcTable").innerHTML = `
     <thead><tr><th style="width:26px;"></th><th>Site</th><th>Nama Titik</th><th>Grup</th><th>Dasar Wajib</th><th>Status</th><th>Progress Periode Ini</th></tr></thead>
     <tbody>${rows.map(p=>{
@@ -350,5 +363,74 @@ function importPersonilCsv(){
     inp.value="";
   };
   inp.click();
+}
+
+/* =========================================================
+   ROSTER PERSONIL (CETAK A4) — utk dibagikan ke ENV site
+   ---------------------------------------------------------
+   QR code di-generate lokal (vendor/qrcode-generator.js, murni JS tanpa dependensi jaringan)
+   supaya tetap jalan walau tools ini dibuka offline via file:// — bukan dari layanan pembuat
+   QR online yang butuh koneksi internet tiap kali dicetak.
+========================================================= */
+function personilDocQrSvg(url){
+  if(!url) return "";
+  try{
+    const qr = qrcode(0, "M");
+    qr.addData(url);
+    qr.make();
+    return qr.createSvgTag({cellSize:2, margin:1});
+  }catch(e){ console.error("Gagal membuat QR dokumentasi personil:", e); return ""; }
+}
+function buildPersonilPrintHtml(){
+  const printedAt = new Date().toLocaleString("id-ID", {dateStyle:"long", timeStyle:"short"});
+  const rows = DB.personil.slice().sort((a,b)=>a.nama.localeCompare(b.nama));
+  const rowsHtml = rows.map((p,i)=>{
+    const pct = completenessPct(p);
+    const pctColor = pct===100?"#2f9e5b":pct>=70?"#c98a1a":"#c0392b";
+    const missing = [];
+    PERSONIL_ITEMS.forEach(it=>{
+      const rec = p.items[it]||{};
+      if(it===PERSONIL_NUMBER_FIELD){ if(!rec.exp) missing.push(PERSONIL_LABELS[it]+" kosong"); }
+      else if(PERSONIL_DATED[it]){
+        if(!rec.exp) missing.push(PERSONIL_LABELS[it]+" kosong");
+        else if(rec.exp < todayStr()) missing.push(PERSONIL_LABELS[it]+" expired ("+rec.exp+")");
+      } else if(!rec.ada) missing.push(PERSONIL_LABELS[it]+" tidak ada");
+    });
+    const qr = personilDocQrSvg(p.dokumentasiLink);
+    const docCell = qr
+      ? `<div class="pg-qr">${qr}</div><div class="pg-qr-url">${escHtml(p.dokumentasiLink)}</div>`
+      : (p.dokumentasiLink ? `<div class="pg-qr-url">${escHtml(p.dokumentasiLink)}</div>` : `<span class="muted">-</span>`);
+    return `<tr>
+      <td>${i+1}</td>
+      <td><b>${escHtml(p.nama)}</b></td>
+      <td>${escHtml(p.role)}</td>
+      <td style="text-align:center;"><b style="color:${pctColor};">${pct}%</b></td>
+      <td style="font-size:8.5px;">${missing.length ? missing.map(escHtml).join("<br>") : '<span style="color:#2f9e5b;">Lengkap</span>'}</td>
+      <td style="text-align:center;">${docCell}</td>
+    </tr>`;
+  }).join("");
+  return `<table class="pg-guide-page pg-batch">
+    <thead><tr><td>
+      <div class="pg-header">
+        <div><h1>Roster Personil PPC &amp; Observer</h1><div class="sub">Kelengkapan dokumen &amp; akses dokumentasi pendukung — bahan persiapan &amp; perizinan akses site</div></div>
+        <div class="sub" style="text-align:right;">Dicetak ${escHtml(printedAt)}</div>
+      </div>
+    </td></tr></thead>
+    <tfoot><tr><td>
+      <div class="pg-foot">Dicetak otomatis dari PHM Emission Sampling Planner &amp; Tracker. Kolom Link Dokumentasi berisi QR code &amp; tautan menuju folder dokumen pendukung (KTP/MCU/dst) tiap personil — scan atau salin tautannya ke browser utk membuka.</div>
+    </td></tr></tfoot>
+    <tbody><tr><td>
+      <table class="pg-table pg-personil-table">
+        <thead><tr><th style="width:16px;">No</th><th>Nama</th><th style="width:90px;">Role</th><th style="width:56px;">Kelengkapan</th><th>Dokumen Perlu Perhatian</th><th style="width:110px;">Link Dokumentasi</th></tr></thead>
+        <tbody>${rowsHtml || `<tr><td colspan="6">Belum ada data personil.</td></tr>`}</tbody>
+      </table>
+    </td></tr></tbody>
+  </table>`;
+}
+function printPersonilRoster(){
+  if(!DB.personil.length){ toast("Belum ada data personil untuk dicetak.","err"); return; }
+  setPrintOrientation("portrait");
+  document.getElementById("printGuideArea").innerHTML = buildPersonilPrintHtml();
+  window.print();
 }
 
