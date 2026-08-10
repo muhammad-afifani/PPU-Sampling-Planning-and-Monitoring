@@ -243,10 +243,11 @@ function renderSamplingEmisiTable(pts){
   const el = document.getElementById("samplingEmisiTable");
   if(!el) return;
   el.innerHTML = `
-    <thead><tr><th>Site</th><th>Titik</th><th>Kategori Sumber</th><th>Wajib Pantau</th><th style="width:190px;">Status Sampling</th><th style="width:150px;">Tanggal Sampling</th><th>Catatan</th></tr></thead>
+    <thead><tr><th>Site</th><th>Titik</th><th>Kategori Sumber</th><th>Wajib Pantau</th><th style="width:190px;">Status Sampling</th><th style="width:150px;">Tanggal Sampling</th><th>Catatan</th><th style="width:60px;">Aksi</th></tr></thead>
     <tbody>${pts.map(p=>{
       const t = ensureTracking(p.id);
       const status = t.samplingStatus||"";
+      const isFilled = status || t.dates.actual || t.samplingNote;
       const notePlaceholder = status==="deferred" ? "mis. Batch 2" : status==="other" ? "mis. Under Maintenance" : "";
       return `<tr>
         <td>${p.site}</td>
@@ -261,6 +262,7 @@ function renderSamplingEmisiTable(pts){
         </select></td>
         <td><input type="date" data-action="setSamplingDate" data-id="${p.id}" value="${t.dates.actual||""}" ${status!=="sampled"?"disabled":""} style="width:100%;"></td>
         <td><input type="text" data-action="setSamplingNote" data-id="${p.id}" value="${escHtml(t.samplingNote||"")}" placeholder="${notePlaceholder}" style="width:100%;" ${status==="sampled"?"disabled":""}></td>
+        <td><button class="btn small danger" data-action="resetSamplingRecord" data-id="${p.id}" title="Kosongkan status, tanggal, dan catatan sampling titik ini" ${isFilled?"":"disabled"}>Reset</button></td>
       </tr>`;
     }).join("")}</tbody>`;
 }

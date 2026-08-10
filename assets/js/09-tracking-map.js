@@ -43,13 +43,18 @@ function ensureTracking(id){
   if(!t.dates) t.dates = {};
   return t;
 }
-function komKey(batchId, site){ return batchId+"::"+site; }
-// Modal catat KOM (Kick Off Meeting) per (batch,site) — absen peserta & ringkasan materi yang
+// KOM di-key per (periode,site) — BUKAN per batch — supaya batch Emisi & Ambient yang mengunjungi
+// site yang sama di periode yang sama gabung jadi satu baris/satu catatan KOM (site cuma butuh 1x
+// Kick Off Meeting per kunjungan periode, terlepas dari berapa tim yang datang). Periode (bukan
+// batchId polos) tetap dipertahankan di key supaya KOM periode lalu tidak "keliatan sudah selesai"
+// lagi kalau site yang sama dikunjungi ulang di periode berikutnya.
+function komKey(period, site){ return period+"::"+site; }
+// Modal catat KOM (Kick Off Meeting) per (periode,site) — absen peserta & ringkasan materi yang
 // disampaikan, bukan cuma centang selesai/belum seperti sebelumnya.
 function openKomDetail(key){
-  const site = key.split("::")[1];
+  const [period, site] = key.split("::");
   const k = DB.komStatus[key] || {done:false, date:"", attendees:"", notes:""};
-  openModal(`<h3>KOM — ${escHtml(site)}</h3>
+  openModal(`<h3>KOM — ${escHtml(site)} <span class="muted" style="font-weight:400;font-size:12px;">(${escHtml(period)})</span></h3>
     <p class="hint">Catat tanggal, peserta (absen), dan materi yang sudah disampaikan saat Kick Off Meeting site ini.</p>
     <div class="field"><label>Tanggal KOM</label><input type="date" id="komDate" value="${escHtml(k.date||todayStr())}"></div>
     <div class="field" style="margin-top:8px;"><label>Peserta / Absen (satu nama per baris)</label>
@@ -87,19 +92,30 @@ function getFilteredTrackingPoints(){
 }
 function renderKomSiteTable(scopePts){
   const pairs = {};
-  scopePts.forEach(p=>{ const k=komKey(p.batchId,p.site); if(!pairs[k]) pairs[k]={batchId:p.batchId, site:p.site, count:0}; pairs[k].count++; });
-  const rows = Object.values(pairs).sort((a,c)=>a.site.localeCompare(c.site));
+  scopePts.forEach(p=>{
+    const b = DB.batches.find(x=>x.id===p.batchId);
+    const period = b ? b.period : "(periode tidak diketahui)";
+    const k = komKey(period, p.site);
+    if(!pairs[k]) pairs[k] = {period, site:p.site, count:0, batchNames:new Set()};
+    pairs[k].count++;
+    if(b) pairs[k].batchNames.add(b.name);
+  });
+  const rows = Object.values(pairs).sort((a,c)=> a.site===c.site ? a.period.localeCompare(c.period) : a.site.localeCompare(c.site));
   document.getElementById("komSiteTable").innerHTML = rows.length ? `
-    <thead><tr><th>Batch</th><th>Site</th><th>Jml Titik</th><th>KOM (Kick Off Meeting)</th></tr></thead>
+    <thead><tr><th>Site</th><th>Periode</th><th>Batch (Emisi/Ambient)</th><th>Jml Titik</th><th>Catatan Hari-H</th><th>KOM (Kick Off Meeting)</th></tr></thead>
     <tbody>${rows.map(r=>{
-      const b = DB.batches.find(x=>x.id===r.batchId);
-      const key = komKey(r.batchId, r.site);
+      const key = komKey(r.period, r.site);
       const k = DB.komStatus[key] || {done:false, date:"", attendees:"", notes:""};
       const nPeserta = (k.attendees||"").split("\n").map(s=>s.trim()).filter(Boolean).length;
+      // Catatan "Hari-H" diisi dari modal Detail Harian di Gantt (per site, per batch) — dikumpulkan
+      // di sini supaya tim yang menyiapkan KOM lihat langsung tanpa bolak-balik ke halaman Gantt.
+      const dayNotes = dayDetailNotesForSite(r.site, r.period);
       return `<tr>
-        <td>${b?escHtml(b.name):"-"}</td>
-        <td><b>${r.site}</b></td>
+        <td><b>${escHtml(r.site)}</b></td>
+        <td>${escHtml(r.period)}</td>
+        <td style="font-size:11px;">${[...r.batchNames].map(escHtml).join("<br>")||"-"}</td>
         <td>${r.count}</td>
+        <td style="font-size:11px;max-width:220px;">${dayNotes.length ? dayNotes.map(n=>`<div style="margin-bottom:2px;"><b>${n.team==="emisi"?"Emisi":"Ambient"}:</b> ${escHtml(n.note)}</div>`).join("") : '<span class="muted">-</span>'}</td>
         <td class="trk-cell${k.done?" done":""}">
           <button class="btn small ${k.done?"":"ghost"}" data-action="openKomDetail" data-key="${escHtml(key)}">
             ${k.done ? `&#10003; ${nPeserta} peserta &middot; ${escHtml(k.date||"-")}` : "Catat KOM"}

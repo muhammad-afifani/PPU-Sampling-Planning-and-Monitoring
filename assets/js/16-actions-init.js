@@ -7,7 +7,7 @@ const ACTIONS = {
   goToPage:(t)=>showPage(t.dataset.page),
   importPointsCsv, exportPointsCsv,
   addPersonil, editPersonil:(t)=>editPersonil(t.dataset.id), deletePersonil:(t)=>deletePersonil(t.dataset.id), savePersonil:(t)=>savePersonil(t.dataset.id),
-  importPersonilCsv, exportPersonilCsv,
+  importPersonilCsv, exportPersonilCsv, printPersonilRoster,
   importRhCsv, exportRhCsv, doImportRhCsv,
   importRhMonthlyCsv, exportRhMonthlyCsv, doImportRhMonthlyCsv,
   openRhDetail:(t)=>openRhDetail(t.dataset.id),
@@ -300,6 +300,20 @@ const ACTIONS = {
     logChange(`Kolom "${label}" di-bulk ${newVal?"centang":"kosongkan"} untuk ${docPts.length} titik`);
     save(); renderTracking();
     toast(`"${label}" di-${newVal?"centang":"kosongkan"} untuk ${docPts.length} baris yang tampil.`,"ok");
+  },
+  // Kosongkan lagi status/tanggal/catatan sampling (Tahap 1) satu titik — utk salah input tanpa
+  // harus utak-atik dropdown+tanggal+catatan satu-satu. TIDAK menyentuh Tahap 2 (BA/draft/dst),
+  // itu checklist dokumen terpisah yang punya alurnya sendiri.
+  resetSamplingRecord:(t)=>{
+    const id = t.dataset.id;
+    const p = DB.points.find(x=>x.id===id);
+    askConfirm(`Kosongkan status, tanggal, dan catatan sampling untuk "${p?p.nama:id}"?`, ()=>{
+      const tr = ensureTracking(id);
+      tr.samplingStatus = ""; tr.actual = false; tr.dates.actual = ""; tr.samplingNote = "";
+      logChange(`Status/tanggal/catatan sampling "${p?p.nama:id}" direset`);
+      save(); renderTracking();
+      toast("Data sampling titik ini dikosongkan.","ok");
+    });
   }
 };
 function save2LocalUiState(){ /* view preference kept in-memory only, resets on reload */ }

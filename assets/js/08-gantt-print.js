@@ -73,10 +73,35 @@ function renderDayDetailModal(b, row){
     <div class="actions" style="justify-content:flex-start;margin-bottom:10px;">
       <button class="btn small ghost" data-action="resetDayOverrides" data-batch-id="${b.id}" data-row-idx="${b.schedule.indexOf(row)}" ${hasOverride?"":"disabled"}>Reset ke Otomatis</button>
     </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label>Catatan Hari-H utk Site Ini <span class="muted" style="font-weight:400;">(otomatis muncul di Tracking BA/CoA &rarr; KOM per Site, dan di Panduan Sampling A4 saat dicetak)</span></label>
+      <textarea data-action="setDayDetailNote" data-batch-id="${b.id}" data-row-idx="${b.schedule.indexOf(row)}" rows="2" style="width:100%;padding:7px 9px;border:1px solid var(--gray-300);border-radius:6px;" placeholder="mis. Akses site perlu izin masuk H-3, kontak PIC lapangan: ...">${escHtml(row.dayDetailNote||"")}</textarea>
+    </div>
     <div class="daydetail-scroll"><div class="daydetail-cols">${cols}</div></div>
     <div class="actions"><button class="btn ghost" data-action="closeModal">Tutup</button></div>
   `, {wide:true});
 }
+// Catatan Hari-H (field di atas) dikumpulkan lintas-halaman lewat fungsi ini — dipakai KOM per
+// Site (Tracking) & Panduan Sampling A4 (cetak), supaya sekali isi di sini otomatis muncul di
+// kedua tempat tanpa perlu diketik ulang.
+function dayDetailNotesForSite(site, period){
+  const notes = [];
+  DB.batches.filter(b=>b.period===period).forEach(b=>{
+    (b.schedule||[]).forEach(row=>{
+      if(row.site===site && row.dayDetailNote) notes.push({team:b.team, note:row.dayDetailNote});
+    });
+  });
+  return notes;
+}
+document.addEventListener("change", e=>{
+  if(e.target.dataset.action==="setDayDetailNote"){
+    const b = DB.batches.find(x=>x.id===e.target.dataset.batchId); if(!b) return;
+    const row = b.schedule[Number(e.target.dataset.rowIdx)]; if(!row) return;
+    row.dayDetailNote = e.target.value.trim();
+    logChange(`Catatan Hari-H site ${row.site} (${b.name}) diperbarui`);
+    save();
+  }
+});
 function resetDayOverrides(batchId, rowIdx){
   const b = DB.batches.find(x=>x.id===batchId); if(!b) return;
   const row = b.schedule[rowIdx]; if(!row) return;
@@ -142,6 +167,7 @@ document.getElementById("ganttMode").addEventListener("change", renderGantt);
 // dilihat di layar. Memakai data batch yang sudah fix dari halaman Perencanaan Batch/Gantt, jadi
 // tidak menduplikasi logika penjadwalan, hanya menyusun ulang tampilannya supaya pas untuk kertas A4.
 const PG_MONTH_ID = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+const DOW_SHORT_ID = ["Min","Sen","Sel","Rab","Kam","Jum","Sab"];
 // Tabel Gantt ringkas per hari, satu baris per site, satu kolom per tanggal kalender — memakai
 // fungsi isBlocked yang sama persis dengan yang dipakai saat generate jadwal, supaya pembagian
 // hari kerja vs buffer vs libur/terhold di sini konsisten dengan jadwal aslinya, bukan sekadar
@@ -234,6 +260,7 @@ function buildPrintGuideHtml(includeGantt){
       return `<tr><td>
         <div class="pg-site">
           <div class="pg-site-head"><span>Site ${escHtml(row.site)} (${sitePts.length} titik)</span><span>Jadwal: ${escHtml(rangeLabel)}</span></div>
+          ${row.dayDetailNote ? `<div class="pg-site-note"><b>Catatan Hari-H:</b> ${escHtml(row.dayDetailNote)}</div>` : ""}
           <table class="pg-table">
             <thead><tr><th style="width:16px;">No</th><th>Nama Titik / Cerobong</th><th>Jenis Sumber</th><th>Parameter Wajib</th><th>Kapasitas / Bahan Bakar</th><th style="width:40px;">Selesai</th><th style="width:110px;">Catatan Lapangan</th></tr></thead>
             <tbody>${dayBlocks}</tbody>
@@ -410,6 +437,14 @@ function buildDayGridView(rows){
 
   const asgByRow = new Map(rows.map(r=>[r, (r.batch && r.rowIdx!=null) ? dailyAssignmentForRow(r.batch, r) : {}]));
   const today = todayStr();
+  // Kumpulan tanggal yang jadi hari crew change utk SETIDAKNYA satu site yang lagi tampil — dipakai
+  // menandai kolom tanggal itu di HEADER (penanda cepat sekilas), di atas outline merah per-sel yang
+  // sudah ada di tiap baris site (lihat dg-cc di bawah).
+  const ccDates = new Set();
+  rows.forEach(r=>{
+    let d = r.start, iter=0;
+    while(d<=r.end && iter<1000){ if(isCrewChange(r.site,d)) ccDates.add(d); d=addDays(d,1); iter++; }
+  });
 
   // Header dua-tingkat: baris bulan (colspan per bulan) di atas, baris tanggal polos di bawah —
   // lebih rapi daripada nama bulan diulang-ulang kecil di tiap kolom tanggal.
@@ -431,7 +466,8 @@ function buildDayGridView(rows){
     const dow = dayOfWeek(dt);
     const isWeekend = dow===0||dow===6;
     const isToday = dt===today;
-    html += `<th class="dg-th-date${isWeekend?" weekend":""}${isToday?" today":""}"><span class="dd">${Number(dt.slice(8,10))}</span></th>`;
+    const isCC = ccDates.has(dt);
+    html += `<th class="dg-th-date${isWeekend?" weekend":""}${isToday?" today":""}${isCC?" dg-th-cc":""}" title="${isCC?"Ada site dgn crew change tanggal ini":""}"><span class="dow">${DOW_SHORT_ID[dow]}</span><span class="dd">${Number(dt.slice(8,10))}</span></th>`;
   });
   html += `</tr></thead><tbody>`;
 
@@ -521,6 +557,18 @@ function unfinalizeBatchSchedule(){
   renderFinalizeStatus();
   toast("Finalisasi dibatalkan — batch bisa di-custom/generate ulang lagi.","ok");
 }
+// Ringkasan "hari crew change" per site yang lagi tampil di filter Gantt saat ini — pembanding
+// cepat tanpa harus buka halaman Aturan Site & Rute, sumber datanya tetap dari sana (DB.siteRules).
+function renderGanttCrewChangeInfo(batches){
+  const el = document.getElementById("ganttCrewChangeInfo");
+  if(!el) return;
+  const sites = [...new Set(batches.flatMap(b=>(b.schedule||[]).map(r=>r.site)))].sort();
+  if(!sites.length){ el.innerHTML = ""; return; }
+  el.innerHTML = `<b>Hari Crew Change per Site:</b> ` + sites.map(s=>{
+    const day = DB.siteRules[s] ? DB.siteRules[s].crewChangeDay : "";
+    return `${escHtml(s)}: <b style="${day===""||day==null?"":"color:#a02a24;"}">${day===""||day==null?"tidak diatur":DOW_LABEL[Number(day)]}</b>`;
+  }).join(" &middot; ") + ` <span class="muted">(ubah di Aturan Site &amp; Rute)</span>`;
+}
 function renderGantt(){
   refreshGanttBatchSelect();
   renderFinalizeStatus();
@@ -528,6 +576,7 @@ function renderGantt(){
   const batchId = document.getElementById("ganttBatch").value;
   let batches = view==="overlay" ? DB.batches : DB.batches.filter(b=>b.team===view);
   if(batchId) batches = batches.filter(b=>b.id===batchId);
+  renderGanttCrewChangeInfo(batches);
   const mode = document.getElementById("ganttMode").value;
   if(mode==="bar"){
     document.getElementById("ganttWrap").innerHTML = buildGanttSVG(batches);

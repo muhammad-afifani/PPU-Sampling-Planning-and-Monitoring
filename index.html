@@ -154,6 +154,11 @@
         <div id="rcChecklist"></div>
       </div>
       <div class="grid cols-4" id="rcStats" style="margin-bottom:16px;"></div>
+      <div class="card">
+        <h3>Resume per Grup Sumber</h3>
+        <div class="hint" style="margin-bottom:8px;">Mengikuti filter Periode/Site/Cari Titik di atas — total titik wajib pantau tiap grup (Turbin, Flare, Gas Engine, dst) untuk cakupan yang sedang ditampilkan.</div>
+        <div id="rcGroupBars"></div>
+      </div>
       <div class="card" id="rcTableCard">
         <div class="toolbar">
           <h3 style="margin:0;">Titik Wajib Dipantau</h3>
@@ -191,6 +196,11 @@
       </div>
       <div class="section-note">Kelengkapan dihitung dari 10 item: KTP, MCU, SPK, Medpass, CLSR, Sertifikat PPC Udara, Foto Background Biru, BOSIET/BST, Vaksin Booster 3, PTS ID. Item bertanggal dianggap tidak valid jika sudah lewat tanggal expired.</div>
       <div class="tablewrap"><table id="personilTable"></table></div>
+      <div class="card">
+        <h3>Roster Personil untuk Persiapan Akses Site (Cetak A4)</h3>
+        <div class="hint" style="margin-bottom:10px;">Ringkasan nama, role, dan kelengkapan dokumen tiap personil — dilengkapi QR code &amp; tautan ke folder dokumentasi (isi lewat "Link Dokumentasi" di form Edit Personil) supaya ENV site bisa langsung scan/buka untuk verifikasi saat mengatur persiapan dan perizinan akses site. Personil tanpa Link Dokumentasi tetap tampil, kolom itu cuma kosong.</div>
+        <button class="btn primary" data-action="printPersonilRoster">Cetak Roster Personil (A4)</button>
+      </div>
     </div>
 
     <!-- RULES -->
@@ -320,6 +330,7 @@
         <div class="hint" style="margin-top:4px;">Tombol "Cetak Panduan Sampling" akan mencetak jadwal beserta daftar titik dan kolom ceklist untuk batch yang sedang dipilih pada filter Batch di atas. Jika filter Batch dikosongkan, seluruh batch pada Tim yang dipilih akan dicetak berurutan, masing masing mulai di halaman baru. "Finalisasi Jadwal" cuma menandai batch yang sedang dipilih sudah final/siap dicetak (bukan mengunci data) — pilih 1 batch spesifik dulu di filter Batch di atas, bukan "Semua batch".</div>
         <div id="ganttFinalizeStatus"></div>
         <div id="ganttMeta" class="hint" style="margin-top:8px;font-size:12.5px;"></div>
+        <div id="ganttCrewChangeInfo" class="hint" style="margin-top:4px;font-size:12.5px;"></div>
         <div id="ganttWrap" style="margin-top:10px;overflow-x:auto;padding-bottom:6px;"></div>
         <div class="legend">
           <span class="item"><span class="sw" style="background:#0ea5a0"></span> Rencana (Emisi)</span>
@@ -1013,6 +1024,7 @@
 <input type="file" id="hiddenCsvFile" accept=".csv" style="display:none;">
 <div id="printGuideArea"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="assets/vendor/qrcode-generator.js"></script>
 
 <script src="assets/data/default-data.js"></script>
 <script src="assets/data/brand-assets.js"></script>

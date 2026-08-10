@@ -325,6 +325,7 @@ textarea.mono{font-family:var(--font-mono);font-size:11.5px;}
 .pg-meta div b{display:block;font-size:8.5px;text-transform:uppercase;color:#555;letter-spacing:.03em;}
 .pg-site{page-break-inside:avoid;margin-bottom:10px;border:1px solid #999;border-radius:4px;overflow:hidden;}
 .pg-site-head{background:#fff;padding:4px 7px 4px 9px;font-size:10.5px;font-weight:700;display:flex;justify-content:space-between;border-bottom:1.3px solid #333;border-left:4px solid #a02a24;}
+.pg-site-note{background:#fdeceb;padding:3px 9px;font-size:8.5px;font-weight:400;border-bottom:1px solid #999;border-left:4px solid #a02a24;}
 .pg-table{width:100%;border-collapse:collapse;font-size:9px;}
 .pg-table th,.pg-table td{border:1px solid #ccc;padding:3px 5px;text-align:left;vertical-align:top;}
 /* color & position:static WAJIB ditulis ulang di sini — <thead th> global punya warna terang
@@ -340,6 +341,10 @@ textarea.mono{font-family:var(--font-mono);font-size:11.5px;}
 .pg-table tr.pg-day-row.pg-day-buffer td{color:#777;font-style:italic;border-left-color:#bbb;}
 .pg-table tr.pg-day-empty td{color:#999;font-style:italic;}
 .pg-box{display:inline-block;width:10px;height:10px;border:1px solid #333;vertical-align:middle;}
+.pg-personil-table td{vertical-align:middle;}
+.pg-qr{line-height:0;}
+.pg-qr svg{width:56px;height:56px;display:block;margin:0 auto;}
+.pg-qr-url{font-size:6.5px;word-break:break-all;text-align:center;margin-top:2px;color:#333;}
 .pg-batch{page-break-before:always;}
 .pg-batch:first-child{page-break-before:auto;}
 .pg-foot{font-size:8px;color:#666;margin-top:6px;padding-top:4px;border-top:1.5px solid #a02a24;}
@@ -454,12 +459,15 @@ textarea.mono{font-family:var(--font-mono);font-size:11.5px;}
 table.daygrid{border-collapse:separate;border-spacing:3px;min-width:max-content;background:var(--gray-100);}
 .dg-th-label{text-align:left;font-size:11.5px;font-weight:700;color:#dbe6f0;min-width:190px;padding:8px 10px;white-space:nowrap;vertical-align:middle;}
 .dg-th-month{text-align:center;font-size:10.5px;font-weight:700;color:#04211f;background:var(--teal-400);padding:4px 0;letter-spacing:.03em;border-radius:4px;white-space:nowrap;}
-.dg-th-date{text-align:center;width:28px;min-width:28px;padding:5px 0;line-height:1.15;vertical-align:middle;}
+.dg-th-date{text-align:center;width:30px;min-width:30px;padding:5px 0;line-height:1.15;vertical-align:middle;}
+.dg-th-date .dow{display:block;font-size:8px;font-weight:700;color:#8fa5bd;text-transform:uppercase;letter-spacing:.02em;}
 .dg-th-date .dd{display:block;font-size:11.5px;font-weight:700;color:#dbe6f0;}
 .dg-th-date.weekend{background:var(--navy-700);}
 .dg-th-date.weekend .dd{opacity:.6;}
 .dg-th-date.today{background:var(--teal-500);border-radius:5px;}
 .dg-th-date.today .dd{color:#04211f;}
+.dg-th-date.today .dow{color:#04211f;opacity:.75;}
+.dg-th-date.dg-th-cc{box-shadow:inset 0 0 0 2px #e0554f;border-radius:4px;}
 /* Kolom Site dibekukan (sticky) horizontal supaya tetap kelihatan saat scroll ke kanan */
 .dg-col-sticky{position:sticky;left:0;z-index:2;}
 thead .dg-col-sticky{z-index:3;}
