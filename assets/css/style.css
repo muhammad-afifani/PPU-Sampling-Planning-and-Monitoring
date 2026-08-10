@@ -525,6 +525,12 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 /* Papan "Detail Harian" (modal, dibuka dari tombol per-baris site di Gantt) — satu kolom per
    tanggal valid di rentang site itu (kerja + buffer), kartu titik/grup bisa digeser drag-drop
    antar kolom utk override manual dari pembagian rata otomatis. */
+/* Baris tombol di TENGAH modal (Reset ke Otomatis, Jalankan Ulang Jadwal) — SENGAJA bukan pakai
+   class .actions: itu sticky ke bawah modal (lihat aturan .modal .actions), pas dipakai lebih dari
+   sekali dalam 1 modal bikin baris tengah ikut "nempel" ke bawah pas discroll & menutupi konten
+   setelahnya (termasuk tombol Tutup, jadi kelihatan "kepotong"/tidak bisa di-scroll). Hanya baris
+   PALING BAWAH modal (tombol Tutup) yang boleh pakai .actions.*/
+.daydetail-actionbar{display:flex;justify-content:flex-start;align-items:center;gap:8px;flex-wrap:wrap;}
 .daydetail-scroll{overflow-x:auto;padding-bottom:8px;margin:0 -2px;}
 .daydetail-cols{display:flex;gap:8px;min-width:max-content;}
 .daydetail-col{width:150px;flex-shrink:0;border:1px solid var(--gray-300);border-radius:8px;background:var(--gray-100);display:flex;flex-direction:column;}

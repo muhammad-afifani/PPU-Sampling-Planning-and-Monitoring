@@ -144,7 +144,7 @@ function renderDayDetailModal(b, row){
   openModal(`
     <h3>Detail Harian — ${escHtml(row.site)} <span class="muted" style="font-weight:400;font-size:12px;">(${escHtml(b.name)})</span></h3>
     <div class="hint" style="margin-bottom:10px;">Tarik (drag) kartu titik ke kolom hari lain utk custom manual — sisanya tetap terbagi rata otomatis. Kolom bergaris miring = hari buffer/cadangan (boleh diisi kalau memang mau dipakai). Klik &times; di pojok kartu utk keluarkan titik itu dari batch ini (mis. jadwal kepanjangan/melebihi periode). Perubahan tersimpan otomatis.</div>
-    <div class="actions" style="justify-content:flex-start;margin-bottom:10px;">
+    <div class="daydetail-actionbar" style="margin-bottom:10px;">
       <button class="btn small ghost" data-action="resetDayOverrides" data-batch-id="${b.id}" data-row-idx="${rowIdx}" ${hasOverride?"":"disabled"}>Reset ke Otomatis</button>
     </div>
     <div class="field" style="margin-bottom:10px;">
@@ -153,7 +153,7 @@ function renderDayDetailModal(b, row){
     </div>
     <div class="daydetail-scroll"><div class="daydetail-cols">${cols}</div></div>
     ${excludedHtml}
-    <div class="actions" style="justify-content:flex-start;margin-top:10px;flex-wrap:wrap;">
+    <div class="daydetail-actionbar" style="margin-top:10px;">
       <button class="btn primary" data-action="applyExcludeReschedule" data-batch-id="${b.id}" data-row-idx="${rowIdx}">&#128260; Jalankan Ulang Jadwal Site Ini</button>
       <span class="hint" style="align-self:center;max-width:360px;">Menghitung ulang hari kerja site ini dari titik yang masih aktif, lalu menggeser tanggal site-site setelahnya di batch ini kalau perlu.</span>
     </div>
