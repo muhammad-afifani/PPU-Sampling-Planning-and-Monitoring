@@ -357,9 +357,22 @@ function buildPrintGuideHtml(includeGantt){
     // titik ke hari lain), hasil cetak ini otomatis ikut mencerminkan susunan finalnya, bukan cuma
     // pembagian rata generik. Baris pemisah hari (mirip kategori-row di Berita Acara) diberi aksen
     // merah tipis; hari buffer tetap ditampilkan (supaya kelihatan sbg cadangan) walau kosong.
-    const siteRows = (b.schedule||[]).map(row=>{
+    const siteRows = (b.schedule||[]).map((row, rowIdx)=>{
       const sitePts = pts.filter(p=>p.site===row.site);
       if(!sitePts.length) return "";
+      // Site berikutnya yang BENERAN tercetak (bukan cuma entri berikutnya di b.schedule mentah) —
+      // discan maju krn ada kemungkinan 1+ site di antaranya kosong utk konteks cetak ini (mis.
+      // semua titiknya kebetulan dikeluarkan dari batch, lihat fitur exclude di Detail Harian).
+      let nextPrintedRow = null;
+      for(let j=rowIdx+1;j<(b.schedule||[]).length;j++){
+        const candidate = b.schedule[j];
+        if(pts.some(p=>p.site===candidate.site)){ nextPrintedRow = candidate; break; }
+      }
+      // Info perpindahan — jam bukan data tersimpan (jadwal cuma per-tanggal), jadi ditulis sbg
+      // panduan umum sesuai kebiasaan lapangan yang diberitahukan, bukan jam presisi per kejadian.
+      const transitionNote = nextPrintedRow ? `<tr><td>
+        <div class="pg-transition-note">&#8594; <b>Pindah ke Site ${escHtml(nextPrintedRow.site)}</b> &mdash; ${escHtml(fmtHariTanggalIndo(nextPrintedRow.start))}. Umumnya berangkat pagi (&plusmn;07:00&ndash;08:00 WIB) atau siang usai istirahat (&plusmn;13:00 WIB); perjalanan antar site sekitar 1&ndash;2 jam.</div>
+      </td></tr>` : "";
       const rangeLabel = row.start===row.end ? row.start : `${row.start} s.d. ${row.end}`;
       const asg = dailyAssignmentForRow(b, row);
       let rowNum = 0;
@@ -401,7 +414,7 @@ function buildPrintGuideHtml(includeGantt){
             <tbody>${dayBlocks}</tbody>
           </table>
         </div>
-      </td></tr>`;
+      </td></tr>${transitionNote}`;
     }).join("");
     return `<table class="pg-guide-page pg-batch">
       <thead><tr><td>
@@ -627,6 +640,12 @@ function buildDayGridView(rows){
     const excludedBadge = excludedCount ? `<span class="badge b-red" style="font-size:9.5px;padding:1px 6px;" title="Titik yang dikeluarkan dari batch ini di site ${escHtml(r.site)} — buka Detail Harian utk lihat/kelola">&#9888; ${excludedCount} dikeluarkan</span>` : "";
     const dragHandle = r.batch ? `<span class="route-drag-handle" title="Tarik untuk ubah urutan site di batch ini">&#8942;&#8942;</span>` : "";
     html += `<tr><td class="dg-td-label dg-col-sticky" draggable="${r.batch?"true":"false"}" data-batch-id="${r.batch?r.batch.id:""}" data-row-idx="${r.rowIdx}"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${dragHandle}<b>${escHtml(r.site)}</b>${adjustBtn}${dayDetailBtn}${excludedBadge}</div><div class="sub">${escHtml(r.batchName)} &middot; ${r.workDays} hari kerja${r.bufferDays?" + "+r.bufferDays+" buffer":""} &middot; ${r.start} &rarr; ${r.end}${r.adjustNote?`<br><span style="color:#a02a24;">&#9998; ${escHtml(r.adjustNote)}</span>`:""}</div></td>`;
+    // Tanggal tim pindah dari site INI ke site berikutnya di batch yang sama (kalau ada) — dipakai
+    // menandai kolom perpindahan dgn anak panah di bawah. Diambil dari tanggal mulai site
+    // berikutnya (bukan field terpisah) supaya OTOMATIS ikut kalau site manapun digeser drag-drop,
+    // tidak perlu disinkronkan manual.
+    const nextRow = (r.batch && r.rowIdx!=null) ? r.batch.schedule[r.rowIdx+1] : null;
+    const transitionDate = nextRow ? nextRow.start : null;
     for(let i=0;i<totalDays;i++){
       const dt = addDays(minDate,i);
       const inRange = dt>=r.start && dt<=r.end;
@@ -636,8 +655,16 @@ function buildDayGridView(rows){
         // kebetulan lagi dalam rentang jadwal aktif) — supaya pola "site X selalu crew change tiap
         // hari Y" langsung kelihatan di sepanjang kalender, bukan cuma pas ada jadwal jalan.
         const ccEmpty = isCrewChange(r.site, dt);
-        const title = ccEmpty ? `${r.site} — ${dt} (hari crew change)` : "";
-        html += `<td class="dg-day-cell dg-empty${isToday?" dg-today-col":""}${ccEmpty?" dg-cc-empty":""}" data-date="${dt}" title="${escHtml(title)}"></td>`;
+        if(dt===transitionDate){
+          // Kotak "pindah ke site berikutnya" — transisi selalu jatuh SETELAH r.end (dicek lewat
+          // minAllowed di handleScheduleDrop & cursor di recalcScheduleFrom), jadi selalu masuk
+          // cabang !inRange ini, tidak pernah bentrok sama kotak kerja aktif site ini sendiri.
+          const title = `Pindah ke ${nextRow.site} — mulai ${nextRow.start}${ccEmpty?` (${r.site}: hari crew change)`:""}`;
+          html += `<td class="dg-day-cell dg-empty dg-transition${isToday?" dg-today-col":""}${ccEmpty?" dg-cc-empty":""}" data-date="${dt}" title="${escHtml(title)}"><span class="dg-transition-arrow">&#8594;</span></td>`;
+        } else {
+          const title = ccEmpty ? `${r.site} — ${dt} (hari crew change)` : "";
+          html += `<td class="dg-day-cell dg-empty${isToday?" dg-today-col":""}${ccEmpty?" dg-cc-empty":""}" data-date="${dt}" title="${escHtml(title)}"></td>`;
+        }
       } else {
         const a = asg[dt] || {points:[], isBuffer:false};
         const names = a.points.map(p=>p.nama).join(", ");
@@ -663,7 +690,8 @@ function buildDayGridView(rows){
     <span class="item"><span class="sw" style="background:#0ea5a0"></span> Sampling Emisi</span>
     <span class="item"><span class="sw" style="background:#3d78c9"></span> Sampling Ambient</span>
     <span class="item"><span class="sw" style="background:#0ea5a0;opacity:.5;"></span> Hari Buffer (pudar)</span>
-    <span class="item"><span class="sw" style="background:#fff;box-shadow:inset 0 0 0 2px #e0554f;"></span> Hari Crew Change (info)</span>
+    <span class="item"><span class="sw" style="background:#fff;box-shadow:inset 0 0 0 2px #e0554f;"></span> Hari Crew Change (info — larangan cuma berlaku utk BERANGKAT dari site itu, datang tetap aman)</span>
+    <span class="item"><span class="sw" style="background:#fdf3e3;box-shadow:inset 0 0 0 2px #c98a1a;"></span> &#8594; Pindah ke Site Berikutnya</span>
   </div>`;
   return html;
 }
