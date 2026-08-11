@@ -3,8 +3,12 @@
 ========================================================= */
 function allSites(){ return [...new Set(DB.points.map(p=>p.site))].sort(); }
 function ensureSiteRule(site){
-  if(!DB.siteRules[site]) DB.siteRules[site] = {crewChangeDay:"", blocked:[], ratioEmisi:4, ratioAmbient:2, transport:"", flareOneDay:false};
+  if(!DB.siteRules[site]) DB.siteRules[site] = {crewChangeDay:"", blocked:[], ratioEmisi:4, ratioAmbient:2, transport:"", flareOneDay:false, permitLeadDays:2};
   else if(DB.siteRules[site].flareOneDay===undefined) DB.siteRules[site].flareOneDay = false;
+  // permitLeadDays: H-berapa entry permit site ini sebaiknya diajukan sebelum jadwal kedatangan
+  // tim (lihat catatan di print guide) — default H-2, override per site kalau butuh beda (mis.
+  // site yang prosesnya lebih lama butuh H-3, atau site yang lebih longgar cukup H-1).
+  else if(DB.siteRules[site].permitLeadDays===undefined) DB.siteRules[site].permitLeadDays = 2;
   return DB.siteRules[site];
 }
 // Dipakai di halaman Aturan Site & Rute DAN widget ringkas di Perencanaan Batch — supaya
@@ -97,6 +101,8 @@ function renderRules(){
         <div class="field"><label>Rasio Emisi (titik/hari)</label><input type="number" min="0.5" step="0.5" value="${r.ratioEmisi}" data-action="setRatio" data-site="${s}" data-field="ratioEmisi"></div>
         <div class="field"><label>Rasio Ambient (titik/hari)</label><input type="number" min="0.5" step="0.5" value="${r.ratioAmbient}" data-action="setRatio" data-site="${s}" data-field="ratioAmbient"></div>
       </div>
+      <div class="field" style="margin-top:8px;"><label>Ajukan Izin Masuk Site (H-berapa)</label><input type="number" min="0" step="1" value="${r.permitLeadDays!=null?r.permitLeadDays:2}" data-action="setPermitLeadDays" data-site="${s}"></div>
+      <div class="hint" style="margin-top:2px;">Dihitung mundur dari tanggal mulai kedatangan tim di site ini, muncul otomatis di Panduan Sampling A4 (cetak) — berjaga kalau jadwal ternyata maju lebih cepat. Boleh beda tiap site.</div>
       <div class="field" style="margin-top:8px;"><label>Catatan Transport</label><input type="text" value="${escHtml(r.transport||"")}" data-action="setTransport" data-site="${s}" placeholder="mis. darat, seatruck, offshore"></div>
       ${hasFlare ? `<label class="checkline" style="margin-top:10px;"><input type="checkbox" data-action="setFlareOneDay" data-site="${s}" ${r.flareOneDay?"checked":""}> Semua titik Flare di site ini selesai dalam 1 hari (tidak dihitung per titik terhadap Rasio Emisi)</label>` : ""}
     </div>`;

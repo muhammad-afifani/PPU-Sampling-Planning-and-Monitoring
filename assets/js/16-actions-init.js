@@ -15,6 +15,7 @@ const ACTIONS = {
   rcPickAll:()=>{ document.querySelectorAll(".rcChk").forEach(c=>c.checked=true); },
   rcPickNone:()=>{ document.querySelectorAll(".rcChk").forEach(c=>c.checked=false); },
   sendPlanToBatch:(t)=>sendPlanToBatch(t.dataset.team),
+  printRencanaExport, doPrintRencanaExport,
   setRcView:(t)=>{
     rcView = t.dataset.view;
     document.getElementById("btnRcTable").classList.toggle("primary", rcView==="table");
@@ -347,6 +348,7 @@ document.addEventListener("click", e=>{
 document.addEventListener("change", e=>{
   if(e.target.dataset.action==="setCrewDay"){ ensureSiteRule(e.target.dataset.site).crewChangeDay = e.target.value; save(); }
   if(e.target.dataset.action==="setRatio"){ ensureSiteRule(e.target.dataset.site)[e.target.dataset.field] = Number(e.target.value)||1; save(); }
+  if(e.target.dataset.action==="setPermitLeadDays"){ ensureSiteRule(e.target.dataset.site).permitLeadDays = Math.max(0, Number(e.target.value)||0); save(); }
   if(e.target.dataset.action==="setTransport"){ ensureSiteRule(e.target.dataset.site).transport = e.target.value; save(); }
   if(e.target.dataset.action==="setFlareOneDay"){ ensureSiteRule(e.target.dataset.site).flareOneDay = e.target.checked; save(); toast("Perubahan berlaku ke jadwal Emisi berikutnya yang di-generate/dihitung ulang di site ini — jadwal yang sudah ada tidak berubah otomatis.","ok"); }
 });

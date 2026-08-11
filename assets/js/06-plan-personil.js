@@ -213,6 +213,115 @@ function renderRencanaCards(period, site, search){
   }).join("") || "<div class='hint' style='padding:14px;'>Tidak ada titik yang cocok filter.</div>";
 }
 
+// Cetak A4 "Daftar Titik Pantau per Periode" — daftar sumber emisi & titik ambient (termasuk
+// kebisingan/kebauan/getaran) per site, serinci Database Titik Pantau, tapi discope ke satu
+// periode tertentu. mode "wajib" = cuma titik yang wajib pantau periode ini (sama seperti isi
+// rcTable di layar); mode "all" = SEMUA titik di site terpilih, masing-masing diberi status wajib
+// periode ini supaya kelihatan mana yang dipantau & mana yang tidak dlm satu dokumen.
+function buildRencanaPrintHtml(period, site, mode){
+  let pts = DB.points.slice();
+  if(site) pts = pts.filter(p=>p.site===site);
+  if(mode==="wajib") pts = pts.filter(p=>!p.tidakBeroperasi && effectiveWajib(p, period));
+  if(!pts.length) return null;
+
+  const bySite = {};
+  pts.forEach(p=>{ (bySite[p.site]=bySite[p.site]||[]).push(p); });
+  const sites = Object.keys(bySite).sort((a,b)=>{
+    const ia=MASTER_SITE_ORDER.indexOf(a), ib=MASTER_SITE_ORDER.indexOf(b);
+    return (ia<0?99:ia)-(ib<0?99:ib);
+  });
+
+  const printedAt = new Date().toLocaleString("id-ID", {dateStyle:"long", timeStyle:"short"});
+  const totalEmisi = pts.filter(p=>p.kategori==="emisi").length;
+  const totalAmbient = pts.length - totalEmisi;
+
+  const siteBlocks = sites.map(s=>{
+    const sitePts = bySite[s].slice().sort((a,b)=>{
+      const gi = subgroupOrderIdx(a)-subgroupOrderIdx(b);
+      return gi!==0 ? gi : a.nama.localeCompare(b.nama);
+    });
+    const wajibCount = sitePts.filter(p=>effectiveWajib(p, period)).length;
+    const rowsHtml = sitePts.map((p,i)=>{
+      const spec = specLineFor(p) || [p.kapasitas, p.jenisBahanBakar].filter(Boolean).join(", ") || "-";
+      return `<tr>
+        <td>${i+1}</td>
+        <td><span class="badge b-gray">${escHtml(monitoringTypeLabel(p))}</span></td>
+        <td><b>${escHtml(p.nama)}</b></td>
+        <td class="muted" style="font-size:8.5px;">${escHtml(subgroupOf(p))}${p.kategori==="emisi"&&p.kategoriSumber?`<div>${escHtml(p.kategoriSumber)}</div>`:""}</td>
+        <td>${escHtml(spec)}</td>
+        <td>${escHtml(p.parameter||"-")}</td>
+        <td>${wajibBadgeHtml(p, period)}</td>
+        <td>${pointStatusBadge(p)}</td>
+        <td style="white-space:nowrap;">${prediksiCellHtml(p)}</td>
+      </tr>`;
+    }).join("");
+    return `<div class="pg-site">
+      <div class="pg-site-head"><span>Site ${escHtml(s)} (${sitePts.length} titik${mode==="all"?`, ${wajibCount} wajib periode ini`:""})</span></div>
+      <table class="pg-table">
+        <thead><tr><th style="width:16px;">No</th><th style="width:70px;">Jenis Pantau</th><th>Nama Titik</th><th style="width:110px;">Grup / Sumber</th><th style="width:90px;">Spesifikasi</th><th>Parameter Wajib</th><th style="width:110px;">Wajib Periode Ini</th><th style="width:70px;">Status</th><th style="width:80px;">Prediksi</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>`;
+  }).join("");
+
+  return `<table class="pg-guide-page">
+    <thead><tr><td>
+      <div class="pg-header">
+        <div>
+          <h1>Daftar Titik Pantau Emisi &amp; Ambient</h1>
+          <div class="sub">Periode ${escHtml(period)}${site?` &middot; Site ${escHtml(site)}`:" &middot; Semua Site"} &middot; ${mode==="wajib"?"Hanya yang wajib dipantau periode ini":"Semua titik, lengkap dengan status wajib/tidaknya"}</div>
+        </div>
+        <div class="sub" style="text-align:right;">Dicetak ${escHtml(printedAt)}</div>
+      </div>
+      <div class="pg-meta">
+        <div><b>Total Titik</b>${pts.length} titik</div>
+        <div><b>Titik Emisi</b>${totalEmisi} titik</div>
+        <div><b>Titik Ambient</b>${totalAmbient} titik (Ambient/Kebisingan/Kebauan/Getaran)</div>
+        <div><b>Jumlah Site</b>${sites.length} site</div>
+      </div>
+    </td></tr></thead>
+    <tfoot><tr><td>
+      <div class="pg-foot">Dicetak otomatis dari PHM Emission Sampling Planner &amp; Tracker &mdash; halaman Plan Pemantauan per Periode. Kolom "Wajib Periode Ini" memperhitungkan ambang RH Emergency Engine (&gt;200 jam/tahun trailing 12 bulan) utk periode yang dipilih.</div>
+    </td></tr></tfoot>
+    <tbody><tr><td>${siteBlocks}</td></tr></tbody>
+  </table>`;
+}
+function printRencanaExport(){
+  const period = document.getElementById("rcPeriode").value || currentPeriodStr();
+  const site = document.getElementById("rcFltSite").value;
+  const probe = buildRencanaPrintHtml(period, site, "wajib");
+  if(!probe){ toast("Tidak ada titik yang cocok (periode/site terpilih) untuk dicetak.","err"); return; }
+  openModal(`
+    <h3>Preferensi Cetak Daftar Titik Pantau</h3>
+    <div class="hint" style="margin-bottom:8px;">Periode: <b>${escHtml(period)}</b> &middot; Site: <b>${site?escHtml(site):"Semua Site"}</b> (ikut filter yang sedang aktif di halaman ini).</div>
+    <div class="field"><label>Titik yang Dicetak</label>
+      <select id="rpMode">
+        <option value="wajib">Hanya yang Wajib Dipantau Periode Ini</option>
+        <option value="all">Semua Titik (dengan status wajib/tidak per titik)</option>
+      </select>
+    </div>
+    <div class="field" style="margin-top:10px;"><label>Orientasi Kertas</label>
+      <select id="rpOrientation"><option value="landscape">Lanskap (Landscape) &mdash; disarankan, kolomnya cukup banyak</option><option value="portrait">Potret (Portrait)</option></select>
+    </div>
+    <div class="actions"><button class="btn ghost" data-action="closeModal">Batal</button><button class="btn primary" data-action="doPrintRencanaExport">Cetak</button></div>
+  `);
+}
+function doPrintRencanaExport(){
+  const period = document.getElementById("rcPeriode").value || currentPeriodStr();
+  const site = document.getElementById("rcFltSite").value;
+  const mode = document.getElementById("rpMode").value;
+  const orientation = document.getElementById("rpOrientation").value;
+  const html = buildRencanaPrintHtml(period, site, mode);
+  if(!html){ toast("Tidak ada titik yang cocok untuk dicetak.","err"); closeModal(); return; }
+  setPrintOrientation(orientation);
+  document.getElementById("printGuideArea").innerHTML = html;
+  closeModal();
+  const originalTitle = document.title;
+  document.title = `Daftar Titik Pantau_${period}${site?"_"+site:""}`;
+  window.print();
+  document.title = originalTitle;
+}
+
 function sendPlanToBatch(team){
   const period = document.getElementById("rcPeriode").value || currentPeriodStr();
   const checkedIds = [...document.querySelectorAll(".rcChk:checked")].map(c=>c.dataset.id);
