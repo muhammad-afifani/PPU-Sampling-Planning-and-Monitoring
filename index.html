@@ -135,7 +135,7 @@
     <!-- PLAN PEMANTAUAN PER PERIODE -->
     <div class="page" id="page-rencana">
       <div class="stickytop">
-      <div class="pagehead"><div><h2>Plan Pemantauan per Periode</h2><div class="desc">Pilih semester → otomatis muncul semua titik yang wajib dipantau periode itu (termasuk Emergency Engine yang kena ambang RH &gt; 200 jam/tahun), lalu kirim ke Perencanaan Batch</div></div></div>
+      <div class="pagehead"><div><h2>Plan Pemantauan per Periode</h2><div class="desc">Pilih semester untuk menampilkan seluruh titik yang wajib dipantau pada periode tersebut (termasuk Emergency Engine yang melewati ambang RH &gt; 200 jam/tahun), kemudian kirim ke Perencanaan Batch</div></div></div>
       <div class="toolbar card" style="padding:12px 14px;">
         <div class="field"><label>Periode</label><select id="rcPeriode"></select></div>
         <div class="field"><label>Site</label><select id="rcFltSite"><option value="">Semua</option></select></div>
@@ -190,7 +190,7 @@
     <!-- PERSONIL -->
     <div class="page" id="page-personil">
       <div class="stickytop">
-      <div class="pagehead"><div><h2>Personil PPC &amp; Observer</h2><div class="desc">Bank data personil — kelengkapan dokumen. Untuk tunjuk siapa berangkat di tiap batch (+ Ketua Tim), buka Perencanaan Batch.</div></div>
+      <div class="pagehead"><div><h2>Personil PPC &amp; Observer</h2><div class="desc">Basis data personil beserta kelengkapan dokumen. Untuk menentukan personil yang bertugas pada tiap batch (termasuk Ketua Tim), buka Perencanaan Batch.</div></div>
         <div class="toolbar">
           <button class="btn primary" data-action="addPersonil">+ Tambah Personil</button>
           <button class="btn" data-action="importPersonilCsv">Import CSV</button>
@@ -248,7 +248,7 @@
     <!-- PLANNER -->
     <div class="page" id="page-planner">
       <div class="stickytop">
-      <div class="pagehead"><div><h2>Perencanaan Batch</h2><div class="desc">3 langkah: pilih tim &amp; tanggal → klik satu tombol → jadwal langsung jadi</div></div>
+      <div class="pagehead"><div><h2>Perencanaan Batch</h2><div class="desc">3 langkah: pilih tim dan tanggal, lalu klik satu tombol untuk membuat jadwal secara otomatis</div></div>
         <button class="btn small ghost" data-action="togglePlSticky" id="btnPlStickyToggle">&#9650; Ciutkan Panel</button>
       </div>
 
@@ -327,7 +327,7 @@
     <!-- GANTT -->
     <div class="page" id="page-gantt">
       <div class="stickytop">
-      <div class="pagehead"><div><h2>Gantt &amp; S-Curve</h2><div class="desc">Visualisasi jadwal per tim, per batch, mirip Primavera P6 / MS Project</div></div>
+      <div class="pagehead"><div><h2>Gantt &amp; S-Curve</h2><div class="desc">Visualisasi jadwal per tim dan per batch dalam bentuk Gantt chart dan kurva-S</div></div>
         <div class="toolbar"><button class="btn ghost" data-action="finalizeBatchSchedule">Finalisasi Jadwal</button><button class="btn primary" data-action="printSamplingGuide">Cetak Panduan Sampling (A4)</button></div>
       </div>
       </div>
@@ -353,7 +353,7 @@
       </div>
       <div class="card">
         <h3>S-Curve (Rencana vs Aktual)</h3>
-        <div class="hint" style="margin-bottom:8px;">Muncul otomatis setelah kamu klik "Buat &amp; Terapkan Jadwal" di halaman Perencanaan Batch. Garis putus = rencana kumulatif, garis solid = aktual kumulatif (dari Tracking).</div>
+        <div class="hint" style="margin-bottom:8px;">Muncul otomatis setelah tombol "Buat &amp; Terapkan Jadwal" diklik di halaman Perencanaan Batch. Garis putus = rencana kumulatif, garis solid = aktual kumulatif (dari Tracking).</div>
         <div id="scurveWrap"></div>
       </div>
     </div>
@@ -361,7 +361,7 @@
     <!-- TRACKING -->
     <div class="page" id="page-tracking">
       <div class="stickytop">
-      <div class="pagehead"><div><h2>Tracking BA / Draft CoA / SHU</h2><div class="desc">Dibagi 2 tahap: eksekusi sampling di lapangan, baru dokumen/pelaporan sampai SIMPEL PPU</div></div>
+      <div class="pagehead"><div><h2>Tracking BA / Draft CoA / SHU</h2><div class="desc">Dibagi menjadi 2 tahap: eksekusi sampling di lapangan, dilanjutkan dengan dokumentasi dan pelaporan hingga SIMPEL PPU</div></div>
         <div class="toolbar">
           <button class="btn" data-action="exportTrackingCsv">Export Tracking (CSV)</button>
           <button class="btn ghost" data-action="importTrackingCsv">Import Tracking (CSV)</button>
@@ -445,7 +445,7 @@
     <!-- RUNNING HOUR DETAIL -->
     <div class="page" id="page-runninghour">
       <div class="stickytop">
-      <div class="pagehead"><div><h2>Running Hour Detail</h2><div class="desc">Riwayat RH bulanan tiap sumber emisi, rekap per semester, dan cek ambang wajib pantau Emergency Engine (RH &gt; 200 jam/tahun)</div></div>
+      <div class="pagehead"><div><h2>Running Hour Detail</h2><div class="desc">Riwayat RH bulanan tiap sumber emisi, rekap per semester, dan pemeriksaan ambang wajib pantau Emergency Engine (RH &gt; 200 jam/tahun)</div></div>
         <div class="toolbar">
           <button class="btn primary" data-action="importRhMonthlyCsv">Import Riwayat Bulanan (CSV)</button>
           <button class="btn" data-action="exportRhMonthlyCsv">Export Riwayat Bulanan (CSV)</button>
@@ -639,7 +639,7 @@
     <!-- DATABASE HASIL PEMANTAUAN -->
     <div class="page" id="page-hasildb">
       <div class="stickytop">
-      <div class="pagehead"><div><h2>Database Hasil Pemantauan</h2><div class="desc">Riwayat hasil uji laboratorium tiap sumber emisi — data mentah di balik dashboard</div></div>
+      <div class="pagehead"><div><h2>Database Hasil Pemantauan</h2><div class="desc">Riwayat hasil uji laboratorium tiap sumber emisi — data dasar yang digunakan pada Dashboard Hasil Pemantauan</div></div>
         <div class="toolbar">
           <button class="btn primary" data-action="importHasilCsv">Import CSV</button>
           <button class="btn" data-action="exportHasilCsv">Export CSV</button>
@@ -718,7 +718,7 @@
     <!-- BAKU MUTU & PERIODE PANTAU (referensi statis) -->
     <div class="page" id="page-bakumutu">
       <div class="stickytop">
-      <div class="pagehead"><div><h2>Baku Mutu &amp; Periode Pantau</h2><div class="desc">Referensi acuan regulasi yang dipakai tool ini — bukan data yang otomatis dipakai untuk hitung-hitungan, sekadar acuan cepat biar tidak perlu buka dokumen aslinya.</div></div></div>
+      <div class="pagehead"><div><h2>Baku Mutu &amp; Periode Pantau</h2><div class="desc">Referensi regulasi yang digunakan pada aplikasi ini — bukan data yang digunakan secara otomatis dalam perhitungan, melainkan acuan cepat agar tidak perlu membuka dokumen aslinya.</div></div></div>
       <div class="reg-jump">
         <span class="grp-label">Emisi</span>
         <a href="#regGenset" class="j-orange">Genset</a>
@@ -822,7 +822,7 @@
       </div>
 
       <div class="card reg-card c-navy" id="regPeriode">
-        <h3>5. Periode / Frekuensi Wajib Pantau <span class="badge b-blue">Pasal 12</span></h3>
+        <h3>5. Periode / Frekuensi Wajib Pantau</h3>
         <div class="grid cols-2">
           <div>
             <div class="muted" style="font-weight:700;font-size:12px;margin-bottom:6px;">Permen LHK 11/2021 — Genset Diesel &amp; Gas (berdasarkan kapasitas)</div>
@@ -961,7 +961,7 @@
 
     <!-- RIWAYAT -->
     <div class="page" id="page-riwayat">
-      <div class="pagehead"><div><h2>Riwayat &amp; Restore</h2><div class="desc">Log aktivitas &amp; titik balik data yang bisa direstore</div></div></div>
+      <div class="pagehead"><div><h2>Riwayat &amp; Restore</h2><div class="desc">Log aktivitas dan titik pemulihan (snapshot) data yang dapat dikembalikan</div></div></div>
       <div class="card">
         <h3>Kapasitas Penyimpanan Browser</h3>
         <p class="hint">Perkiraan pemakaian localStorage saat ini. Quota sebenarnya beda-beda tiap browser (umumnya 5–10 MB) — dihitung konservatif pakai asumsi 5 MB supaya peringatan muncul lebih awal, bukan pas sudah mepet.</p>
@@ -971,7 +971,7 @@
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
           <div>
             <h3 style="color:#0b6b66;">Snapshot Tersimpan (maks. 5 terakhir)</h3>
-            <p class="hint">Dibuat otomatis sebelum aksi besar (generate/hitung ulang jadwal, reset data, import). Bukan undo per-ketikan — untuk itu, backup manual lewat halaman Data (Import/Export). Tiap snapshot adalah salinan penuh seluruh data, jadi kalau localStorage browser terasa penuh (mis. muncul error "exceeded the quota" saat generate jadwal), hapus snapshot lama di sini dulu — data titik/tracking/hasil pemantauan/batch kamu TIDAK ikut terhapus.</p>
+            <p class="hint">Dibuat otomatis sebelum aksi besar (generate/hitung ulang jadwal, reset data, import). Bukan undo per-ketikan — untuk itu, gunakan backup manual melalui halaman Data (Import/Export). Setiap snapshot merupakan salinan penuh seluruh data, sehingga apabila localStorage browser terasa penuh (mis. muncul error "exceeded the quota" saat generate jadwal), hapus snapshot lama di sini terlebih dahulu — data titik/tracking/hasil pemantauan/batch <b>tidak</b> ikut terhapus.</p>
           </div>
           <button class="btn small danger" data-action="clearAllSnapshots" style="flex-shrink:0;">Hapus Semua Snapshot</button>
         </div>
@@ -985,10 +985,10 @@
 
     <!-- DATA -->
     <div class="page" id="page-data">
-      <div class="pagehead"><div><h2>Data — Import / Export / Reset</h2><div class="desc">Backup, restore, atau reset seluruh data tools</div></div></div>
+      <div class="pagehead"><div><h2>Data — Import / Export / Reset</h2><div class="desc">Backup, restore, atau reset seluruh data aplikasi</div></div></div>
       <div class="card" style="background:#eafaf1;border-color:#3fb27f;border-width:2px;">
-        <h3 style="color:#1f7a4d;">📦 Backup Lengkap — pakai INI untuk share/pindah ke laptop lain</h3>
-        <p class="hint" style="font-weight:600;color:var(--navy-900);">Isinya SEMUA: titik pantau, personil, aturan, batch, JADWAL (termasuk yang sudah difinalisasi), tracking, running hour, hasil pemantauan — benar-benar seluruh isi tools ini.</p>
+        <h3 style="color:#1f7a4d;">📦 Backup Lengkap — gunakan fitur ini untuk berbagi atau memindahkan data ke perangkat lain</h3>
+        <p class="hint" style="font-weight:600;color:var(--navy-900);">Berisi seluruh data: titik pantau, personil, aturan, batch, jadwal (termasuk yang sudah difinalisasi), tracking, running hour, dan hasil pemantauan — seluruh isi aplikasi ini.</p>
         <div class="toolbar">
           <button class="btn primary" data-action="exportAll">Export Semua Data (.json)</button>
         </div>
@@ -997,13 +997,13 @@
           <div class="hint">Pilih file backup .json untuk restore (akan menimpa data saat ini)</div>
         </div>
         <div style="border-top:1px solid #3fb27f;margin:12px 0 0;padding-top:10px;">
-          <b style="font-size:12.5px;">Atau ambil langsung dari GitHub</b>
-          <p class="hint" style="margin-top:2px;">Upload file .json hasil "Export Semua Data" di atas ke repo GitHub-mu, ambil link Raw-nya, tempel di sini — orang lain tinggal klik "Cek Update" utk narik jadwal terbarumu tanpa perlu kamu kirim file manual tiap kali update.</p>
+          <b style="font-size:12.5px;">Atau Ambil Otomatis dari GitHub</b>
+          <p class="hint" style="margin-top:2px;">Unggah file .json hasil "Export Semua Data" di atas ke repository GitHub, salin tautan Raw-nya, lalu masukkan pada kolom berikut — pengguna lain cukup mengklik "Cek Update" untuk mengambil data terbaru tanpa perlu menerima file secara manual setiap kali ada pembaruan.</p>
           <div class="field" style="margin-top:6px;"><label>URL Backup Lengkap</label><input type="text" id="fullBackupUrl" placeholder="https://raw.githubusercontent.com/user/repo/main/phm_emisi_backup.json"></div>
           <div class="toolbar" style="margin-top:8px;">
             <button class="btn primary" data-action="checkFullBackupUpdate">Cek Update (Online)</button>
           </div>
-          <div class="hint" style="margin-top:8px;">"Cek Update (Online)" butuh tools ini dibuka lewat alamat web (mis. GitHub Pages), bukan double-click file HTML dari folder — browser akan menolak koneksi online-nya kalau dibuka lokal. Kalau offline, pakai file picker di atas.</div>
+          <div class="hint" style="margin-top:8px;">"Cek Update (Online)" mengharuskan aplikasi ini diakses melalui alamat web (mis. GitHub Pages), bukan dibuka langsung dari file HTML di folder — browser akan menolak koneksi tersebut apabila diakses secara lokal. Jika bekerja secara offline, gunakan file picker di atas.</div>
         </div>
       </div>
       <div class="card">
