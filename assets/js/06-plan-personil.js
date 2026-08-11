@@ -383,7 +383,7 @@ function renderPersonil(){
   <tbody>${DB.personil.map(p=>{
     const pct = completenessPct(p);
     const assignments = batchesForPersonil(p.id);
-    return `<tr><td class="pz-nama" title="${escHtml(p.nama)}"><b>${escHtml(p.nama)}</b></td><td class="pz-role">${p.role}</td>
+    return `<tr><td class="pz-nama" title="${escHtml(p.nama)}"><b>${escHtml(p.nama)}</b>${p.telepon?`<div class="muted" style="font-size:10.5px;margin-top:1px;">${escHtml(p.telepon)}</div>`:""}</td><td class="pz-role">${p.role}</td>
       ${PERSONIL_ITEMS.map(it=>{
         const rec = p.items[it]||{};
         if(it===PERSONIL_NUMBER_FIELD){
@@ -439,7 +439,7 @@ function renderPersonilAlokasi(){
 }
 const PERSONIL_ROLES = ["PPC Emisi","PPC Ambient","Observer"];
 function personilFormHtml(p){
-  p = p || {id:"", nama:"", role:"PPC Emisi", items:{}, dokumentasiLink:""};
+  p = p || {id:"", nama:"", role:"PPC Emisi", items:{}, dokumentasiLink:"", telepon:""};
   const itemFields = PERSONIL_ITEMS.map(it=>{
     const rec = p.items[it]||{};
     if(it===PERSONIL_NUMBER_FIELD){
@@ -460,6 +460,9 @@ function personilFormHtml(p){
     <div class="field"><label>Nama</label><input type="text" id="p_nama" value="${escHtml(p.nama)}"></div>
     <div class="field"><label>Role</label><select id="p_role">${roleOptions.map(r=>`<option ${p.role===r?"selected":""}>${escHtml(r)}</option>`).join("")}</select></div>
   </div>
+  <div class="grid cols-2" style="margin-top:10px;">
+    <div class="field"><label>No. Telepon / WhatsApp</label><input type="tel" id="p_telepon" value="${escHtml(p.telepon||"")}" placeholder="08xx-xxxx-xxxx"></div>
+  </div>
   <div class="grid cols-2" style="margin-top:10px;">${itemFields}</div>
   <div class="field" style="margin-top:10px;"><label>Link Dokumentasi (mis. folder Drive/SharePoint berisi PDF KTP/MCU/dst)</label><input type="url" id="p_dokLink" value="${escHtml(p.dokumentasiLink||"")}" placeholder="https://..."></div>
   <div class="actions">
@@ -476,7 +479,7 @@ function savePersonil(id){
     else if(PERSONIL_DATED[it]) items[it] = {exp: document.getElementById("pi_"+it).value};
     else items[it] = {ada: document.getElementById("pi_"+it).value==="1"};
   });
-  const val = {nama: document.getElementById("p_nama").value.trim(), role: document.getElementById("p_role").value, items, dokumentasiLink: document.getElementById("p_dokLink").value.trim()};
+  const val = {nama: document.getElementById("p_nama").value.trim(), role: document.getElementById("p_role").value, items, dokumentasiLink: document.getElementById("p_dokLink").value.trim(), telepon: document.getElementById("p_telepon").value.trim()};
   if(!val.nama){ toast("Nama wajib diisi.","err"); return; }
   if(id){ Object.assign(DB.personil.find(p=>p.id===id), val); }
   else { DB.personil.push({id: uid("PS"), ...val}); }

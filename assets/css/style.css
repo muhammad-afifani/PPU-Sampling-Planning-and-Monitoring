@@ -328,6 +328,7 @@ textarea.mono{font-family:var(--font-mono);font-size:11.5px;}
 .pg-site-note{background:#fdeceb;padding:3px 9px;font-size:8.5px;font-weight:400;border-bottom:1px solid #999;border-left:4px solid #a02a24;}
 .pg-site-note-excluded{background:#fdf3e3;border-left-color:#c98a1a;}
 .pg-site-note-permit{background:#eaf1fb;border-left-color:#3d78c9;}
+.pg-site-note-personil{background:#eafaf5;border-left-color:#0ea5a0;}
 .pg-transition-note{background:#fdf3e3;color:#7a5209;padding:5px 9px;font-size:8.5px;font-weight:400;border:1px dashed #c98a1a;border-radius:4px;margin:4px 0 10px;}
 .pg-mom-body{padding:7px 10px;font-size:9.5px;line-height:1.5;}
 .pg-mom-body>div{margin-bottom:5px;}
@@ -417,7 +418,11 @@ textarea.mono{font-family:var(--font-mono);font-size:11.5px;}
 .pg-gantt{margin-bottom:10px;overflow:visible;}
 .pg-gantt table{border-collapse:collapse;font-size:7px;}
 .pg-gantt th,.pg-gantt td{border:1px solid #ddd;width:12px;height:13px;padding:0;text-align:center;}
-.pg-gantt th{background:#333;color:#fff;font-weight:400;}
+/* position:static WAJIB ditulis ulang di sini juga (sama alasannya dgn .pg-table th di atas) —
+   tanpa override ini, <thead th> global (position:sticky;top:0, utk tabel layar biasa) bikin baris
+   tanggal ini "mengambang" nempel di atas viewport preview cetak & menimpa baris site pertama
+   (SPS) di bawahnya, bukan cuma diam sbg header tabel biasa. */
+.pg-gantt th{background:#333;color:#fff;font-weight:400;position:static;}
 .pg-gantt th.pg-gantt-site,.pg-gantt td.pg-gantt-site{width:auto;min-width:64px;max-width:110px;text-align:left;padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pg-gantt td.pg-gantt-site{font-weight:700;background:#fafafa;}
 .pg-gantt-work{background:#0ea5a0;}
