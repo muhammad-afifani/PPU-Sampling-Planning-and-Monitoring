@@ -20,9 +20,15 @@
    sendiri ke kantor mereka, site tidak perlu ikut koordinasi/tahu PTS-nya — lihat catatan user).
    Rute yang tidak terdaftar di tabel ini (mode tidak diketahui) DIANGGAP tetap perlu ditampilkan
    info personil+PTS-nya (default aman: lebih baik kelebihan info drpd kelewat pas boarding).
+
+   Field "bookingOverride" (opsional): rute khusus di mana tanggung jawab booking transport BUKAN
+   site keberangkatan (aturan umum), melainkan site tetap yang disebut di sini — dipakai kode
+   (lihat bookingResponsibilityText di 08-gantt-print.js). Kasus BEKAPAI: booking laut ke/dari
+   BEKAPAI SELALU jadi urusan BEKAPAI sendiri, termasuk pas keberangkatan dari SPS menuju BEKAPAI
+   (SPS tidak ikut booking sama sekali) — lihat catatan user.
 ========================================================= */
 const TRAVEL_ROUTES = {
-  "SPS>BEKAPAI": {label:"Laut · berangkat ±06:30 WITA", mode:"laut", note:"Dari Jetty Senipah (SPS). Personil standby di jetty plg lambat ±06:00 WITA.", equipmentNote:"Peralatan sampling didrop sore hari H-1 keberangkatan (perlu diangkut ke basket dulu) — koordinasikan dengan tim Marine di jetty Senipah."},
+  "SPS>BEKAPAI": {label:"Laut · berangkat ±06:30 WITA", mode:"laut", note:"Dari Jetty Senipah (SPS). Personil standby di jetty plg lambat ±06:00 WITA.", equipmentNote:"Peralatan sampling didrop sore hari H-1 keberangkatan (perlu diangkut ke basket dulu) — koordinasikan dengan tim Marine di jetty Senipah.", bookingOverride:"BEKAPAI"},
   "BEKAPAI>SPS": {label:"Laut · siang–sore", mode:"laut", note:"Tergantung jadwal tim Marine Transport — umumnya berangkat dari BEKAPAI ±13:00–16:00 WITA (setelah istirahat siang)."},
   "SPS>HCA": {label:"Darat · fleksibel", mode:"darat", note:"Transport SCI sendiri, jadwal menyesuaikan kebutuhan (tidak terpaku jam tetap)."},
   "HCA>SPS": {label:"Darat · fleksibel", mode:"darat", note:"Transport SCI sendiri, jadwal menyesuaikan kebutuhan (tidak terpaku jam tetap)."},
