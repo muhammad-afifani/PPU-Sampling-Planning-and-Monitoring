@@ -348,9 +348,11 @@ textarea.mono{font-family:var(--font-mono);font-size:11.5px;}
 .pg-table tr.pg-day-row.pg-day-buffer td{color:#777;font-style:italic;border-left-color:#bbb;}
 .pg-table tr.pg-day-empty td{color:#999;font-style:italic;}
 .pg-box{display:inline-block;width:10px;height:10px;border:1px solid #333;vertical-align:middle;}
-.pg-personil-table td{vertical-align:middle;}
-.pg-pi-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px 10px;}
-.pg-pi-item{font-size:7.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:1px 0;}
+/* Kartu 1 personil/blok di Kelengkapan Data Personil (cetak) — dipakai bareng .pg-site/.pg-site-head
+   yg sudah ada (page-break-inside:avoid ikut kebawa dari sana), badan kartu dibagi flex: tabel item
+   di kiri (melebar), kotak QR+link dokumentasi fixed-width di kanan (kalau ada link-nya). */
+.pg-personil-card-body{display:flex;gap:10px;padding:7px 9px;align-items:flex-start;}
+.pg-personil-qr-box{flex-shrink:0;width:76px;text-align:center;}
 .pg-qr{line-height:0;}
 .pg-qr svg{width:56px;height:56px;display:block;margin:0 auto;}
 .pg-qr-url{font-size:6.5px;word-break:break-all;text-align:center;margin-top:2px;color:#333;}

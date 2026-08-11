@@ -386,9 +386,9 @@ function buildPrintGuideHtml(includeGantt){
       // tidak pernah beda kata. Booking transport selalu site ASAL; PTS cuma ditampilkan kalau moda
       // bukan darat (personil urus sendiri ke kantor PPC-nya utk jalur darat).
       const showPts = !route || route.mode!=="darat";
-      const bookingNoteHtml = `<div class="pg-transition-note" style="margin-top:4px;">Booking transport: <b>ENV Site ${escHtml(row.site)}</b> (site asal — site tujuan tidak perlu booking).</div>`;
+      const bookingNoteHtml = `<div class="pg-transition-note" style="margin-top:4px;">${bookingResponsibilityText(row.site)}</div>`;
       const transitPersonilHtml = showPts
-        ? `<div class="pg-transition-note" style="margin-top:4px;"><b>Personil yang Berangkat (perlu dicek PTS):</b>${personilChipsHtml(b.assignedPersonil, true)}</div>`
+        ? `<div class="pg-transition-note" style="margin-top:4px;"><b>Personil yang Berangkat (perlu dicek PTS):</b>${personilChipsHtml(b.assignedPersonil)}</div>`
         : `<div class="pg-transition-note" style="margin-top:4px;">Transport darat — diurus langsung oleh personil PPC ke kantor masing-masing; site tidak perlu koordinasi PTS.</div>`;
       const transitionNote = nextPrintedRow ? `<tr><td>
         <div class="pg-transition-note">&#8594; <b>Pindah ke Site ${escHtml(nextPrintedRow.site)}</b> &mdash; ${escHtml(fmtHariTanggalIndo(nextPrintedRow.start))}. ${travelInfoHtml}</div>
@@ -411,12 +411,13 @@ function buildPrintGuideHtml(includeGantt){
             <td><b>${escHtml(p.nama)}</b></td>
             <td>${jenis}</td>
             <td>${escHtml(p.parameter||"-")}</td>
+            <td style="white-space:nowrap;">${escHtml(frekuensiLabelShort(p.frekuensiBulan))}</td>
             <td>${escHtml(spec)}</td>
             <td style="text-align:center;"><span class="pg-box"></span></td>
             <td></td>
           </tr>`;
         }).join("");
-        return `<tr class="pg-day-row${a.isBuffer?" pg-day-buffer":""}"><td colspan="7">${escHtml(dayLabel)}</td></tr>${ptRows || `<tr class="pg-day-empty"><td colspan="7">Belum ada titik dialokasikan ke hari ini.</td></tr>`}`;
+        return `<tr class="pg-day-row${a.isBuffer?" pg-day-buffer":""}"><td colspan="8">${escHtml(dayLabel)}</td></tr>${ptRows || `<tr class="pg-day-empty"><td colspan="8">Belum ada titik dialokasikan ke hari ini.</td></tr>`}`;
       }).join("");
       // Titik yang dikeluarkan dari batch ini (lihat Detail Harian di Gantt) ikut dicetak di sini
       // supaya tim lapangan & yang menyusun batch berikutnya sama-sama lihat catatannya di kertas,
@@ -434,7 +435,7 @@ function buildPrintGuideHtml(includeGantt){
       // pertama) — dokumen ini dibawa fisik ke lapangan & tiap halaman/site berpotensi
       // difotokopi/dipisah sendiri-sendiri, jadi nomor telepon tetap harus ikut kebawa walau
       // halaman pg-meta-nya tertinggal.
-      const personilNote = `<div class="pg-site-note pg-site-note-personil"><b>Personil di Site Ini:</b>${personilChipsHtml(b.assignedPersonil, false)}</div>`;
+      const personilNote = `<div class="pg-site-note pg-site-note-personil"><b>Personil di Site Ini:</b>${personilChipsHtml(b.assignedPersonil)}</div>`;
       return `<tr><td>
         <div class="pg-site">
           <div class="pg-site-head"><span>Site ${escHtml(row.site)} (${sitePts.length} titik)</span><span>Jadwal: ${escHtml(rangeLabel)}</span></div>
@@ -443,7 +444,7 @@ function buildPrintGuideHtml(includeGantt){
           ${row.dayDetailNote ? `<div class="pg-site-note"><b>Catatan Saat Sampling:</b> ${escHtml(row.dayDetailNote)}</div>` : ""}
           ${excludedNote}
           <table class="pg-table">
-            <thead><tr><th style="width:16px;">No</th><th>Nama Titik / Cerobong</th><th>Jenis Sumber</th><th>Parameter Wajib</th><th>Kapasitas / Bahan Bakar</th><th style="width:40px;">Selesai</th><th style="width:110px;">Catatan Lapangan</th></tr></thead>
+            <thead><tr><th style="width:16px;">No</th><th>Nama Titik / Cerobong</th><th>Jenis Sumber</th><th>Parameter Wajib</th><th style="width:52px;">Frekuensi</th><th>Kapasitas / Bahan Bakar</th><th style="width:40px;">Selesai</th><th style="width:110px;">Catatan Lapangan</th></tr></thead>
             <tbody>${dayBlocks}</tbody>
           </table>
         </div>
@@ -785,6 +786,12 @@ function permitReminderText(site, startDate){
   const permit = permitDeadlineFor(site, startDate);
   return `<b>Saran Pengajuan Izin Masuk (H-${permit.days}):</b> idealnya sudah diajukan sebelum ${escHtml(fmtHariTanggalIndo(permit.date))} apabila memungkinkan &mdash; sebagai antisipasi kalau jadwal kedatangan ternyata dimajukan.`;
 }
+// Kalimat tanggung jawab booking transport — dipakai bareng oleh panduan cetak & preview per-site.
+// Diringkas sesuai masukan: cukup sebut siapa yang booking (ENV Site/Site Reps site ASAL), tanpa
+// embel-embel "site tujuan tidak perlu booking" yang dianggap sudah umum diketahui.
+function bookingResponsibilityText(site){
+  return `Booking transport dilakukan oleh ENV Site/Site Reps. asal (<b>${escHtml(site)}</b>).`;
+}
 // Preview "apa yang perlu disiapkan" per site, dari jadwal batch yang lagi tampil di filter Gantt
 // saat ini (sama persis dgn batches yg dipakai buildDayGridView/S-Curve) — utk site ENV yang perlu
 // tahu kapan personil masuk, kapan ajukan izin, dan (kalau site itu jadi TITIK KEBERANGKATAN ke
@@ -792,15 +799,27 @@ function permitReminderText(site, startDate){
 // yang perlu dicek PTS-nya sebelum naik. Booking transport SELALU jadi tanggung jawab site ASAL
 // (site yang ditinggalkan), bukan site tujuan — dan PTS cuma relevan utk moda laut/seatruck (lihat
 // field "mode" di TRAVEL_ROUTES, travel-routes.js); transport darat diurus personil PPC sendiri ke
-// kantor mereka, site tidak perlu ikut koordinasi PTS-nya sama sekali.
-function personilChipsHtml(assignedPersonil, showPts){
+// kantor mereka, site tidak perlu ikut koordinasi PTS-nya sama sekali. Blok mana yang ditampilkan
+// (transit vs tidak) tetap diatur pemanggil (lihat showPts di buildSiteBriefingHtml/buildPrintGuideHtml)
+// — tapi begitu daftar personilnya ditampilkan, telepon/PTS/Medpass SELALU ikut disertakan sekaligus,
+// bukan lagi digating per-field, supaya info kontak & kesehatan selalu kebaca tanpa perlu buka data
+// personil terpisah.
+function personilChipsHtml(assignedPersonil){
   const list = (assignedPersonil||[]).map(a=>DB.personil.find(p=>p.id===a.id)).filter(Boolean);
   if(!list.length) return `<div class="hint" style="margin-top:2px;">Belum ada personil ditunjuk — tunjuk di Perencanaan Batch.</div>`;
   return list.map(p=>{
     const pts = (p.items.ptsid||{}).exp || "";
+    const medpassExp = (p.items.medpass||{}).exp || "";
     const teleponHtml = ` &middot; Telepon: ${p.telepon?escHtml(p.telepon):'<span style="color:#c0392b;">belum diisi</span>'}`;
-    const ptsHtml = showPts ? ` &middot; PTS: ${pts?escHtml(pts):'<span style="color:#c0392b;">belum diisi</span>'}` : "";
-    return `<div style="padding:2px 0;">${escHtml(p.nama)} <span class="muted">(${escHtml(p.role||"-")})</span>${teleponHtml}${ptsHtml}</div>`;
+    const ptsHtml = ` &middot; PTS: ${pts?escHtml(pts):'<span style="color:#c0392b;">belum diisi</span>'}`;
+    let medpassHtml;
+    if(!medpassExp){ medpassHtml = ` &middot; Medpass: <span style="color:#c0392b;">belum diisi</span>`; }
+    else {
+      const days = Math.round((new Date(medpassExp)-new Date())/86400000);
+      const color = days<0 ? "#c0392b" : days<=30 ? "#c98a1a" : "#2f9e5b";
+      medpassHtml = ` &middot; Medpass s.d. <span style="color:${color};">${escHtml(medpassExp)}</span>`;
+    }
+    return `<div style="padding:2px 0;">${escHtml(p.nama)} <span class="muted">(${escHtml(p.role||"-")})</span>${teleponHtml}${ptsHtml}${medpassHtml}</div>`;
   }).join("");
 }
 function buildSiteBriefingHtml(batches){
@@ -827,19 +846,19 @@ function buildSiteBriefingHtml(batches){
         const travelLine = route ? `<b>${escHtml(route.label)}</b>${route.note?" &mdash; "+escHtml(route.note):""}` : `Moda transport belum terdata utk rute ini — cek manual ke tim terkait.`;
         const equipmentLine = route && route.equipmentNote ? `<div class="hint" style="margin-top:3px;">&#128230; ${escHtml(route.equipmentNote)}</div>` : "";
         const ptsBlock = showPts
-          ? `<div style="margin-top:5px;"><b>Personil yang Berangkat (perlu dicek PTS):</b>${personilChipsHtml(b.assignedPersonil, true)}</div>`
+          ? `<div style="margin-top:5px;"><b>Personil yang Berangkat (perlu dicek PTS):</b>${personilChipsHtml(b.assignedPersonil)}</div>`
           : `<div class="hint" style="margin-top:5px;">Transport darat — diurus langsung oleh personil PPC ke kantor masing-masing; site tidak perlu koordinasi PTS.</div>`;
         outboundHtml = `<div class="section-note" style="margin-top:8px;background:#fdf3e3;border-color:#c98a1a;">
           <b>&#8594; Persiapan Keberangkatan ke ${escHtml(nextRow.site)}</b> &mdash; ${escHtml(fmtHariTanggalIndo(nextRow.start))}
           <div style="margin-top:3px;">${travelLine}</div>
           ${equipmentLine}
-          <div style="margin-top:5px;">Booking transport: <b>ENV Site ${escHtml(site)}</b> (site asal — site tujuan tidak perlu booking).</div>
+          <div style="margin-top:5px;">${bookingResponsibilityText(site)}</div>
           ${ptsBlock}
         </div>`;
       }
       return `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed var(--gray-200);">
         <div><b>${rangeLabel}</b> <span class="muted">(${escHtml(b.name)})</span></div>
-        <div style="margin-top:4px;"><b>Personil:</b>${personilChipsHtml(b.assignedPersonil, false)}</div>
+        <div style="margin-top:4px;"><b>Personil:</b>${personilChipsHtml(b.assignedPersonil)}</div>
         <div class="hint" style="margin-top:4px;">${permitReminderText(site, row.start)} Pastikan akomodasi sudah dipesan sebelum kedatangan.</div>
         ${outboundHtml}
       </div>`;

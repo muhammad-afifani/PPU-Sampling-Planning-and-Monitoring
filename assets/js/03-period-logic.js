@@ -47,6 +47,14 @@ function nextPeriodAfter(periodStr, months){
   const totalSem = (cur.year*2 + (cur.sem-1)) + Math.max(1, Math.round((Number(months)||6)/6));
   return periodLabel((totalSem%2)+1, Math.floor(totalSem/2));
 }
+// Label ringkas siklus pemantauan (p.frekuensiBulan) — "1x6 Bln"/"1x1 Thn"/"1x3 Thn" dst, dipakai
+// di kolom cetak yang sempit (Panduan Sampling A4). Kelipatan 12 ditulis dalam tahun (lebih ringkas
+// & lazim dibaca drpd "1x12 Bln"/"1x36 Bln"), sisanya polos dalam bulan.
+function frekuensiLabelShort(months){
+  const m = Number(months);
+  if(!m) return "-";
+  return m % 12 === 0 ? `1x${m/12} Thn` : `1x${m} Bln`;
+}
 function semesterMonthLabels(sem, year){
   const startMonth0 = sem===1 ? 0 : 6;
   return [0,1,2,3,4,5].map(i=>monthLabel(year, startMonth0+i));
