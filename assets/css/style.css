@@ -483,8 +483,8 @@ thead .dg-col-sticky{z-index:3;}
    di Gantt — tabel ini lebar (10 kolom dokumen + dst), tanpa ini identitas baris hilang saat
    discroll ke kanan. Lebar KEDUANYA fixed (bukan cuma min-width) supaya offset left Role selalu
    pas persis di tepi kanan Nama, tidak peduli isi kolom lain. */
-.pz-nama{position:sticky;left:0;z-index:2;min-width:150px;max-width:150px;width:150px;background:#fff;box-shadow:2px 0 3px -2px rgba(0,0,0,.15);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.pz-role{position:sticky;left:150px;z-index:2;min-width:92px;max-width:92px;width:92px;background:#fff;box-shadow:2px 0 3px -2px rgba(0,0,0,.15);}
+.pz-nama{position:sticky;left:0;z-index:2;min-width:280px;max-width:280px;width:280px;background:#fff;box-shadow:2px 0 3px -2px rgba(0,0,0,.15);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pz-role{position:sticky;left:280px;z-index:2;min-width:100px;max-width:100px;width:100px;background:#fff;box-shadow:2px 0 3px -2px rgba(0,0,0,.15);}
 thead .pz-nama,thead .pz-role{z-index:3;background:var(--navy-900);box-shadow:none;}
 /* Timeline alokasi site per personil (halaman Personil) — satu baris flow per orang, panah antar
    kartu site menandakan urutan kronologis (sudah diurutkan naik dari tanggal mulai). */
@@ -512,8 +512,11 @@ thead .pz-nama,thead .pz-role{z-index:3;background:var(--navy-900);box-shadow:no
 /* Sama seperti .dg-cc, tapi utk sel di LUAR rentang jadwal aktif (lihat catatan di buildDayGridView)
    — .dg-empty menimpa box-shadow jadi none & warna border ke abu2, jadi ditulis ulang lagi di sini
    dgn 3 kelas sekaligus supaya spesifisitasnya menang & bordernya diwarnai merah juga, bukan cuma
-   box-shadow (kalau cuma box-shadow, border abu2 .dg-empty di luarnya bikin outline merah kurang jelas). */
-.dg-day-cell.dg-empty.dg-cc-empty{box-shadow:inset 0 0 0 2px #e0554f;border-color:#e0554f;}
+   box-shadow (kalau cuma box-shadow, border abu2 .dg-empty di luarnya bikin outline merah kurang jelas).
+   Warna dibuat lebih pudar (rgba, bukan hex solid #e0554f spt .dg-cc) drpd versi di hari sampling
+   aktif — di sini cuma info "site ini biasanya crew change tiap hari ini", bukan hari kerja
+   sungguhan, jadi tidak perlu semencolok itu. */
+.dg-day-cell.dg-empty.dg-cc-empty{box-shadow:inset 0 0 0 2px rgba(224,85,79,.4);border-color:rgba(224,85,79,.4);}
 /* Kotak "pindah ke site berikutnya" (lihat transitionDate di buildDayGridView) — 3 kelas sekaligus
    dgn alasan spesifisitas yang sama seperti dg-cc-empty di atas. Warna amber (beda dari merah
    crew-change) supaya keduanya tetap kebeda kalau kebetulan jatuh di tanggal yang sama. */

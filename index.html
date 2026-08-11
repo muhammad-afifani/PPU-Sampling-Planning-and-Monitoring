@@ -193,8 +193,8 @@
       <div class="pagehead"><div><h2>Personil PPC &amp; Observer</h2><div class="desc">Basis data personil beserta kelengkapan dokumen. Untuk menentukan personil yang bertugas pada tiap batch (termasuk Ketua Tim), buka Perencanaan Batch.</div></div>
         <div class="toolbar">
           <button class="btn primary" data-action="addPersonil">+ Tambah Personil</button>
-          <button class="btn" data-action="importPersonilCsv">Import CSV</button>
-          <button class="btn" data-action="exportPersonilCsv">Export CSV</button>
+          <button class="btn" data-action="importPersonilCsv">Import Excel (.csv)</button>
+          <button class="btn" data-action="exportPersonilCsv">Export Excel (.csv)</button>
           <button class="btn ghost" data-action="goToPage" data-page="planner">Buka Perencanaan Batch &rarr;</button>
         </div>
       </div>
@@ -207,9 +207,12 @@
         <div id="personilAlokasi"></div>
       </div>
       <div class="card">
-        <h3>Kelengkapan Data Personil (Cetak A4)</h3>
-        <div class="hint" style="margin-bottom:10px;">Ringkasan nama, role, dan kelengkapan dokumen tiap personil (termasuk tanggal kedaluwarsa tiap item) — dilengkapi QR code &amp; tautan ke folder dokumentasi (isi lewat "Link Dokumentasi" di form Edit Personil) supaya ENV site bisa langsung scan/buka untuk verifikasi saat mengatur persiapan dan perizinan akses site. Personil tanpa Link Dokumentasi tetap tampil, kolom itu cuma kosong.</div>
-        <button class="btn primary" data-action="printPersonilRoster">Cetak Kelengkapan Data Personil (A4)</button>
+        <h3>Kelengkapan Data Personil (Cetak A4 / Excel)</h3>
+        <div class="hint" style="margin-bottom:10px;">Ringkasan nama, role, dan kelengkapan dokumen tiap personil (termasuk tanggal kedaluwarsa tiap item) — dilengkapi QR code &amp; tautan ke folder dokumentasi (isi lewat "Link Dokumentasi" di form Edit Personil) supaya ENV site bisa langsung scan/buka untuk verifikasi saat mengatur persiapan dan perizinan akses site. Personil tanpa Link Dokumentasi tetap tampil, kolom itu cuma kosong. Butuh format yang bisa langsung disalin per kolom (mis. ke Excel)? Gunakan "Export Excel (.csv)" — satu kolom per item, isinya tanggal/status polos tanpa format tambahan.</div>
+        <div class="toolbar">
+          <button class="btn primary" data-action="printPersonilRoster">Cetak Kelengkapan Data Personil (A4)</button>
+          <button class="btn" data-action="exportPersonilCsv">Export Excel (.csv)</button>
+        </div>
       </div>
     </div>
 
@@ -350,6 +353,11 @@
           <span class="item"><span class="sw" style="background:repeating-linear-gradient(45deg,#ccc,#ccc 3px,#eee 3px,#eee 6px)"></span> Buffer</span>
           <span class="item"><span class="sw" style="background:#e0554f;opacity:.35"></span> Hari crew change</span>
         </div>
+      </div>
+      <div style="margin:16px 0;">
+        <h3 style="margin-bottom:4px;">Preview Persiapan per Site</h3>
+        <div class="hint" style="margin-bottom:10px;">Ringkasan otomatis dari jadwal batch yang sedang tampil di filter di atas: siapa saja yang masuk ke site tsb dan kapan, batas ajukan izin masuk, pengingat akomodasi, dan (untuk site yang jadi titik keberangkatan ke site berikutnya) siapa yang bertanggung jawab memesan transport beserta personil &amp; PTS yang perlu dicek sebelum naik.</div>
+        <div id="siteBriefingWrap"></div>
       </div>
       <div class="card">
         <h3>S-Curve (Rencana vs Aktual)</h3>

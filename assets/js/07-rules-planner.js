@@ -131,8 +131,16 @@ function currentBatch(){
 function refreshBatchSelect(){
   const team = document.getElementById("plTeam").value;
   const sel = document.getElementById("plBatch");
+  const prevValue = sel.value;
   const list = getBatchesForTeam(team);
   sel.innerHTML = list.map(b=>`<option value="${b.id}">${b.name}</option>`).join("") || "<option value=''>(belum ada batch)</option>";
+  // Rebuild innerHTML mereset seleksi ke opsi PERTAMA walau opsi lama masih ada di daftar baru —
+  // dipasang lagi manual di sini kalau masih valid (pola sama dgn refreshGanttBatchSelect di
+  // 08-gantt-print.js). Tanpa ini, batch yg sedang dipilih user diam-diam ganti ke batch lain
+  // begitu refreshBatchSelect() jalan lagi (mis. tiap ketukan di field Tanggal Mulai/Ratio/Buffer,
+  // yang unconditional manggil ini krn field Nama Batch perlu update label opsi live) — kalau user
+  // lanjut klik "Buat & Terapkan Jadwal" setelahnya, jadwal ke-generate ke batch yg SALAH.
+  if(list.some(b=>b.id===prevValue)) sel.value = prevValue;
 }
 document.getElementById("plTeam").addEventListener("change", ()=>{ refreshBatchSelect(); loadBatchIntoForm(); renderPlanner(); });
 document.getElementById("plBatch").addEventListener("change", ()=>{ loadBatchIntoForm(); renderPlanner(); });

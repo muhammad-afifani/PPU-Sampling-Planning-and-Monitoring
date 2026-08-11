@@ -437,8 +437,9 @@ function renderPersonilAlokasi(){
     </div>`).join("")
     : "<div class='hint' style='padding:10px;'>Belum ada personil yang ditugaskan ke batch manapun — tunjuk dulu di Perencanaan Batch.</div>";
 }
+const PERSONIL_ROLES = ["PPC Emisi","PPC Ambient","Observer"];
 function personilFormHtml(p){
-  p = p || {id:"", nama:"", role:"PPC Udara", items:{}, dokumentasiLink:""};
+  p = p || {id:"", nama:"", role:"PPC Emisi", items:{}, dokumentasiLink:""};
   const itemFields = PERSONIL_ITEMS.map(it=>{
     const rec = p.items[it]||{};
     if(it===PERSONIL_NUMBER_FIELD){
@@ -449,11 +450,15 @@ function personilFormHtml(p){
       return `<div class="field"><label>${PERSONIL_LABELS[it]}</label><select id="pi_${it}"><option value="0" ${!rec.ada?"selected":""}>Belum Ada</option><option value="1" ${rec.ada?"selected":""}>Ada</option></select></div>`;
     }
   }).join("");
+  // Role lama ("PPC Udara", sebelum dipecah jadi Emisi/Ambient) tetap ditampilkan sbg opsi kalau
+  // personil ini masih memakainya, supaya tidak diam-diam ganti ke opsi pertama pas form dibuka —
+  // user perlu pilih manual jadi Emisi atau Ambient (tidak bisa ditebak otomatis dari data lama).
+  const roleOptions = PERSONIL_ROLES.includes(p.role) || !p.role ? PERSONIL_ROLES : [p.role, ...PERSONIL_ROLES];
   return `
   <h3>${p.id?"Edit":"Tambah"} Personil</h3>
   <div class="grid cols-2">
     <div class="field"><label>Nama</label><input type="text" id="p_nama" value="${escHtml(p.nama)}"></div>
-    <div class="field"><label>Role</label><select id="p_role"><option ${p.role==="PPC Udara"?"selected":""}>PPC Udara</option><option ${p.role==="Observer"?"selected":""}>Observer</option></select></div>
+    <div class="field"><label>Role</label><select id="p_role">${roleOptions.map(r=>`<option ${p.role===r?"selected":""}>${escHtml(r)}</option>`).join("")}</select></div>
   </div>
   <div class="grid cols-2" style="margin-top:10px;">${itemFields}</div>
   <div class="field" style="margin-top:10px;"><label>Link Dokumentasi (mis. folder Drive/SharePoint berisi PDF KTP/MCU/dst)</label><input type="url" id="p_dokLink" value="${escHtml(p.dokumentasiLink||"")}" placeholder="https://..."></div>
@@ -503,7 +508,7 @@ function importPersonilCsv(){
       const rows = csvParse(reader.result);
       rows.forEach(r=>{
         if(!r.nama) return;
-        DB.personil.push({id: uid("PS"), nama:r.nama, role:r.role||"PPC Udara", items:{
+        DB.personil.push({id: uid("PS"), nama:r.nama, role:r.role||"PPC Emisi", items:{
           ktp:{exp:r.ktpExp||""}, mcu:{exp:r.mcuExp||""}, spk:{exp:r.spkExp||""}, medpass:{exp:r.medpassExp||""},
           clsr:{exp:r.clsrExp||""}, ppc:{exp:r.ppcExp||""}, fotoBiru:{ada:/^1|true|ya$/i.test(r.fotoBiruAda||"")},
           bosiet:{exp:r.bosietExp||""}, vaksin:{ada:/^1|true|ya$/i.test(r.vaksinAda||"")}, ptsid:{exp:r.ptsidExp||""}
@@ -579,7 +584,7 @@ function buildPersonilPrintHtml(){
   return `<table class="pg-guide-page pg-batch">
     <thead><tr><td>
       <div class="pg-header">
-        <div><h1>Kelengkapan Data Personil</h1><div class="sub">PPC Udara &amp; Observer — rincian dokumen beserta tanggal kedaluwarsa, bahan persiapan &amp; perizinan akses site</div></div>
+        <div><h1>Kelengkapan Data Personil</h1><div class="sub">PPC Emisi, PPC Ambient &amp; Observer — rincian dokumen beserta tanggal kedaluwarsa, bahan persiapan &amp; perizinan akses site</div></div>
         <div class="sub" style="text-align:right;">Dicetak ${escHtml(printedAt)}</div>
       </div>
     </td></tr></thead>

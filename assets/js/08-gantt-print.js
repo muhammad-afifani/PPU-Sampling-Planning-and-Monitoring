@@ -377,8 +377,13 @@ function buildPrintGuideHtml(includeGantt){
       const travelInfoHtml = route
         ? `<b>${escHtml(route.label)}</b>${route.note?" &mdash; "+escHtml(route.note):""}`
         : `Umumnya berangkat pagi (&plusmn;07:00&ndash;08:00 WIB) atau siang usai istirahat (&plusmn;13:00 WIB); perjalanan antar site sekitar 1&ndash;2 jam.`;
+      // Catatan drop peralatan (mis. Bekapai — perlu diangkut ke basket dulu, koordinasi Marine di
+      // jetty) — beda baris dari info jam berangkat personil krn ini soal LOGISTIK PERALATAN H-1,
+      // bukan jadwal keberangkatan personil itu sendiri.
+      const equipmentNoteHtml = route && route.equipmentNote ? `<div class="pg-transition-note" style="margin-top:4px;">&#128230; <b>Persiapan Peralatan:</b> ${escHtml(route.equipmentNote)}</div>` : "";
       const transitionNote = nextPrintedRow ? `<tr><td>
         <div class="pg-transition-note">&#8594; <b>Pindah ke Site ${escHtml(nextPrintedRow.site)}</b> &mdash; ${escHtml(fmtHariTanggalIndo(nextPrintedRow.start))}. ${travelInfoHtml}</div>
+        ${equipmentNoteHtml}
       </td></tr>` : "";
       const rangeLabel = row.start===row.end ? row.start : `${row.start} s.d. ${row.end}`;
       const asg = dailyAssignmentForRow(b, row);
@@ -413,9 +418,8 @@ function buildPrintGuideHtml(includeGantt){
       }).join("; ")}</div>` : "";
       // Batas ajukan izin masuk — H-N mundur dari tanggal mulai site ini (permitLeadDays per site,
       // diatur di Aturan Site & Rute, default H-2). Cuma pengingat/FYI, bukan constraint jadwal.
-      const permitLeadDays = DB.siteRules[row.site]?.permitLeadDays ?? 2;
-      const permitDate = addDays(row.start, -permitLeadDays);
-      const permitNote = `<div class="pg-site-note pg-site-note-permit"><b>Ajukan Izin Masuk Site (H-${permitLeadDays}):</b> selambat-lambatnya ${escHtml(fmtHariTanggalIndo(permitDate))} — berjaga kalau jadwal kedatangan maju lebih cepat.</div>`;
+      const permitDeadline = permitDeadlineFor(row.site, row.start);
+      const permitNote = `<div class="pg-site-note pg-site-note-permit"><b>Ajukan Izin Masuk Site (H-${permitDeadline.days}):</b> selambat-lambatnya ${escHtml(fmtHariTanggalIndo(permitDeadline.date))} — berjaga kalau jadwal kedatangan maju lebih cepat.</div>`;
       return `<tr><td>
         <div class="pg-site">
           <div class="pg-site-head"><span>Site ${escHtml(row.site)} (${sitePts.length} titik)</span><span>Jadwal: ${escHtml(rangeLabel)}</span></div>
@@ -750,6 +754,79 @@ function unfinalizeBatchSchedule(){
   renderFinalizeStatus();
   toast("Finalisasi dibatalkan — batch bisa di-custom/generate ulang lagi.","ok");
 }
+// Batas ajukan izin masuk site — H-N mundur dari tanggal mulai (permitLeadDays per site, diatur
+// di Aturan Site & Rute, default H-2). Dipakai bareng di panduan cetak & preview per-site di bawah
+// supaya angkanya konsisten, tidak dihitung ulang beda cara di 2 tempat.
+function permitDeadlineFor(site, startDate){
+  const days = DB.siteRules[site]?.permitLeadDays ?? 2;
+  return { days, date: addDays(startDate, -days) };
+}
+// Preview "apa yang perlu disiapkan" per site, dari jadwal batch yang lagi tampil di filter Gantt
+// saat ini (sama persis dgn batches yg dipakai buildDayGridView/S-Curve) — utk site ENV yang perlu
+// tahu kapan personil masuk, kapan ajukan izin, dan (kalau site itu jadi TITIK KEBERANGKATAN ke
+// site berikutnya di rute batch yg sama) siapa yang tanggung jawab booking transport & siapa saja
+// yang perlu dicek PTS-nya sebelum naik. Booking transport SELALU jadi tanggung jawab site ASAL
+// (site yang ditinggalkan), bukan site tujuan — dan PTS cuma relevan utk moda laut/seatruck (lihat
+// field "mode" di TRAVEL_ROUTES, travel-routes.js); transport darat diurus personil PPC sendiri ke
+// kantor mereka, site tidak perlu ikut koordinasi PTS-nya sama sekali.
+function personilChipsHtml(assignedPersonil, showPts){
+  const list = (assignedPersonil||[]).map(a=>DB.personil.find(p=>p.id===a.id)).filter(Boolean);
+  if(!list.length) return `<div class="hint" style="margin-top:2px;">Belum ada personil ditunjuk — tunjuk di Perencanaan Batch.</div>`;
+  return list.map(p=>{
+    const pts = (p.items.ptsid||{}).exp || "";
+    const docLink = p.dokumentasiLink ? ` &middot; <a href="${escHtml(p.dokumentasiLink)}" target="_blank" rel="noopener">dokumen</a>` : "";
+    const ptsHtml = showPts ? ` &middot; PTS: ${pts?escHtml(pts):'<span style="color:#c0392b;">belum diisi</span>'}` : "";
+    return `<div style="padding:2px 0;">${escHtml(p.nama)} <span class="muted">(${escHtml(p.role||"-")})</span>${docLink}${ptsHtml}</div>`;
+  }).join("");
+}
+function buildSiteBriefingHtml(batches){
+  const visitsBySite = {};
+  batches.forEach(b=>{
+    (b.schedule||[]).forEach((row, idx)=>{
+      (visitsBySite[row.site] = visitsBySite[row.site]||[]).push({b, row, idx});
+    });
+  });
+  const sites = Object.keys(visitsBySite).sort((a,c)=>{
+    const ia=MASTER_SITE_ORDER.indexOf(a), ic=MASTER_SITE_ORDER.indexOf(c);
+    return (ia<0?99:ia)-(ic<0?99:ic);
+  });
+  if(!sites.length) return `<div class="hint" style="padding:10px;">Belum ada jadwal utk ditampilkan — buat &amp; terapkan jadwal dulu di Perencanaan Batch.</div>`;
+  return sites.map(site=>{
+    const visits = visitsBySite[site].slice().sort((a,c)=>a.row.start.localeCompare(c.row.start));
+    const visitBlocks = visits.map(({b, row, idx})=>{
+      const rangeLabel = row.start===row.end ? fmtHariTanggalIndo(row.start) : `${fmtHariTanggalIndo(row.start)} s.d. ${fmtHariTanggalIndo(row.end)}`;
+      const permit = permitDeadlineFor(site, row.start);
+      const nextRow = b.schedule[idx+1];
+      let outboundHtml = "";
+      if(nextRow){
+        const route = travelRouteInfo(site, nextRow.site);
+        const showPts = !route || route.mode!=="darat";
+        const travelLine = route ? `<b>${escHtml(route.label)}</b>${route.note?" &mdash; "+escHtml(route.note):""}` : `Moda transport belum terdata utk rute ini — cek manual ke tim terkait.`;
+        const equipmentLine = route && route.equipmentNote ? `<div class="hint" style="margin-top:3px;">&#128230; ${escHtml(route.equipmentNote)}</div>` : "";
+        const ptsBlock = showPts
+          ? `<div style="margin-top:5px;"><b>Personil yang Berangkat (perlu dicek PTS):</b>${personilChipsHtml(b.assignedPersonil, true)}</div>`
+          : `<div class="hint" style="margin-top:5px;">Transport darat — diurus langsung oleh personil PPC ke kantor masing-masing; site tidak perlu koordinasi PTS.</div>`;
+        outboundHtml = `<div class="section-note" style="margin-top:8px;background:#fdf3e3;border-color:#c98a1a;">
+          <b>&#8594; Persiapan Keberangkatan ke ${escHtml(nextRow.site)}</b> &mdash; ${escHtml(fmtHariTanggalIndo(nextRow.start))}
+          <div style="margin-top:3px;">${travelLine}</div>
+          ${equipmentLine}
+          <div style="margin-top:5px;">Booking transport: <b>ENV Site ${escHtml(site)}</b> (site asal — site tujuan tidak perlu booking).</div>
+          ${ptsBlock}
+        </div>`;
+      }
+      return `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed var(--gray-200);">
+        <div><b>${rangeLabel}</b> <span class="muted">(${escHtml(b.name)})</span></div>
+        <div style="margin-top:4px;"><b>Personil:</b>${personilChipsHtml(b.assignedPersonil, false)}</div>
+        <div class="hint" style="margin-top:4px;">Ajukan Izin Masuk (H-${permit.days}): selambat-lambatnya ${escHtml(fmtHariTanggalIndo(permit.date))}. Pastikan akomodasi sudah dipesan sebelum kedatangan.</div>
+        ${outboundHtml}
+      </div>`;
+    }).join("");
+    return `<div class="card" style="padding:12px 14px;margin-bottom:10px;">
+      <h3 style="margin-bottom:8px;">${escHtml(site)}</h3>
+      ${visitBlocks}
+    </div>`;
+  }).join("");
+}
 // Ringkasan "hari crew change" per site yang lagi tampil di filter Gantt saat ini — pembanding
 // cepat tanpa harus buka halaman Aturan Site & Rute, sumber datanya tetap dari sana (DB.siteRules).
 function renderGanttCrewChangeInfo(batches){
@@ -782,6 +859,7 @@ function renderGantt(){
     document.getElementById("ganttWrap").innerHTML = buildDayGridView(rows);
   }
   document.getElementById("scurveWrap").innerHTML = buildSCurveSVG(batches, DB.points, view);
+  document.getElementById("siteBriefingWrap").innerHTML = buildSiteBriefingHtml(batches);
 }
 function handleScheduleDrop(batchId, rowIdx, newDate){
   const b = DB.batches.find(x=>x.id===batchId); if(!b) return;
