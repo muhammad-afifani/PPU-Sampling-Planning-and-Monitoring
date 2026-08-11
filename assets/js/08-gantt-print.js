@@ -386,7 +386,7 @@ function buildPrintGuideHtml(includeGantt){
       // tidak pernah beda kata. Booking transport selalu site ASAL; PTS cuma ditampilkan kalau moda
       // bukan darat (personil urus sendiri ke kantor PPC-nya utk jalur darat).
       const showPts = !route || route.mode!=="darat";
-      const bookingNoteHtml = `<div class="pg-transition-note" style="margin-top:4px;">${bookingResponsibilityText(row.site)}</div>`;
+      const bookingNoteHtml = `<div class="pg-transition-note" style="margin-top:4px;">${bookingResponsibilityText(row.site, nextPrintedRow ? nextPrintedRow.site : null)}</div>`;
       const transitPersonilHtml = showPts
         ? `<div class="pg-transition-note" style="margin-top:4px;"><b>Personil yang Berangkat (perlu dicek PTS):</b>${personilChipsHtml(b.assignedPersonil)}</div>`
         : `<div class="pg-transition-note" style="margin-top:4px;">Transport darat — diurus langsung oleh personil PPC ke kantor masing-masing; site tidak perlu koordinasi PTS.</div>`;
@@ -788,9 +788,15 @@ function permitReminderText(site, startDate){
 }
 // Kalimat tanggung jawab booking transport — dipakai bareng oleh panduan cetak & preview per-site.
 // Diringkas sesuai masukan: cukup sebut siapa yang booking (ENV Site/Site Reps site ASAL), tanpa
-// embel-embel "site tujuan tidak perlu booking" yang dianggap sudah umum diketahui.
-function bookingResponsibilityText(site){
-  return `Booking transport dilakukan oleh ENV Site/Site Reps. asal (<b>${escHtml(site)}</b>).`;
+// embel-embel "site tujuan tidak perlu booking" yang dianggap sudah umum diketahui. Rute yang
+// punya "bookingOverride" di TRAVEL_ROUTES (mis. semua rute ke/dari BEKAPAI) MENGESAMPINGKAN aturan
+// "site asal" ini — site yang disebut di override itu yang booking, walau bukan site keberangkatan.
+function bookingResponsibilityText(fromSite, toSite){
+  const route = travelRouteInfo(fromSite, toSite);
+  if(route && route.bookingOverride){
+    return `Booking transport dilakukan oleh <b>${escHtml(route.bookingOverride)}</b> (rute khusus ke/dari ${escHtml(route.bookingOverride)} — bukan site asal).`;
+  }
+  return `Booking transport dilakukan oleh ENV Site/Site Reps. asal (<b>${escHtml(fromSite)}</b>).`;
 }
 // Preview "apa yang perlu disiapkan" per site, dari jadwal batch yang lagi tampil di filter Gantt
 // saat ini (sama persis dgn batches yg dipakai buildDayGridView/S-Curve) — utk site ENV yang perlu
@@ -852,7 +858,7 @@ function buildSiteBriefingHtml(batches){
           <b>&#8594; Persiapan Keberangkatan ke ${escHtml(nextRow.site)}</b> &mdash; ${escHtml(fmtHariTanggalIndo(nextRow.start))}
           <div style="margin-top:3px;">${travelLine}</div>
           ${equipmentLine}
-          <div style="margin-top:5px;">${bookingResponsibilityText(site)}</div>
+          <div style="margin-top:5px;">${bookingResponsibilityText(site, nextRow.site)}</div>
           ${ptsBlock}
         </div>`;
       }
