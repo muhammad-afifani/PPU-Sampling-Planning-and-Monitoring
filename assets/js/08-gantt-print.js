@@ -370,10 +370,15 @@ function buildPrintGuideHtml(includeGantt){
         const candidate = b.schedule[j];
         if(pts.some(p=>p.site===candidate.site)){ nextPrintedRow = candidate; break; }
       }
-      // Info perpindahan — jam bukan data tersimpan (jadwal cuma per-tanggal), jadi ditulis sbg
-      // panduan umum sesuai kebiasaan lapangan yang diberitahukan, bukan jam presisi per kejadian.
+      // Info perpindahan — kalau rutenya ada di TRAVEL_ROUTES (travel-routes.js, data FYI dari tim
+      // lapangan) dipakai persis, kalau tidak baru balik ke panduan umum (jam bukan data tersimpan,
+      // jadwal cuma per-tanggal, jadi generik memang seharusnya cuma perkiraan bukan jam presisi).
+      const route = nextPrintedRow ? travelRouteInfo(row.site, nextPrintedRow.site) : null;
+      const travelInfoHtml = route
+        ? `<b>${escHtml(route.label)}</b>${route.note?" &mdash; "+escHtml(route.note):""}`
+        : `Umumnya berangkat pagi (&plusmn;07:00&ndash;08:00 WIB) atau siang usai istirahat (&plusmn;13:00 WIB); perjalanan antar site sekitar 1&ndash;2 jam.`;
       const transitionNote = nextPrintedRow ? `<tr><td>
-        <div class="pg-transition-note">&#8594; <b>Pindah ke Site ${escHtml(nextPrintedRow.site)}</b> &mdash; ${escHtml(fmtHariTanggalIndo(nextPrintedRow.start))}. Umumnya berangkat pagi (&plusmn;07:00&ndash;08:00 WIB) atau siang usai istirahat (&plusmn;13:00 WIB); perjalanan antar site sekitar 1&ndash;2 jam.</div>
+        <div class="pg-transition-note">&#8594; <b>Pindah ke Site ${escHtml(nextPrintedRow.site)}</b> &mdash; ${escHtml(fmtHariTanggalIndo(nextPrintedRow.start))}. ${travelInfoHtml}</div>
       </td></tr>` : "";
       const rangeLabel = row.start===row.end ? row.start : `${row.start} s.d. ${row.end}`;
       const asg = dailyAssignmentForRow(b, row);
@@ -406,9 +411,15 @@ function buildPrintGuideHtml(includeGantt){
         const reasonLabel = EXCLUDE_REASON_LABELS[r.reason] || r.reason;
         return `${escHtml(p.nama)} (${escHtml(reasonLabel)}${r.note?": "+escHtml(r.note):""})`;
       }).join("; ")}</div>` : "";
+      // Batas ajukan izin masuk — H-N mundur dari tanggal mulai site ini (permitLeadDays per site,
+      // diatur di Aturan Site & Rute, default H-2). Cuma pengingat/FYI, bukan constraint jadwal.
+      const permitLeadDays = DB.siteRules[row.site]?.permitLeadDays ?? 2;
+      const permitDate = addDays(row.start, -permitLeadDays);
+      const permitNote = `<div class="pg-site-note pg-site-note-permit"><b>Ajukan Izin Masuk Site (H-${permitLeadDays}):</b> selambat-lambatnya ${escHtml(fmtHariTanggalIndo(permitDate))} — berjaga kalau jadwal kedatangan maju lebih cepat.</div>`;
       return `<tr><td>
         <div class="pg-site">
           <div class="pg-site-head"><span>Site ${escHtml(row.site)} (${sitePts.length} titik)</span><span>Jadwal: ${escHtml(rangeLabel)}</span></div>
+          ${permitNote}
           ${row.dayDetailNote ? `<div class="pg-site-note"><b>Catatan Saat Sampling:</b> ${escHtml(row.dayDetailNote)}</div>` : ""}
           ${excludedNote}
           <table class="pg-table">
@@ -661,7 +672,8 @@ function buildDayGridView(rows){
           // Kotak "pindah ke site berikutnya" — transisi selalu jatuh SETELAH r.end (dicek lewat
           // minAllowed di handleScheduleDrop & cursor di recalcScheduleFrom), jadi selalu masuk
           // cabang !inRange ini, tidak pernah bentrok sama kotak kerja aktif site ini sendiri.
-          const title = `Pindah ke ${nextRow.site} — mulai ${nextRow.start}${ccEmpty?` (${r.site}: hari crew change)`:""}`;
+          const routeInfo = travelRouteInfo(r.site, nextRow.site);
+          const title = `Pindah ke ${nextRow.site} — mulai ${nextRow.start}${routeInfo?` · ${routeInfo.label}`:""}${ccEmpty?` (${r.site}: hari crew change)`:""}`;
           html += `<td class="dg-day-cell dg-empty dg-transition${isToday?" dg-today-col":""}${ccEmpty?" dg-cc-empty":""}" data-date="${dt}" title="${escHtml(title)}"><span class="dg-transition-arrow">&#8594;</span></td>`;
         } else {
           const title = ccEmpty ? `${r.site} — ${dt} (hari crew change)` : "";
