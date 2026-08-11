@@ -381,9 +381,20 @@ function buildPrintGuideHtml(includeGantt){
       // jetty) — beda baris dari info jam berangkat personil krn ini soal LOGISTIK PERALATAN H-1,
       // bukan jadwal keberangkatan personil itu sendiri.
       const equipmentNoteHtml = route && route.equipmentNote ? `<div class="pg-transition-note" style="margin-top:4px;">&#128230; <b>Persiapan Peralatan:</b> ${escHtml(route.equipmentNote)}</div>` : "";
+      // Tanggung jawab booking & checklist PTS — logika SAMA PERSIS dgn blok "Persiapan Keberangkatan"
+      // di panel Preview Persiapan per Site (buildSiteBriefingHtml), supaya versi cetak & versi layar
+      // tidak pernah beda kata. Booking transport selalu site ASAL; PTS cuma ditampilkan kalau moda
+      // bukan darat (personil urus sendiri ke kantor PPC-nya utk jalur darat).
+      const showPts = !route || route.mode!=="darat";
+      const bookingNoteHtml = `<div class="pg-transition-note" style="margin-top:4px;">Booking transport: <b>ENV Site ${escHtml(row.site)}</b> (site asal — site tujuan tidak perlu booking).</div>`;
+      const transitPersonilHtml = showPts
+        ? `<div class="pg-transition-note" style="margin-top:4px;"><b>Personil yang Berangkat (perlu dicek PTS):</b>${personilChipsHtml(b.assignedPersonil, true)}</div>`
+        : `<div class="pg-transition-note" style="margin-top:4px;">Transport darat — diurus langsung oleh personil PPC ke kantor masing-masing; site tidak perlu koordinasi PTS.</div>`;
       const transitionNote = nextPrintedRow ? `<tr><td>
         <div class="pg-transition-note">&#8594; <b>Pindah ke Site ${escHtml(nextPrintedRow.site)}</b> &mdash; ${escHtml(fmtHariTanggalIndo(nextPrintedRow.start))}. ${travelInfoHtml}</div>
         ${equipmentNoteHtml}
+        ${bookingNoteHtml}
+        ${transitPersonilHtml}
       </td></tr>` : "";
       const rangeLabel = row.start===row.end ? row.start : `${row.start} s.d. ${row.end}`;
       const asg = dailyAssignmentForRow(b, row);
@@ -417,13 +428,18 @@ function buildPrintGuideHtml(includeGantt){
         return `${escHtml(p.nama)} (${escHtml(reasonLabel)}${r.note?": "+escHtml(r.note):""})`;
       }).join("; ")}</div>` : "";
       // Batas ajukan izin masuk — H-N mundur dari tanggal mulai site ini (permitLeadDays per site,
-      // diatur di Aturan Site & Rute, default H-2). Cuma pengingat/FYI, bukan constraint jadwal.
-      const permitDeadline = permitDeadlineFor(row.site, row.start);
-      const permitNote = `<div class="pg-site-note pg-site-note-permit"><b>Ajukan Izin Masuk Site (H-${permitDeadline.days}):</b> selambat-lambatnya ${escHtml(fmtHariTanggalIndo(permitDeadline.date))} — berjaga kalau jadwal kedatangan maju lebih cepat.</div>`;
+      // diatur di Aturan Site & Rute, default H-2). Cuma pengingat/saran/FYI, bukan constraint jadwal.
+      const permitNote = `<div class="pg-site-note pg-site-note-permit">${permitReminderText(row.site, row.start)} Pastikan akomodasi sudah dipesan sebelum kedatangan.</div>`;
+      // Personil yang ditugaskan dicetak ULANG per site (bukan cuma sekali di pg-meta halaman
+      // pertama) — dokumen ini dibawa fisik ke lapangan & tiap halaman/site berpotensi
+      // difotokopi/dipisah sendiri-sendiri, jadi nomor telepon tetap harus ikut kebawa walau
+      // halaman pg-meta-nya tertinggal.
+      const personilNote = `<div class="pg-site-note pg-site-note-personil"><b>Personil di Site Ini:</b>${personilChipsHtml(b.assignedPersonil, false)}</div>`;
       return `<tr><td>
         <div class="pg-site">
           <div class="pg-site-head"><span>Site ${escHtml(row.site)} (${sitePts.length} titik)</span><span>Jadwal: ${escHtml(rangeLabel)}</span></div>
           ${permitNote}
+          ${personilNote}
           ${row.dayDetailNote ? `<div class="pg-site-note"><b>Catatan Saat Sampling:</b> ${escHtml(row.dayDetailNote)}</div>` : ""}
           ${excludedNote}
           <table class="pg-table">
@@ -761,6 +777,14 @@ function permitDeadlineFor(site, startDate){
   const days = DB.siteRules[site]?.permitLeadDays ?? 2;
   return { days, date: addDays(startDate, -days) };
 }
+// Kalimat pengingat izin masuk — dipakai bareng oleh panduan cetak & preview per-site di bawah
+// supaya wording-nya konsisten di 2 tempat. Dibingkai sbg SARAN (bukan keharusan mutlak): H-N
+// itu jaga-jaga kalau jadwal kedatangan ternyata dimajukan, bukan syarat kaku yang mengunci
+// tanggal — sengaja tidak dipakai kata "harus"/"wajib".
+function permitReminderText(site, startDate){
+  const permit = permitDeadlineFor(site, startDate);
+  return `<b>Saran Pengajuan Izin Masuk (H-${permit.days}):</b> idealnya sudah diajukan sebelum ${escHtml(fmtHariTanggalIndo(permit.date))} apabila memungkinkan &mdash; sebagai antisipasi kalau jadwal kedatangan ternyata dimajukan.`;
+}
 // Preview "apa yang perlu disiapkan" per site, dari jadwal batch yang lagi tampil di filter Gantt
 // saat ini (sama persis dgn batches yg dipakai buildDayGridView/S-Curve) — utk site ENV yang perlu
 // tahu kapan personil masuk, kapan ajukan izin, dan (kalau site itu jadi TITIK KEBERANGKATAN ke
@@ -774,9 +798,9 @@ function personilChipsHtml(assignedPersonil, showPts){
   if(!list.length) return `<div class="hint" style="margin-top:2px;">Belum ada personil ditunjuk — tunjuk di Perencanaan Batch.</div>`;
   return list.map(p=>{
     const pts = (p.items.ptsid||{}).exp || "";
-    const docLink = p.dokumentasiLink ? ` &middot; <a href="${escHtml(p.dokumentasiLink)}" target="_blank" rel="noopener">dokumen</a>` : "";
+    const teleponHtml = ` &middot; Telepon: ${p.telepon?escHtml(p.telepon):'<span style="color:#c0392b;">belum diisi</span>'}`;
     const ptsHtml = showPts ? ` &middot; PTS: ${pts?escHtml(pts):'<span style="color:#c0392b;">belum diisi</span>'}` : "";
-    return `<div style="padding:2px 0;">${escHtml(p.nama)} <span class="muted">(${escHtml(p.role||"-")})</span>${docLink}${ptsHtml}</div>`;
+    return `<div style="padding:2px 0;">${escHtml(p.nama)} <span class="muted">(${escHtml(p.role||"-")})</span>${teleponHtml}${ptsHtml}</div>`;
   }).join("");
 }
 function buildSiteBriefingHtml(batches){
@@ -795,7 +819,6 @@ function buildSiteBriefingHtml(batches){
     const visits = visitsBySite[site].slice().sort((a,c)=>a.row.start.localeCompare(c.row.start));
     const visitBlocks = visits.map(({b, row, idx})=>{
       const rangeLabel = row.start===row.end ? fmtHariTanggalIndo(row.start) : `${fmtHariTanggalIndo(row.start)} s.d. ${fmtHariTanggalIndo(row.end)}`;
-      const permit = permitDeadlineFor(site, row.start);
       const nextRow = b.schedule[idx+1];
       let outboundHtml = "";
       if(nextRow){
@@ -817,7 +840,7 @@ function buildSiteBriefingHtml(batches){
       return `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed var(--gray-200);">
         <div><b>${rangeLabel}</b> <span class="muted">(${escHtml(b.name)})</span></div>
         <div style="margin-top:4px;"><b>Personil:</b>${personilChipsHtml(b.assignedPersonil, false)}</div>
-        <div class="hint" style="margin-top:4px;">Ajukan Izin Masuk (H-${permit.days}): selambat-lambatnya ${escHtml(fmtHariTanggalIndo(permit.date))}. Pastikan akomodasi sudah dipesan sebelum kedatangan.</div>
+        <div class="hint" style="margin-top:4px;">${permitReminderText(site, row.start)} Pastikan akomodasi sudah dipesan sebelum kedatangan.</div>
         ${outboundHtml}
       </div>`;
     }).join("");
