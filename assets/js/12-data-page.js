@@ -81,6 +81,34 @@ async function checkFullBackupUpdate(){
     toast('Gagal mengambil data online: '+err.message+'. Kalau file ini dibuka langsung dari folder (bukan lewat alamat web), browser menolak koneksi online-nya — pakai "Pilih File" sebagai gantinya.',"err");
   }
 }
+// Repo tempat aplikasi ini di-hosting (GitHub Pages) — dipakai utk cari otomatis file backup
+// terbaru di root repo, TANPA perlu simpan/perbarui nama file atau tanggal secara manual di kode
+// ini. exportAll() selalu menamai file dgn pola phm_emisi_backup_YYYY-MM-DD.json (lihat di atas),
+// jadi begitu file baru diunggah ke repo dgn nama itu, tombol "Ambil Data Terbaru dari Repository"
+// otomatis ketemu & pakai yang tanggalnya paling baru — tidak ada lagi link/nama file yg jadi basi
+// kalau lupa diperbarui satu-satu tiap kali ada backup baru (masalah nyata di versi sebelumnya,
+// lihat riwayat commit ONBOARDING_BACKUP_URL).
+const REPO_CONTENTS_API = "https://api.github.com/repos/muhammad-afifani/PPU-Sampling-Planning-and-Monitoring/contents/";
+const BACKUP_FILENAME_RE = /^phm_emisi_backup_\d{4}-\d{2}-\d{2}\.json$/;
+async function checkRepoBackupUpdate(){
+  try{
+    const res = await fetch(REPO_CONTENTS_API, {cache:"no-store"});
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const files = await res.json();
+    const backups = (Array.isArray(files)?files:[]).filter(f=>BACKUP_FILENAME_RE.test(f.name));
+    if(!backups.length) throw new Error('Tidak ada file "phm_emisi_backup_YYYY-MM-DD.json" di root repository.');
+    // Nama file mengandung tanggal format ISO (YYYY-MM-DD), jadi urutan string = urutan tanggal —
+    // tidak perlu parsing tanggal terpisah.
+    backups.sort((a,b)=> b.name.localeCompare(a.name));
+    const latest = backups[0];
+    const dataRes = await fetch(latest.download_url, {cache:"no-store"});
+    if(!dataRes.ok) throw new Error("HTTP "+dataRes.status);
+    const data = await dataRes.json();
+    handleFullBackupPackage(data, latest.name);
+  }catch(err){
+    toast('Gagal mengambil data terbaru dari repository: '+err.message+'. Kalau aplikasi ini dibuka langsung dari folder (bukan lewat alamat web), browser menolak koneksi online-nya — pakai "Pilih File" sebagai gantinya.',"err");
+  }
+}
 
 /* =========================================================
    TUR ONBOARDING (pertama kali buka tools ini)
@@ -90,20 +118,13 @@ async function checkFullBackupUpdate(){
    Backup Lengkap. Tur ini nuntun 1x saja (ditandai DB.meta.onboardingSeen, lihat migrateDB) supaya
    user baru tidak bingung harus ngapain, tanpa ganggu user yg sudah pernah pakai.
 ========================================================= */
-// Ganti nilai ini kalau link backup terbaru berubah (mis. export ulang dgn nama file baru).
-const ONBOARDING_BACKUP_URL = "https://raw.githubusercontent.com/muhammad-afifani/PPU-Sampling-Planning-and-Monitoring/refs/heads/main/phm_emisi_backup_2026-07-09.json";
 // Dipisah dari maybeShowOnboarding() supaya HTML-nya bisa dipakai ulang dari tombol "Lihat Panduan
 // Update Data" di modal Tentang (replayOnboarding) tanpa duplikasi isi.
 function renderOnboardingModal(){
   openModal(`
     <h3>👋 Selamat Datang di PHM Emission Sampling Planner</h3>
-    <p>Apakah ini pertama kali kamu mengakses tools prototipe ini?</p>
-    <p class="hint">Tools ini masih tahap pengembangan (prototipe) — belum ada server pusat yang otomatis menyinkronkan data ke semua orang. Supaya kamu langsung lihat jadwal &amp; data terbaru (bukan data kosong bawaan), perlu 1x update data manual dari file yang sudah disiapkan. Ikuti 3 langkah ini:</p>
-    <ol style="margin:10px 0 10px 20px;font-size:13px;line-height:1.9;">
-      <li>Klik <b>"Mulai Update Data"</b> di bawah — otomatis membuka halaman Data &amp; mengisi link update-nya.</li>
-      <li>Klik tombol hijau <b>"Cek Update (Online)"</b>.</li>
-      <li>Setelah muncul ringkasan perbandingan data, klik <b>"Timpa dengan Data Ini"</b> — selesai.</li>
-    </ol>
+    <p>Apakah ini pertama kali mengakses aplikasi prototipe ini?</p>
+    <p class="hint">Aplikasi ini masih tahap pengembangan (prototipe) — belum ada server pusat yang otomatis menyinkronkan data ke semua pengguna. Agar langsung menampilkan jadwal dan data terbaru (bukan data kosong bawaan), diperlukan satu kali update data dari repository. Klik "Mulai Update Data" di bawah — data terbaru akan diambil otomatis, dan ringkasan perbandingannya ditampilkan lebih dulu sebelum diterapkan.</p>
     <div class="actions">
       <button class="btn ghost" data-action="dismissOnboarding">Lewati (bukan pertama kali)</button>
       <button class="btn primary" data-action="startOnboardingUpdate">Mulai Update Data</button>
@@ -132,16 +153,7 @@ function startOnboardingUpdate(){
   DB.meta.onboardingSeen = true; save();
   closeModal();
   showPage("data");
-  document.getElementById("fullBackupUrl").value = ONBOARDING_BACKUP_URL;
-  // Sorotan sesaat di tombol "Cek Update (Online)" biar mata user langsung ketuju ke sana
-  // begitu field link-nya udah otomatis keisi, tanpa perlu nebak2 tombol mana yg diklik lanjut.
-  const btn = document.querySelector('[data-action="checkFullBackupUpdate"]');
-  if(btn){
-    btn.style.transition = "box-shadow .3s ease";
-    btn.style.boxShadow = "0 0 0 4px rgba(63,178,127,.5)";
-    setTimeout(()=>{ btn.style.boxShadow = ""; }, 2500);
-    btn.scrollIntoView({behavior:"smooth", block:"center"});
-  }
+  checkRepoBackupUpdate();
 }
 
 function resetDefault(){

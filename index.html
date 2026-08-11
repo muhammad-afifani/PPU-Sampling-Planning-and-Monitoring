@@ -997,13 +997,20 @@
           <div class="hint">Pilih file backup .json untuk restore (akan menimpa data saat ini)</div>
         </div>
         <div style="border-top:1px solid #3fb27f;margin:12px 0 0;padding-top:10px;">
-          <b style="font-size:12.5px;">Atau Ambil Otomatis dari GitHub</b>
-          <p class="hint" style="margin-top:2px;">Unggah file .json hasil "Export Semua Data" di atas ke repository GitHub, salin tautan Raw-nya, lalu masukkan pada kolom berikut — pengguna lain cukup mengklik "Cek Update" untuk mengambil data terbaru tanpa perlu menerima file secara manual setiap kali ada pembaruan.</p>
+          <b style="font-size:12.5px;">Ambil Data Terbaru dari Repository</b>
+          <p class="hint" style="margin-top:2px;">Mengambil otomatis file backup .json dengan tanggal terbaru dari root repository GitHub aplikasi ini — cukup unggah file .json hasil "Export Semua Data" ke repository, lalu klik tombol berikut. Tidak perlu menyalin atau menempelkan tautan apa pun.</p>
+          <div class="toolbar" style="margin-top:6px;">
+            <button class="btn primary" data-action="checkRepoBackupUpdate">Ambil Data Terbaru dari Repository</button>
+          </div>
+          <div class="hint" style="margin-top:8px;">Fitur ini mengharuskan aplikasi diakses melalui alamat web (mis. GitHub Pages), bukan dibuka langsung dari file HTML di folder — browser akan menolak koneksi tersebut apabila diakses secara lokal. Jika bekerja secara offline, gunakan file picker di atas.</div>
+        </div>
+        <div style="border-top:1px solid #3fb27f;margin:12px 0 0;padding-top:10px;">
+          <b style="font-size:12.5px;">Atau dari URL Lain</b>
+          <p class="hint" style="margin-top:2px;">Untuk mengambil data dari repository atau tautan lain di luar repository default aplikasi ini.</p>
           <div class="field" style="margin-top:6px;"><label>URL Backup Lengkap</label><input type="text" id="fullBackupUrl" placeholder="https://raw.githubusercontent.com/user/repo/main/phm_emisi_backup.json"></div>
           <div class="toolbar" style="margin-top:8px;">
-            <button class="btn primary" data-action="checkFullBackupUpdate">Cek Update (Online)</button>
+            <button class="btn ghost" data-action="checkFullBackupUpdate">Cek Update dari URL</button>
           </div>
-          <div class="hint" style="margin-top:8px;">"Cek Update (Online)" mengharuskan aplikasi ini diakses melalui alamat web (mis. GitHub Pages), bukan dibuka langsung dari file HTML di folder — browser akan menolak koneksi tersebut apabila diakses secara lokal. Jika bekerja secara offline, gunakan file picker di atas.</div>
         </div>
       </div>
       <div class="card">
