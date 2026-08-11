@@ -126,7 +126,10 @@ function migrateDB(){
   // v2: angka baku mutu persis + metode SNI di catatan, param Gas 500-1000/1000-3000 KW (hapus
   //     Total Partikulat yang salah), dan periode pantau (100-500=3th, 500-1000=1th, >=1000=6bln;
   //     Turbin/Flare/Heater/Glycol Reboiler Permen LH 13/2009 = 6 bulan semua).
-  const REG_DATA_VERSION = 2;
+  // v3: Turbine Engine Generator dikoreksi jadi 1x/tahun (12 bulan) — v2 keliru menyamaratakan
+  //     SEMUA "Turbin" (Generator maupun Compressor) jadi 6 bulan; yang benar cuma Turbine Engine
+  //     Compressor/Flare/Heater/Glycol Reboiler yang 6 bulan, Turbine Engine Generator 1x/tahun.
+  const REG_DATA_VERSION = 3;
   if((DB.meta.regDataVersion||0) < REG_DATA_VERSION){
     const defaultByName = {};
     DEFAULT_ENGINES.forEach(e=>{ defaultByName[e.nama.trim()] = e; });
