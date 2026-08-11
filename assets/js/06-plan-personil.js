@@ -542,47 +542,62 @@ function personilDocQrSvg(url){
     return qr.createSvgTag({cellSize:2, margin:1});
   }catch(e){ console.error("Gagal membuat QR dokumentasi personil:", e); return ""; }
 }
-// Baris "Label: nilai" per item (KTP/MCU/dst) LENGKAP dgn tanggal kedaluwarsanya — beda dari badge
-// ringkas di tabel layar (yang cuma nunjukin status), di sini semua item ditulis apa adanya
-// (termasuk yg masih berlaku) supaya kelengkapan datanya kelihatan utuh begitu dicetak di kertas.
-function personilItemDetailHtml(p){
+// Baris tabel "Item | Status | Tanggal Kedaluwarsa / No." per item (KTP/MCU/dst) — Status &amp;
+// nilai mentahnya (tanggal atau nomor) SENGAJA dipisah jadi 2 kolom (bukan digabung jadi 1 teks
+// kecil spt sebelumnya) supaya tanggal kedaluwarsanya selalu kebaca jelas di kertas, tidak cuma
+// status "Ada/Tidak" polos.
+function personilItemRowsHtml(p){
   return PERSONIL_ITEMS.map(it=>{
     const rec = p.items[it]||{};
-    let text, color;
+    let statusText, statusColor, valueText;
     if(it===PERSONIL_NUMBER_FIELD){
-      if(rec.exp){ text = "No. "+rec.exp; color = "#333"; } else { text = "kosong"; color = "#c0392b"; }
+      if(rec.exp){ statusText = "Terisi"; statusColor = "#2f9e5b"; valueText = "No. "+rec.exp; }
+      else { statusText = "Kosong"; statusColor = "#c0392b"; valueText = "-"; }
     } else if(PERSONIL_DATED[it]){
-      if(!rec.exp){ text = "kosong"; color = "#c0392b"; }
+      if(!rec.exp){ statusText = "Kosong"; statusColor = "#c0392b"; valueText = "-"; }
       else {
         const days = Math.round((new Date(rec.exp)-new Date())/86400000);
-        text = "s.d. "+rec.exp;
-        color = days<0 ? "#c0392b" : days<=30 ? "#c98a1a" : "#2f9e5b";
+        statusColor = days<0 ? "#c0392b" : days<=30 ? "#c98a1a" : "#2f9e5b";
+        statusText = days<0 ? "Expired" : days<=30 ? `${days} hr lagi` : "Berlaku";
+        valueText = "s.d. "+rec.exp;
       }
     } else {
-      text = rec.ada ? "Ada" : "Tidak ada";
-      color = rec.ada ? "#2f9e5b" : "#c0392b";
+      statusText = rec.ada ? "Ada" : "Tidak Ada";
+      statusColor = rec.ada ? "#2f9e5b" : "#c0392b";
+      valueText = "-";
     }
-    return `<div class="pg-pi-item"><b>${escHtml(PERSONIL_LABELS[it])}:</b> <span style="color:${color};">${escHtml(text)}</span></div>`;
+    return `<tr><td>${escHtml(PERSONIL_LABELS[it])}</td><td><span style="color:${statusColor};font-weight:700;">${escHtml(statusText)}</span></td><td>${escHtml(valueText)}</td></tr>`;
   }).join("");
 }
+// Kartu 1 personil per blok (pola sama dgn .pg-site di Panduan Sampling) — dipilih ketimbang 1
+// baris tabel raksasa per personil krn 10 item kelengkapan tidak muat dibaca kalau dipaksa jadi
+// kolom² sempit; di sini tiap item dapat barisnya sendiri di tabel Item/Status/Tanggal yg jelas.
 function buildPersonilPrintHtml(){
   const printedAt = new Date().toLocaleString("id-ID", {dateStyle:"long", timeStyle:"short"});
   const rows = DB.personil.slice().sort((a,b)=>a.nama.localeCompare(b.nama));
-  const rowsHtml = rows.map((p,i)=>{
+  const cardsHtml = rows.map((p,i)=>{
     const pct = completenessPct(p);
     const pctColor = pct===100?"#2f9e5b":pct>=70?"#c98a1a":"#c0392b";
     const qr = personilDocQrSvg(p.dokumentasiLink);
-    const docCell = qr
-      ? `<div class="pg-qr">${qr}</div><div class="pg-qr-url">${escHtml(p.dokumentasiLink)}</div>`
-      : (p.dokumentasiLink ? `<div class="pg-qr-url">${escHtml(p.dokumentasiLink)}</div>` : `<span class="muted">-</span>`);
-    return `<tr>
-      <td>${i+1}</td>
-      <td><b>${escHtml(p.nama)}</b></td>
-      <td>${escHtml(p.role)}</td>
-      <td style="text-align:center;"><b style="color:${pctColor};">${pct}%</b></td>
-      <td><div class="pg-pi-grid">${personilItemDetailHtml(p)}</div></td>
-      <td style="text-align:center;">${docCell}</td>
-    </tr>`;
+    const qrBox = p.dokumentasiLink
+      ? `<div class="pg-personil-qr-box">${qr}<div class="pg-qr-url">${escHtml(p.dokumentasiLink)}</div></div>`
+      : "";
+    const contactLine = p.telepon ? ` &middot; Telepon: ${escHtml(p.telepon)}` : "";
+    return `<tr><td>
+      <div class="pg-site pg-personil-card">
+        <div class="pg-site-head">
+          <span>${i+1}. ${escHtml(p.nama)} <span class="muted" style="font-weight:400;">&mdash; ${escHtml(p.role||"-")}</span>${contactLine}</span>
+          <span>Kelengkapan: <b style="color:${pctColor};">${pct}%</b></span>
+        </div>
+        <div class="pg-personil-card-body">
+          <table class="pg-table" style="flex:1;">
+            <thead><tr><th>Dokumen / Item</th><th style="width:100px;">Status</th><th style="width:120px;">Tanggal Kedaluwarsa / No.</th></tr></thead>
+            <tbody>${personilItemRowsHtml(p)}</tbody>
+          </table>
+          ${qrBox}
+        </div>
+      </div>
+    </td></tr>`;
   }).join("");
   return `<table class="pg-guide-page pg-batch">
     <thead><tr><td>
@@ -592,14 +607,9 @@ function buildPersonilPrintHtml(){
       </div>
     </td></tr></thead>
     <tfoot><tr><td>
-      <div class="pg-foot">Dicetak otomatis dari PHM Emission Sampling Planner &amp; Tracker. Kolom Link Dokumentasi berisi QR code &amp; tautan menuju folder dokumen pendukung (KTP/MCU/dst) tiap personil — scan atau salin tautannya ke browser utk membuka.</div>
+      <div class="pg-foot">Dicetak otomatis dari PHM Emission Sampling Planner &amp; Tracker. QR code &amp; tautan menuju folder dokumen pendukung (KTP/MCU/dst) tiap personil — scan atau salin tautannya ke browser utk membuka.</div>
     </td></tr></tfoot>
-    <tbody><tr><td>
-      <table class="pg-table pg-personil-table">
-        <thead><tr><th style="width:16px;">No</th><th>Nama</th><th style="width:90px;">Role</th><th style="width:56px;">Kelengkapan</th><th>Rincian Dokumen &amp; Tanggal Kedaluwarsa</th><th style="width:110px;">Link Dokumentasi</th></tr></thead>
-        <tbody>${rowsHtml || `<tr><td colspan="6">Belum ada data personil.</td></tr>`}</tbody>
-      </table>
-    </td></tr></tbody>
+    <tbody>${cardsHtml || `<tr><td>Belum ada data personil.</td></tr>`}</tbody>
   </table>`;
 }
 function printPersonilRoster(){
