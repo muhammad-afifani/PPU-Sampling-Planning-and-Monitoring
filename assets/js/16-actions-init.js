@@ -67,7 +67,7 @@ const ACTIONS = {
     save(); refreshRouteViews();
   },
   exportAll, resetDefault, resetEmpty, downloadTemplatePoints, downloadTemplatePersonil,
-  checkFullBackupUpdate, applyFullBackupImport,
+  checkFullBackupUpdate, checkRepoBackupUpdate, applyFullBackupImport,
   dismissOnboarding, startOnboardingUpdate, replayOnboarding, openAboutModal,
   importHasilCsv, exportHasilCsv, downloadTemplateHasil, resetHasilData,
   hdChip:(t)=>{
