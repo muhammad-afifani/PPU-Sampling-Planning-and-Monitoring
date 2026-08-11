@@ -652,13 +652,15 @@ function buildDayGridView(rows){
     const excludedCount = r.batch ? dedupeByGroup((r.batch.excluded||[]).map(id=>DB.points.find(p=>p.id===id)).filter(p=>p && p.site===r.site)).length : 0;
     const excludedBadge = excludedCount ? `<span class="badge b-red" style="font-size:9.5px;padding:1px 6px;" title="Titik yang dikeluarkan dari batch ini di site ${escHtml(r.site)} — buka Detail Harian utk lihat/kelola">&#9888; ${excludedCount} dikeluarkan</span>` : "";
     const dragHandle = r.batch ? `<span class="route-drag-handle" title="Tarik untuk ubah urutan site di batch ini">&#8942;&#8942;</span>` : "";
-    html += `<tr><td class="dg-td-label dg-col-sticky" draggable="${r.batch?"true":"false"}" data-batch-id="${r.batch?r.batch.id:""}" data-row-idx="${r.rowIdx}"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${dragHandle}<b>${escHtml(r.site)}</b>${adjustBtn}${dayDetailBtn}${excludedBadge}</div><div class="sub">${escHtml(r.batchName)} &middot; ${r.workDays} hari kerja${r.bufferDays?" + "+r.bufferDays+" buffer":""} &middot; ${r.start} &rarr; ${r.end}${r.adjustNote?`<br><span style="color:#a02a24;">&#9998; ${escHtml(r.adjustNote)}</span>`:""}</div></td>`;
     // Tanggal tim pindah dari site INI ke site berikutnya di batch yang sama (kalau ada) — dipakai
-    // menandai kolom perpindahan dgn anak panah di bawah. Diambil dari tanggal mulai site
-    // berikutnya (bukan field terpisah) supaya OTOMATIS ikut kalau site manapun digeser drag-drop,
-    // tidak perlu disinkronkan manual.
+    // menandai kolom perpindahan dgn anak panah di bawah, DAN ditulis sbg info singkat di kolom
+    // label kiri (dihitung di sini, sebelum baris label, supaya bisa dipakai di keduanya). Diambil
+    // dari tanggal mulai site berikutnya (bukan field terpisah) supaya OTOMATIS ikut kalau site
+    // manapun digeser drag-drop, tidak perlu disinkronkan manual.
     const nextRow = (r.batch && r.rowIdx!=null) ? r.batch.schedule[r.rowIdx+1] : null;
     const transitionDate = nextRow ? nextRow.start : null;
+    const transitionInfoLine = nextRow ? `<br><span style="color:#c98a1a;">&#8594; Pindah ke ${escHtml(nextRow.site)}: mulai ${nextRow.start} <span class="muted" style="font-size:10px;">(tarik &#8594; di kalender utk geser)</span></span>` : "";
+    html += `<tr><td class="dg-td-label dg-col-sticky" draggable="${r.batch?"true":"false"}" data-batch-id="${r.batch?r.batch.id:""}" data-row-idx="${r.rowIdx}"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${dragHandle}<b>${escHtml(r.site)}</b>${adjustBtn}${dayDetailBtn}${excludedBadge}</div><div class="sub">${escHtml(r.batchName)} &middot; ${r.workDays} hari kerja${r.bufferDays?" + "+r.bufferDays+" buffer":""} &middot; ${r.start} &rarr; ${r.end}${r.adjustNote?`<br><span style="color:#a02a24;">&#9998; ${escHtml(r.adjustNote)}</span>`:""}${transitionInfoLine}</div></td>`;
     for(let i=0;i<totalDays;i++){
       const dt = addDays(minDate,i);
       const inRange = dt>=r.start && dt<=r.end;
@@ -672,9 +674,13 @@ function buildDayGridView(rows){
           // Kotak "pindah ke site berikutnya" — transisi selalu jatuh SETELAH r.end (dicek lewat
           // minAllowed di handleScheduleDrop & cursor di recalcScheduleFrom), jadi selalu masuk
           // cabang !inRange ini, tidak pernah bentrok sama kotak kerja aktif site ini sendiri.
+          // draggable: bisa ditarik ke kolom tanggal lain (row manapun, cuma tanggal targetnya yang
+          // dipakai — lihat setupGanttDragDrop) utk geser transisi ini; buffer site r "dikorbankan"
+          // otomatis kalau digeser lebih awal (lihat handleTransitionDrop), hari kerja wajib tetap
+          // dihormati/tidak bisa dipotong.
           const routeInfo = travelRouteInfo(r.site, nextRow.site);
-          const title = `Pindah ke ${nextRow.site} — mulai ${nextRow.start}${routeInfo?` · ${routeInfo.label}`:""}${ccEmpty?` (${r.site}: hari crew change)`:""}`;
-          html += `<td class="dg-day-cell dg-empty dg-transition${isToday?" dg-today-col":""}${ccEmpty?" dg-cc-empty":""}" data-date="${dt}" title="${escHtml(title)}"><span class="dg-transition-arrow">&#8594;</span></td>`;
+          const title = `Pindah ke ${nextRow.site} — mulai ${nextRow.start}${routeInfo?` · ${routeInfo.label}`:""}${ccEmpty?` (${r.site}: hari crew change)`:""} — tarik utk geser tanggal pindah`;
+          html += `<td class="dg-day-cell dg-empty dg-transition${isToday?" dg-today-col":""}${ccEmpty?" dg-cc-empty":""}" draggable="true" data-batch-id="${r.batch.id}" data-row-idx="${r.rowIdx}" data-date="${dt}" title="${escHtml(title)}"><span class="dg-transition-arrow">&#8594;</span></td>`;
         } else {
           const title = ccEmpty ? `${r.site} — ${dt} (hari crew change)` : "";
           html += `<td class="dg-day-cell dg-empty${isToday?" dg-today-col":""}${ccEmpty?" dg-cc-empty":""}" data-date="${dt}" title="${escHtml(title)}"></td>`;
@@ -796,6 +802,68 @@ function handleScheduleDrop(batchId, rowIdx, newDate){
   loadBatchIntoForm();
   toast(`Site ${row.site} dipindah ke ${newDate}. Jadwal site setelahnya ikut menyesuaikan.`+(row.crewChangeNote?` Catatan: ${row.crewChangeNote}.`:""),"ok");
 }
+// Hitung berapa hari VALID (bukan isBlocked) dalam rentang [start,end] inklusif di site tsb — cara
+// hitungnya persis sama dgn loop counted++ di recalcScheduleFrom, supaya hasil geser transisi
+// (lihat handleTransitionDrop) konsisten dgn cara jadwal aslinya dihitung.
+function countValidDaysInclusive(site, start, end){
+  let d = start, count = 0, iterations = 0;
+  while(d<=end && iterations<730){
+    if(!isBlocked(site,d)) count++;
+    d = addDays(d,1);
+    iterations++;
+  }
+  return count;
+}
+// Tanggal transisi PALING CEPAT yg masih menghormati hari kerja wajib site ini (buffer sudah
+// dikorbankan smp 0) — dipakai utk pesan error yg actionable pas geser transisi ditolak.
+function earliestTransitionDate(site, start, workDays){
+  let d = start, counted = 0, iterations = 0, lastDate = start;
+  while(counted<workDays && iterations<730){
+    if(!isBlocked(site,d)){ counted++; lastDate = d; }
+    d = addDays(d,1);
+    iterations++;
+  }
+  return addDays(lastDate,1);
+}
+// Geser tanggal PINDAH dari site (rowIdx) ke site berikutnya — beda dari handleScheduleDrop (yang
+// menggeser tanggal MULAI satu site apa adanya): di sini hari buffer site yang DITINGGALKAN
+// (rowIdx) yang "dikorbankan"/ditambah supaya transisinya jatuh di tanggal baru, hari kerja WAJIB
+// site itu tetap dihormati (tidak bisa dipotong). Site rowIdx sendiri TIDAK pindah tanggal mulai;
+// yang berubah cuma end/bufferDays-nya, lalu recalcScheduleFrom yang biasa meng-cascade ke site-site
+// setelahnya (termasuk mencari hari valid pertama utk site berikutnya via findValidStart, jadi
+// kalau tanggal yang diminta user kebetulan jatuh pas isBlocked/crew change site berikutnya,
+// otomatis digeser ke hari valid terdekat — sama seperti generate/adjust biasa, bukan dipaksa).
+function handleTransitionDrop(batchId, rowIdx, newDate){
+  const b = DB.batches.find(x=>x.id===batchId); if(!b) return;
+  const row = b.schedule[rowIdx];
+  const nextRow = b.schedule[rowIdx+1];
+  if(!row || !nextRow || !newDate) return;
+  if(newDate === nextRow.start) return;
+  if(newDate <= row.start){
+    toast(`Tanggal pindah harus setelah site ${row.site} mulai (${row.start}).`,"err");
+    return;
+  }
+  const availableDays = countValidDaysInclusive(row.site, row.start, addDays(newDate,-1));
+  if(availableDays < row.workDays){
+    const minDate = earliestTransitionDate(row.site, row.start, row.workDays);
+    toast(`Tidak bisa dipindah ke ${newDate} — site ${row.site} masih butuh ${row.workDays} hari kerja wajib (buffer boleh dikorbankan, hari kerja inti tidak). Paling cepat: ${minDate}.`,"err");
+    return;
+  }
+  row.bufferDays = availableDays - row.workDays;
+  recalcScheduleFrom(b, rowIdx);
+  applyScheduleToPoints(b, b.team);
+  const actualDate = nextRow.start;
+  logChange(`Transisi ${row.site} → ${nextRow.site} (${b.name}) digeser ke ${actualDate}${actualDate!==newDate?` (diminta ${newDate})`:""} — buffer ${row.site} disesuaikan jadi ${row.bufferDays} hari`);
+  save();
+  renderGantt();
+  renderMaster();
+  loadBatchIntoForm();
+  if(actualDate===newDate){
+    toast(`Transisi ${row.site} → ${nextRow.site} dipindah ke ${newDate}. Jadwal site setelahnya ikut menyesuaikan.`,"ok");
+  } else {
+    toast(`Digeser ke ${actualDate} (bukan ${newDate} persis) — ${nextRow.site} perlu hari valid pertama (cek Hari Terhold/Crew Change site tsb).`,"ok");
+  }
+}
 // Geser urutan SITE di jadwal satu batch (drag baris label di kiri) — beda dari drag kotak
 // tanggal (yang cuma menggeser tanggal mulai satu site). Reorder dibatasi dalam satu batch yang
 // sama karena urutan & kaskade tanggal cuma masuk akal per-batch. Setelah reorder, tanggal
@@ -819,6 +887,16 @@ function handleRowReorder(batchId, fromIdx, toIdx){
 (function setupGanttDragDrop(){
   const wrap = document.getElementById("ganttWrap");
   wrap.addEventListener("dragstart", e=>{
+    // Kotak transisi (panah →) dicek DULUAN — dia juga punya class dg-day-cell, jadi kalau cabang
+    // day-cell biasa di bawah dicek lebih dulu, drag transisi bakal ketangkep sana & salah dianggap
+    // "geser tanggal mulai site ini apa adanya" (handleScheduleDrop) alih-alih "geser transisi,
+    // korbankan buffer site yg ditinggalkan" (handleTransitionDrop) — dua semantik yg beda.
+    const transitionCell = e.target.closest("td.dg-transition[draggable='true']");
+    if(transitionCell){
+      e.dataTransfer.setData("application/x-transition-drag", JSON.stringify({batchId:transitionCell.dataset.batchId, rowIdx:Number(transitionCell.dataset.rowIdx)}));
+      e.dataTransfer.effectAllowed = "move";
+      return;
+    }
     const chip = e.target.closest("td.dg-day-cell[draggable='true']");
     if(chip){
       e.dataTransfer.setData("text/plain", JSON.stringify({batchId:chip.dataset.batchId, rowIdx:Number(chip.dataset.rowIdx)}));
@@ -848,6 +926,16 @@ function handleRowReorder(batchId, fromIdx, toIdx){
     if(cell){
       e.preventDefault();
       cell.classList.remove("dragover");
+      // Drop target-nya cuma peduli TANGGAL kolom yg dituju (cell.dataset.date), bukan row visual
+      // tempat kolom itu digambar — jadi transisi bisa "ditarik ke bawah" ke row site berikutnya
+      // seperti diminta, atau digeser ke kolom lain di row asalnya sendiri, dua-duanya valid.
+      const transitionRaw = e.dataTransfer.getData("application/x-transition-drag");
+      if(transitionRaw){
+        let payload; try{ payload = JSON.parse(transitionRaw); }catch(_){ return; }
+        if(!payload || !payload.batchId) return;
+        handleTransitionDrop(payload.batchId, payload.rowIdx, cell.dataset.date);
+        return;
+      }
       let payload;
       try{ payload = JSON.parse(e.dataTransfer.getData("text/plain")); }catch(_){ return; }
       if(!payload || !payload.batchId) return;
