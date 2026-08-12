@@ -1,6 +1,12 @@
 /* =========================================================
    NAV
 ========================================================= */
+// Ikon sidebar (search, chevron toggle, tombol header, dst.) ditulis di HTML sbg placeholder
+// <span class="ms-icon" data-icon="...">, dihidrasi sekali di sini jadi <svg> inline betulan —
+// lihat 00-icons.js utk kenapa inline (bukan <img>/fetch sprite): supaya warnanya ikut currentColor
+// & tetap jalan offline lewat file://.
+hydrateIcons();
+
 function showPage(p){
   document.querySelectorAll(".page").forEach(el=>el.classList.remove("active"));
   document.querySelectorAll(".navbtn").forEach(el=>el.classList.remove("active"));
@@ -12,9 +18,38 @@ function showPage(p){
   window.scrollTo(0,0);
 }
 document.getElementById("navMenu").addEventListener("click", e=>{
+  const groupHead = e.target.closest(".navgroup-head");
+  if(groupHead){ groupHead.closest(".navgroup").classList.toggle("closed"); return; }
   const b = e.target.closest(".navbtn"); if(!b) return;
   showPage(b.dataset.page);
 });
+
+// Cari menu — filter substring case-insensitive di label tiap item (data-label, bukan innerText,
+// supaya tanda "&" yang di-escape HTML tidak ikut kehitung). Grup yang semua isinya kefilter habis
+// disembunyikan seluruhnya; selama query masih terisi, semua grup dipaksa terbuka (override status
+// collapsed manual-nya) supaya hasil cari selalu kelihatan tanpa perlu buka grup satu-satu dulu.
+(function(){
+  const input = document.getElementById("navSearch");
+  const emptyEl = document.getElementById("navSearchEmpty");
+  if(!input) return;
+  input.addEventListener("input", ()=>{
+    const q = input.value.trim().toLowerCase();
+    let anyVisible = false;
+    document.querySelectorAll(".navgroup").forEach(group=>{
+      group.classList.toggle("force-open", !!q);
+      let groupHasMatch = false;
+      group.querySelectorAll(".navbtn").forEach(btn=>{
+        const label = (btn.dataset.label||btn.textContent).toLowerCase();
+        const match = !q || label.includes(q);
+        btn.classList.toggle("hidden-by-search", !match);
+        if(match) groupHasMatch = true;
+      });
+      group.style.display = groupHasMatch ? "" : "none";
+      if(groupHasMatch) anyVisible = true;
+    });
+    if(emptyEl) emptyEl.style.display = anyVisible ? "none" : "block";
+  });
+})();
 
 // Collapse sidebar jadi rail ikon-saja — preferensi tampilan murni, disimpan terpisah dari DB
 // (bukan bagian data yang di-export/restore) supaya tetap keingat tiap buka file ini lagi.
@@ -32,7 +67,9 @@ document.getElementById("navMenu").addEventListener("click", e=>{
 
 function updateMetaLine(){
   const el = document.getElementById("metaLine"); if(!el) return;
-  el.innerHTML = `Semester ${escHtml(DB.meta.semester)} &middot; Tahun ${escHtml(DB.meta.tahun)} <span class="tag-pill" style="background:var(--teal-500);">${escHtml(currentPeriodStr())} aktif</span>`;
+  el.textContent = `Semester ${DB.meta.semester} · Tahun ${DB.meta.tahun}`;
+  const tagWrap = document.getElementById("periodActiveTagWrap");
+  if(tagWrap) tagWrap.innerHTML = `<span class="ms-tag-accent"><span class="ms-pulse-dot"></span>${escHtml(currentPeriodStr())} aktif</span>`;
 }
 function renderPage(p){
   updateMetaLine();

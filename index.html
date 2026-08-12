@@ -12,43 +12,78 @@
 <div id="toastStack"></div>
 <div class="app">
   <div class="sidebar">
-    <button class="sidebar-toggle" id="btnSidebarToggle" type="button" title="Collapse/expand menu">&#10094;</button>
+    <button class="sidebar-toggle" id="btnSidebarToggle" type="button" title="Collapse/expand menu"><span class="ms-icon" data-icon="chevron-left" data-size="15"></span></button>
     <div class="brand">
-      <div class="brand-mark">PHM</div>
-      <div class="brand-logo"><img id="brandLogoImg" alt="Pertamina Hulu Mahakam"></div>
+      <div class="brand-logo"><img id="brandLogoImg" alt="Pertamina Hulu Mahakam" class="grayscale"></div>
       <h1>Emission Sampling<br>Planner &amp; Tracker</h1>
-      <div class="sub" id="metaLine" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">Semester — · Tahun —</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
-        <button class="btn small ghost" data-action="openPeriodModal" style="padding:3px 8px;font-size:10.5px;color:#7f93ab;border-color:rgba(255,255,255,.18);">Ubah Periode Aktif</button>
-        <button class="btn small" data-action="openAboutModal" style="padding:3px 8px;font-size:10.5px;background:var(--teal-500);color:#04211f;font-weight:700;border:none;">&#8505;&#65039; Info &amp; Panduan Setup</button>
-      </div>
+      <div class="sub" id="metaLine">Semester — · Tahun —</div>
+      <div id="periodActiveTagWrap"></div>
+      <button class="btn btn-secondary btn-block" data-action="openPeriodModal">
+        <span class="ms-icon" data-icon="refresh-cw" data-size="15"></span> Ubah Periode Aktif
+      </button>
+      <button class="btn btn-block btn-accent-soft" data-action="openAboutModal">
+        <span class="ms-icon" data-icon="book-open" data-size="15"></span> Info &amp; Panduan Setup
+      </button>
+    </div>
+    <div class="sidebar-search">
+      <span class="ms-icon" data-icon="search" data-size="14"></span>
+      <input type="text" id="navSearch" placeholder="Cari menu&hellip;">
     </div>
     <nav id="navMenu">
-      <button class="navbtn" data-page="dashboard" title="Dashboard"><span class="ico">&#127968;</span><span class="label">Dashboard</span></button>
-      <div class="navgroup-label">Setup</div>
-      <button class="navbtn" data-page="master" data-group="setup" title="Database Titik Pantau"><span class="ico">&#128193;</span><span class="label">Database Titik Pantau</span></button>
-      <button class="navbtn" data-page="rules" data-group="setup" title="Aturan Site &amp; Rute"><span class="ico">&#129517;</span><span class="label">Aturan Site &amp; Rute</span></button>
-      <button class="navbtn" data-page="personil" data-group="setup" title="Personil PPC &amp; Observer"><span class="ico">&#128101;</span><span class="label">Personil PPC &amp; Observer</span></button>
-      <div class="navgroup-label">Perencanaan</div>
-      <button class="navbtn" data-page="rencana" data-group="plan" title="Plan Pemantauan (Periode)"><span class="ico">&#128197;</span><span class="label">Plan Pemantauan (Periode)</span></button>
-      <button class="navbtn" data-page="planner" data-group="plan" title="Perencanaan Batch"><span class="ico">&#128203;</span><span class="label">Perencanaan Batch</span></button>
-      <button class="navbtn" data-page="gantt" data-group="plan" title="Gantt &amp; S-Curve"><span class="ico">&#128202;</span><span class="label">Gantt &amp; S-Curve</span></button>
-      <div class="navgroup-label">Eksekusi &amp; Monitoring</div>
-      <button class="navbtn" data-page="tracking" data-group="exec" title="Tracking BA / CoA"><span class="ico">&#9989;</span><span class="label">Tracking BA / CoA</span></button>
-      <button class="navbtn" data-page="beritaacara" data-group="exec" title="Berita Acara"><span class="ico">&#128196;</span><span class="label">Berita Acara</span></button>
-      <button class="navbtn" data-page="runninghour" data-group="exec" title="Running Hour Detail"><span class="ico">&#9201;&#65039;</span><span class="label">Running Hour Detail</span></button>
-      <div class="navgroup-label">Hasil Pemantauan</div>
-      <button class="navbtn" data-page="hasildashboard" data-group="hasil" title="Dashboard Hasil Pemantauan"><span class="ico">&#128200;</span><span class="label">Dashboard Hasil Pemantauan</span></button>
-      <button class="navbtn" data-page="hasildb" data-group="hasil" title="Database Hasil Pemantauan"><span class="ico">&#128300;</span><span class="label">Database Hasil Pemantauan</span></button>
-      <div class="navgroup-label">Referensi</div>
-      <button class="navbtn" data-page="lokasi" data-group="ref" title="Lokasi Titik Pantau"><span class="ico">&#128506;&#65039;</span><span class="label">Lokasi Titik Pantau</span></button>
-      <button class="navbtn" data-page="bakumutu" data-group="ref" title="Baku Mutu &amp; Periode Pantau"><span class="ico">&#128218;</span><span class="label">Baku Mutu &amp; Periode Pantau</span></button>
-      <div class="navgroup-label">Admin</div>
-      <button class="navbtn" data-page="riwayat" data-group="admin" title="Riwayat &amp; Restore"><span class="ico">&#128337;</span><span class="label">Riwayat &amp; Restore</span></button>
-      <button class="navbtn" data-page="data" data-group="admin" title="Data (Import/Export)"><span class="ico">&#128190;</span><span class="label">Data (Import/Export)</span></button>
+      <div class="navgroup" data-navgroup="">
+        <div class="navgroup-items">
+          <button class="navbtn" data-page="dashboard" data-label="Dashboard" title="Dashboard"><span class="navbtn-icon ms-icon" data-icon="home"></span><span class="label">Dashboard</span></button>
+        </div>
+      </div>
+      <div class="navgroup" data-navgroup="setup">
+        <button type="button" class="navgroup-head"><span>Setup</span><span class="ms-icon navgroup-chevron" data-icon="chevron-down" data-size="13"></span></button>
+        <div class="navgroup-items">
+          <button class="navbtn" data-page="master" data-group="setup" data-label="Database Titik Pantau" title="Database Titik Pantau"><span class="navbtn-icon ms-icon" data-icon="folder"></span><span class="label">Database Titik Pantau</span></button>
+          <button class="navbtn" data-page="rules" data-group="setup" data-label="Aturan Site &amp; Rute" title="Aturan Site &amp; Rute"><span class="navbtn-icon ms-icon" data-icon="route"></span><span class="label">Aturan Site &amp; Rute</span></button>
+          <button class="navbtn" data-page="personil" data-group="setup" data-label="Personil PPC &amp; Observer" title="Personil PPC &amp; Observer"><span class="navbtn-icon ms-icon" data-icon="users"></span><span class="label">Personil PPC &amp; Observer</span></button>
+        </div>
+      </div>
+      <div class="navgroup" data-navgroup="plan">
+        <button type="button" class="navgroup-head"><span>Perencanaan</span><span class="ms-icon navgroup-chevron" data-icon="chevron-down" data-size="13"></span></button>
+        <div class="navgroup-items">
+          <button class="navbtn" data-page="rencana" data-group="plan" data-label="Plan Pemantauan (Periode)" title="Plan Pemantauan (Periode)"><span class="navbtn-icon ms-icon" data-icon="calendar-clock"></span><span class="label">Plan Pemantauan (Periode)</span></button>
+          <button class="navbtn" data-page="planner" data-group="plan" data-label="Perencanaan Batch" title="Perencanaan Batch"><span class="navbtn-icon ms-icon" data-icon="files"></span><span class="label">Perencanaan Batch</span></button>
+          <button class="navbtn" data-page="gantt" data-group="plan" data-label="Gantt &amp; S-Curve" title="Gantt &amp; S-Curve"><span class="navbtn-icon ms-icon" data-icon="bar-chart-3"></span><span class="label">Gantt &amp; S-Curve</span></button>
+        </div>
+      </div>
+      <div class="navgroup" data-navgroup="exec">
+        <button type="button" class="navgroup-head"><span>Eksekusi &amp; Monitoring</span><span class="ms-icon navgroup-chevron" data-icon="chevron-down" data-size="13"></span></button>
+        <div class="navgroup-items">
+          <button class="navbtn" data-page="tracking" data-group="exec" data-label="Tracking BA / CoA" title="Tracking BA / CoA"><span class="navbtn-icon ms-icon" data-icon="clipboard-check"></span><span class="label">Tracking BA / CoA</span></button>
+          <button class="navbtn" data-page="beritaacara" data-group="exec" data-label="Berita Acara" title="Berita Acara"><span class="navbtn-icon ms-icon" data-icon="file-text"></span><span class="label">Berita Acara</span></button>
+          <button class="navbtn" data-page="runninghour" data-group="exec" data-label="Running Hour Detail" title="Running Hour Detail"><span class="navbtn-icon ms-icon" data-icon="gauge"></span><span class="label">Running Hour Detail</span></button>
+        </div>
+      </div>
+      <div class="navgroup" data-navgroup="hasil">
+        <button type="button" class="navgroup-head"><span>Hasil Pemantauan</span><span class="ms-icon navgroup-chevron" data-icon="chevron-down" data-size="13"></span></button>
+        <div class="navgroup-items">
+          <button class="navbtn" data-page="hasildashboard" data-group="hasil" data-label="Dashboard Hasil Pemantauan" title="Dashboard Hasil Pemantauan"><span class="navbtn-icon ms-icon" data-icon="trending-up"></span><span class="label">Dashboard Hasil Pemantauan</span></button>
+          <button class="navbtn" data-page="hasildb" data-group="hasil" data-label="Database Hasil Pemantauan" title="Database Hasil Pemantauan"><span class="navbtn-icon ms-icon" data-icon="database"></span><span class="label">Database Hasil Pemantauan</span></button>
+        </div>
+      </div>
+      <div class="navgroup" data-navgroup="ref">
+        <button type="button" class="navgroup-head"><span>Referensi</span><span class="ms-icon navgroup-chevron" data-icon="chevron-down" data-size="13"></span></button>
+        <div class="navgroup-items">
+          <button class="navbtn" data-page="lokasi" data-group="ref" data-label="Lokasi Titik Pantau" title="Lokasi Titik Pantau"><span class="navbtn-icon ms-icon" data-icon="map-pin"></span><span class="label">Lokasi Titik Pantau</span></button>
+          <button class="navbtn" data-page="bakumutu" data-group="ref" data-label="Baku Mutu &amp; Periode Pantau" title="Baku Mutu &amp; Periode Pantau"><span class="navbtn-icon ms-icon" data-icon="shield-check"></span><span class="label">Baku Mutu &amp; Periode Pantau</span></button>
+        </div>
+      </div>
+      <div class="navgroup" data-navgroup="admin">
+        <button type="button" class="navgroup-head"><span>Admin</span><span class="ms-icon navgroup-chevron" data-icon="chevron-down" data-size="13"></span></button>
+        <div class="navgroup-items">
+          <button class="navbtn" data-page="riwayat" data-group="admin" data-label="Riwayat &amp; Restore" title="Riwayat &amp; Restore"><span class="navbtn-icon ms-icon" data-icon="history"></span><span class="label">Riwayat &amp; Restore</span></button>
+          <button class="navbtn" data-page="data" data-group="admin" data-label="Data (Import/Export)" title="Data (Import/Export)"><span class="navbtn-icon ms-icon" data-icon="arrow-left-right"></span><span class="label">Data (Import/Export)</span></button>
+        </div>
+      </div>
+      <div class="navgroup-empty hint" id="navSearchEmpty" style="display:none;">Tidak ada menu yang cocok.</div>
     </nav>
     <div class="sidebar-foot">
-      <div class="savebadge"><span class="dot"></span><span>Data tersimpan di localStorage</span></div>
+      <div class="savebadge"><span class="ms-icon" data-icon="hard-drive" data-size="12"></span><span>Data tersimpan di localStorage</span></div>
       <div class="storage-badge" id="storageUsageBadge" title="Perkiraan kapasitas localStorage terpakai"></div>
     </div>
   </div>
@@ -1069,6 +1104,7 @@
 <script src="assets/data/default-data.js"></script>
 <script src="assets/data/brand-assets.js"></script>
 <script src="assets/data/travel-routes.js"></script>
+<script src="assets/js/00-icons.js"></script>
 <script src="assets/js/01-state.js"></script>
 <script src="assets/js/02-nav-util.js"></script>
 <script src="assets/js/03-period-logic.js"></script>
