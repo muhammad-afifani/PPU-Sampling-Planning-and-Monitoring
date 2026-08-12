@@ -3,7 +3,7 @@
 ========================================================= */
 const ACTIONS = {
   addPoint, editPoint:(t)=>editPoint(t.dataset.id), deletePoint:(t)=>deletePoint(t.dataset.id), savePoint:(t)=>savePoint(t.dataset.id),
-  verifyAllVisible,
+  verifyAllVisible, clearStaleVisible, openMasterColumnPicker,
   goToPage:(t)=>showPage(t.dataset.page),
   importPointsCsv, exportPointsCsv,
   addPersonil, editPersonil:(t)=>editPersonil(t.dataset.id), deletePersonil:(t)=>deletePersonil(t.dataset.id), savePersonil:(t)=>savePersonil(t.dataset.id),
