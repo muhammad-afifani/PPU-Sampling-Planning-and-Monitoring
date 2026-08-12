@@ -1,82 +1,123 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&display=swap');
 :root{
   --navy-950:#0a1628; --navy-900:#0d1f38; --navy-800:#12294a; --navy-700:#1a3a63;
   --navy-600:#254d7f; --teal-500:#0ea5a0; --teal-400:#2dd4c8; --teal-100:#d9f7f3;
   --amber-500:#e8a33d; --red-500:#e0554f; --green-500:#3fb27f; --gray-100:#f4f6f8;
   --gray-200:#e6eaee; --gray-300:#d3dae1; --gray-500:#7f8fa0; --gray-700:#465468; --gray-900:#1c2733;
-  --font-ui: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-ui: "Archivo", -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   --font-mono: "SF Mono",Consolas,"Cascadia Code",monospace;
+
+  /* Modernist tokens — dipakai utk sidebar & chrome brand (tombol utama, link, focus ring), BUKAN
+     buat menimpa warna semantik data (badge status, warna tim emisi/ambient, Gantt, dst. tetap pakai
+     token navy/teal/amber/red/green di atas apa adanya) — lihat catatan di README redesign sidebar. */
+  --ms-bg:#f3f2f2; --ms-surface:#eae9e9; --ms-text:#201e1d;
+  --ms-accent:#ec3013; --ms-accent-100:#fff2ef; --ms-accent-200:#ffe0d9; --ms-accent-300:#ffc4b8;
+  --ms-accent-600:#dd2b0f; --ms-accent-700:#ae1800; --ms-accent-800:#7c1405;
+  --ms-neutral-100:#f8f4f4; --ms-neutral-200:#eae7e7; --ms-neutral-300:#d7d3d3; --ms-neutral-400:#bab6b6;
+  --ms-neutral-600:#7d7979; --ms-neutral-700:#605d5d; --ms-neutral-800:#444141;
+  --ms-divider: color-mix(in srgb, #201e1d 40%, transparent);
+  --font-heading: "Archivo", var(--font-ui);
 }
 *{box-sizing:border-box;}
-html,body{margin:0;padding:0;height:100%;background:var(--gray-100);font-family:var(--font-ui);color:var(--gray-900);font-size:14px;}
+html,body{margin:0;padding:0;height:100%;background:var(--ms-bg);font-family:var(--font-ui);color:var(--ms-text);font-size:14px;}
 button{font-family:inherit;cursor:pointer;}
 input,select,textarea{font-family:inherit;font-size:13px;}
 ::-webkit-scrollbar{width:9px;height:9px;}
 ::-webkit-scrollbar-thumb{background:var(--gray-300);border-radius:5px;}
 .app{display:flex;min-height:100vh;}
+a{color:var(--ms-accent);}
+:focus-visible{outline:2px solid var(--ms-accent);outline-offset:2px;}
 
-/* Sidebar */
-/* z-index eksplisit wajib di sini — tanpanya .sidebar (position:sticky tapi z-index:auto) kalah
+/* Sidebar — restyle "Modernist": flat, architectural, latar terang, aksen merah, tipografi Archivo,
+   0 radius, garis pembatas 2px solid. Lihat design_handoff_sidebar_menu/README.md (dikirim user)
+   utk spek lengkapnya; token warnanya ada di :root sbg --ms-*.
+   z-index eksplisit wajib di sini — tanpanya .sidebar (position:sticky tapi z-index:auto) kalah
    stacking-order melawan .stickytop di .main (z-index:30), jadi tombol ciutkan yang nongol keluar
-   dari tepi kanan sidebar (right:-13px) ketutup/ketumpuk konten halaman saat discroll. */
-.sidebar{width:236px;flex-shrink:0;background:linear-gradient(180deg,var(--navy-950),var(--navy-900));color:#cdd9e6;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;transition:width .22s cubic-bezier(.4,0,.2,1);overflow:visible;z-index:40;}
-.brand{padding:18px 18px 14px;border-bottom:1px solid rgba(255,255,255,.08);transition:padding .22s ease;}
-.brand h1{font-size:15px;margin:8px 0 2px;color:#fff;font-weight:700;line-height:1.3;}
-.brand .sub{font-size:11px;color:#7f93ab;}
-.brand-mark{display:none;font-weight:800;font-size:15px;color:#fff;text-align:center;letter-spacing:.03em;}
-/* Logo asli (PNG dgn teks hitam "PERTAMINA" + arrow mark berwarna) TIDAK kebaca di atas latar
-   sidebar navy gelap tanpa alas — dibungkus chip putih membulat spy tetap legible, sama seperti
-   logo ini dipakai di kop Berita Acara (kertas putih). Lebar dibatasi biar proporsional di sidebar
-   236px, tinggi ikut otomatis. */
-.brand-logo{background:#fff;border-radius:8px;padding:8px 10px;display:inline-block;max-width:100%;}
-.brand-logo img{display:block;width:100%;max-width:168px;height:auto;}
-.sidebar.collapsed .brand-logo{display:none;}
-nav{flex:1;padding:10px 8px;overflow-y:auto;overflow-x:hidden;}
-nav .navgroup-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#5f7085;padding:12px 10px 4px;white-space:nowrap;transition:opacity .15s ease;}
-nav .navgroup-label:first-child{padding-top:4px;}
-nav .navbtn{display:flex;align-items:center;gap:9px;width:100%;padding:9px 10px;margin:2px 0;border:none;border-left:3px solid transparent;background:transparent;color:#aebdd0;text-align:left;border-radius:7px;font-size:13px;font-weight:500;transition:background .15s ease,color .15s ease,border-color .15s ease;}
-nav .navbtn:hover{background:rgba(255,255,255,.06);color:#fff;}
-nav .navbtn.active{background:var(--teal-500);color:#04211f;font-weight:700;}
-nav .navbtn .ico{width:16px;text-align:center;font-size:13px;flex-shrink:0;transition:transform .15s ease;}
-nav .navbtn:hover .ico{transform:scale(1.22);}
-nav .navbtn.active .ico{transform:scale(1.05);}
-nav .navbtn .label{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;transition:opacity .12s ease;}
-nav .navbtn[data-group="setup"]{border-left-color:#2b7fb0;}
-nav .navbtn[data-group="plan"]{border-left-color:var(--teal-500);}
-nav .navbtn[data-group="exec"]{border-left-color:var(--amber-500);}
-nav .navbtn[data-group="hasil"]{border-left-color:#3fb27f;}
-nav .navbtn[data-group="ref"]{border-left-color:#7c5cbf;}
-nav .navbtn[data-group="admin"]{border-left-color:#64748b;}
-.sidebar-foot{padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:10.5px;color:#5f7085;white-space:nowrap;overflow:hidden;}
-.savebadge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:var(--teal-400);}
-.savebadge .dot{width:6px;height:6px;border-radius:50%;background:var(--teal-400);}
+   dari tepi kanan sidebar (right:-14px) ketutup/ketumpuk konten halaman saat discroll. */
+.sidebar{width:308px;flex-shrink:0;background:var(--ms-neutral-100);color:var(--ms-text);border-right:2px solid var(--ms-divider);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;transition:width .38s cubic-bezier(.4,0,.2,1);overflow:visible;z-index:40;font-family:var(--font-ui);}
+.sidebar.collapsed{width:80px;}
+.ms-icon{display:inline-flex;flex-shrink:0;}
+.ms-icon svg{display:block;}
+
+.brand{padding:var(--space-4,16px);border-bottom:2px solid var(--ms-divider);transition:padding .22s ease;}
+.brand h1{font-family:var(--font-heading);font-size:18px;line-height:1.15;margin:0 0 4px;font-weight:800;letter-spacing:-.01em;}
+.brand .sub{font-size:12px;opacity:.6;margin-bottom:8px;}
+.brand-logo{margin-bottom:10px;}
+.brand-logo img{display:block;width:100%;max-width:100%;height:52px;object-fit:contain;}
+.grayscale{filter:grayscale(1) contrast(1.08);}
+.ms-tag-accent{display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.02em;padding:3px 10px;background:var(--ms-accent-100);color:var(--ms-accent-800);margin-bottom:8px;}
+.ms-pulse-dot{width:6px;height:6px;border-radius:50%;background:var(--ms-accent-700);animation:ms-pulse 1.6s ease-in-out infinite;flex-shrink:0;}
+@keyframes ms-pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+.btn-secondary{border:1px solid var(--ms-divider);background:transparent;color:var(--ms-text);}
+.btn-secondary:hover{background:color-mix(in srgb, var(--ms-text) 7%, transparent);}
+.btn-secondary:active{background:color-mix(in srgb, var(--ms-text) 14%, transparent);}
+.btn-block{width:100%;justify-content:flex-start;text-align:left;margin-top:8px;border-radius:0;}
+.btn-accent-soft{background:var(--ms-accent-100);color:var(--ms-accent-800);border:1px solid transparent;}
+.btn-accent-soft:hover{background:var(--ms-accent-200);}
+.sidebar.collapsed .brand{padding:12px 8px;text-align:center;}
+.sidebar.collapsed .brand h1,.sidebar.collapsed .brand .sub,.sidebar.collapsed .brand .ms-tag-accent,.sidebar.collapsed .brand button{display:none;}
+.sidebar.collapsed .brand-logo{margin-bottom:0;}
+.sidebar.collapsed .brand-logo img{height:40px;}
+
+.sidebar-search{padding:12px 16px 0;position:relative;}
+.sidebar-search .ms-icon{position:absolute;left:26px;top:50%;transform:translateY(-50%);opacity:.5;pointer-events:none;}
+.sidebar-search input{width:100%;min-height:34px;padding:6px 10px 6px 32px;font:inherit;font-size:13px;color:var(--ms-text);background:var(--ms-surface);border:1px solid var(--ms-divider);border-radius:0;}
+.sidebar-search input:hover{border-color:color-mix(in srgb, var(--ms-text) 45%, transparent);}
+.sidebar-search input:focus-visible{border-color:var(--ms-accent);outline-offset:0;}
+.sidebar.collapsed .sidebar-search{display:none;}
+
+nav{flex:1;padding:12px 8px;overflow-y:auto;overflow-x:hidden;}
+.navgroup{margin-bottom:8px;}
+.navgroup-head{display:flex;align-items:center;justify-content:space-between;width:100%;background:none;border:none;cursor:pointer;padding:6px 8px;font-family:var(--font-heading);font-weight:800;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ms-neutral-600);}
+.navgroup-head:hover{color:var(--ms-text);}
+.navgroup-chevron svg{transition:transform .2s ease;}
+.navgroup.closed .navgroup-chevron svg{transform:rotate(-90deg);}
+.navgroup-items{display:flex;flex-direction:column;gap:2px;padding:2px 0 4px;}
+.navgroup.closed .navgroup-items{display:none;}
+/* Selama kolom Cari Menu terisi (.force-open), grup yg lagi manual-ditutup ttp dipaksa kelihatan
+   isinya — supaya hasil cari tidak "hilang" gara-gara kebetulan grupnya lagi collapsed. Status
+   .closed sendiri TIDAK diubah/disentuh saat searching (lihat handler di 02-nav-util.js), jadi
+   begitu kolom cari dikosongkan lagi, grup otomatis balik ke kondisi buka/tutup semula. */
+.navgroup.closed.force-open .navgroup-items{display:flex;}
+.navgroup.closed.force-open .navgroup-chevron svg{transform:rotate(0deg);}
+.navgroup-empty{padding:14px 10px;font-size:12px;}
+.sidebar.collapsed .navgroup-head{display:none;}
+.sidebar.collapsed .navgroup.closed .navgroup-items{display:flex;}
+
+nav .navbtn{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:none;border-left:3px solid transparent;background:transparent;color:var(--ms-text);text-align:left;border-radius:0;font-size:13.5px;font-weight:500;transition:background .15s ease,color .15s ease,border-color .15s ease;}
+nav .navbtn:hover{background:var(--ms-neutral-200);}
+nav .navbtn .navbtn-icon{color:var(--ms-neutral-700);}
+nav .navbtn.active{background:var(--ms-accent-100);color:var(--ms-accent-800);font-weight:800;border-left-color:var(--ms-accent);}
+nav .navbtn.active:hover{background:var(--ms-accent-200);}
+nav .navbtn.active .navbtn-icon{color:var(--ms-accent-700);}
+nav .navbtn .label{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+nav .navbtn.hidden-by-search{display:none;}
+.sidebar.collapsed nav .navbtn{justify-content:center;padding:9px 0;gap:0;}
+.sidebar.collapsed nav .navbtn .label{display:none;}
+
+.sidebar-foot{padding:12px 16px;border-top:2px solid var(--ms-divider);font-size:11px;white-space:nowrap;overflow:hidden;}
+.savebadge{display:inline-flex;align-items:center;gap:6px;font-size:11px;opacity:.6;margin-bottom:6px;}
 /* Indikator sisa kapasitas localStorage — ditaruh selalu-kelihatan di kaki sidebar (bukan cuma
    notif pas kepenuhan) supaya user bisa lihat trennya lebih awal & bersihkan snapshot lama di
-   Riwayat sebelum benar-benar mentok error. Warna berubah bertahap sesuai ambang (lihat JS). */
-.storage-badge{margin-top:6px;font-size:9.5px;color:#5f7085;}
-.storage-badge .bar-track{width:100%;height:4px;border-radius:2px;background:rgba(255,255,255,.12);margin-top:3px;overflow:hidden;}
-.storage-badge .bar-fill{height:100%;border-radius:2px;transition:width .2s ease;}
-.sidebar.collapsed .storage-badge{display:none;}
+   Riwayat sebelum benar-benar mentok error. Warna berubah bertahap sesuai ambang (lihat JS);
+   lebar bar-fill dianimasikan via transition supaya "mengisi" tiap kali angkanya update, bukan
+   cuma pop langsung ke lebar akhirnya. */
+.storage-badge .bar-track{width:100%;height:6px;background:var(--ms-neutral-300);margin-top:3px;overflow:hidden;}
+.storage-badge .bar-fill{height:100%;transition:width 1.2s cubic-bezier(.16,1,.3,1);}
+.storage-badge span{display:block;font-size:11px;opacity:.55;margin-top:4px;}
+.sidebar.collapsed .storage-badge,.sidebar.collapsed .savebadge{display:none;}
 
 .storage-badge-riwayat{margin-top:4px;font-size:12.5px;color:var(--gray-700);max-width:360px;}
 .storage-badge-riwayat .bar-track{height:8px;background:var(--gray-200);}
 
-/* Sidebar collapse — tombol bulat kecil di tepi kanan sidebar, klik utk lock collapse/expand
-   (state disimpan di localStorage terpisah dari DB karena ini preferensi tampilan, bukan data).
-   Icon nav & tombol toggle sendiri sudah dianimasikan (scale/rotate) supaya interaksinya kerasa
-   hidup, bukan cuma lebar sidebar yang berubah tiba-tiba. */
-.sidebar-toggle{position:absolute;top:66px;right:-14px;width:28px;height:28px;border-radius:50%;background:var(--teal-500);color:#04211f;border:2.5px solid var(--navy-900);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;cursor:pointer;transition:transform .22s cubic-bezier(.4,0,.2,1),background .15s ease;z-index:5;padding:0;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,.35);}
-.sidebar-toggle:hover{background:var(--teal-400);transform:scale(1.15);}
-.sidebar.collapsed .sidebar-toggle{transform:rotate(180deg);}
-.sidebar.collapsed .sidebar-toggle:hover{transform:rotate(180deg) scale(1.15);}
-.sidebar.collapsed{width:60px;}
-.sidebar.collapsed .brand{padding:16px 4px;text-align:center;}
-.sidebar.collapsed .brand .tag,.sidebar.collapsed .brand h1,.sidebar.collapsed .brand .sub,.sidebar.collapsed .brand button{display:none;}
-.sidebar.collapsed .brand-mark{display:block;}
-.sidebar.collapsed nav .navgroup-label{opacity:0;height:0;padding:0;overflow:hidden;}
-.sidebar.collapsed nav .navbtn{justify-content:center;padding:9px 0;gap:0;}
-.sidebar.collapsed nav .navbtn .label{display:none;}
-.sidebar.collapsed .sidebar-foot{padding:12px 6px;text-align:center;}
-.sidebar.collapsed .sidebar-foot .savebadge span:not(.dot){display:none;}
+/* Sidebar collapse — tombol persegi kecil (0 radius, sesuai sistem) mengambang di tepi kanan
+   sidebar, klik utk lock collapse/expand (state disimpan di localStorage terpisah dari DB karena
+   ini preferensi tampilan, bukan data). Border 2px warna latar HALAMAN (bukan latar sidebar)
+   supaya tombolnya kelihatan "memotong" garis pembatas sidebar, bukan menyatu dengannya. */
+.sidebar-toggle{position:absolute;top:28px;right:-14px;width:28px;height:28px;border-radius:0;background:var(--ms-accent);color:#fff;border:2px solid var(--ms-bg);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s ease,transform .1s ease;z-index:5;padding:0;line-height:1;box-shadow:var(--shadow-md,0 3px 10px rgba(45,43,43,.16));}
+.sidebar-toggle:hover{background:var(--ms-accent-600);}
+.sidebar-toggle:active{background:var(--ms-accent-700);transform:scale(.92);}
+.sidebar.collapsed .sidebar-toggle .ms-icon svg{transform:rotate(180deg);}
 
 /* Main */
 .main{flex:1;min-width:0;padding:22px 26px 60px;}
@@ -131,8 +172,9 @@ tbody tr:hover{background:var(--gray-100);}
 
 .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:7px;border:1px solid var(--gray-300);background:#fff;color:var(--gray-900);font-size:12.5px;font-weight:600;}
 .btn:hover{border-color:var(--gray-500);}
-.btn.primary{background:var(--teal-500);border-color:var(--teal-500);color:#fff;}
-.btn.primary:hover{background:#0c8f8a;}
+.btn.primary{background:var(--ms-accent);border-color:var(--ms-accent);color:#fff;}
+.btn.primary:hover{background:var(--ms-accent-600);border-color:var(--ms-accent-600);}
+.btn.primary:active{background:var(--ms-accent-700);border-color:var(--ms-accent-700);}
 .btn.danger{background:#fff;border-color:var(--red-500);color:var(--red-500);}
 .btn.danger:hover{background:#fdeceb;}
 .btn.ghost{border-color:transparent;background:transparent;color:var(--gray-700);}
