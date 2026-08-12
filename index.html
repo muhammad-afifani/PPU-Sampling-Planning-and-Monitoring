@@ -102,6 +102,7 @@
           <button class="btn" data-action="importPointsCsv">Import CSV</button>
           <button class="btn" data-action="exportPointsCsv">Export CSV</button>
           <button class="btn ghost" data-action="verifyAllVisible" title="Tandai semua titik yang tampil (sesuai filter) sebagai sudah dicek">&#10003; Tandai Tampil Sudah Dicek</button>
+          <button class="btn ghost" data-action="clearStaleVisible" title="Hapus tanda kuning 'berubah sejak dicek' pada titik yang tampil (sesuai filter) — tanggal verifikasi terakhir tidak diubah, cuma tandanya yang dihilangkan">&#10005; Hapus Tanda Berubah</button>
         </div>
       </div>
       <div class="toolbar card" style="padding:12px 14px;">
@@ -122,6 +123,9 @@
           <button class="btn small ghost" data-action="expandSitesOnlyMaster" title="Buka header site saja (level 1), jenis sumber di dalamnya tetap ciut">Buka Level Site</button>
           <button class="btn small ghost" data-action="expandAllMaster" title="Buka site sekaligus semua jenis sumber di dalamnya (level 1 + 2)">Expand Semua</button>
           <button class="btn small ghost" data-action="collapseAllMaster">Collapse Semua</button>
+        </span>
+        <span id="masterFlatControls" style="display:none;gap:8px;flex-wrap:wrap;">
+          <button class="btn small ghost" data-action="openMasterColumnPicker" title="Pilih kolom mana saja yang ditampilkan di tabel datar ini">&#9881; Atur Kolom</button>
         </span>
       </div>
       </div>

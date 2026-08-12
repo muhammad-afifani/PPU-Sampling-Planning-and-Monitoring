@@ -173,6 +173,20 @@ function verifyAllVisible(){
     toast(`${rows.length} titik ditandai sudah dicek.`,"ok");
   });
 }
+// Hapus tanda "berubah sejak dicek" (stale) TANPA menstempel verifikasi baru — beda dari
+// verifyAllVisible di atas (yang menstempel lastVerified=now, seolah baru saja dicek ulang beneran
+// hari ini). Di sini cuma p.updatedAt yang dikosongkan, jadi verifyStatus balik ke "verified" tapi
+// tanggal yang tetap ditampilkan adalah tanggal verifikasi ASLI (bisa lama) — sesuai permintaan:
+// buang tanda kuningnya kalau sudah lama, bukan pura-pura baru saja diverifikasi ulang.
+function clearStaleVisible(){
+  const rows = filteredMasterRows().filter(p=>verifyStatus(p)==="stale");
+  if(!rows.length){ toast('Tidak ada titik berstatus "Berubah Sejak Dicek" pada filter yang sedang aktif.',"err"); return; }
+  askConfirm(`Hapus tanda "berubah sejak dicek" pada ${rows.length} titik yang sedang ditampilkan (sesuai filter)? Tanggal verifikasi terakhir TIDAK berubah — cuma tanda kuningnya yang dihilangkan, bukan verifikasi ulang.`, ()=>{
+    rows.forEach(p=>{ p.updatedAt = null; });
+    save(); renderMaster();
+    toast(`Tanda "berubah sejak dicek" dihapus dari ${rows.length} titik.`,"ok");
+  });
+}
 function populateSiteFilter(){
   const sites = [...new Set(DB.points.map(p=>p.site))].sort();
   const sel = document.getElementById("fltSite");
@@ -286,28 +300,64 @@ function renderMasterTree(rows){
   });
   return html;
 }
+// Kolom Tampilan Tabel Datar didefinisikan sbg data (bukan markup statis) supaya sebagian bisa
+// disembunyikan/ditampilkan lewat "Atur Kolom" tanpa menduplikasi logika render-nya. Nama Titik &
+// Aksi dikunci (locked:true) — identitas baris & tombol Edit/Hapus, tidak masuk akal disembunyikan.
+const MASTER_FLAT_COLUMNS = [
+  {key:"site", label:"Site", locked:false, th:()=>"Site", td:"", cell:p=>p.site},
+  {key:"jenis", label:"Jenis Pantau", locked:false, th:()=>"Jenis Pantau", td:"", cell:p=>`<span class="badge b-gray">${escHtml(monitoringTypeLabel(p))}</span>`},
+  {key:"nama", label:"Nama Titik", locked:true, th:()=>"Nama Titik", td:"", cell:p=>escHtml(p.nama)},
+  {key:"grup", label:"Grup / Sumber", locked:false, th:()=>"Grup / Sumber", td:'class="muted" style="font-size:11.5px;"', cell:p=>`${escHtml(subgroupOf(p))}${p.kategori==="emisi"&&p.kategoriSumber?`<div style="font-size:10px;">${escHtml(p.kategoriSumber)}</div>`:""}`},
+  {key:"kapasitas", label:"Kapasitas", locked:false, th:()=>"Kapasitas", td:'class="muted" style="font-size:11px;"', cell:p=>escHtml(p.kapasitas||"-")},
+  {key:"bahanBakar", label:"Bahan Bakar", locked:false, th:()=>"Bahan Bakar", td:'class="muted" style="font-size:11px;"', cell:p=>escHtml(p.jenisBahanBakar||"-")},
+  {key:"parameter", label:"Parameter Wajib", locked:false, th:()=>"Parameter Wajib", td:'style="font-size:11.5px;"', cell:p=>escHtml(p.parameter||"-")},
+  {key:"rh", label:"RH/Tahun", locked:false, th:period=>rhColumnLabel(period), td:'class="muted"', cell:(p,period)=>{ const v=rhYearValue(p,period); return v!=null?v:"-"; }},
+  {key:"progress", label:"Progress", locked:false, th:()=>"Progress", td:"", cell:p=>pointStatusBadge(p)},
+  {key:"wajib", label:"Wajib", locked:false, th:()=>"Wajib", td:"", cell:p=>wajibBadgeHtml(p)},
+  {key:"prediksi", label:"Prediksi", locked:false, th:()=>"Prediksi", td:'style="white-space:nowrap;"', cell:p=>prediksiCellHtml(p)},
+  {key:"verifikasi", label:"Verifikasi", locked:false, th:()=>VERIF_TH_HTML, td:"", cell:p=>verifyCellHtml(p)},
+  {key:"batch", label:"Batch", locked:false, th:()=>"Batch", td:'class="muted" style="font-size:11px;"', cell:p=>escHtml(batchNameOf(p.batchId))},
+  {key:"aksi", label:"Aksi", locked:true, th:()=>"Aksi", td:'style="white-space:nowrap;"', cell:p=>`<button class="btn small" data-action="editPoint" data-id="${p.id}">Edit</button>
+      <button class="btn small danger" data-action="deletePoint" data-id="${p.id}">Hapus</button>`},
+];
+function masterHiddenCols(){ return DB.meta.masterHiddenCols || []; }
+function masterVisibleColumns(){
+  const hidden = new Set(masterHiddenCols());
+  return MASTER_FLAT_COLUMNS.filter(c=>c.locked || !hidden.has(c.key));
+}
 function renderMasterFlat(rows){
   const period = currentPeriodStr();
+  const cols = masterVisibleColumns();
   document.getElementById("masterTable").innerHTML = `
-    <thead><tr><th>Site</th><th>Jenis Pantau</th><th>Nama Titik</th><th>Grup / Sumber</th><th>Kapasitas</th><th>Bahan Bakar</th><th>Parameter Wajib</th><th>${rhColumnLabel(period)}</th><th>Progress</th><th>Wajib</th><th>Prediksi</th><th>${VERIF_TH_HTML}</th><th>Batch</th><th>Aksi</th></tr></thead>
-    <tbody>${rows.map(p=>`<tr>
-      <td>${p.site}</td>
-      <td><span class="badge b-gray">${escHtml(monitoringTypeLabel(p))}</span></td>
-      <td>${escHtml(p.nama)}</td>
-      <td class="muted" style="font-size:11.5px;">${escHtml(subgroupOf(p))}${p.kategori==="emisi"&&p.kategoriSumber?`<div style="font-size:10px;">${escHtml(p.kategoriSumber)}</div>`:""}</td>
-      <td class="muted" style="font-size:11px;">${escHtml(p.kapasitas||"-")}</td>
-      <td class="muted" style="font-size:11px;">${escHtml(p.jenisBahanBakar||"-")}</td>
-      <td style="font-size:11.5px;">${escHtml(p.parameter||"-")}</td>
-      <td class="muted">${rhYearValue(p,period)!=null?rhYearValue(p,period):"-"}</td>
-      <td>${pointStatusBadge(p)}</td>
-      <td>${wajibBadgeHtml(p)}</td>
-      <td style="white-space:nowrap;">${prediksiCellHtml(p)}</td>
-      <td>${verifyCellHtml(p)}</td>
-      <td class="muted" style="font-size:11px;">${escHtml(batchNameOf(p.batchId))}</td>
-      <td style="white-space:nowrap;"><button class="btn small" data-action="editPoint" data-id="${p.id}">Edit</button>
-          <button class="btn small danger" data-action="deletePoint" data-id="${p.id}">Hapus</button></td>
-    </tr>`).join("")}</tbody>`;
+    <thead><tr>${cols.map(c=>`<th>${c.th(period)}</th>`).join("")}</tr></thead>
+    <tbody>${rows.map(p=>`<tr>${cols.map(c=>`<td ${c.td}>${c.cell(p,period)}</td>`).join("")}</tr>`).join("")}</tbody>`;
 }
+// Modal "Atur Kolom" — checkbox per kolom yang bisa disembunyikan, diterapkan LANGSUNG tiap
+// dicentang/dikosongkan (bukan tombol "Terapkan" terpisah) supaya langsung kelihatan efeknya di
+// tabel di belakang modal. Pilihan disimpan di DB.meta.masterHiddenCols, jadi tetap diingat lain kali
+// tools ini dibuka lagi (bukan cuma sesi ini saja).
+function openMasterColumnPicker(){
+  const hidden = new Set(masterHiddenCols());
+  const rowsHtml = MASTER_FLAT_COLUMNS.filter(c=>!c.locked).map(c=>`
+    <label class="checkline" style="display:block;padding:4px 0;">
+      <input type="checkbox" class="masterColChk" data-key="${c.key}" ${hidden.has(c.key)?"":"checked"}> ${escHtml(c.label)}
+    </label>`).join("");
+  openModal(`
+    <h3>Atur Kolom — Tampilan Tabel Datar</h3>
+    <div class="hint" style="margin-bottom:8px;">Pilih kolom yang mau ditampilkan. Nama Titik &amp; Aksi selalu tampil (identitas baris &amp; tombol Edit/Hapus). Perubahan langsung diterapkan &amp; diingat utk kunjungan berikutnya.</div>
+    ${rowsHtml}
+    <div class="actions"><button class="btn primary" data-action="closeModal">Tutup</button></div>
+  `);
+}
+document.addEventListener("change", e=>{
+  if(e.target.classList && e.target.classList.contains("masterColChk")){
+    const key = e.target.dataset.key;
+    const hidden = new Set(masterHiddenCols());
+    if(e.target.checked) hidden.delete(key); else hidden.add(key);
+    DB.meta.masterHiddenCols = [...hidden];
+    save(); renderMaster();
+  }
+});
 function renderMaster(){
   // Dibungkus try/catch: kalau ada error render di tengah jalan (mis. data lama/edge-case),
   // sebelumnya tabel diam saja tidak berubah (kelihatan seperti "filter tidak jalan") karena
@@ -321,6 +371,7 @@ function renderMaster(){
   // sudah kelihatan rata (tidak ada yang di-collapse), jadi tombolnya cuma bikin bingung kalau
   // tetap ditampilkan (kelihatan seperti tombol yang seharusnya ngapa-ngapain tapi diam saja).
   document.getElementById("masterTreeControls").style.display = masterView==="tree" ? "flex" : "none";
+  document.getElementById("masterFlatControls").style.display = masterView==="flat" ? "flex" : "none";
   if(masterView==="tree"){
     document.getElementById("masterTreeWrap").style.display="block";
     document.getElementById("masterFlatWrap").style.display="none";
