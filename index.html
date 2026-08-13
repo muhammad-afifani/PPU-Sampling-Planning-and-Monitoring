@@ -98,7 +98,7 @@
     </nav>
     <div class="sidebar-foot">
       <button class="theme-toggle" id="btnThemeToggle" type="button" title="Ganti tema terang/gelap">
-        <span class="ms-icon" data-icon="moon" data-size="15" id="themeToggleIcon"></span>
+        <span class="ms-icon" data-icon="moon" data-size="12" id="themeToggleIcon"></span>
         <span class="theme-toggle-label" id="themeToggleLabel">Mode Gelap</span>
       </button>
       <div class="savebadge"><span class="ms-icon" data-icon="hard-drive" data-size="12"></span><span>Data tersimpan di localStorage</span></div>
@@ -252,12 +252,19 @@
           <button class="btn primary" data-action="addPersonil">+ Tambah Personil</button>
           <button class="btn" data-action="importPersonilCsv">Import Excel (.csv)</button>
           <button class="btn" data-action="exportPersonilCsv">Export Excel (.csv)</button>
-          <button class="btn ghost" data-action="goToPage" data-page="planner">Buka Perencanaan Batch &rarr;</button>
+          <button class="btn" data-action="goToPage" data-page="planner">Buka Perencanaan Batch &rarr;</button>
         </div>
       </div>
+      <div class="toolbar card" style="padding:12px 14px;">
+        <div class="field"><label>Role</label><select id="pzFltRole"><option value="">Semua</option><option>PPC Emisi</option><option>PPC Ambient</option><option>Observer</option></select></div>
+        <div class="field"><label>Kelengkapan</label><select id="pzFltKelengkapan"><option value="">Semua</option><option value="lengkap">Lengkap (100%)</option><option value="belum">Belum Lengkap (&lt;100%)</option></select></div>
+        <div class="spacer"></div>
+        <div class="field"><label>Cari Personil</label><div class="search-wrap"><span class="search-ico">&#128269;</span><input type="text" id="pzFltSearch" placeholder="nama atau nomor telepon..."></div></div>
       </div>
-      <div class="section-note">Kelengkapan dihitung dari 10 item: KTP, MCU, SPK, Medpass, CLSR, Sertifikat PPC Udara, Foto Background Biru, BOSIET/BST, Vaksin Booster 3, PTS ID. Item bertanggal dianggap tidak valid jika sudah lewat tanggal expired.</div>
+      </div>
+      <div class="alert-box alert-info"><span class="ms-icon" data-icon="info" data-size="16"></span><div>Kelengkapan dihitung dari 10 item: KTP, MCU, SPK, Medpass, CLSR, Sertifikat PPC Udara, Foto Background Biru, BOSIET/BST, Vaksin Booster 3, PTS ID. Item bertanggal dianggap tidak valid jika sudah lewat tanggal expired.</div></div>
       <div class="tablewrap"><table id="personilTable"></table></div>
+      <div class="hint" id="personilCount" style="margin-bottom:16px;"></div>
       <div class="card">
         <h3>Alokasi Site &amp; Jadwal Pindah per Personil</h3>
         <div class="hint" style="margin-bottom:10px;">Site mana saja tiap personil ditugaskan (dari Perencanaan Batch) beserta tanggal-tanggal perpindahannya, diurut dari yang paling awal.</div>
