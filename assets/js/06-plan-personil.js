@@ -252,7 +252,7 @@ function buildRencanaPrintHtml(period, site, mode){
         <td>${escHtml(p.parameter||"-")}</td>
         <td>${wajibBadgeHtml(p, period)}</td>
         <td>${pointStatusBadge(p)}</td>
-        <td style="white-space:nowrap;">${prediksiCellHtml(p)}</td>
+        <td style="white-space:nowrap;">${prediksiCellHtml(p, period)}</td>
       </tr>`;
     }).join("");
     return `<div class="pg-site">
@@ -350,16 +350,24 @@ function sendPlanToBatch(team){
 /* =========================================================
    PERSONIL
 ========================================================= */
+// Sertif. PPC Udara ("ppc") cuma wajib utk personil yang memang bertugas sbg PPC (Emisi/Ambient) —
+// role Observer tidak wajib punya, jadi dianggap N/A: tidak dihitung sbg item "kosong"/kurang
+// lengkap di persentase kelengkapan maupun ditampilkan sbg peringatan di tabel/cetak roster.
+function personilItemNA(p, it){
+  return it==="ppc" && p.role==="Observer";
+}
 function completenessPct(p){
-  let ok=0;
+  let ok=0, total=0;
   PERSONIL_ITEMS.forEach(it=>{
+    if(personilItemNA(p, it)) return;
+    total++;
     const rec = p.items[it];
     if(!rec) return;
     if(it===PERSONIL_NUMBER_FIELD){ if(rec.exp) ok++; }
     else if(PERSONIL_DATED[it]){ if(rec.exp && rec.exp >= todayStr()) ok++; }
     else { if(rec.ada) ok++; }
   });
-  return Math.round(ok/PERSONIL_ITEMS.length*100);
+  return total ? Math.round(ok/total*100) : 100;
 }
 // Pakai komponen tanggal LOKAL (bukan toISOString, yang mengambil tanggal UTC — bisa mundur
 // satu hari kalau jam lokal masih pagi di timezone UTC+, mis. jam 00:00-07:59 WIB).
@@ -386,6 +394,9 @@ function renderPersonil(){
     return `<tr><td class="pz-nama" title="${escHtml(p.nama)}"><b>${escHtml(p.nama)}</b>${p.telepon?`<div class="muted" style="font-size:10.5px;margin-top:1px;">${escHtml(p.telepon)}</div>`:""}</td><td class="pz-role">${p.role}</td>
       ${PERSONIL_ITEMS.map(it=>{
         const rec = p.items[it]||{};
+        if(personilItemNA(p, it)){
+          return `<td style="white-space:nowrap;"><span class="badge b-gray" title="Tidak wajib untuk role ${escHtml(p.role)}">N/A</span></td>`;
+        }
         if(it===PERSONIL_NUMBER_FIELD){
           return rec.exp ? `<td style="white-space:nowrap;">${escHtml(rec.exp)}</td>` : `<td style="white-space:nowrap;"><span class="badge b-red">Kosong</span></td>`;
         } else if(PERSONIL_DATED[it]){
@@ -445,7 +456,8 @@ function personilFormHtml(p){
     if(it===PERSONIL_NUMBER_FIELD){
       return `<div class="field"><label>${PERSONIL_LABELS[it]}</label><input type="text" inputmode="numeric" pattern="[0-9]*" id="pi_${it}" value="${escHtml(rec.exp||"")}" placeholder="nomor PTS ID"></div>`;
     } else if(PERSONIL_DATED[it]){
-      return `<div class="field"><label>${PERSONIL_LABELS[it]} (exp)</label><input type="date" id="pi_${it}" value="${rec.exp||""}"></div>`;
+      const naHint = it==="ppc" ? ` <span class="muted" style="font-weight:400;">(N/A / tidak wajib utk role Observer)</span>` : "";
+      return `<div class="field"><label>${PERSONIL_LABELS[it]} (exp)${naHint}</label><input type="date" id="pi_${it}" value="${rec.exp||""}"></div>`;
     } else {
       return `<div class="field"><label>${PERSONIL_LABELS[it]}</label><select id="pi_${it}"><option value="0" ${!rec.ada?"selected":""}>Belum Ada</option><option value="1" ${rec.ada?"selected":""}>Ada</option></select></div>`;
     }
@@ -550,6 +562,10 @@ function personilItemRowsHtml(p){
   return PERSONIL_ITEMS.map(it=>{
     const rec = p.items[it]||{};
     let statusText, statusColor, valueText;
+    if(personilItemNA(p, it)){
+      statusText = "N/A"; statusColor = "#8a8f98"; valueText = `Tidak wajib (role ${p.role})`;
+      return `<tr><td>${escHtml(PERSONIL_LABELS[it])}</td><td><span style="color:${statusColor};font-weight:700;">${escHtml(statusText)}</span></td><td>${escHtml(valueText)}</td></tr>`;
+    }
     if(it===PERSONIL_NUMBER_FIELD){
       if(rec.exp){ statusText = "Terisi"; statusColor = "#2f9e5b"; valueText = "No. "+rec.exp; }
       else { statusText = "Kosong"; statusColor = "#c0392b"; valueText = "-"; }

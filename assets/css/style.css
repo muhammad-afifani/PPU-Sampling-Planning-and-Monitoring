@@ -282,11 +282,17 @@ details.guide summary:hover{background:rgba(14,165,160,.08);}
 details.guide .guide-body{padding:0 18px 16px;margin-top:2px;}
 
 /* Header sticky per halaman (judul + toolbar filter) supaya tetap kelihatan saat scroll ke bawah.
-   Margin negatif = lebar padding kiri/kanan .main, supaya background sticky menutup penuh lebar
-   kolom konten (bukan cuma area teks) saat konten lain scroll di baliknya. */
-.stickytop{position:sticky;top:0;z-index:30;background:var(--gray-100);margin:0 -26px 16px;padding:0 26px;}
+   Margin negatif kiri/kanan = lebar padding .main, supaya background sticky menutup penuh lebar
+   kolom konten (bukan cuma area teks) saat konten lain scroll di baliknya.
+   Margin-top negatif -22px + padding-top 22px (trik sama, diterapkan ke sisi atas juga) = lebar
+   padding-top .main — TANPA ini, box .stickytop mulai 22px di bawah tepi atas sungguhan .main,
+   jadi begitu discroll dia masih "jalan normal" sejauh 22px itu dulu sebelum posisi stickynya
+   "kena" & berhenti (kelihatan spt header geser dikit lalu baru freeze). Dengan trik ini box-nya
+   sudah pas di top:0 sejak scroll=0, jadi langsung freeze tanpa jarak tempuh sama sekali — tampilan
+   pas belum discroll tetap sama persis (kontennya "didorong" balik ke bawah oleh padding-top). */
+.stickytop{position:sticky;top:0;z-index:30;background:var(--gray-100);margin:-22px -26px 16px;padding:22px 26px 0;}
 .stickytop > *:last-child{margin-bottom:16px;}
-@media(max-width:980px){.stickytop{margin:0 -16px 16px;padding:0 16px;}}
+@media(max-width:980px){.stickytop{margin:-22px -16px 16px;padding:22px 16px 0;}}
 
 svg text{font-family:var(--font-ui);}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;margin-top:8px;}

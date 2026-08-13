@@ -164,6 +164,7 @@ function load(){
   else { DB = freshDB(); }
   migrateDB();
   updateStorageUsageBadge();
+  probeRealStorageQuota();
 }
 // Kalau localStorage penuh (QuotaExceededError), penyebab paling umum adalah DB.snapshots —
 // tiap snapshot (lihat snapshotBefore) adalah salinan PENUH seluruh database, dibuat otomatis
@@ -196,24 +197,47 @@ function save(){
     throw err;
   }
 }
-// Perkiraan kapasitas localStorage terpakai — quota SEBENARNYA beda2 per browser (umumnya 5-10MB,
-// tidak ada API standar utk tanya angka pastinya), jadi dipakai asumsi konservatif 5MB supaya
-// warning muncul lebih awal drpd mepet. Dipanggil tiap kali save() berhasil supaya SELALU kekinian,
-// bukan cuma pas halaman Riwayat dibuka — biar user kelihatan trennya sebelum benar2 mentok error.
+// "MB terpakai" SELALU angka ASLI (bukan prediksi) — ukuran byte sebenarnya dari string DB yang
+// tersimpan di localStorage saat ini (new Blob().size), dihitung ulang tiap load()/save() berhasil
+// jadi otomatis kekinian tanpa perlu direfresh manual. Yang tadinya cuma perkiraan adalah PENYEBUT-nya
+// (kapasitas maksimum) — localStorage sendiri tidak punya API standar utk tanya batas pastinya,
+// jadi dulu dipakai asumsi konservatif 5MB. Browser modern (Chrome/Edge/Firefox) sebenarnya expose
+// Storage API (navigator.storage.estimate()) yang memberi kuota ASLI per-origin (mencakup seluruh
+// penyimpanan origin ini, bukan cuma key localStorage kita, tapi origin ini memang cuma pakai
+// localStorage) — biasanya jauh lebih besar dari 5MB (ratusan MB-GB, tergantung disk kosong), jadi
+// dipakai KALAU berhasil didapat (async, sekali per load, di-cache). Kalau API-nya tidak ada/gagal
+// (browser lama, atau context file:// yang originnya "null" di sebagian browser), fallback diam2 ke
+// asumsi 5MB lama supaya badge tetap tampil masuk akal.
 const STORAGE_QUOTA_ASSUMED_BYTES = 5*1024*1024;
+let REAL_QUOTA_BYTES = null;
+function probeRealStorageQuota(){
+  if(!(navigator.storage && navigator.storage.estimate)) return;
+  navigator.storage.estimate().then(est=>{
+    if(est && est.quota){ REAL_QUOTA_BYTES = est.quota; updateStorageUsageBadge(); }
+  }).catch(()=>{ /* API ada tapi gagal (mis. origin file:// dibatasi) — tetap pakai asumsi 5MB */ });
+}
+function fmtBytesHuman(bytes){
+  const mb = bytes/1024/1024;
+  if(mb>=1024) return (mb/1024).toFixed(1)+" GB";
+  return (mb>=10?Math.round(mb):mb.toFixed(1))+" MB";
+}
 function storageUsageInfo(){
   const raw = localStorage.getItem(STORAGE_KEY) || "";
   const bytes = new Blob([raw]).size;
-  const pct = Math.min(100, Math.round(bytes/STORAGE_QUOTA_ASSUMED_BYTES*100));
-  return {bytes, pct};
+  const quota = REAL_QUOTA_BYTES || STORAGE_QUOTA_ASSUMED_BYTES;
+  const pct = Math.min(100, Math.round(bytes/quota*100));
+  return {bytes, pct, quota, isReal: !!REAL_QUOTA_BYTES};
 }
 function updateStorageUsageBadge(){
-  const {bytes, pct} = storageUsageInfo();
+  const {bytes, pct, quota, isReal} = storageUsageInfo();
   const mb = (bytes/1024/1024).toFixed(2);
   const color = pct>=85 ? "var(--red-500)" : pct>=60 ? "var(--amber-500)" : "var(--teal-400)";
+  const quotaLabel = isReal
+    ? `dari &#8776;${fmtBytesHuman(quota)} kuota browser aktual (${pct}%)`
+    : `(&#8776;${pct}% dari perkiraan kapasitas browser — kuota aktual blm bisa dibaca di browser ini)`;
   [document.getElementById("storageUsageBadge"), document.getElementById("storageUsageBadgeRiwayat")].forEach(el=>{
     if(!el) return;
-    el.innerHTML = `<span>~${mb} MB terpakai (&#8776;${pct}% dari perkiraan kapasitas browser)</span><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>`;
+    el.innerHTML = `<span>~${mb} MB terpakai ${quotaLabel}</span><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>`;
   });
 }
 // Pencatatan "terakhir diupdate" per kategori dataset yang punya kebutuhan CSV (import/export),
