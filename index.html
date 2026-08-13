@@ -48,7 +48,7 @@
         <div class="navgroup-items">
           <button class="navbtn" data-page="rencana" data-group="plan" data-label="Plan Pemantauan (Periode)" title="Plan Pemantauan (Periode)"><span class="navbtn-icon ms-icon" data-icon="calendar-clock"></span><span class="label">Plan Pemantauan (Periode)</span></button>
           <button class="navbtn" data-page="planner" data-group="plan" data-label="Perencanaan Batch" title="Perencanaan Batch"><span class="navbtn-icon ms-icon" data-icon="files"></span><span class="label">Perencanaan Batch</span></button>
-          <button class="navbtn" data-page="gantt" data-group="plan" data-label="Gantt &amp; S-Curve" title="Gantt &amp; S-Curve"><span class="navbtn-icon ms-icon" data-icon="bar-chart-3"></span><span class="label">Gantt &amp; S-Curve</span></button>
+          <button class="navbtn" data-page="gantt" data-group="plan" data-label="Scheduling Tools" title="Scheduling Tools"><span class="navbtn-icon ms-icon" data-icon="bar-chart-3"></span><span class="label">Scheduling Tools</span></button>
         </div>
       </div>
       <div class="navgroup" data-navgroup="exec">
@@ -98,7 +98,7 @@
           <div><b>1. Database Titik Pantau</b><div class="hint">Cek/edit daftar sumber emisi &amp; ambient. Sudah terisi data PHM, tinggal disesuaikan kalau ada perubahan.</div></div>
           <div><b>2. Personil PPC &amp; Observer</b><div class="hint">Input personil PPC Udara &amp; kelengkapan dokumennya (opsional, bisa belakangan).</div></div>
           <div><b>3. Perencanaan Batch</b><div class="hint">Pilih tim &amp; tanggal, klik satu tombol "Buat &amp; Terapkan Jadwal". Ini langkah utama.</div></div>
-          <div><b>4. Gantt, Kalender &amp; Tracking</b><div class="hint">Otomatis terisi setelah langkah 3. Update status di halaman Tracking saat sampling berjalan.</div></div>
+          <div><b>4. Scheduling Tools &amp; Tracking</b><div class="hint">Otomatis terisi setelah langkah 3. Update status di halaman Tracking saat sampling berjalan.</div></div>
         </div>
       </details>
       <div class="grid cols-4" id="dashStats"></div>
@@ -300,7 +300,7 @@
         <div class="grid cols-3 guide-body">
           <div><b>1. Pilih Tim &amp; Batch</b><div class="hint">Pilih Emisi atau Ambient, lalu klik "+ Batch Baru" (atau pilih batch yang sudah ada). Isi rentang tanggal batch (Mulai &amp; Selesai Target) — mis. Batch 1 = 18–30, Batch 2 bisa direncanakan di bulan berikutnya.</div></div>
           <div><b>2. (Opsional) Kecualikan Titik</b><div class="hint">Semua titik wajib pantau otomatis tercentang. Buka site lalu kategori sumbernya untuk melihat detail dan menghilangkan centang bila perlu.</div></div>
-          <div><b>3. Klik "Buat &amp; Terapkan Jadwal"</b><div class="hint">Jadwal langsung dibuat, disimpan ke titik pantau, dan otomatis muncul di Gantt &amp; S-Curve — tanpa langkah simpan terpisah.</div></div>
+          <div><b>3. Klik "Buat &amp; Terapkan Jadwal"</b><div class="hint">Jadwal langsung dibuat, disimpan ke titik pantau, dan otomatis muncul di Scheduling Tools — tanpa langkah simpan terpisah.</div></div>
         </div>
       </details>
 
@@ -369,7 +369,7 @@
     <!-- GANTT -->
     <div class="page" id="page-gantt">
       <div class="stickytop">
-      <div class="pagehead"><div><h2>Gantt &amp; S-Curve</h2><div class="desc">Visualisasi jadwal per tim dan per batch dalam bentuk Gantt chart dan kurva-S</div></div>
+      <div class="pagehead"><div><h2>Scheduling Tools</h2><div class="desc">Visualisasi jadwal per tim dan per batch dalam bentuk Gantt chart dan kurva-S</div></div>
         <div class="toolbar"><button class="btn ghost" data-action="finalizeBatchSchedule">Finalisasi Jadwal</button><button class="btn primary" data-action="printSamplingGuide">Cetak Panduan Sampling (A4)</button></div>
       </div>
       </div>
