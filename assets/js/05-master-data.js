@@ -110,17 +110,31 @@ function wajibBadgeHtml(p, period){
   if(r.type==="emergency-exempt") return `<span class="badge b-gray" title="Emergency Engine, RH 12 bulan terakhir ${r.rh??0} jam ≤ 200 jam">Tidak Wajib (Emergency, ${r.rh??0}j)</span>`;
   return `<span class="badge b-amber">Tidak Wajib</span>${p.alasanTidakWajib?`<div class="muted" style="font-size:10px;margin-top:2px;">${escHtml(p.alasanTidakWajib)}</div>`:""}`;
 }
-// Highlight kolom "Prediksi Periode Berikutnya" terhadap periode aktif saat ini — biar langsung
-// kelihatan titik mana yang JATUH TEMPO periode ini (biru) atau malah sudah LEWAT dari prediksinya
-// (merah) tanpa harus membandingkan manual satu-satu ke badge "Periode Aktif" di sidebar.
-function prediksiCellHtml(p){
+// Highlight kolom "Prediksi Periode Berikutnya" terhadap periode acuan (default: periode aktif) —
+// biar langsung kelihatan titik mana yang JATUH TEMPO periode ini (biru) atau malah sudah LEWAT
+// dari prediksinya (merah) tanpa harus membandingkan manual satu-satu ke badge "Periode Aktif" di
+// sidebar. Terima param `period` opsional supaya bisa dipakai juga di cetak Rencana per-periode
+// (yang periodenya bisa beda dari periode aktif saat ini, lewat pemilih periode di halaman itu).
+//
+// Titik yang WAJIB pantau tapi belum pernah punya prediksi tercatat (belum pernah disampling —
+// prediksiBerikutnya cuma keisi OTOMATIS begitu ada pemantauanTerakhir, lihat 01-state.js &
+// migrateDB) tidak dibiarkan tampil "-" polos (bikin seolah "belum wajib"/kosong info) — mengikuti
+// asumsi aman yang sama dgn isDueThisPeriod (03-period-logic.js): titik tanpa prediksi dianggap
+// jatuh tempo SEKARANG, jadi ditampilkan sebagai badge periode berjalan. Ini murni tampilan (fallback
+// display), TIDAK menulis nilai ke p.prediksiBerikutnya — begitu titik ini disampling & pemantauanTerakhir
+// terisi, auto-hitung prediksi yang sebenarnya (existing logic) tetap akan mengisi field-nya dgn benar.
+function prediksiCellHtml(p, period){
+  period = period || currentPeriodStr();
   const val = p.prediksiBerikutnya;
-  if(!val) return `<span class="muted">-</span>`;
+  if(!val){
+    if(effectiveWajib(p, period)) return `<span class="badge b-blue" title="Belum ada tanggal pemantauan terakhir/prediksi tercatat untuk titik ini — karena wajib pantau, dianggap jatuh tempo pada periode ${escHtml(period)} sampai diisi tanggal pemantauan sebenarnya">${escHtml(period)}</span>`;
+    return `<span class="muted">-</span>`;
+  }
   const parts = hasilPeriodParts(val);
-  const curParts = hasilPeriodParts(currentPeriodStr());
+  const curParts = hasilPeriodParts(period);
   if(parts.order==null || curParts.order==null) return escHtml(val);
-  if(parts.order===curParts.order) return `<span class="badge b-blue" title="Jatuh tempo pada periode aktif saat ini (${escHtml(currentPeriodStr())})">${escHtml(val)}</span>`;
-  if(parts.order<curParts.order) return `<span class="badge b-red" title="Prediksi sudah lewat dari periode aktif saat ini (${escHtml(currentPeriodStr())}) — cek apakah sudah disampling atau jadwalnya perlu diperbarui">${escHtml(val)}, lewat</span>`;
+  if(parts.order===curParts.order) return `<span class="badge b-blue" title="Jatuh tempo pada periode ${escHtml(period)}">${escHtml(val)}</span>`;
+  if(parts.order<curParts.order) return `<span class="badge b-red" title="Prediksi sudah lewat dari periode ${escHtml(period)} — cek apakah sudah disampling atau jadwalnya perlu diperbarui">${escHtml(val)}, lewat</span>`;
   return `<span class="muted">${escHtml(val)}</span>`;
 }
 // Nama batch yang enak dibaca dari id-nya (bukan id mentah semacam "B_lj9go6f").

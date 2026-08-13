@@ -84,7 +84,7 @@
     </nav>
     <div class="sidebar-foot">
       <div class="savebadge"><span class="ms-icon" data-icon="hard-drive" data-size="12"></span><span>Data tersimpan di localStorage</span></div>
-      <div class="storage-badge" id="storageUsageBadge" title="Perkiraan kapasitas localStorage terpakai"></div>
+      <div class="storage-badge" id="storageUsageBadge" title="Ukuran data tersimpan = angka asli (real-time). Kuota browser = asli kalau browser mendukung Storage API, kalau tidak dipakai perkiraan konservatif."></div>
     </div>
   </div>
 
@@ -1011,7 +1011,7 @@
       <div class="pagehead"><div><h2>Riwayat &amp; Restore</h2><div class="desc">Log aktivitas dan titik pemulihan (snapshot) data yang dapat dikembalikan</div></div></div>
       <div class="card">
         <h3>Kapasitas Penyimpanan Browser</h3>
-        <p class="hint">Perkiraan pemakaian localStorage saat ini. Quota sebenarnya beda-beda tiap browser (umumnya 5–10 MB) — dihitung konservatif pakai asumsi 5 MB supaya peringatan muncul lebih awal, bukan pas sudah mepet.</p>
+        <p class="hint">Angka "MB terpakai" adalah ukuran data asli (real-time, ambil dari data yang benar-benar tersimpan) — bukan prediksi. Angka kuota totalnya baru perkiraan: kalau browser mendukung Storage API, dipakai kuota asli yang dilaporkan browser (biasanya jauh di atas 5 MB); kalau tidak didukung (browser lama, atau dibuka via file:// di sebagian browser), dipakai asumsi konservatif 5 MB supaya peringatan tetap muncul lebih awal, bukan pas sudah mepet.</p>
         <div class="storage-badge storage-badge-riwayat" id="storageUsageBadgeRiwayat"></div>
       </div>
       <div class="card" style="background:#f7fbfb;border-color:#c9ece8;">
