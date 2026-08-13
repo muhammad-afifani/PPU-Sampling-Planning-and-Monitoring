@@ -382,13 +382,30 @@ function batchesForPersonil(personilId){
     .filter(b=>(b.assignedPersonil||[]).some(a=>a.id===personilId))
     .map(b=>({batch:b, lead:b.assignedPersonil.find(a=>a.id===personilId).lead}));
 }
+// Role/status-kelengkapan/nama-atau-kontak — dibaca langsung dari toolbar filter (pola sama dgn
+// renderMaster() di 05-master-data.js), murni penyaring TAMPILAN, tidak menyentuh DB.personil.
+function personilMatchesFilter(p){
+  const role = document.getElementById("pzFltRole").value;
+  if(role && p.role!==role) return false;
+  const kelengkapan = document.getElementById("pzFltKelengkapan").value;
+  if(kelengkapan){
+    const pct = completenessPct(p);
+    if(kelengkapan==="lengkap" && pct!==100) return false;
+    if(kelengkapan==="belum" && pct===100) return false;
+  }
+  const q = document.getElementById("pzFltSearch").value.trim().toLowerCase();
+  if(q && !(p.nama.toLowerCase().includes(q) || (p.telepon||"").toLowerCase().includes(q))) return false;
+  return true;
+}
 function renderPersonil(){
   // Nama & Role dibekukan (sticky) horizontal — tabel ini lebar (10 kolom dokumen + dst), tanpa ini
   // dua kolom identitas itu ikut hilang begitu discroll ke kanan, jadi susah tahu baris siapa yang
   // lagi dilihat. Pola & lebar sama dgn .dg-col-sticky di Gantt (kolom Site).
+  const rows = DB.personil.filter(personilMatchesFilter);
+  const colCount = 6 + PERSONIL_ITEMS.length;
   document.getElementById("personilTable").innerHTML = `
-  <thead><tr><th class="pz-nama">Nama</th><th class="pz-role">Role</th>${PERSONIL_ITEMS.map(it=>`<th style="min-width:104px;white-space:nowrap;">${PERSONIL_LABELS[it]}</th>`).join("")}<th style="min-width:120px;">Kelengkapan</th><th style="min-width:100px;">Dokumentasi</th><th style="min-width:170px;">Ditugaskan di Batch</th><th style="min-width:130px;">Aksi</th></tr></thead>
-  <tbody>${DB.personil.map(p=>{
+  <thead><tr><th class="pz-nama">Nama</th><th class="pz-role">Role</th>${PERSONIL_ITEMS.map(it=>`<th style="min-width:92px;white-space:nowrap;">${PERSONIL_LABELS[it]}</th>`).join("")}<th style="min-width:120px;">Kelengkapan</th><th style="min-width:100px;">Dokumentasi</th><th style="min-width:170px;">Ditugaskan di Batch</th><th style="min-width:130px;">Aksi</th></tr></thead>
+  <tbody>${rows.length ? rows.map(p=>{
     const pct = completenessPct(p);
     const assignments = batchesForPersonil(p.id);
     return `<tr><td class="pz-nama" title="${escHtml(p.nama)}"><b>${escHtml(p.nama)}</b>${p.telepon?`<div class="muted" style="font-size:10.5px;margin-top:1px;">${escHtml(p.telepon)}</div>`:""}</td><td class="pz-role">${p.role}</td>
@@ -414,7 +431,9 @@ function renderPersonil(){
       <td><button class="btn small" data-action="editPersonil" data-id="${p.id}">Edit</button>
           <button class="btn small danger" data-action="deletePersonil" data-id="${p.id}">Hapus</button></td>
     </tr>`;
-  }).join("")}</tbody>`;
+  }).join("") : `<tr><td colspan="${colCount}" class="muted" style="text-align:center;padding:22px;">Tidak ada personil yang cocok dengan pencarian/filter.</td></tr>`}</tbody>`;
+  const countEl = document.getElementById("personilCount");
+  if(countEl) countEl.textContent = rows.length===DB.personil.length ? `${DB.personil.length} personil` : `${rows.length} dari ${DB.personil.length} personil ditampilkan`;
   renderPersonilAlokasi();
 }
 // Timeline "personil X pindah dari site A (tgl) ke site B (tgl)" — dihitung dari batch yang sudah
@@ -437,17 +456,21 @@ function renderPersonilAlokasi(){
   el.innerHTML = rows.length ? rows.map(r=>`
     <div class="pal-card">
       <div class="pal-name"><b>${escHtml(r.p.nama)}</b> <span class="muted" style="font-weight:400;">(${escHtml(r.p.role)})</span></div>
-      <div class="pal-timeline">
+      <div class="pal-stepper">
         ${r.items.map((it,i)=>`
-          ${i>0?'<span class="pal-arrow">&rarr;</span>':""}
-          <div class="pal-item" title="${escHtml(it.batchName)}${it.lead?" — Ketua Tim":""}">
-            <span class="badge ${it.team==="emisi"?"b-teal":"b-blue"}">${escHtml(it.site)}</span>
+          ${i>0?`<span class="pal-connector">${msIcon("chevron-right",14)}</span>`:""}
+          <div class="pal-step" title="${escHtml(it.batchName)}${it.lead?" — Ketua Tim":""}">
+            <span class="pal-site-pill" style="--site-c:${HASIL_SITE_COLORS[it.site]||"#7f8fa0"};">${escHtml(it.site)}</span>
             <span class="pal-date">${escHtml(it.start||"?")} &rarr; ${escHtml(it.end||"?")}</span>
           </div>`).join("")}
       </div>
     </div>`).join("")
     : "<div class='hint' style='padding:10px;'>Belum ada personil yang ditugaskan ke batch manapun — tunjuk dulu di Perencanaan Batch.</div>";
 }
+["pzFltRole","pzFltKelengkapan","pzFltSearch"].forEach(id=>{
+  document.addEventListener("input", e=>{ if(e.target.id===id) renderPersonil(); });
+  document.addEventListener("change", e=>{ if(e.target.id===id) renderPersonil(); });
+});
 const PERSONIL_ROLES = ["PPC Emisi","PPC Ambient","Observer"];
 function personilFormHtml(p){
   p = p || {id:"", nama:"", role:"PPC Emisi", items:{}, dokumentasiLink:"", telepon:""};

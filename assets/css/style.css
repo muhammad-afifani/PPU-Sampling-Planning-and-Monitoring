@@ -19,7 +19,7 @@
   --font-heading: "Archivo", var(--font-ui);
 
   /* Dua token tambahan khusus utk dark mode (lihat blok [data-theme="dark"] di bawah) — dipakai
-     nggantiin dua pola warna yg TIDAK BISA ikut ambil untung dari sekadar membalik --gray-*/--ms-*:
+     nggantiin dua pola warna yg TIDAK BISA ikut ambil untung dari sekadar membalik --gray-* atau --ms-*:
      --surface-card = latar "kertas" elemen spt .card/.modal/.btn/input, yg di source code aslinya
      ditulis literal `#fff` (bukan token), jadi kalau tidak ditarik jadi variabel di sini dia akan
      tetap putih menyala walau halamannya sudah gelap. --heading/--heading-2 = warna teks judul yg
@@ -207,11 +207,13 @@ nav .navbtn.hidden-by-search{display:none;}
    gampang ditemukan & selalu 1 klik dari mana saja. Ikon bulan/matahari ditukar oleh JS (lihat
    applyTheme() di 02-nav-util.js) sesuai tema yg SEDANG aktif (bulan = tawaran pindah ke gelap,
    matahari = tawaran pindah ke terang) — bukan menunjukkan tema saat ini, tapi menunjukkan tujuan
-   sekali klik, konsisten dgn pola ikon toggle lain di app ini (mis. panah collapse sidebar). */
-.theme-toggle{width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;margin-bottom:10px;border:1px solid var(--ms-divider);border-radius:0;background:transparent;color:var(--ms-text);font:inherit;font-size:12.5px;font-weight:600;text-align:left;transition:background .15s ease;}
-.theme-toggle:hover{background:color-mix(in srgb, var(--ms-text) 7%, transparent);}
+   sekali klik, konsisten dgn pola ikon toggle lain di app ini (mis. panah collapse sidebar).
+   Sengaja dibikin kecil & sizes-to-content (bukan width:100% spt tombol menu lain) — cuma "klip"
+   kecil di kaki sidebar, bukan tombol besar yg berebut perhatian dgn menu2 navigasi di atasnya. */
+.theme-toggle{width:fit-content;display:flex;align-items:center;gap:6px;padding:4px 10px;margin-bottom:10px;border:1.5px solid var(--ms-divider);border-radius:14px;background:transparent;color:var(--ms-text);font:inherit;font-size:11px;font-weight:600;text-align:left;transition:background .15s ease,border-color .15s ease;}
+.theme-toggle:hover{background:color-mix(in srgb, var(--ms-text) 7%, transparent);border-color:var(--ms-text);}
 .theme-toggle:active{background:color-mix(in srgb, var(--ms-text) 14%, transparent);}
-.sidebar.collapsed .theme-toggle{justify-content:center;padding:7px 0;}
+.sidebar.collapsed .theme-toggle{justify-content:center;padding:4px;width:28px;}
 .sidebar.collapsed .theme-toggle-label{display:none;}
 .savebadge{display:inline-flex;align-items:center;gap:6px;font-size:11px;opacity:.6;margin-bottom:6px;}
 /* Indikator sisa kapasitas localStorage — ditaruh selalu-kelihatan di kaki sidebar (bukan cuma
@@ -275,9 +277,10 @@ table{width:100%;border-collapse:collapse;font-size:12.5px;}
 thead th{text-align:left;background:var(--navy-900);color:#dbe6f0;font-weight:600;padding:8px 9px;position:sticky;top:0;white-space:nowrap;}
 tbody td{padding:7px 9px;border-bottom:1px solid var(--gray-200);vertical-align:middle;}
 tbody tr:hover{background:var(--gray-100);}
-/* Tabel Personil punya banyak kolom bertanda (badge+tanggal) yang gampang berdesakan — kasih
-   ruang lebih supaya tidak numpuk. */
-#personilTable td, #personilTable th{padding:9px 13px;}
+/* Tabel Personil punya 10 kolom dokumen (badge+tanggal) — padding dipadatkan (drpd default
+   tbody td di atas) supaya tabel tidak selebar mungkin & scroll horizontal ke kolom
+   Dokumentasi/Ditugaskan/Aksi di ujung kanan tidak sejauh sebelumnya. */
+#personilTable td, #personilTable th{padding:7px 10px;}
 .tablewrap{overflow:auto;max-height:64vh;border:1px solid var(--gray-200);border-radius:8px;}
 .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:700;letter-spacing:.02em;}
 .b-gray{background:var(--gray-200);color:var(--gray-700);}
@@ -341,6 +344,14 @@ tbody tr:hover{background:var(--gray-100);}
 .progressbar{height:7px;border-radius:6px;background:var(--gray-200);overflow:hidden;}
 .progressbar > div{height:100%;background:var(--teal-500);}
 .section-note{background:#fbf8ee;border:1px solid #ecdfae;color:#7a5c10;padding:9px 12px;border-radius:7px;font-size:12px;margin-bottom:12px;}
+/* Alert box beraksen info (icon+teks sejajar) — varian ".card" kecil beraksen warna spt
+   .card-accent-*, dipakai utk catatan/penjelasan yg butuh lebih menonjol drpd .hint polos tapi
+   tanpa perlu warna semantik status (bandingkan .section-note yg juga dipakai di halaman lain,
+   sengaja tidak diubah di sini spy tidak ikut menular). */
+.alert-box{display:flex;align-items:flex-start;gap:10px;padding:10px 13px;border-radius:8px;font-size:12px;line-height:1.55;margin-bottom:12px;}
+.alert-box .ms-icon{flex-shrink:0;margin-top:2px;}
+.alert-info{background:#fbf8ee;border:1px solid #ecdfae;color:#7a5c10;}
+.alert-info .ms-icon{color:#c98a1a;}
 
 /* Kartu ".card" varian beraksen warna (dulu ditulis lewat inline style="background:#xxx" langsung
    di index.html — dipindah jadi class supaya bisa dikasih override dark-mode juga, sama seperti
@@ -355,6 +366,8 @@ tbody tr:hover{background:var(--gray-100);}
 :root[data-theme="dark"] .card-accent-green{background:color-mix(in srgb, #3fb27f 16%, var(--surface-card));border-color:color-mix(in srgb, #3fb27f 45%, var(--surface-card));}
 :root[data-theme="dark"] .accent-green-heading{color:color-mix(in srgb, #3fb27f 55%, white);}
 :root[data-theme="dark"] .accent-amber-text{color:color-mix(in srgb, #8a5c11 55%, white);}
+:root[data-theme="dark"] .alert-info{background:color-mix(in srgb, #8a5c11 18%, var(--surface-card));border-color:color-mix(in srgb, #8a5c11 45%, var(--surface-card));color:color-mix(in srgb, #8a5c11 55%, white);}
+:root[data-theme="dark"] .alert-info .ms-icon{color:color-mix(in srgb, #8a5c11 55%, white);}
 
 /* Halaman Baku Mutu & Periode Pantau — jump-nav chip (ikut sticky bareng pagehead) dan kartu
    beraksen warna per regulasi supaya halaman referensi ini enak dipindai (tiap regulasi punya
@@ -672,15 +685,20 @@ thead .dg-col-sticky{z-index:3;}
 .pz-nama{position:sticky;left:0;z-index:2;min-width:280px;max-width:280px;width:280px;background:var(--surface-card);box-shadow:2px 0 3px -2px rgba(0,0,0,.15);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .pz-role{position:sticky;left:280px;z-index:2;min-width:100px;max-width:100px;width:100px;background:var(--surface-card);box-shadow:2px 0 3px -2px rgba(0,0,0,.15);}
 thead .pz-nama,thead .pz-role{z-index:3;background:var(--navy-900);box-shadow:none;}
-/* Timeline alokasi site per personil (halaman Personil) — satu baris flow per orang, panah antar
-   kartu site menandakan urutan kronologis (sudah diurutkan naik dari tanggal mulai). */
+/* Stepper alokasi site per personil (halaman Personil) — satu baris stepper horizontal per orang,
+   satu step = satu penempatan site (sudah diurutkan naik dari tanggal mulai). Warna pill per site
+   (--site-c, di-set inline dari JS) SENGAJA dipakai dari HASIL_SITE_COLORS yg sama dgn Dashboard
+   Hasil Pemantauan (14-hasil-dashboard.js) supaya "bahasa warna per-site" konsisten se-app, bukan
+   palet baru yg cuma dipakai di sini. Connector panah antar step pakai flex-wrap biasa (bukan
+   garis/line absolute) supaya tetap rapi kalau baris personil dgn banyak site wrap ke baris baru. */
 .pal-card{padding:10px 0;border-bottom:1px solid var(--gray-200);}
 .pal-card:last-child{border-bottom:none;}
-.pal-name{font-size:13px;margin-bottom:6px;}
-.pal-timeline{display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
-.pal-item{display:inline-flex;align-items:center;gap:7px;background:var(--gray-100);border-radius:7px;padding:5px 10px;}
-.pal-date{font-size:11px;color:var(--gray-700);white-space:nowrap;}
-.pal-arrow{color:var(--gray-400);font-weight:700;font-size:13px;}
+.pal-name{font-size:13px;margin-bottom:8px;}
+.pal-stepper{display:flex;align-items:flex-start;flex-wrap:wrap;}
+.pal-step{display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 2px 6px;}
+.pal-site-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;color:#fff;background:var(--site-c, var(--gray-500));white-space:nowrap;}
+.pal-date{font-size:10px;color:var(--gray-500);white-space:nowrap;}
+.pal-connector{display:flex;color:var(--gray-300);padding-top:8px;margin:0 1px;}
 .dg-td-label{padding:7px 10px;vertical-align:middle;background:var(--surface-card);border-radius:6px;box-shadow:2px 0 3px -2px rgba(0,0,0,.12);}
 .dg-td-label[draggable="true"]{cursor:grab;}
 .dg-td-label[draggable="true"]:active{cursor:grabbing;}
