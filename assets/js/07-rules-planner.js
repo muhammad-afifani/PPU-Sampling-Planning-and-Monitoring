@@ -489,7 +489,7 @@ function generateSchedule(){
   renderScheduleTable(b);
   renderMaster();
   if(safetyTripped) toast("Site "+trippedSites.join(", ")+" butuh lebih dari 2 tahun karena hari valid tidak cukup — cek Hari Terhold/Crew Change site tersebut di Aturan Site & Rute.","err");
-  else toast("Jadwal dibuat & diterapkan untuk "+orderedSites.length+" site, "+checked.length+" titik. Cek halaman Gantt & S-Curve.","ok");
+  else toast("Jadwal dibuat & diterapkan untuk "+orderedSites.length+" site, "+checked.length+" titik. Cek halaman Scheduling Tools.","ok");
   }catch(err){
     toast("Gagal generate jadwal: "+err.message,"err");
     console.error(err);
@@ -549,7 +549,7 @@ function renderScheduleTable(b){
       const overDays = daysBetweenInclusive(b.end, actualEnd)-1;
       warnEl.innerHTML = `<div class="section-note" style="border-color:#e0554f;background:#fdeceb;color:#a02a24;">
         Jadwal berakhir <b>${actualEnd}</b>, melebihi target selesai <b>${b.end}</b> sebanyak <b>${overDays} hari</b>.
-        Geser site tertentu di kalender (halaman Gantt &amp; S-Curve), atau kurangi hari kerja/buffer di bawah lalu klik "Terapkan Perubahan".
+        Geser site tertentu di kalender (halaman Scheduling Tools), atau kurangi hari kerja/buffer di bawah lalu klik "Terapkan Perubahan".
       </div>`;
     } else warnEl.innerHTML = "";
   }

@@ -93,11 +93,22 @@ function renderPage(p){
 // Ukur tinggi header sticky (.stickytop) halaman aktif lalu simpan sebagai custom property
 // --stickyoffset di elemen halaman itu — dipakai .tree-head/.tree-subhead supaya nempel PAS
 // di bawah header, bukan ketiban/ketimpa olehnya.
+// offsetHeight SAJA tidak cukup — itu cuma border-box (konten+padding), tidak termasuk
+// margin-bottom .stickytop (lihat style.css, 16px, "napas" yang sama dipakai semua halaman
+// lain yg kontennya tidak sticky). Tanpa menambahkannya di sini, .tree-head/.tree-subhead
+// nempel PAS di tepi bawah .stickytop begitu sama-sama posisi stuck — margin 16px-nya seolah
+// hilang/dilewati, jadi kelihatan mepet dibanding halaman lain yg spacing-nya sama tapi kontennya
+// tidak sticky (margin biasa tetap kepakai di flow normal).
 function syncStickyOffset(pageId){
   const pageEl = document.getElementById("page-"+pageId);
   if(!pageEl) return;
   const st = pageEl.querySelector(".stickytop");
-  pageEl.style.setProperty("--stickyoffset", (st ? st.offsetHeight : 0)+"px");
+  let offset = 0;
+  if(st){
+    const marginBottom = parseFloat(getComputedStyle(st).marginBottom) || 0;
+    offset = st.offsetHeight + marginBottom;
+  }
+  pageEl.style.setProperty("--stickyoffset", offset+"px");
 }
 function syncActiveStickyOffset(){
   const active = document.querySelector(".navbtn.active");
