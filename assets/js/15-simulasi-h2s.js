@@ -108,14 +108,14 @@ function buildSimTrendChart(scope, periodsInScope, threshold, unit, mode){
   function xFor(i){ return padL + (n<=1?plotW/2:(i/(n-1))*plotW); }
   function yFor(v){ return padT + plotH - (v/maxY)*plotH; }
 
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11.5px;background:#fff;border:1px solid var(--gray-200);border-radius:10px;">`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11.5px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;">`;
   for(let g=0; g<=4; g++){
     const y = padT + plotH - (g/4)*plotH;
-    svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#eef1f4"/>`;
-    svg += `<text x="2" y="${y+4}" fill="#7f8fa0">${Math.round(maxY*g/4)}</text>`;
+    svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--gray-200)"/>`;
+    svg += `<text x="2" y="${y+4}" fill="var(--gray-500)">${Math.round(maxY*g/4)}</text>`;
   }
-  periodsInScope.forEach((p,i)=>{ svg += `<text x="${xFor(i)}" y="${H-10}" text-anchor="middle" fill="#7f8fa0">${p}</text>`; });
-  svg += `<text x="2" y="12" fill="#7f8fa0">Satuan, ${escHtml(unit)}</text>`;
+  periodsInScope.forEach((p,i)=>{ svg += `<text x="${xFor(i)}" y="${H-10}" text-anchor="middle" fill="var(--gray-500)">${p}</text>`; });
+  svg += `<text x="2" y="12" fill="var(--gray-500)">Satuan, ${escHtml(unit)}</text>`;
   const ys = yFor(threshold);
   svg += `<line x1="${padL}" y1="${ys}" x2="${W-padR}" y2="${ys}" stroke="#e8a33d" stroke-width="1.5" stroke-dasharray="6,4"/>`;
   svg += `<text x="${W-padR-2}" y="${ys-5}" text-anchor="end" fill="#e8a33d" font-weight="700">Usulan ${threshold}</text>`;
@@ -168,14 +168,14 @@ function buildSimEngineChart(engines, threshold, unit){
   const H = topPad + rows.length*(barH+gap);
   const maxV = Math.max(threshold, ...rows.map(r=>r.maxVal))*1.15;
   const plotW = W-padL-padR;
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11px;background:#fff;border:1px solid var(--gray-200);border-radius:10px;">`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;">`;
   rows.forEach((r,i)=>{
     const y = topPad + i*(barH+gap);
     const barLen = (r.maxVal/maxV)*plotW;
     const color = r.currentlyExceeds?"#e0554f":r.exceedCount>0?"#e8a33d":"#3fb27f";
-    svg += `<text x="${padL-8}" y="${y+barH/2+4}" text-anchor="end" fill="#1c2733" font-weight="700">${escHtml(r.cerobong)}</text>`;
+    svg += `<text x="${padL-8}" y="${y+barH/2+4}" text-anchor="end" fill="var(--gray-900)" font-weight="700">${escHtml(r.cerobong)}</text>`;
     svg += `<rect x="${padL}" y="${y}" width="${Math.max(2,barLen)}" height="${barH}" rx="6" fill="${color}"/>`;
-    svg += `<text x="${padL+Math.max(2,barLen)+6}" y="${y+barH/2+4}" fill="#1c2733" font-weight="700">${r.maxVal} ${escHtml(unit)}</text>`;
+    svg += `<text x="${padL+Math.max(2,barLen)+6}" y="${y+barH/2+4}" fill="var(--gray-900)" font-weight="700">${r.maxVal} ${escHtml(unit)}</text>`;
   });
   const xThr = padL + (threshold/maxV)*plotW;
   svg += `<line x1="${xThr}" y1="0" x2="${xThr}" y2="${H}" stroke="#e8a33d" stroke-width="1.5" stroke-dasharray="5,3"/>`;
@@ -310,13 +310,13 @@ function buildH2STrendChart(records){
   const n = periods.length;
   function xFor(i){ return padL+(n<=1?plotW/2:(i/(n-1))*plotW); }
   function yFor(v){ return padT+plotH-(v/maxY)*plotH; }
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:10px;background:#fff;border:1px solid var(--gray-200);border-radius:10px;">`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:10px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;">`;
   for(let g=0; g<=4; g++){
     const y = padT+plotH-(g/4)*plotH;
-    svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#eef1f4"/>`;
-    svg += `<text x="2" y="${y+3}" fill="#7f8fa0">${fmtSci(maxY*g/4)}</text>`;
+    svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--gray-200)"/>`;
+    svg += `<text x="2" y="${y+3}" fill="var(--gray-500)">${fmtSci(maxY*g/4)}</text>`;
   }
-  periods.forEach((p,i)=>{ svg += `<text x="${xFor(i)}" y="${H-10}" text-anchor="middle" fill="#7f8fa0">${p}</text>`; });
+  periods.forEach((p,i)=>{ svg += `<text x="${xFor(i)}" y="${H-10}" text-anchor="middle" fill="var(--gray-500)">${p}</text>`; });
   sites.forEach((site,si)=>{
     const color = HASIL_SITE_COLORS[site]||HD_PALETTE[si%HD_PALETTE.length];
     const pts = periods.map((p,i)=>{

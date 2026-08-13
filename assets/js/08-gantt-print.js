@@ -731,7 +731,7 @@ function buildDayGridView(rows){
     <span class="item"><span class="sw" style="background:#0ea5a0"></span> Sampling Emisi</span>
     <span class="item"><span class="sw" style="background:#3d78c9"></span> Sampling Ambient</span>
     <span class="item"><span class="sw" style="background:#0ea5a0;opacity:.5;"></span> Hari Buffer (pudar)</span>
-    <span class="item"><span class="sw" style="background:#fff;box-shadow:inset 0 0 0 2px #e0554f;"></span> Hari Crew Change (info — larangan cuma berlaku utk BERANGKAT dari site itu, datang tetap aman)</span>
+    <span class="item"><span class="sw" style="background:var(--surface-card);box-shadow:inset 0 0 0 2px #e0554f;"></span> Hari Crew Change (info — larangan cuma berlaku utk BERANGKAT dari site itu, datang tetap aman)</span>
     <span class="item"><span class="sw" style="background:#fdf3e3;box-shadow:inset 0 0 0 2px #c98a1a;"></span> &#8594; Pindah ke Site Berikutnya</span>
   </div>`;
   return html;
@@ -1107,7 +1107,7 @@ function buildGanttSVG(batches){
   const W = leftW + totalDays*dayW + 20;
   const H = topH + rows.length*rowH + 16;
 
-  let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="font-size:13px;background:#fff;border:1px solid var(--gray-200);border-radius:10px;font-family:var(--font-ui);">`;
+  let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="font-size:13px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;font-family:var(--font-ui);">`;
   // day grid + labels
   for(let i=0;i<totalDays;i++){
     const dt = addDays(minDate,i);
@@ -1115,21 +1115,21 @@ function buildGanttSVG(batches){
     const dow = dayOfWeek(dt);
     const isWeekend = dow===0||dow===6;
     svg += `<rect x="${x}" y="${topH}" width="${dayW}" height="${H-topH}" fill="${isWeekend?'#f4f7f9':'#fff'}" />`;
-    svg += `<text x="${x+dayW/2}" y="22" text-anchor="middle" fill="#7f8fa0" font-size="10.5px">${DOW_LABEL[dow].slice(0,3)}</text>`;
-    svg += `<text x="${x+dayW/2}" y="40" text-anchor="middle" fill="#1c2733" font-weight="700" font-size="13px">${dt.slice(8,10)}</text>`;
+    svg += `<text x="${x+dayW/2}" y="22" text-anchor="middle" fill="var(--gray-500)" font-size="10.5px">${DOW_LABEL[dow].slice(0,3)}</text>`;
+    svg += `<text x="${x+dayW/2}" y="40" text-anchor="middle" fill="var(--gray-900)" font-weight="700" font-size="13px">${dt.slice(8,10)}</text>`;
     if(dt.slice(8,10)==="01"||i===0) svg += `<text x="${x+4}" y="54" fill="#0ea5a0" font-weight="700" font-size="10.5px">${dt.slice(0,7)}</text>`;
-    svg += `<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="#eef1f4"/>`;
+    svg += `<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="var(--gray-200)"/>`;
   }
-  svg += `<line x1="${leftW}" y1="${topH}" x2="${W}" y2="${topH}" stroke="#c8d2db" stroke-width="1.5"/>`;
-  svg += `<rect x="0" y="0" width="${leftW}" height="${H}" fill="#fff"/>`;
-  svg += `<line x1="${leftW}" y1="0" x2="${leftW}" y2="${H}" stroke="#c8d2db" stroke-width="1.5"/>`;
+  svg += `<line x1="${leftW}" y1="${topH}" x2="${W}" y2="${topH}" stroke="var(--gray-300)" stroke-width="1.5"/>`;
+  svg += `<rect x="0" y="0" width="${leftW}" height="${H}" fill="var(--surface-card)"/>`;
+  svg += `<line x1="${leftW}" y1="0" x2="${leftW}" y2="${H}" stroke="var(--gray-300)" stroke-width="1.5"/>`;
 
   rows.forEach((r,ri)=>{
     const y = topH + ri*rowH;
-    if(ri%2===1) svg += `<rect x="0" y="${y}" width="${W}" height="${rowH}" fill="#fafbfc"/>`;
-    svg += `<text x="14" y="${y+rowH/2-4}" fill="#1c2733" font-weight="700" font-size="14px">${r.site}</text>`;
-    svg += `<text x="14" y="${y+rowH/2+14}" fill="#8391a3" font-size="10.5px">${escSvg(r.batchName)} · ${r.count} titik</text>`;
-    svg += `<line x1="0" y1="${y+rowH}" x2="${W}" y2="${y+rowH}" stroke="#eef1f4"/>`;
+    if(ri%2===1) svg += `<rect x="0" y="${y}" width="${W}" height="${rowH}" fill="var(--gray-100)"/>`;
+    svg += `<text x="14" y="${y+rowH/2-4}" fill="var(--gray-900)" font-weight="700" font-size="14px">${r.site}</text>`;
+    svg += `<text x="14" y="${y+rowH/2+14}" fill="var(--gray-500)" font-size="10.5px">${escSvg(r.batchName)} · ${r.count} titik</text>`;
+    svg += `<line x1="0" y1="${y+rowH}" x2="${W}" y2="${y+rowH}" stroke="var(--gray-200)"/>`;
 
     for(let i=0;i<totalDays;i++){
       const dt = addDays(minDate,i);
@@ -1137,7 +1137,7 @@ function buildGanttSVG(batches){
         svg += `<rect x="${leftW+i*dayW}" y="${y+2}" width="${dayW}" height="${rowH-4}" fill="#e0554f" opacity="0.22"/>`;
       }
       if(isBlocked(r.site, dt)){
-        svg += `<rect x="${leftW+i*dayW}" y="${y+2}" width="${dayW}" height="${rowH-4}" fill="#7f8fa0" opacity="0.22"/>`;
+        svg += `<rect x="${leftW+i*dayW}" y="${y+2}" width="${dayW}" height="${rowH-4}" fill="var(--gray-500)" opacity="0.22"/>`;
       }
     }
 
@@ -1192,11 +1192,11 @@ function buildSCurveSVG(batches, points, view){
   const pathPlanned = plannedPts.map((pt,i)=>(i===0?"M":"L")+toXY(pt[0],pt[1]).join(",")).join(" ");
   const pathActual = actualPts.map((pt,i)=>(i===0?"M":"L")+toXY(pt[0],pt[1]).join(",")).join(" ");
 
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:12px;background:#fff;border:1px solid var(--gray-200);border-radius:10px;">`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:12px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;">`;
   for(let g=0; g<=4; g++){
     const v = total*g/4, y = padT+plotH-(g/4)*plotH;
-    svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#eef1f4"/>`;
-    svg += `<text x="2" y="${y+4}" fill="#7f8fa0" font-size="11px">${Math.round(g/4*100)}%</text>`;
+    svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--gray-200)"/>`;
+    svg += `<text x="2" y="${y+4}" fill="var(--gray-500)" font-size="11px">${Math.round(g/4*100)}%</text>`;
   }
 
   // Garis "Hari ini" — biar langsung kelihatan posisi sekarang relatif ke rencana.
@@ -1229,8 +1229,8 @@ function buildSCurveSVG(batches, points, view){
     const [x,y] = toXY(pt[0],pt[1]);
     svg += `<circle cx="${x}" cy="${y}" r="3.5" fill="#3fb27f"><title>${addDays(minDate,i)} — aktual: ${pt[1]}/${total}</title></circle>`;
   });
-  svg += `<text x="${padL}" y="${H-8}" fill="#7f8fa0" font-size="11px">${minDate}</text>`;
-  svg += `<text x="${W-padR-70}" y="${H-8}" fill="#7f8fa0" font-size="11px">${maxDate}</text>`;
+  svg += `<text x="${padL}" y="${H-8}" fill="var(--gray-500)" font-size="11px">${minDate}</text>`;
+  svg += `<text x="${W-padR-70}" y="${H-8}" fill="var(--gray-500)" font-size="11px">${maxDate}</text>`;
   svg += `</svg>`;
   svg = `<div class="hint" style="margin-bottom:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">${doneNow} dari ${total} titik selesai (${Math.round(doneNow/total*100)}%) ${deltaHtml}</div>` + svg;
   svg += `<div class="legend"><span class="item"><span class="sw" style="background:#3d78c9"></span>Rencana (kumulatif)</span><span class="item"><span class="sw" style="background:#3fb27f"></span>Aktual (kumulatif)</span><span class="item"><span class="sw" style="background:#e0a53d"></span>Hari ini</span></div>`;

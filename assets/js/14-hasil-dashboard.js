@@ -421,13 +421,13 @@ function buildHasilTrendChart(filtered, parameter, periodsInScope, allSites, sel
   function xFor(i){ return padL + (n<=1?plotW/2:(i/(n-1))*plotW); }
   function yFor(v){ return padT + plotH - (v/maxY)*plotH; }
 
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11.5px;background:#fff;border:1px solid var(--gray-200);border-radius:10px;">`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11.5px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;">`;
   for(let g=0; g<=4; g++){
     const y = padT + plotH - (g/4)*plotH;
-    svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#eef1f4"/>`;
-    svg += `<text x="2" y="${y+4}" fill="#7f8fa0">${Math.round(maxY*g/4)}</text>`;
+    svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--gray-200)"/>`;
+    svg += `<text x="2" y="${y+4}" fill="var(--gray-500)">${Math.round(maxY*g/4)}</text>`;
   }
-  periodsInScope.forEach((p,i)=>{ svg += `<text x="${xFor(i)}" y="${H-10}" text-anchor="middle" fill="#7f8fa0">${p}</text>`; });
+  periodsInScope.forEach((p,i)=>{ svg += `<text x="${xFor(i)}" y="${H-10}" text-anchor="middle" fill="var(--gray-500)">${p}</text>`; });
 
   if(standardRef){
     const ys = yFor(standardRef);
@@ -500,7 +500,7 @@ function buildHasilDonutChart(filtered){
   const svg = `<svg viewBox="0 0 220 220" style="width:220px;height:220px;display:block;margin:0 auto;">
     ${paths}
     <text x="110" y="104" text-anchor="middle" font-size="24" font-weight="800" fill="var(--navy-900)">${Math.round(ok/total*100)}%</text>
-    <text x="110" y="124" text-anchor="middle" font-size="11" fill="#7f8fa0">memenuhi</text>
+    <text x="110" y="124" text-anchor="middle" font-size="11" fill="var(--gray-500)">memenuhi</text>
   </svg>`;
   const labels = {ok:["Memenuhi Baku Mutu","#3fb27f"], exceed:["Melebihi Baku Mutu","#e0554f"], not_applicable:["Tidak Ada Baku Mutu","#c8d2db"], not_evaluated:["Belum Dievaluasi","#e8a33d"]};
   const legend = segs.map(([key,val])=>`<span class="item"><span class="sw" style="background:${labels[key][1]}"></span>${labels[key][0]}: ${val}</span>`).join("");
@@ -516,14 +516,14 @@ function buildHasilRankChart(filtered, parameter, periodsInScope){
   const H = topPad + rows.length*rowH + 10;
   const maxPct = Math.max(100, ...rows.map(r=>r.pctOfStandard))*1.05;
   const plotW = W-padL-padR;
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11px;background:#fff;border:1px solid var(--gray-200);border-radius:10px;">`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;">`;
   rows.forEach((r,i)=>{
     const y = topPad + i*rowH;
     const barLen = (r.pctOfStandard/maxPct)*plotW;
     const color = r.pctOfStandard>=100?"#e0554f":r.pctOfStandard>=80?"#e8a33d":"#3fb27f";
-    svg += `<text x="${padL-8}" y="${y+rowH/2+4}" text-anchor="end" fill="#1c2733">${escHtml(r.cerobong)}</text>`;
+    svg += `<text x="${padL-8}" y="${y+rowH/2+4}" text-anchor="end" fill="var(--gray-900)">${escHtml(r.cerobong)}</text>`;
     svg += `<rect x="${padL}" y="${y+4}" width="${Math.max(2,barLen)}" height="${rowH-10}" rx="4" fill="${color}"/>`;
-    svg += `<text x="${padL+barLen+6}" y="${y+rowH/2+4}" fill="#1c2733" font-weight="700">${r.pctOfStandard}%</text>`;
+    svg += `<text x="${padL+barLen+6}" y="${y+rowH/2+4}" fill="var(--gray-900)" font-weight="700">${r.pctOfStandard}%</text>`;
   });
   const x100 = padL + (100/maxPct)*plotW;
   svg += `<line x1="${x100}" y1="0" x2="${x100}" y2="${H}" stroke="#e0554f" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>`;
@@ -541,14 +541,14 @@ function buildHasilSiteChart(filtered, parameter){
   const H = topPad + avgs.length*(barH+gap);
   const maxPct = Math.max(100, ...avgs.map(a=>a.avg))*1.05;
   const plotW = W-padL-padR;
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11.5px;background:#fff;border:1px solid var(--gray-200);border-radius:10px;">`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11.5px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;">`;
   avgs.forEach((a,i)=>{
     const y = topPad + i*(barH+gap);
     const barLen = (a.avg/maxPct)*plotW;
     const color = HASIL_SITE_COLORS[a.site] || "#7f8fa0";
-    svg += `<text x="${padL-8}" y="${y+barH/2+4}" text-anchor="end" fill="#1c2733" font-weight="700">${a.site}</text>`;
+    svg += `<text x="${padL-8}" y="${y+barH/2+4}" text-anchor="end" fill="var(--gray-900)" font-weight="700">${a.site}</text>`;
     svg += `<rect x="${padL}" y="${y}" width="${Math.max(2,barLen)}" height="${barH}" rx="6" fill="${color}"/>`;
-    svg += `<text x="${padL+barLen+6}" y="${y+barH/2+4}" fill="#1c2733">${Math.round(a.avg*10)/10}% <tspan fill="#9db3c9" font-size="10px">(n=${a.n})</tspan></text>`;
+    svg += `<text x="${padL+barLen+6}" y="${y+barH/2+4}" fill="var(--gray-900)">${Math.round(a.avg*10)/10}% <tspan fill="#9db3c9" font-size="10px">(n=${a.n})</tspan></text>`;
   });
   svg += `</svg>`;
   return svg;
@@ -581,13 +581,13 @@ function buildHasilCompareChart(filtered, parameter, periodsInScope, selectedCer
   const H = topPad + rows.length*(barH+gap);
   const maxV = Math.max(useStd?100:1, ...rows.map(metric))*1.35;
   const plotW = W-padL-padR;
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11px;background:#fff;border:1px solid var(--gray-200);border-radius:10px;">`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;">`;
   rows.forEach((r,i)=>{
     const y = topPad + i*(barH+gap);
     const m = metric(r);
     const barLen = (m/maxV)*plotW;
     const color = r.pct!=null ? (r.pct>=100?"#e0554f":r.pct>=80?"#e8a33d":"#3fb27f") : HD_PALETTE[i%HD_PALETTE.length];
-    svg += `<text x="${padL-8}" y="${y+barH/2+4}" text-anchor="end" fill="#1c2733" font-weight="700">${escHtml(r.cerobong)}</text>`;
+    svg += `<text x="${padL-8}" y="${y+barH/2+4}" text-anchor="end" fill="var(--gray-900)" font-weight="700">${escHtml(r.cerobong)}</text>`;
     svg += `<rect x="${padL}" y="${y}" width="${Math.max(2,barLen)}" height="${barH}" rx="6" fill="${color}"/>`;
     const label = useStd ? `${m}%` : `${Math.round(m*100)/100}${r.pct!=null?` &middot; ${r.pct}%BM`:""}`;
     const estW = label.replace(/&\w+;/g,"x").length*6.3;
@@ -595,7 +595,7 @@ function buildHasilCompareChart(filtered, parameter, periodsInScope, selectedCer
     if(xOutside+estW > W-4){
       svg += `<text x="${padL+Math.max(2,barLen)-6}" y="${y+barH/2+4}" text-anchor="end" fill="#fff" font-weight="700">${label}</text>`;
     }else{
-      svg += `<text x="${xOutside}" y="${y+barH/2+4}" fill="#1c2733" font-weight="700">${label}</text>`;
+      svg += `<text x="${xOutside}" y="${y+barH/2+4}" fill="var(--gray-900)" font-weight="700">${label}</text>`;
     }
   });
   const unitNote = `Satuan: ${rows[0].unit}${hasStd?" &middot; %BM = persentase terhadap baku mutu":""}`;
@@ -700,14 +700,14 @@ function buildHasilCorrelationChart(filteredAllParams, periodsInScope, corrParam
   function yForPrimary(v){ return padT+plotH-(v/maxPrimary)*plotH; }
   function yForPct(pct){ return padT+plotH-(pct/100)*plotH; }
 
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11px;background:#fff;border:1px solid var(--gray-200);border-radius:10px;">`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;">`;
   for(let g=0; g<=4; g++){
     const y = padT+plotH-(g/4)*plotH;
-    svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#eef1f4"/>`;
+    svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--gray-200)"/>`;
     svg += `<text x="2" y="${y+4}" fill="${primary.color}">${Math.round(maxPrimary*g/4)}</text>`;
     svg += `<text x="${W-padR+6}" y="${y+4}" fill="#9db3c9">${g*25}%</text>`;
   }
-  periodsInScope.forEach((p,i)=>{ svg += `<text x="${xFor(i)}" y="${H-8}" text-anchor="middle" fill="#7f8fa0">${p}</text>`; });
+  periodsInScope.forEach((p,i)=>{ svg += `<text x="${xFor(i)}" y="${H-8}" text-anchor="middle" fill="var(--gray-500)">${p}</text>`; });
   svg += `<text x="2" y="12" fill="${primary.color}" font-weight="700">${escHtml(primary.param)} (${escHtml(primary.unit)})</text>`;
   svg += `<text x="${W-padR+6}" y="12" text-anchor="end" fill="#9db3c9" font-weight="700">lainnya, persen dari nilai maksimum</text>`;
 
@@ -772,10 +772,10 @@ function hdBuildScatter(pairs, colorA, paramA, paramB, unitA, unitB){
   const rx = (maxX-minX)||1, ry=(maxY-minY)||1;
   function xFor(v){ return pad + ((v-minX)/rx)*(W-pad-14); }
   function yFor(v){ return H-pad - ((v-minY)/ry)*(H-pad-14); }
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:300px;height:auto;display:block;background:#fff;border:1px solid var(--gray-200);border-radius:8px;">`;
-  svg += `<line x1="${pad}" y1="${H-pad}" x2="${W-8}" y2="${H-pad}" stroke="#c8d2db"/><line x1="${pad}" y1="${H-pad}" x2="${pad}" y2="8" stroke="#c8d2db"/>`;
-  svg += `<text x="${pad}" y="${H-8}" font-size="9" fill="#7f8fa0">${escHtml(paramA)} (${escHtml(unitA)})</text>`;
-  svg += `<text x="4" y="16" font-size="9" fill="#7f8fa0" transform="rotate(-90 4 16)">${escHtml(paramB)} (${escHtml(unitB)})</text>`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:300px;height:auto;display:block;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:8px;">`;
+  svg += `<line x1="${pad}" y1="${H-pad}" x2="${W-8}" y2="${H-pad}" stroke="var(--gray-300)"/><line x1="${pad}" y1="${H-pad}" x2="${pad}" y2="8" stroke="var(--gray-300)"/>`;
+  svg += `<text x="${pad}" y="${H-8}" font-size="9" fill="var(--gray-500)">${escHtml(paramA)} (${escHtml(unitA)})</text>`;
+  svg += `<text x="4" y="16" font-size="9" fill="var(--gray-500)" transform="rotate(-90 4 16)">${escHtml(paramB)} (${escHtml(unitB)})</text>`;
   // garis regresi linear y = a + bx, metode kuadrat terkecil (least squares)
   const n = pairs.length, mx=xs.reduce((a,b)=>a+b,0)/n, my=ys.reduce((a,b)=>a+b,0)/n;
   let num=0, den=0; pairs.forEach(p=>{ num+=(p.x-mx)*(p.y-my); den+=(p.x-mx)*(p.x-mx); });

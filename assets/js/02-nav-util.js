@@ -65,6 +65,31 @@ document.getElementById("navMenu").addEventListener("click", e=>{
   setCollapsed(localStorage.getItem("phmSidebarCollapsed")==="1");
 })();
 
+// Toggle tema terang/gelap — atribut data-theme di <html> sudah distempel lebih dulu oleh inline
+// script anti-FOUC di <head> (index.html, jalan sebelum CSS/JS lain), jadi di sini cuma perlu BACA
+// nilai yg sudah ada itu (bukan tentukan ulang dari nol) supaya toggle & stempel awal selalu sinkron.
+// Ikon & label tombol menunjukkan TUJUAN sekali klik (bulan = "pindah ke gelap", matahari = "pindah
+// ke terang"), bukan status tema saat ini — pola yg sama dgn tombol ciutkan sidebar di atas.
+(function(){
+  const btn = document.getElementById("btnThemeToggle");
+  const iconEl = document.getElementById("themeToggleIcon");
+  const labelEl = document.getElementById("themeToggleLabel");
+  if(!btn) return;
+  function applyTheme(theme){
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("phmTheme", theme);
+    const isDark = theme==="dark";
+    iconEl.innerHTML = msIcon(isDark?"sun":"moon", 15);
+    labelEl.textContent = isDark ? "Mode Terang" : "Mode Gelap";
+    btn.title = isDark ? "Ganti ke tema terang" : "Ganti ke tema gelap";
+  }
+  btn.addEventListener("click", ()=>{
+    const current = document.documentElement.getAttribute("data-theme")==="dark" ? "dark" : "light";
+    applyTheme(current==="dark" ? "light" : "dark");
+  });
+  applyTheme(document.documentElement.getAttribute("data-theme")==="dark" ? "dark" : "light");
+})();
+
 function updateMetaLine(){
   const el = document.getElementById("metaLine"); if(!el) return;
   el.textContent = `Semester ${DB.meta.semester} · Tahun ${DB.meta.tahun}`;

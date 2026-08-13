@@ -5,6 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PHM ENV — Emission Sampling Planner &amp; Tracker</title>
 <link rel="icon" type="image/png" href="assets/Pertamina-Logo.png">
+<script>
+// Anti-FOUC: stempel data-theme di <html> SEBELUM CSS/apapun lain dirender, supaya halaman tidak
+// sempat kelihatan terang sekilas lalu "berkedip" ke gelap begitu 02-nav-util.js baru jalan
+// belakangan. Prioritas: preferensi manual tersimpan (localStorage) > preferensi sistem OS/browser
+// (prefers-color-scheme) > terang (default). Logika PERSIS sama dipakai ulang di applyTheme()
+// (02-nav-util.js) supaya toggle di kaki sidebar tetap konsisten dgn stempel awal ini.
+(function(){
+  try{
+    var saved = localStorage.getItem("phmTheme");
+    var theme = saved==="dark"||saved==="light" ? saved : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", theme);
+  }catch(e){ /* localStorage diblokir (mis. mode privat ketat) — biarkan default CSS (terang) */ }
+})();
+</script>
 <link rel="stylesheet" href="assets/css/style.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
@@ -83,6 +97,10 @@
       <div class="navgroup-empty hint" id="navSearchEmpty" style="display:none;">Tidak ada menu yang cocok.</div>
     </nav>
     <div class="sidebar-foot">
+      <button class="theme-toggle" id="btnThemeToggle" type="button" title="Ganti tema terang/gelap">
+        <span class="ms-icon" data-icon="moon" data-size="15" id="themeToggleIcon"></span>
+        <span class="theme-toggle-label" id="themeToggleLabel">Mode Gelap</span>
+      </button>
       <div class="savebadge"><span class="ms-icon" data-icon="hard-drive" data-size="12"></span><span>Data tersimpan di localStorage</span></div>
       <div class="storage-badge" id="storageUsageBadge" title="Ukuran data tersimpan = angka asli (real-time). Kuota browser = asli kalau browser mendukung Storage API, kalau tidak dipakai perkiraan konservatif."></div>
     </div>
@@ -913,7 +931,7 @@
         <h3>6. Kandungan Sulfur (H2S) — Dasar Pengecualian Baku Mutu SO2 <span class="badge b-blue">Pasal 12 Ayat 2b</span></h3>
         <div class="hint" style="margin-top:-6px;">Kenapa Turbin Gas, Heater/Reboiler, dan Glycol Reboiler di PHM tidak diwajibkan memenuhi baku mutu SO2 secara numerik, padahal tabel baku mutu di kartu 2 dan 3 di atas jelas mencantumkan angkanya. Jawabannya ada di Pasal 12 ayat (2) huruf b: sumber emisi tersebut boleh menggunakan kandungan sulfur dalam bahan bakar sebagai baku mutu pengganti, selama kandungan sulfurnya tetap di bawah 0,5% berat. Pemantauan H2S pada fuel gas, dilakukan tiap 6 bulan, adalah cara PHM membuktikan dan menjaga status pengecualian ini tetap berlaku dari waktu ke waktu, bukan sekadar formalitas satu kali.</div>
         <div class="hint" style="margin-top:8px;">Kandungan sulfur diukur melalui parameter <b>H2S (Hidrogen Sulfida)</b> pada titik pengambilan gas umpan bahan bakar (fuel gas supply) tiap site, satu titik per site, bukan per cerobong emisi. Data lengkapnya tersimpan sebagai parameter emisi di <a href="#" data-action="goToPage" data-page="hasildb">Database Hasil Pemantauan</a> dan dapat dianalisis trennya di <a href="#" data-action="goToPage" data-page="hasildashboard">Dashboard Hasil Pemantauan</a>.</div>
-        <div class="section-note" style="margin-top:10px;background:#fff;border-color:var(--gray-200);">
+        <div class="section-note" style="margin-top:10px;background:var(--surface-card);border-color:var(--gray-200);">
           <b>Contoh evaluasi (data terburuk/tertinggi yang pernah tercatat, HCA, S2 2025):</b>
           <ul style="margin:8px 0 0;padding-left:18px;line-height:1.7;">
             <li><b>Kandungan Terukur vs Ambang Batas:</b> hasil pengukuran H2S tertinggi yang pernah tercatat adalah 3,65 &times; 10&#8315;&sup3; %, setara 0,00365% berat, sedangkan ambang batas pada Pasal 12 ayat (2) huruf b adalah 0,5% berat.</li>
@@ -1014,10 +1032,10 @@
         <p class="hint">Angka "MB terpakai" adalah ukuran data asli (real-time, ambil dari data yang benar-benar tersimpan) — bukan prediksi. Angka kuota totalnya baru perkiraan: kalau browser mendukung Storage API, dipakai kuota asli yang dilaporkan browser (biasanya jauh di atas 5 MB); kalau tidak didukung (browser lama, atau dibuka via file:// di sebagian browser), dipakai asumsi konservatif 5 MB supaya peringatan tetap muncul lebih awal, bukan pas sudah mepet.</p>
         <div class="storage-badge storage-badge-riwayat" id="storageUsageBadgeRiwayat"></div>
       </div>
-      <div class="card" style="background:#f7fbfb;border-color:#c9ece8;">
+      <div class="card card-accent-teal">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
           <div>
-            <h3 style="color:#0b6b66;">Snapshot Tersimpan (maks. 5 terakhir)</h3>
+            <h3 class="accent-teal-heading">Snapshot Tersimpan (maks. 5 terakhir)</h3>
             <p class="hint">Dibuat otomatis sebelum aksi besar (generate/hitung ulang jadwal, reset data, import). Bukan undo per-ketikan — untuk itu, gunakan backup manual melalui halaman Data (Import/Export). Setiap snapshot merupakan salinan penuh seluruh data, sehingga apabila localStorage browser terasa penuh (mis. muncul error "exceeded the quota" saat generate jadwal), hapus snapshot lama di sini terlebih dahulu — data titik/tracking/hasil pemantauan/batch <b>tidak</b> ikut terhapus.</p>
           </div>
           <button class="btn small danger" data-action="clearAllSnapshots" style="flex-shrink:0;">Hapus Semua Snapshot</button>
@@ -1033,9 +1051,9 @@
     <!-- DATA -->
     <div class="page" id="page-data">
       <div class="pagehead"><div><h2>Data — Import / Export / Reset</h2><div class="desc">Backup, restore, atau reset seluruh data aplikasi</div></div></div>
-      <div class="card" style="background:#eafaf1;border-color:#3fb27f;border-width:2px;">
-        <h3 style="color:#1f7a4d;">📦 Backup Lengkap — gunakan fitur ini untuk berbagi atau memindahkan data ke perangkat lain</h3>
-        <p class="hint" style="font-weight:600;color:var(--navy-900);">Berisi seluruh data: titik pantau, personil, aturan, batch, jadwal (termasuk yang sudah difinalisasi), tracking, running hour, dan hasil pemantauan — seluruh isi aplikasi ini.</p>
+      <div class="card card-accent-green" style="border-width:2px;">
+        <h3 class="accent-green-heading">📦 Backup Lengkap — gunakan fitur ini untuk berbagi atau memindahkan data ke perangkat lain</h3>
+        <p class="hint" style="font-weight:600;color:var(--heading);">Berisi seluruh data: titik pantau, personil, aturan, batch, jadwal (termasuk yang sudah difinalisasi), tracking, running hour, dan hasil pemantauan — seluruh isi aplikasi ini.</p>
         <div class="toolbar">
           <button class="btn primary" data-action="exportAll">Export Semua Data (.json)</button>
         </div>
@@ -1081,7 +1099,7 @@
       <div class="grid cols-2">
         <div class="card">
           <h3>Template CSV — Titik Pantau</h3>
-          <p class="hint" style="color:#8a5c11;">Pemisah kolom pakai titik-koma (;), bukan koma — supaya field yang isinya daftar (mis. parameter "NOx, CO") tidak ikut kepisah saat dibuka di Excel.</p>
+          <p class="hint accent-amber-text">Pemisah kolom pakai titik-koma (;), bukan koma — supaya field yang isinya daftar (mis. parameter "NOx, CO") tidak ikut kepisah saat dibuka di Excel.</p>
           <p class="hint">Kolom: id;site;kategori;nama;kategoriSumber;regulasi;parameter;parameterCatatan;wajib;frekuensiBulan;tidakBeroperasi;alasanTidakWajib;kapasitas;kapasitasKW;jenisBahanBakar;runningHour;pemantauanTerakhir;prediksiBerikutnya;lastSampling</p>
           <button class="btn small" data-action="downloadTemplatePoints">Download Template Kosong</button>
         </div>
