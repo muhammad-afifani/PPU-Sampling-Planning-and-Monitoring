@@ -285,6 +285,7 @@ function refreshGanttBatchSelect(){
 document.getElementById("ganttView").addEventListener("change", ()=>{ refreshGanttBatchSelect(); renderGantt(); });
 document.getElementById("ganttBatch").addEventListener("change", renderGantt);
 document.getElementById("ganttMode").addEventListener("change", renderGantt);
+document.addEventListener("input", e=>{ if(e.target.id==="spSearch") spApplyFilter(); });
 
 /* =========================================================
    PANDUAN SAMPLING A4 (CETAK)
@@ -828,52 +829,206 @@ function personilChipsHtml(assignedPersonil){
     return `<div style="padding:2px 0;">${escHtml(p.nama)} <span class="muted">(${escHtml(p.role||"-")})</span>${teleponHtml}${ptsHtml}${medpassHtml}</div>`;
   }).join("");
 }
-function buildSiteBriefingHtml(batches){
+/* =========================================================
+   PREVIEW PERSIAPAN PER SITE — panel interaktif (Scheduling Tools)
+   ---------------------------------------------------------
+   Redesain dari versi lama (kartu teks polos, selalu terbuka semua, tanpa cari/filter) supaya
+   sepadan dgn tabel/Gantt di atasnya: kartu per-site collapsible, ringkasan angka, cari nama
+   site/personil, filter "Perlu Perhatian Saja", dan blok Persiapan Keberangkatan yang menonjol.
+   Kontennya TETAP dari fungsi yang sama dgn Panduan Sampling cetak (permitReminderText,
+   bookingResponsibilityText, travelRouteInfo) — cuma wadah tampilannya yang beda, supaya versi
+   layar & versi cetak tidak pernah beda kata.
+========================================================= */
+const SP_STATUS_COLOR = {ok:"#2f9e5b", warn:"#c98a1a", bad:"#c0392b"};
+const SP_STATUS_RANK = {ok:0, warn:1, bad:2};
+function spWorstStatus(...statuses){ return statuses.reduce((w,s)=> SP_STATUS_RANK[s]>SP_STATUS_RANK[w]?s:w, "ok"); }
+// Status 1 personil (dot + warna tiap field) — dipakai bareng oleh daftar "Personil Bertugas" &
+// "Personil yang Berangkat", jadi 1 orang yang sama selalu tampil sama persis di keduanya.
+function personilStatusRow(p){
+  const pts = (p.items.ptsid||{}).exp || "";
+  const medpassExp = (p.items.medpass||{}).exp || "";
+  const teleponStatus = p.telepon ? "ok" : "bad";
+  const ptsStatus = pts ? "ok" : "bad";
+  let medpassStatus = "bad";
+  if(medpassExp){
+    const days = Math.round((new Date(medpassExp)-new Date())/86400000);
+    medpassStatus = days<0 ? "bad" : days<=30 ? "warn" : "ok";
+  }
+  const worst = spWorstStatus(teleponStatus, ptsStatus, medpassStatus);
+  return {
+    id: p.id, nama: p.nama, role: p.role||"-",
+    telepon: p.telepon || "belum diisi", teleponColor: SP_STATUS_COLOR[teleponStatus],
+    pts: pts || "belum diisi", ptsColor: SP_STATUS_COLOR[ptsStatus],
+    medpass: medpassExp ? fmtHariTanggalIndo(medpassExp) : "belum diisi", medpassColor: SP_STATUS_COLOR[medpassStatus],
+    dotColor: SP_STATUS_COLOR[worst], hasIssue: worst!=="ok"
+  };
+}
+function spPersonilRowsHtml(rows){
+  if(!rows.length) return `<div class="hint" style="padding:6px 0;">Belum ada personil ditunjuk — tunjuk di Perencanaan Batch.</div>`;
+  return rows.map(r=>`<div class="sp-person">
+    <span class="sp-dot" style="background:${r.dotColor};"></span>
+    <div class="sp-person-id"><div class="sp-person-name">${escHtml(r.nama)}</div><div class="sp-person-role">${escHtml(r.role)}</div></div>
+    <div class="sp-person-fields">
+      <span class="sp-field">${msIcon("phone",12)}<span style="color:${r.teleponColor};">${escHtml(r.telepon)}</span></span>
+      <span class="sp-field">PTS: <b style="color:${r.ptsColor};">${escHtml(r.pts)}</b></span>
+      <span class="sp-field">Medpass: <b style="color:${r.medpassColor};">${escHtml(r.medpass)}</b></span>
+    </div>
+  </div>`).join("");
+}
+// Titik non-excluded batch ini di 1 site — dipakai utk menentukan site berikutnya yang BENERAN
+// jadi tujuan keberangkatan (lompati site yang seluruh titiknya kebetulan dikeluarkan dari batch),
+// pola sama persis dgn "nextPrintedRow" di buildPrintGuideHtml supaya preview layar & cetak selalu
+// menunjuk site tujuan yang sama.
+function spSiteHasPoints(b, site){
+  const excluded = b.excluded||[];
+  return (b.items||[]).some(id=>{
+    if(excluded.includes(id)) return false;
+    const p = DB.points.find(x=>x.id===id);
+    return p && p.site===site;
+  });
+}
+function spNextVisit(b, idx){
+  for(let j=idx+1;j<(b.schedule||[]).length;j++){
+    const row = b.schedule[j];
+    if(spSiteHasPoints(b, row.site)) return row;
+  }
+  return null;
+}
+// Susun data per-site (independen dari HTML) dari jadwal batch yg lagi tampil di filter Gantt saat
+// ini — 1 site bisa punya >1 "visit" (mis. batch Emisi & Ambient sama-sama singgah, atau overlay
+// 2 batch tim yg sama) makanya visits tetap array, bukan diasumsikan cuma 1x per site.
+function buildSitePreviewData(batches){
   const visitsBySite = {};
   batches.forEach(b=>{
     (b.schedule||[]).forEach((row, idx)=>{
+      if(!spSiteHasPoints(b, row.site)) return;
       (visitsBySite[row.site] = visitsBySite[row.site]||[]).push({b, row, idx});
     });
   });
-  const sites = Object.keys(visitsBySite).sort((a,c)=>{
+  const siteNames = Object.keys(visitsBySite).sort((a,c)=>{
     const ia=MASTER_SITE_ORDER.indexOf(a), ic=MASTER_SITE_ORDER.indexOf(c);
     return (ia<0?99:ia)-(ic<0?99:ic);
   });
-  if(!sites.length) return `<div class="hint" style="padding:10px;">Belum ada jadwal utk ditampilkan — buat &amp; terapkan jadwal dulu di Perencanaan Batch.</div>`;
-  return sites.map(site=>{
+  const sites = siteNames.map(site=>{
     const visits = visitsBySite[site].slice().sort((a,c)=>a.row.start.localeCompare(c.row.start));
-    const visitBlocks = visits.map(({b, row, idx})=>{
+    const personIds = new Set();
+    let hasIssue = false;
+    let earliestPermit = null;
+    const visitData = visits.map(({b, row, idx})=>{
       const rangeLabel = row.start===row.end ? fmtHariTanggalIndo(row.start) : `${fmtHariTanggalIndo(row.start)} s.d. ${fmtHariTanggalIndo(row.end)}`;
-      const nextRow = b.schedule[idx+1];
-      let outboundHtml = "";
+      const personnel = (b.assignedPersonil||[]).map(a=>DB.personil.find(p=>p.id===a.id)).filter(Boolean).map(personilStatusRow);
+      personnel.forEach(p=>{ personIds.add(p.id); if(p.hasIssue) hasIssue = true; });
+      const permit = permitDeadlineFor(site, row.start);
+      if(!earliestPermit || permit.date<earliestPermit.date) earliestPermit = {site, days:permit.days, date:permit.date};
+      const nextRow = spNextVisit(b, idx);
+      let departure = null;
       if(nextRow){
         const route = travelRouteInfo(site, nextRow.site);
         const showPts = !route || route.mode!=="darat";
-        const travelLine = route ? `<b>${escHtml(route.label)}</b>${route.note?" &mdash; "+escHtml(route.note):""}` : `Moda transport belum terdata utk rute ini — cek manual ke tim terkait.`;
-        const equipmentLine = route && route.equipmentNote ? `<div class="hint" style="margin-top:3px;">&#128230; ${escHtml(route.equipmentNote)}</div>` : "";
-        const ptsBlock = showPts
-          ? `<div style="margin-top:5px;"><b>Personil yang Berangkat (perlu dicek PTS):</b>${personilChipsHtml(b.assignedPersonil)}</div>`
-          : `<div class="hint" style="margin-top:5px;">Transport darat — diurus langsung oleh personil PPC ke kantor masing-masing; site tidak perlu koordinasi PTS.</div>`;
-        outboundHtml = `<div class="section-note" style="margin-top:8px;background:#fdf3e3;border-color:#c98a1a;">
-          <b>&#8594; Persiapan Keberangkatan ke ${escHtml(nextRow.site)}</b> &mdash; ${escHtml(fmtHariTanggalIndo(nextRow.start))}
-          <div style="margin-top:3px;">${travelLine}</div>
-          ${equipmentLine}
-          <div style="margin-top:5px;">${bookingResponsibilityText(site, nextRow.site)}</div>
-          ${ptsBlock}
-        </div>`;
+        departure = {
+          toSite: nextRow.site, dateLabel: fmtHariTanggalIndo(nextRow.start),
+          hasTravelInfo: !!route, travelLabel: route?route.label:"", travelNote: route?(route.note||""):"",
+          noTravelInfo: !route,
+          hasEquipmentNote: !!(route && route.equipmentNote), equipmentNote: route?(route.equipmentNote||""):"",
+          bookingHtml: bookingResponsibilityText(site, nextRow.site),
+          showPts, showDaratNote: !showPts,
+          personnel
+        };
       }
-      return `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed var(--gray-200);">
-        <div><b>${rangeLabel}</b> <span class="muted">(${escHtml(b.name)})</span></div>
-        <div style="margin-top:4px;"><b>Personil:</b>${personilChipsHtml(b.assignedPersonil)}</div>
-        <div class="hint" style="margin-top:4px;">${permitReminderText(site, row.start)} Pastikan akomodasi sudah dipesan sebelum kedatangan.</div>
-        ${outboundHtml}
-      </div>`;
-    }).join("");
-    return `<div class="card" style="padding:12px 14px;margin-bottom:10px;">
-      <h3 style="margin-bottom:8px;">${escHtml(site)}</h3>
-      ${visitBlocks}
-    </div>`;
+      return {batchName: b.name, rangeLabel, personnel, permitHtml: permitReminderText(site, row.start), departure};
+    });
+    return {
+      site, visits: visitData,
+      personnelCount: personIds.size, hasIssue,
+      issueCount: visitData.reduce((n,v)=>n+v.personnel.filter(p=>p.hasIssue).length, 0),
+      nextDeparture: visitData.map(v=>v.departure).find(Boolean) || null,
+      nearestPermit: earliestPermit,
+      searchBlob: (site+" "+visitData.flatMap(v=>v.personnel.map(p=>p.nama)).join(" ")).toLowerCase()
+    };
+  });
+  return sites;
+}
+let spExpanded = {}, spFilterIssues = false;
+function spToggleAll(open){
+  document.querySelectorAll("#siteBriefingWrap details[data-site]").forEach(d=>{ d.open = open; spExpanded[d.dataset.site] = open; });
+}
+function spApplyFilter(){
+  const wrap = document.getElementById("siteBriefingWrap");
+  if(!wrap) return;
+  const q = (document.getElementById("spSearch")||{}).value?.trim().toLowerCase() || "";
+  let visible = 0;
+  const cards = wrap.querySelectorAll("[data-site-card]");
+  cards.forEach(card=>{
+    const matchesSearch = !q || card.dataset.search.includes(q);
+    const matchesIssue = !spFilterIssues || card.dataset.hasIssue==="1";
+    const show = matchesSearch && matchesIssue;
+    card.style.display = show ? "" : "none";
+    if(show) visible++;
+  });
+  const total = cards.length;
+  const countEl = document.getElementById("spResultCount");
+  if(countEl) countEl.textContent = total ? (visible===total ? `Menampilkan ${total} site` : `Menampilkan ${visible} dari ${total} site`) : "";
+  const noResultsEl = document.getElementById("spNoResults");
+  if(noResultsEl) noResultsEl.style.display = (total>0 && visible===0) ? "" : "none";
+}
+function spSetFilter(issuesOnly){
+  spFilterIssues = issuesOnly;
+  document.getElementById("spFilterAll").classList.toggle("active", !issuesOnly);
+  document.getElementById("spFilterIssues").classList.toggle("active", issuesOnly);
+  spApplyFilter();
+}
+function buildSiteBriefingHtml(batches){
+  const sites = buildSitePreviewData(batches);
+  if(!sites.length) return {statsHtml:"", bodyHtml:`<div class="hint" style="padding:10px;">Belum ada jadwal utk ditampilkan — buat &amp; terapkan jadwal dulu di Perencanaan Batch.</div>`};
+
+  const totalPersonnel = new Set(sites.flatMap(s=>s.visits.flatMap(v=>v.personnel.map(p=>p.id)))).size;
+  const totalIssues = new Set(sites.flatMap(s=>s.visits.flatMap(v=>v.personnel.filter(p=>p.hasIssue).map(p=>p.id)))).size;
+  const nearest = sites.map(s=>s.nearestPermit).filter(Boolean).sort((a,c)=>a.date.localeCompare(c.date))[0];
+  const statsHtml = `<div class="sp-stats">
+    <div class="sp-stat"><div class="sp-stat-label">Site Dikunjungi</div><div class="sp-stat-value">${sites.length}</div></div>
+    <div class="sp-stat"><div class="sp-stat-label">Personil Bertugas</div><div class="sp-stat-value">${totalPersonnel}</div></div>
+    <div class="sp-stat"><div class="sp-stat-label">Dokumen Perlu Dicek</div><div class="sp-stat-value" style="color:${totalIssues?SP_STATUS_COLOR.warn:'inherit'};">${totalIssues}</div></div>
+    <div class="sp-stat"><div class="sp-stat-label">Deadline Izin Terdekat</div><div class="sp-stat-value sp-stat-value-sm">${nearest?`${escHtml(nearest.site)} &middot; H-${nearest.days} &middot; ${escHtml(fmtHariTanggalIndo(nearest.date))}`:"&ndash;"}</div></div>
+  </div>`;
+
+  const bodyHtml = sites.map(s=>{
+    const wasOpen = spExpanded[s.site];
+    const open = wasOpen===undefined ? true : wasOpen;
+    spExpanded[s.site] = open;
+    const issueBadge = s.hasIssue ? `<span class="sp-issue-badge">${msIcon("triangle-alert",13)}${s.issueCount} personil perlu dicek</span>` : "";
+    const departureBadge = s.nextDeparture ? `<span class="sp-departure-badge">${msIcon("arrow-right",14)}Berangkat ke ${escHtml(s.nextDeparture.toSite)}</span>` : "";
+    const dateRangeLabel = s.visits.length===1 ? s.visits[0].rangeLabel : `${s.visits.length} kunjungan`;
+    const batchTag = s.visits.length===1 ? `<span class="badge b-gray">${escHtml(s.visits[0].batchName)}</span>` : `<span class="badge b-gray">${s.visits.length} batch</span>`;
+
+    const visitsHtml = s.visits.map((v,vi)=>`
+      <div class="sp-visit">
+        ${s.visits.length>1 ? `<div class="sp-visit-head"><b>${v.rangeLabel}</b> <span class="muted">(${escHtml(v.batchName)})</span></div>` : ""}
+        <div class="sp-section-label">${msIcon("users",13)}Personil Bertugas</div>
+        ${spPersonilRowsHtml(v.personnel)}
+        <div class="sp-permit-box">${msIcon("calendar-clock",15)}<div>${v.permitHtml} Pastikan akomodasi sudah dipesan sebelum kedatangan.</div></div>
+        ${v.departure ? `<div class="sp-departure-box">
+          <div class="sp-departure-title">${msIcon("arrow-right",16)}Persiapan Keberangkatan ke ${escHtml(v.departure.toSite)} &mdash; ${escHtml(v.departure.dateLabel)}</div>
+          ${v.departure.hasTravelInfo ? `<div class="sp-departure-line"><b>${escHtml(v.departure.travelLabel)}</b>${v.departure.travelNote?" &mdash; "+escHtml(v.departure.travelNote):""}</div>` : `<div class="sp-departure-line muted">Moda transport belum terdata utk rute ini — cek manual ke tim terkait.</div>`}
+          ${v.departure.hasEquipmentNote ? `<div class="sp-departure-line sp-departure-equipment">${msIcon("package",14)}<span>${escHtml(v.departure.equipmentNote)}</span></div>` : ""}
+          <div class="sp-departure-line">${v.departure.bookingHtml}</div>
+          ${v.departure.showPts ? `<div class="sp-section-label" style="margin-top:10px;">Personil yang Berangkat (perlu dicek PTS)</div>${spPersonilRowsHtml(v.departure.personnel)}` : `<div class="sp-departure-line muted">Transport darat — diurus langsung oleh personil PPC ke kantor masing-masing; site tidak perlu koordinasi PTS.</div>`}
+        </div>` : (vi===s.visits.length-1 ? `<div class="hint" style="margin-top:12px;font-style:italic;">Site akhir dalam rute batch ini — tidak ada keberangkatan lanjutan yang perlu disiapkan.</div>` : "")}
+      </div>`).join("");
+
+    return `<details class="sp-site" data-site="${escHtml(s.site)}" data-site-card data-search="${escHtml(s.searchBlob)}" data-has-issue="${s.hasIssue?1:0}" ${open?"open":""}>
+      <summary class="sp-site-head">
+        ${msIcon("chevron-down",18)}
+        <div class="sp-site-title">
+          <div class="sp-site-name-row"><h3>${escHtml(s.site)}</h3>${batchTag}${issueBadge}</div>
+          <div class="sp-site-meta">${escHtml(dateRangeLabel)} &middot; ${s.personnelCount} personil</div>
+        </div>
+        ${departureBadge}
+      </summary>
+      <div class="sp-site-body">${visitsHtml}</div>
+    </details>`;
   }).join("");
+
+  return {statsHtml, bodyHtml};
 }
 // Ringkasan "hari crew change" per site yang lagi tampil di filter Gantt saat ini — pembanding
 // cepat tanpa harus buka halaman Aturan Site & Rute, sumber datanya tetap dari sana (DB.siteRules).
@@ -907,7 +1062,16 @@ function renderGantt(){
     document.getElementById("ganttWrap").innerHTML = buildDayGridView(rows);
   }
   document.getElementById("scurveWrap").innerHTML = buildSCurveSVG(batches, DB.points, view);
-  document.getElementById("siteBriefingWrap").innerHTML = buildSiteBriefingHtml(batches);
+  renderSitePreview(batches);
+}
+function renderSitePreview(batches){
+  const {statsHtml, bodyHtml} = buildSiteBriefingHtml(batches);
+  document.getElementById("spStatsWrap").innerHTML = statsHtml;
+  document.getElementById("siteBriefingWrap").innerHTML = bodyHtml;
+  document.querySelectorAll("#siteBriefingWrap details[data-site]").forEach(d=>{
+    d.addEventListener("toggle", ()=>{ spExpanded[d.dataset.site] = d.open; });
+  });
+  spApplyFilter();
 }
 function handleScheduleDrop(batchId, rowIdx, newDate){
   const b = DB.batches.find(x=>x.id===batchId); if(!b) return;

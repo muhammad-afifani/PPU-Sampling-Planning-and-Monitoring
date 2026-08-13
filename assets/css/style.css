@@ -736,6 +736,68 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 .pt-pill:hover{border-color:var(--teal-500);background:var(--teal-100);}
 .pt-pill.excluded{background:#fdeceb;border-color:#e0554f;color:#a02a24;text-decoration:line-through;opacity:.85;}
 
+/* Preview Persiapan per Site (Scheduling Tools) — kartu per-site collapsible (native <details>,
+   state buka/tutup jadi otomatis "gratis" dari browser, tidak perlu di-render ulang tiap toggle)
+   + ringkasan angka + cari/filter. Cari & filter TIDAK memicu render ulang (lihat spApplyFilter di
+   08-gantt-print.js) — cuma toggle display tiap kartu via querySelectorAll, supaya state buka/tutup
+   kartu yang sudah diatur user tidak ke-reset tiap kali mengetik di kolom cari. */
+.sp-stats{display:grid;grid-template-columns:repeat(4,1fr);margin:16px 0 20px;border-top:1px solid var(--gray-200);border-bottom:1px solid var(--gray-200);}
+.sp-stat{padding:13px 18px;border-left:1px solid var(--gray-200);}
+.sp-stat:first-child{border-left:none;padding-left:0;}
+.sp-stat-label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#0b6b66;margin-bottom:5px;}
+.sp-stat-value{font-size:25px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--heading);}
+.sp-stat-value-sm{font-size:13.5px;font-weight:700;line-height:1.35;}
+.sp-toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px;}
+.sp-toolbar .search-wrap{flex:1;min-width:200px;max-width:300px;}
+
+.sp-site{border:1px solid var(--gray-200);border-radius:8px;margin-bottom:10px;overflow:hidden;background:var(--surface-card);}
+.sp-site-head{display:flex;align-items:center;gap:12px;padding:13px 16px;cursor:pointer;list-style:none;user-select:none;}
+.sp-site-head::-webkit-details-marker{display:none;}
+.sp-site-head:hover{background:var(--gray-100);}
+.sp-site-head svg{flex-shrink:0;color:var(--teal-500);transition:transform .15s ease;}
+.sp-site:not([open]) .sp-site-head svg{transform:rotate(-90deg);}
+.sp-site-title{flex:1;min-width:0;}
+.sp-site-name-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+.sp-site-name-row h3{margin:0;font-size:16.5px;color:var(--heading);}
+.sp-site-meta{font-size:11.5px;color:var(--gray-500);margin-top:3px;}
+.sp-issue-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#c98a1a;}
+.sp-departure-badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:#0b6b66;white-space:nowrap;flex-shrink:0;}
+
+.sp-site-body{padding:0 16px 16px;border-top:1px solid var(--gray-200);}
+.sp-visit{padding-top:14px;}
+.sp-visit + .sp-visit{margin-top:8px;padding-top:16px;border-top:1px dashed var(--gray-200);}
+.sp-visit-head{font-size:12.5px;margin-bottom:8px;}
+.sp-section-label{display:flex;align-items:center;gap:6px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--gray-500);margin:6px 0 4px;}
+
+.sp-person{display:flex;align-items:center;gap:11px;padding:8px 0;border-bottom:1px solid var(--gray-200);flex-wrap:wrap;}
+.sp-person:last-child{border-bottom:none;}
+.sp-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.sp-person-id{min-width:160px;flex:1 1 170px;}
+.sp-person-name{font-weight:700;font-size:13.5px;}
+.sp-person-role{font-size:11px;color:var(--gray-500);}
+.sp-person-fields{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;}
+.sp-field{display:inline-flex;align-items:center;gap:5px;}
+.sp-field svg{color:var(--gray-500);}
+
+.sp-permit-box{display:flex;gap:9px;align-items:flex-start;margin-top:12px;padding:11px 13px;background:var(--gray-100);border-radius:7px;font-size:12.5px;line-height:1.6;}
+.sp-permit-box svg{flex-shrink:0;margin-top:1px;color:var(--gray-500);}
+
+.sp-departure-box{border:1px solid #e0c07a;background:#fdf3e3;border-radius:7px;padding:14px 16px;margin-top:14px;}
+.sp-departure-title{display:flex;align-items:center;gap:7px;font-weight:700;font-size:14px;color:#8a5c11;margin-bottom:8px;}
+.sp-departure-line{font-size:12.5px;margin-bottom:6px;}
+.sp-departure-line:last-child{margin-bottom:0;}
+.sp-departure-equipment{display:flex;gap:6px;color:#8a5c11;}
+.sp-departure-equipment svg{flex-shrink:0;margin-top:1px;}
+.sp-departure-box .sp-section-label{color:#8a5c11;}
+.sp-departure-box .sp-person{border-bottom-color:color-mix(in srgb, #c98a1a 22%, transparent);}
+:root[data-theme="dark"] .sp-departure-box{background:color-mix(in srgb, #c98a1a 16%, var(--surface-card));border-color:color-mix(in srgb, #c98a1a 45%, var(--surface-card));}
+:root[data-theme="dark"] .sp-departure-title{color:color-mix(in srgb, #c98a1a 60%, white);}
+:root[data-theme="dark"] .sp-departure-equipment{color:color-mix(in srgb, #c98a1a 60%, white);}
+:root[data-theme="dark"] .sp-departure-box .sp-section-label{color:color-mix(in srgb, #c98a1a 60%, white);}
+:root[data-theme="dark"] .sp-issue-badge{color:color-mix(in srgb, #c98a1a 60%, white);}
+:root[data-theme="dark"] .sp-stat-label{color:color-mix(in srgb, #0b6b66 55%, white);}
+:root[data-theme="dark"] .sp-departure-badge{color:color-mix(in srgb, #0b6b66 55%, white);}
+
 /* Papan "Detail Harian" (modal, dibuka dari tombol per-baris site di Gantt) — satu kolom per
    tanggal valid di rentang site itu (kerja + buffer), kartu titik/grup bisa digeser drag-drop
    antar kolom utk override manual dari pembagian rata otomatis. */

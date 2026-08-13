@@ -26,6 +26,8 @@ const ACTIONS = {
   closeModal,
   newBatch, deleteBatch, generateSchedule, recalcSchedule, carryOverBatch, printSamplingGuide, doPrintSamplingGuide, printBeritaAcara, exportTrackingCsv, importTrackingCsv,
   finalizeBatchSchedule, unfinalizeBatchSchedule,
+  expandAllSitePreview:()=>spToggleAll(true), collapseAllSitePreview:()=>spToggleAll(false),
+  spSetFilterAll:()=>spSetFilter(false), spSetFilterIssues:()=>spSetFilter(true),
   togglePlSticky:(t)=>{
     const el = document.getElementById("plStickyBody");
     const collapsed = el.classList.toggle("collapsed");

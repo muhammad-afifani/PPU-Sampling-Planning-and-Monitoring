@@ -418,9 +418,25 @@
           <span class="item"><span class="sw" style="background:#e0554f;opacity:.35"></span> Hari crew change</span>
         </div>
       </div>
-      <div style="margin:16px 0;">
-        <h3 style="margin-bottom:4px;">Preview Persiapan per Site</h3>
-        <div class="hint" style="margin-bottom:10px;">Ringkasan otomatis dari jadwal batch yang sedang tampil di filter di atas: siapa saja yang masuk ke site tsb dan kapan, batas ajukan izin masuk, pengingat akomodasi, dan (untuk site yang jadi titik keberangkatan ke site berikutnya) siapa yang bertanggung jawab memesan transport beserta personil &amp; PTS yang perlu dicek sebelum naik.</div>
+      <div style="margin:24px 0;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+          <div>
+            <h3 style="margin-bottom:4px;">Preview Persiapan per Site</h3>
+            <div class="hint" style="max-width:640px;margin-bottom:0;">Ringkasan otomatis dari jadwal batch yang sedang tampil di filter di atas: siapa saja yang masuk ke site tsb dan kapan, batas ajukan izin masuk, pengingat akomodasi, dan (untuk site yang jadi titik keberangkatan ke site berikutnya) siapa yang bertanggung jawab memesan transport beserta personil &amp; PTS yang perlu dicek sebelum naik.</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-shrink:0;">
+            <button class="btn small" data-action="expandAllSitePreview">Buka Semua</button>
+            <button class="btn small" data-action="collapseAllSitePreview">Tutup Semua</button>
+          </div>
+        </div>
+        <div id="spStatsWrap"></div>
+        <div class="sp-toolbar">
+          <div class="search-wrap"><span class="search-ico">&#128269;</span><input type="text" id="spSearch" placeholder="Cari site atau nama personil..."></div>
+          <button class="chip-toggle active" id="spFilterAll" data-action="spSetFilterAll" type="button">Semua Site</button>
+          <button class="chip-toggle" id="spFilterIssues" data-action="spSetFilterIssues" type="button">Perlu Perhatian Saja</button>
+          <span class="hint" id="spResultCount" style="margin:0;"></span>
+        </div>
+        <div id="spNoResults" class="hint" style="display:none;padding:22px;text-align:center;border:1px dashed var(--gray-200);border-radius:8px;margin-bottom:10px;">Tidak ada site yang cocok dengan pencarian/filter saat ini.</div>
         <div id="siteBriefingWrap"></div>
       </div>
       <div class="card">
