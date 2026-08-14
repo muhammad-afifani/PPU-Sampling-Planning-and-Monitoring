@@ -35,38 +35,6 @@ function rencanaProgressBadge(p, period){
   const m = map[periodOfPointStatus(p, period)];
   return `<span class="badge ${m[0]}">${m[1]}</span>`;
 }
-// Recap "sudah dicek dari mana sampai mana" untuk satu periode — dari milih periode, Master Data
-// diverifikasi, personil ditunjuk, sampai batch & jadwalnya jadi. Murni dihitung ulang tiap
-// render (bukan status tersimpan sendiri) supaya selalu mencerminkan kondisi terkini.
-function renderRencanaChecklist(period, wajibPts, elId){
-  const el = document.getElementById(elId||"rcChecklist"); if(!el) return;
-  const verifiedWajib = wajibPts.filter(p=>verifyStatus(p)==="verified");
-  const pctVerified = wajibPts.length ? Math.round(verifiedWajib.length/wajibPts.length*100) : 100;
-  const verifiedDates = wajibPts.filter(p=>p.lastVerified).map(p=>p.lastVerified).sort();
-  const oldestVerified = verifiedDates[0];
-  const relatedBatches = DB.batches.filter(b=>b.period===period);
-  const anyPersonilAssigned = relatedBatches.some(b=>(b.assignedPersonil||[]).length>0);
-  const anyScheduled = relatedBatches.some(b=>(b.schedule||[]).length>0);
-
-  const steps = [
-    {label:"1. Periode Pemantauan Dipilih", done:true, note:`Periode aktif: ${period}`},
-    {label:"2. Database Titik Pantau Diverifikasi", done: wajibPts.length>0 && verifiedWajib.length===wajibPts.length,
-      note: wajibPts.length
-        ? `${verifiedWajib.length}/${wajibPts.length} titik wajib sudah dicek (${pctVerified}%)${oldestVerified?" · verifikasi tertua: "+fmtDateTimeId(oldestVerified):""}. Cek/tandai di halaman Database Titik Pantau.`
-        : "Belum ada titik wajib pantau untuk periode ini."},
-    {label:"3. Personil Ditunjuk untuk Batch", done: anyPersonilAssigned,
-      note: relatedBatches.length ? (anyPersonilAssigned?"Tim sudah ditunjuk di Perencanaan Batch.":"Batch sudah ada tapi belum ada personil ditunjuk.") : "Belum ada batch untuk periode ini — kirim titik terpilih ke batch di bawah."},
-    {label:"4. Batch Dibuat & Jadwal Diterapkan", done: anyScheduled,
-      note: relatedBatches.length ? (anyScheduled?relatedBatches.length+" batch untuk periode ini, jadwal sudah dibuat.":"Batch ada tapi jadwal belum dibuat — buka Perencanaan Batch.") : "Belum ada batch untuk periode ini."}
-  ];
-  const doneCount = steps.filter(s=>s.done).length;
-  el.innerHTML = `<div class="hint" style="margin-bottom:8px;">${doneCount} dari ${steps.length} langkah selesai untuk periode <b>${escHtml(period)}</b>.</div>`
-    + steps.map(s=>`
-    <div style="display:flex;align-items:flex-start;gap:9px;padding:7px 0;border-bottom:1px solid var(--gray-200);">
-      <span class="badge ${s.done?"b-green":"b-gray"}" style="flex-shrink:0;margin-top:1px;">${s.done?"&#10003;":"&#9675;"}</span>
-      <div><b style="font-size:12.5px;">${escHtml(s.label)}</b><div class="muted" style="font-size:11px;margin-top:1px;">${s.note}</div></div>
-    </div>`).join("");
-}
 function renderRencana(){
   document.getElementById("btnRcTable").classList.toggle("primary", rcView==="table");
   document.getElementById("btnRcCard").classList.toggle("primary", rcView==="card");
@@ -97,11 +65,6 @@ function renderRencana(){
   const all = DB.points.filter(p=>!p.tidakBeroperasi);
   const wajibPts = all.filter(p=>effectiveWajib(p, period));
   const exemptEmg = all.filter(p=>isEmergencyEngine(p) && wajibReason(p, period).type==="emergency-exempt");
-  // Sama seperti di Dashboard — checklist verifikasi cuma menghitung titik yg jatuh tempo periode
-  // ini (isDueThisPeriod), tabel pemilihan titik di bawah TETAP pakai wajibPts polos (tidak
-  // difilter) krn halaman ini memang dipakai utk browse/pilih titik lebih luas, bukan cuma yg
-  // due sekarang.
-  renderRencanaChecklist(period, wajibPts.filter(p=>isDueThisPeriod(p,period)));
 
   let rows = wajibPts.slice();
   if(site) rows = rows.filter(p=>p.site===site);
