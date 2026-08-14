@@ -381,21 +381,30 @@ function buildPrintGuideHtml(includeGantt){
       // Catatan drop peralatan (mis. Bekapai — perlu diangkut ke basket dulu, koordinasi Marine di
       // jetty) — beda baris dari info jam berangkat personil krn ini soal LOGISTIK PERALATAN H-1,
       // bukan jadwal keberangkatan personil itu sendiri.
-      const equipmentNoteHtml = route && route.equipmentNote ? `<div class="pg-transition-note" style="margin-top:4px;">&#128230; <b>Persiapan Peralatan:</b> ${escHtml(route.equipmentNote)}</div>` : "";
+      const equipmentLineHtml = route && route.equipmentNote ? `<div class="pg-transition-line">&#128230; <b>Persiapan Peralatan:</b> ${escHtml(route.equipmentNote)}</div>` : "";
       // Tanggung jawab booking & checklist PTS — logika SAMA PERSIS dgn blok "Persiapan Keberangkatan"
       // di panel Preview Persiapan per Site (buildSiteBriefingHtml), supaya versi cetak & versi layar
       // tidak pernah beda kata. Booking transport selalu site ASAL; PTS cuma ditampilkan kalau moda
       // bukan darat (personil urus sendiri ke kantor PPC-nya utk jalur darat).
       const showPts = !route || route.mode!=="darat";
-      const bookingNoteHtml = `<div class="pg-transition-note" style="margin-top:4px;">${bookingResponsibilityText(row.site, nextPrintedRow ? nextPrintedRow.site : null)}</div>`;
-      const transitPersonilHtml = showPts
-        ? `<div class="pg-transition-note" style="margin-top:4px;"><b>Personil yang Berangkat (perlu dicek PTS):</b>${personilChipsHtml(b.assignedPersonil)}</div>`
-        : `<div class="pg-transition-note" style="margin-top:4px;">Transport darat — diurus langsung oleh personil PPC ke kantor masing-masing; site tidak perlu koordinasi PTS.</div>`;
+      const bookingLineHtml = `<div class="pg-transition-line">${bookingResponsibilityText(row.site, nextPrintedRow ? nextPrintedRow.site : null)}</div>`;
+      // TIDAK mencetak ulang daftar personil di sini (dulu personilChipsHtml(b.assignedPersonil)
+      // dipanggil lagi persis spt di .pg-site-info di atas) — b.assignedPersonil berlaku utk 1 batch
+      // penuh, bukan per-site, jadi "personil yang berangkat" selalu 100% sama dgn "personil di site
+      // ini" yang sudah tercetak di atas tabel titik. Cukup 1 baris pengingat merujuk balik ke sana,
+      // sama spt fix di panel layarnya (lihat komentar personilStatusRow di bawah).
+      const ptsLineHtml = `<div class="pg-transition-line">${showPts ? "Pastikan <b>PTS</b> personil yang bertugas di site ini (lihat kotak di atas) sudah dicek sebelum naik ke moda transport ini." : "Transport darat — diurus langsung oleh personil PPC ke kantor masing-masing; site tidak perlu koordinasi PTS."}</div>`;
+      // SATU box .pg-transition-box (dulu 4 box .pg-transition-note terpisah bertumpuk) — samakan
+      // dgn .sp-departure-box di panel layar: judul lalu baris-baris polos di dalam 1 bingkai,
+      // bukan tiap butir py border/margin sendiri2 yg bikin kesan berantakan.
       const transitionNote = nextPrintedRow ? `<tr><td>
-        <div class="pg-transition-note">&#8594; <b>Pindah ke Site ${escHtml(nextPrintedRow.site)}</b> &mdash; ${escHtml(fmtHariTanggalIndo(nextPrintedRow.start))}. ${travelInfoHtml}</div>
-        ${equipmentNoteHtml}
-        ${bookingNoteHtml}
-        ${transitPersonilHtml}
+        <div class="pg-transition-box">
+          <div class="pg-transition-title">&#8594; Pindah ke Site ${escHtml(nextPrintedRow.site)} &mdash; ${escHtml(fmtHariTanggalIndo(nextPrintedRow.start))}</div>
+          <div class="pg-transition-line">${travelInfoHtml}</div>
+          ${equipmentLineHtml}
+          ${bookingLineHtml}
+          ${ptsLineHtml}
+        </div>
       </td></tr>` : "";
       const rangeLabel = row.start===row.end ? row.start : `${row.start} s.d. ${row.end}`;
       const asg = dailyAssignmentForRow(b, row);
@@ -424,25 +433,30 @@ function buildPrintGuideHtml(includeGantt){
       // supaya tim lapangan & yang menyusun batch berikutnya sama-sama lihat catatannya di kertas,
       // bukan cuma di layar.
       const excludedForSite = dedupeByGroup((b.excluded||[]).map(id=>DB.points.find(p=>p.id===id)).filter(p=>p && p.site===row.site));
-      const excludedNote = excludedForSite.length ? `<div class="pg-site-note pg-site-note-excluded"><b>Tidak Ikut Batch Ini (${excludedForSite.length}):</b> ${excludedForSite.map(p=>{
+      const excludedNote = excludedForSite.length ? `<div class="pg-site-warn"><b>&#9888; Tidak Ikut Batch Ini (${excludedForSite.length}):</b> ${excludedForSite.map(p=>{
         const r = (b.excludeReasons||{})[p.id] || {reason:"batch2", note:""};
         const reasonLabel = EXCLUDE_REASON_LABELS[r.reason] || r.reason;
         return `${escHtml(p.nama)} (${escHtml(reasonLabel)}${r.note?": "+escHtml(r.note):""})`;
       }).join("; ")}</div>` : "";
-      // Batas ajukan izin masuk — H-N mundur dari tanggal mulai site ini (permitLeadDays per site,
-      // diatur di Aturan Site & Rute, default H-2). Cuma pengingat/saran/FYI, bukan constraint jadwal.
-      const permitNote = `<div class="pg-site-note pg-site-note-permit">${permitReminderText(row.site, row.start)} Pastikan akomodasi sudah dipesan sebelum kedatangan.</div>`;
       // Personil yang ditugaskan dicetak ULANG per site (bukan cuma sekali di pg-meta halaman
       // pertama) — dokumen ini dibawa fisik ke lapangan & tiap halaman/site berpotensi
       // difotokopi/dipisah sendiri-sendiri, jadi nomor telepon tetap harus ikut kebawa walau
       // halaman pg-meta-nya tertinggal.
-      const personilNote = `<div class="pg-site-note pg-site-note-personil"><b>Personil di Site Ini:</b>${personilChipsHtml(b.assignedPersonil)}</div>`;
+      const personilLine = `<div class="pg-site-info-row"><b>Personil di Site Ini:</b>${personilChipsHtml(b.assignedPersonil)}</div>`;
+      // Batas ajukan izin masuk — H-N mundur dari tanggal mulai site ini (permitLeadDays per site,
+      // diatur di Aturan Site & Rute, default H-2). Cuma pengingat/saran/FYI, bukan constraint jadwal.
+      const permitLine = `<div class="pg-site-info-row">${permitReminderText(row.site, row.start)} Pastikan akomodasi sudah dipesan sebelum kedatangan.</div>`;
+      const dayDetailLine = row.dayDetailNote ? `<div class="pg-site-info-row"><b>Catatan Saat Sampling:</b> ${escHtml(row.dayDetailNote)}</div>` : "";
+      // SATU box .pg-site-info abu netral (dulu 3 box warna beda2 spt di atas komentar CSS-nya) —
+      // personil ditaruh baris pertama krn dirujuk balik oleh .pg-transition-box di bawah tabel.
       return `<tr><td>
         <div class="pg-site">
           <div class="pg-site-head"><span>Site ${escHtml(row.site)} (${sitePts.length} titik)</span><span>Jadwal: ${escHtml(rangeLabel)}</span></div>
-          ${permitNote}
-          ${personilNote}
-          ${row.dayDetailNote ? `<div class="pg-site-note"><b>Catatan Saat Sampling:</b> ${escHtml(row.dayDetailNote)}</div>` : ""}
+          <div class="pg-site-info">
+            ${personilLine}
+            ${permitLine}
+            ${dayDetailLine}
+          </div>
           ${excludedNote}
           <table class="pg-table">
             <thead><tr><th style="width:16px;">No</th><th>Nama Titik / Cerobong</th><th>Jenis Sumber</th><th>Parameter Wajib</th><th style="width:52px;">Frekuensi</th><th>Kapasitas / Bahan Bakar</th><th style="width:40px;">Selesai</th><th style="width:110px;">Catatan Lapangan</th></tr></thead>
@@ -842,8 +856,10 @@ function personilChipsHtml(assignedPersonil){
 const SP_STATUS_COLOR = {ok:"#2f9e5b", warn:"#c98a1a", bad:"#c0392b"};
 const SP_STATUS_RANK = {ok:0, warn:1, bad:2};
 function spWorstStatus(...statuses){ return statuses.reduce((w,s)=> SP_STATUS_RANK[s]>SP_STATUS_RANK[w]?s:w, "ok"); }
-// Status 1 personil (dot + warna tiap field) — dipakai bareng oleh daftar "Personil Bertugas" &
-// "Personil yang Berangkat", jadi 1 orang yang sama selalu tampil sama persis di keduanya.
+// Status 1 personil (dot + warna tiap field) — dipakai utk daftar "Personil Bertugas". Blok
+// Persiapan Keberangkatan TIDAK mencetak ulang daftar ini (personil yang berangkat = personil yang
+// sama, DB.batches belum punya konsep penugasan per-site) — cukup diingatkan lewat 1 baris teks
+// merujuk balik ke daftar di atas, supaya tidak boros tempat (2x daftar identik persis).
 function personilStatusRow(p){
   const pts = (p.items.ptsid||{}).exp || "";
   const medpassExp = (p.items.medpass||{}).exp || "";
@@ -931,8 +947,7 @@ function buildSitePreviewData(batches){
           noTravelInfo: !route,
           hasEquipmentNote: !!(route && route.equipmentNote), equipmentNote: route?(route.equipmentNote||""):"",
           bookingHtml: bookingResponsibilityText(site, nextRow.site),
-          showPts, showDaratNote: !showPts,
-          personnel
+          showPts, showDaratNote: !showPts
         };
       }
       return {batchName: b.name, rangeLabel, personnel, permitHtml: permitReminderText(site, row.start), departure};
@@ -1011,7 +1026,7 @@ function buildSiteBriefingHtml(batches){
           ${v.departure.hasTravelInfo ? `<div class="sp-departure-line"><b>${escHtml(v.departure.travelLabel)}</b>${v.departure.travelNote?" &mdash; "+escHtml(v.departure.travelNote):""}</div>` : `<div class="sp-departure-line muted">Moda transport belum terdata utk rute ini — cek manual ke tim terkait.</div>`}
           ${v.departure.hasEquipmentNote ? `<div class="sp-departure-line sp-departure-equipment">${msIcon("package",14)}<span>${escHtml(v.departure.equipmentNote)}</span></div>` : ""}
           <div class="sp-departure-line">${v.departure.bookingHtml}</div>
-          ${v.departure.showPts ? `<div class="sp-section-label" style="margin-top:10px;">Personil yang Berangkat (perlu dicek PTS)</div>${spPersonilRowsHtml(v.departure.personnel)}` : `<div class="sp-departure-line muted">Transport darat — diurus langsung oleh personil PPC ke kantor masing-masing; site tidak perlu koordinasi PTS.</div>`}
+          ${v.departure.showPts ? `<div class="sp-departure-line">Pastikan <b>PTS</b> personil di atas sudah dicek sebelum naik ke moda transport ini.</div>` : `<div class="sp-departure-line muted">Transport darat — diurus langsung oleh personil PPC ke kantor masing-masing; site tidak perlu koordinasi PTS.</div>`}
         </div>` : (vi===s.visits.length-1 ? `<div class="hint" style="margin-top:12px;font-style:italic;">Site akhir dalam rute batch ini — tidak ada keberangkatan lanjutan yang perlu disiapkan.</div>` : "")}
       </div>`).join("");
 
