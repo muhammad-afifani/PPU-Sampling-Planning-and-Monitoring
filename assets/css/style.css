@@ -501,8 +501,9 @@ textarea.mono{font-family:var(--font-mono);font-size:11.5px;}
 
 /* Panduan Sampling A4 (cetak) — dibangun di kontainer terpisah yang selalu ada di DOM tapi
    disembunyikan di layar biasa (display:none), lalu ditampilkan HANYA saat mode cetak lewat
-   trik "visibility" (bukan toggle display seluruh app) supaya tata letak sisa halaman tidak
-   perlu diutak-atik bolak-balik. Dirancang ringkas & padat khusus utk kertas A4 potret. */
+   blok @media print di bawah (yang men-display:none-kan .app/#toastStack/#overlay, bukan
+   sebaliknya meng-nolkan #printGuideArea ini). Dirancang ringkas & padat khusus utk kertas A4
+   potret. */
 #printGuideArea{display:none;}
 /* Sama seperti .pg-ba-page (lihat catatan di bawah): dibungkus SATU <table> supaya header
    (judul+meta) & footer ikut TERULANG di setiap halaman cetak kalau isi batch itu meluber
@@ -517,11 +518,21 @@ textarea.mono{font-family:var(--font-mono);font-size:11.5px;}
 .pg-meta div b{display:block;font-size:8.5px;text-transform:uppercase;color:#555;letter-spacing:.03em;}
 .pg-site{page-break-inside:avoid;margin-bottom:10px;border:1px solid #999;border-radius:4px;overflow:hidden;}
 .pg-site-head{background:#fff;padding:4px 7px 4px 9px;font-size:10.5px;font-weight:700;display:flex;justify-content:space-between;border-bottom:1.3px solid #333;border-left:4px solid #a02a24;}
-.pg-site-note{background:#fdeceb;padding:3px 9px;font-size:8.5px;font-weight:400;border-bottom:1px solid #999;border-left:4px solid #a02a24;}
-.pg-site-note-excluded{background:#fdf3e3;border-left-color:#c98a1a;}
-.pg-site-note-permit{background:#eaf1fb;border-left-color:#3d78c9;}
-.pg-site-note-personil{background:#eafaf5;border-left-color:#0ea5a0;}
-.pg-transition-note{background:#fdf3e3;color:#7a5209;padding:5px 9px;font-size:8.5px;font-weight:400;border:1px dashed #c98a1a;border-radius:4px;margin:4px 0 10px;}
+/* SATU box abu netral utk semua info "sekadar perlu tahu" (personil/izin masuk/catatan hari) —
+   sebelumnya tiap butir py sendiri (biru utk izin, teal utk personil, merah muda utk catatan)
+   sehingga 3 warna jenuh berebut perhatian padahal ketiganya sama-sama cuma info, bukan
+   peringatan. Warna kuat sekarang disisakan khusus utk hal yg BENAR2 perlu perhatian:
+   .pg-site-warn (titik dikeluarkan dari batch) & .pg-transition-box (aksi pindah site). */
+.pg-site-info{background:#f6f6f7;padding:4px 9px;font-size:8.5px;font-weight:400;border-bottom:1px solid #999;border-left:4px solid #999;}
+.pg-site-info-row{padding:1.5px 0;}
+.pg-site-warn{background:#fdeceb;color:#a02a24;padding:3px 9px;font-size:8.5px;font-weight:400;border-bottom:1px solid #999;border-left:4px solid #a02a24;}
+/* Samakan persis dgn .sp-departure-box (panel layar Preview Persiapan per Site) — 1 box beraksen
+   kuning tanah berisi judul + baris-baris polos di dalamnya, BUKAN beberapa box .pg-transition-note
+   terpisah bertumpuk (catatan pindah + peralatan + booking + personil masing2 punya border sendiri
+   spt sebelumnya) supaya versi cetak & versi layar sama-sama rapi & konsisten gaya. */
+.pg-transition-box{background:#fdf3e3;color:#7a5209;padding:6px 9px;font-size:8.5px;font-weight:400;border:1px solid #e0c07a;border-radius:4px;margin:4px 0 10px;}
+.pg-transition-title{font-weight:700;font-size:9px;margin-bottom:3px;}
+.pg-transition-line{padding:1.5px 0;}
 .pg-mom-body{padding:7px 10px;font-size:9.5px;line-height:1.5;}
 .pg-mom-body>div{margin-bottom:5px;}
 .pg-mom-body ul{margin:3px 0 0 16px;padding:0;}
@@ -623,15 +634,19 @@ textarea.mono{font-family:var(--font-mono);font-size:11.5px;}
 .pg-gantt-buffer{background:#bfe9e4;}
 .pg-gantt-off{background:#eee;}
 @media print{
-  /* html,body punya background abu-abu (var(--gray-100)) utk tampilan layar biasa aplikasi ini.
-     visibility:hidden pada anak-anaknya TIDAK menghapus cat latar milik body/html itu sendiri,
-     jadi tanpa override ini abu-abu itu tetap jadi kanvas halaman cetak yang sebenarnya, mengintip
-     di balik/celah konten putih #printGuideArea — inilah sumber asli semua keluhan "latar abu-abu"
-     sebelumnya, bukan cuma dari elemen individual seperti .pg-table th atau .pg-site-head saja. */
+  /* html,body punya background abu-abu (var(--gray-100)) utk tampilan layar biasa aplikasi ini. */
   html,body{background:#fff !important;}
-  body *{visibility:hidden;}
-  #printGuideArea, #printGuideArea *{visibility:visible;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  #printGuideArea{display:block;position:absolute;left:0;top:0;width:100%;background:#fff;color:#000;}
+  /* SEBELUMNYA body *{visibility:hidden} + #printGuideArea{position:absolute} — visibility:hidden
+     MENYEMBUNYIKAN elemen tapi TIDAK mengeluarkannya dari alur dokumen, jadi tinggi asli tiap
+     halaman app ini (.app — sidebar + SEMUA 16 .page sekaligus, termasuk tabel-tabel besar di
+     Database Titik Pantau/Hasil Pemantauan yg tetap ada di DOM walau lagi displaynya "none" di
+     layar) tetap dihitung penuh oleh mesin paginasi cetak, menghasilkan puluhan halaman kosong di
+     ekor dokumen (isi Panduan Sampling cuma butuh 4-5 halaman, tapi html sebenarnya "setinggi"
+     jauh lebih dari itu krn .app tetap makan tempat walau tak kelihatan). display:none di bawah ini
+     BENAR-BENAR mengeluarkan .app/#toastStack/#overlay dari alur dokumen (tinggi jadi nol), jadi
+     mesin paginasi cuma menghitung tinggi #printGuideArea yang sebenarnya. */
+  #toastStack, .app, #overlay{display:none !important;}
+  #printGuideArea{display:block;background:#fff;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   @page{size:A4;margin:12mm;}
 }
 
