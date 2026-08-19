@@ -813,6 +813,40 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 :root[data-theme="dark"] .sp-stat-label{color:color-mix(in srgb, #0b6b66 55%, white);}
 :root[data-theme="dark"] .sp-departure-badge{color:color-mix(in srgb, #0b6b66 55%, white);}
 
+/* Transport Arrange (Scheduling Tools) — recap leg antar-site per tim, dikelompokkan Darat vs
+   Laut/Seatruck. 2 warna aksen dipakai konsisten di title+border-left tiap grup: slate utk darat
+   (rutin, dipesan PPC SCI), teal utk laut/seatruck (dipesan ENV Site asal) — beda dari warna
+   kuning tanah .sp-departure-box/.pg-transition-box (itu "aksi butuh perhatian" per 1 site), di
+   sini cuma rekap netral jadi tidak perlu warna "urgent" spt itu. */
+.ta-team{margin-bottom:22px;}
+.ta-team:last-child{margin-bottom:0;}
+.ta-team-head{font-size:15px;font-weight:700;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--gray-200);}
+.ta-group{margin-bottom:16px;}
+.ta-group:last-child{margin-bottom:0;}
+.ta-group-head{display:flex;align-items:baseline;gap:9px;margin-bottom:8px;flex-wrap:wrap;}
+.ta-group-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;}
+.ta-group-sub{font-size:11.5px;color:var(--gray-500);}
+.ta-group-darat .ta-group-title{color:#5b6b7a;}
+.ta-group-air .ta-group-title{color:#0e7490;}
+.ta-group-unknown .ta-group-title{color:var(--amber-500);}
+.ta-leg{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--gray-200);border-left:3px solid var(--gray-300);border-radius:7px;padding:8px 12px;margin-bottom:6px;background:var(--surface-card);}
+.ta-leg:last-child{margin-bottom:0;}
+.ta-group-darat .ta-leg{border-left-color:#5b6b7a;}
+.ta-group-air .ta-leg{border-left-color:#0e7490;}
+.ta-group-unknown .ta-leg{border-left-color:var(--amber-500);border-style:dashed;}
+.ta-leg-date{flex-shrink:0;font-weight:700;font-size:12px;min-width:84px;padding-top:1px;}
+.ta-leg-body{flex:1;min-width:0;}
+.ta-leg-route{font-size:12.5px;margin-bottom:3px;}
+.ta-leg-mode{font-size:11px;color:var(--gray-500);margin-left:2px;}
+.ta-leg-booking{font-size:11.5px;color:var(--gray-500);}
+.ta-leg-note{display:flex;gap:5px;align-items:flex-start;font-size:11px;color:var(--gray-500);margin-top:3px;}
+.ta-leg-note svg{flex-shrink:0;margin-top:1px;}
+.ta-leg-batch{font-size:10.5px;color:var(--gray-500);margin-top:3px;font-style:italic;}
+:root[data-theme="dark"] .ta-group-darat .ta-group-title{color:color-mix(in srgb, #5b6b7a 60%, white);}
+:root[data-theme="dark"] .ta-group-air .ta-group-title{color:color-mix(in srgb, #0e7490 55%, white);}
+:root[data-theme="dark"] .ta-group-darat .ta-leg{border-left-color:color-mix(in srgb, #5b6b7a 55%, var(--surface-card));}
+:root[data-theme="dark"] .ta-group-air .ta-leg{border-left-color:color-mix(in srgb, #0e7490 55%, var(--surface-card));}
+
 /* Papan "Detail Harian" (modal, dibuka dari tombol per-baris site di Gantt) — satu kolom per
    tanggal valid di rentang site itu (kerja + buffer), kartu titik/grup bisa digeser drag-drop
    antar kolom utk override manual dari pembagian rata otomatis. */

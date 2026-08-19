@@ -120,10 +120,6 @@
         </div>
       </details>
       <div class="grid cols-4" id="dashStats"></div>
-      <div class="card" style="margin-top:16px;">
-        <h3>Checklist Kesiapan Periode Ini</h3>
-        <div id="dashChecklist"></div>
-      </div>
       <div class="grid cols-2" style="margin-top:16px;">
         <div class="card">
           <h3>S-Curve Progress (Gabungan)</h3>
@@ -205,10 +201,6 @@
         <button class="btn small" data-action="setRcView" data-view="card" id="btnRcCard">Tampilan Kartu per Site</button>
         <span class="hint" style="align-self:center;margin-left:6px;">Kartu per site menampilkan SEMUA titik (bukan cuma yang wajib) — abu-abu = tidak wajib periode ini. Klik kartu untuk edit di Database Titik Pantau.</span>
       </div>
-      </div>
-      <div class="card">
-        <h3>Checklist Kesiapan Periode Ini</h3>
-        <div id="rcChecklist"></div>
       </div>
       <div class="grid cols-4" id="rcStats" style="margin-bottom:16px;"></div>
       <div class="card">
@@ -438,6 +430,11 @@
         </div>
         <div id="spNoResults" class="hint" style="display:none;padding:22px;text-align:center;border:1px dashed var(--gray-200);border-radius:8px;margin-bottom:10px;">Tidak ada site yang cocok dengan pencarian/filter saat ini.</div>
         <div id="siteBriefingWrap"></div>
+      </div>
+      <div class="card">
+        <h3>Transport Arrange</h3>
+        <div class="hint" style="margin-bottom:10px;">Rekap semua leg perpindahan antar-site dari jadwal batch yang sedang tampil di filter di atas, per tim, diurut tanggal — dipisah Transport Darat (BPN/SPS/HCA, booking oleh PPC SCI) dan Transport Air/Laut &amp; Seatruck (BEKAPAI/CPU/SPU/NPU, booking oleh ENV Site/Site Reps. asal kecuali rute khusus). Termasuk leg keberangkatan dari &amp; kembali ke BPN (Base Office) kalau datanya tersedia.</div>
+        <div id="transportArrangeWrap"></div>
       </div>
       <div class="card">
         <h3>S-Curve (Rencana vs Aktual)</h3>

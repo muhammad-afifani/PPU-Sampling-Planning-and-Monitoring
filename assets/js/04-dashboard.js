@@ -45,14 +45,6 @@ function renderDashboard(){
   });
   document.getElementById("dashWarnings").innerHTML = warn.length? "<ul style='margin:0;padding-left:18px;font-size:12.5px;line-height:1.9;'>"+warn.slice(0,12).map(w=>"<li>"+w+"</li>").join("")+"</ul>" : "<div class='hint'>Tidak ada peringatan aktif.</div>";
 
-  // Checklist "2. Database Titik Pantau Diverifikasi" cuma menghitung titik yang wajib DAN
-  // memang jatuh tempo periode aktif ini (lihat isDueThisPeriod) — titik wajib yg siklusnya
-  // >1 semester (mis. prediksi berikutnya S1 2027) belum perlu diverifikasi sekarang, jadi tidak
-  // ikut menahan checklist ini dari centang hijau. Kartu statistik "Titik Wajib Pantau" dkk di atas
-  // sengaja TIDAK diubah (masih pakai `wajib` polos) krn itu rekap kepatuhan keseluruhan, beda
-  // konteks dgn checklist verifikasi database ini.
-  renderRencanaChecklist(period, wajib.filter(p=>isDueThisPeriod(p,period)), "dashChecklist");
-
   // per site recap
   const sites = [...new Set(pts.map(p=>p.site))];
   let rows = sites.map(s=>{

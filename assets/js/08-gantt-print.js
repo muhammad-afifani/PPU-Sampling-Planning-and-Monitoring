@@ -799,7 +799,7 @@ function permitDeadlineFor(site, startDate){
 // tanggal — sengaja tidak dipakai kata "harus"/"wajib".
 function permitReminderText(site, startDate){
   const permit = permitDeadlineFor(site, startDate);
-  return `<b>Saran Pengajuan Izin Masuk (H-${permit.days}):</b> idealnya sudah diajukan sebelum ${escHtml(fmtHariTanggalIndo(permit.date))} apabila memungkinkan &mdash; sebagai antisipasi kalau jadwal kedatangan ternyata dimajukan.`;
+  return `<b>Saran Pengajuan Entry Permit (H-${permit.days}):</b> idealnya sudah diajukan sebelum ${escHtml(fmtHariTanggalIndo(permit.date))} apabila memungkinkan &mdash; sebagai antisipasi kalau jadwal kedatangan ternyata dimajukan.`;
 }
 // Kalimat tanggung jawab booking transport — dipakai bareng oleh panduan cetak & preview per-site.
 // Diringkas sesuai masukan: cukup sebut siapa yang booking (ENV Site/Site Reps site ASAL), tanpa
@@ -921,10 +921,15 @@ function buildSitePreviewData(batches){
       (visitsBySite[row.site] = visitsBySite[row.site]||[]).push({b, row, idx});
     });
   });
-  const siteNames = Object.keys(visitsBySite).sort((a,c)=>{
-    const ia=MASTER_SITE_ORDER.indexOf(a), ic=MASTER_SITE_ORDER.indexOf(c);
-    return (ia<0?99:ia)-(ic<0?99:ic);
+  // Urutan kartu ikut urutan ASLI jadwal yang sudah dibuat (tanggal kunjungan pertama tiap site),
+  // BUKAN referensi tetap MASTER_SITE_ORDER — supaya kalau urutan rute batch ini beda dari urutan
+  // baku (mis. sudah digeser lewat handleRowReorder di Gantt), kartu di panel preview ini tetap
+  // sinkron dgn urutan yang beneran tampil di Gantt/tabel jadwal di atasnya, bukan urutan lain.
+  const earliestStart = {};
+  Object.keys(visitsBySite).forEach(site=>{
+    earliestStart[site] = visitsBySite[site].reduce((min,v)=> (!min || v.row.start<min) ? v.row.start : min, null);
   });
+  const siteNames = Object.keys(visitsBySite).sort((a,c)=> earliestStart[a].localeCompare(earliestStart[c]));
   const sites = siteNames.map(site=>{
     const visits = visitsBySite[site].slice().sort((a,c)=>a.row.start.localeCompare(c.row.start));
     const personIds = new Set();
@@ -1078,6 +1083,7 @@ function renderGantt(){
   }
   document.getElementById("scurveWrap").innerHTML = buildSCurveSVG(batches, DB.points, view);
   renderSitePreview(batches);
+  document.getElementById("transportArrangeWrap").innerHTML = buildTransportArrangeHtml(batches);
 }
 function renderSitePreview(batches){
   const {statsHtml, bodyHtml} = buildSiteBriefingHtml(batches);
@@ -1087,6 +1093,105 @@ function renderSitePreview(batches){
     d.addEventListener("toggle", ()=>{ spExpanded[d.dataset.site] = d.open; });
   });
   spApplyFilter();
+}
+/* =========================================================
+   TRANSPORT ARRANGE — recap pemesanan transport per tim (Scheduling Tools)
+   ---------------------------------------------------------
+   Rekap SEMUA leg perpindahan antar-site utk batch yg lagi tampil di filter Gantt, dikelompokkan
+   per tim lalu per moda (Darat vs Laut/Seatruck) — supaya siapa urus booking apa & kapan kelihatan
+   di SATU tempat, bukan cuma tersebar per-site di Preview Persiapan per Site di atas. Datanya dari
+   sumber yg SAMA PERSIS dgn Preview & Panduan Cetak (spNextVisit, travelRouteInfo,
+   bookingResponsibilityText) — supaya tidak pernah beda kata antar 3 tempat itu.
+   Leg BPN <-> site pertama/terakhir (berangkat & kembali ke Base Office) ditambahkan otomatis
+   KALAU BPN memang terdaftar di rute tim ybs (DB.routeEmisi/routeAmbient, lihat default-data.js)
+   DAN datanya ada di TRAVEL_ROUTES — tidak dipaksakan/dikarang kalau rutenya belum terdaftar
+   (mis. BPN<->BEKAPAI), supaya recap ini tidak pernah menampilkan info yg belum tervalidasi tim
+   lapangan (lebih baik tidak muncul drpd salah/menyesatkan utk urusan booking transport riil).
+   Booking transport darat (BPN/SPS/HCA) dipesan PPC SCI (sesuai catatan tim lapangan) — beda dari
+   aturan umum bookingResponsibilityText (site asal) yg dipakai laut/seatruck, jadi utk leg darat
+   dipakai route.note (sudah berisi "diatur oleh SCI" di travel-routes.js) bukan fungsi itu.
+========================================================= */
+const TRANSPORT_SITE_LABEL = {SPS:"Jetty Senipah", HCA:"Handil", BPN:"Base Office"};
+function transportSiteLabel(site){
+  const friendly = TRANSPORT_SITE_LABEL[site];
+  return friendly ? `<b>${escHtml(site)}</b> <span class="muted">(${escHtml(friendly)})</span>` : `<b>${escHtml(site)}</b>`;
+}
+function fmtDateDDMMMYYYY(dateStr){
+  const [y,m,d] = dateStr.split("-").map(Number);
+  return String(d).padStart(2,"0")+"-"+MONTH_SHORT_EN[m-1]+"-"+y;
+}
+// Kumpulan leg perpindahan 1 tim, diurut kronologis — leg antar-site asli dari jadwal (spNextVisit,
+// sama persis dgn yg dipakai buildSitePreviewData) + 2 leg bonus opsional ke/dari BPN di ujung rute.
+function buildTransportArrangeLegs(batches, team){
+  const entries = batches.filter(b=>b.team===team).map(b=>({
+    b, sched: (b.schedule||[]).filter(row=>spSiteHasPoints(b, row.site))
+  })).filter(e=>e.sched.length);
+  if(!entries.length) return [];
+  const multiBatch = entries.length>1;
+  const legs = [];
+  entries.forEach(({b, sched})=>{
+    sched.forEach(row=>{
+      const nextRow = spNextVisit(b, b.schedule.indexOf(row));
+      if(!nextRow) return;
+      legs.push({date: nextRow.start, fromSite: row.site, toSite: nextRow.site, route: travelRouteInfo(row.site, nextRow.site), batchName: b.name, multiBatch});
+    });
+    const routeArr = team==="ambient" ? DB.routeAmbient : DB.routeEmisi;
+    if(!(routeArr||[]).includes("BPN")) return;
+    const firstSite = sched[0].site, lastSite = sched[sched.length-1].site;
+    if(firstSite!=="BPN"){
+      const r0 = travelRouteInfo("BPN", firstSite);
+      if(r0) legs.push({date: sched[0].start, fromSite:"BPN", toSite:firstSite, route:r0, batchName:b.name, multiBatch});
+    }
+    if(lastSite!=="BPN"){
+      const r1 = travelRouteInfo(lastSite, "BPN");
+      if(r1) legs.push({date: sched[sched.length-1].end, fromSite:lastSite, toSite:"BPN", route:r1, batchName:b.name, multiBatch});
+    }
+  });
+  legs.sort((a,c)=>a.date.localeCompare(c.date));
+  return legs;
+}
+function transportLegHtml(leg, isDarat){
+  const bookingLine = isDarat
+    ? (leg.route&&leg.route.note ? escHtml(leg.route.note) : "Booking kendaraan diatur oleh PPC SCI.")
+    : bookingResponsibilityText(leg.fromSite, leg.toSite);
+  const modeLabel = leg.route ? escHtml(leg.route.label) : "Info rute belum terdaftar";
+  const extraNote = (!isDarat && leg.route && leg.route.note) ? `<div class="ta-leg-note">${escHtml(leg.route.note)}</div>` : "";
+  const equipNote = leg.route && leg.route.equipmentNote ? `<div class="ta-leg-note">${msIcon("package",12)}<span>${escHtml(leg.route.equipmentNote)}</span></div>` : "";
+  return `<div class="ta-leg">
+    <div class="ta-leg-date">${fmtDateDDMMMYYYY(leg.date)}</div>
+    <div class="ta-leg-body">
+      <div class="ta-leg-route">dari ${transportSiteLabel(leg.fromSite)} menuju ke ${transportSiteLabel(leg.toSite)} <span class="ta-leg-mode">${modeLabel}</span></div>
+      <div class="ta-leg-booking">${bookingLine}</div>
+      ${extraNote}
+      ${equipNote}
+      ${leg.multiBatch ? `<div class="ta-leg-batch">${escHtml(leg.batchName)}</div>` : ""}
+    </div>
+  </div>`;
+}
+function transportGroupHtml(title, subtitle, legs, isDarat, extraClass){
+  if(!legs.length) return "";
+  return `<div class="ta-group ${extraClass}">
+    <div class="ta-group-head"><span class="ta-group-title">${escHtml(title)}</span><span class="ta-group-sub">${escHtml(subtitle)}</span></div>
+    ${legs.map(l=>transportLegHtml(l, isDarat)).join("")}
+  </div>`;
+}
+function buildTransportArrangeHtml(batches){
+  const teams = [["emisi","Tim Emisi"],["ambient","Tim Ambient"]];
+  const blocks = teams.map(([team,label])=>{
+    const legs = buildTransportArrangeLegs(batches, team);
+    if(!legs.length) return "";
+    const darat = legs.filter(l=>l.route && l.route.mode==="darat");
+    const air = legs.filter(l=>l.route && (l.route.mode==="laut"||l.route.mode==="seatruck"));
+    const lain = legs.filter(l=>!darat.includes(l) && !air.includes(l));
+    return `<div class="ta-team">
+      <div class="ta-team-head">${escHtml(label)}</div>
+      ${transportGroupHtml("Transport Darat","Booking kendaraan oleh PPC SCI", darat, true, "ta-group-darat")}
+      ${transportGroupHtml("Transport Air (Laut / Seatruck)","Booking oleh ENV Site/Site Reps. asal, kecuali rute khusus (lihat catatan)", air, false, "ta-group-air")}
+      ${transportGroupHtml("Rute Belum Terdaftar","Belum ada data referensi rute tersimpan — koordinasikan manual ke tim lapangan", lain, false, "ta-group-unknown")}
+    </div>`;
+  }).filter(Boolean);
+  if(!blocks.length) return `<div class="hint" style="padding:10px;">Belum ada jadwal utk ditampilkan — buat &amp; terapkan jadwal dulu di Perencanaan Batch.</div>`;
+  return blocks.join("");
 }
 function handleScheduleDrop(batchId, rowIdx, newDate){
   const b = DB.batches.find(x=>x.id===batchId); if(!b) return;
