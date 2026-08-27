@@ -512,7 +512,10 @@ function recalcScheduleFrom(b, idx, forcedStart){
     // findValidStart). Baris pertama di batch (i===0, tidak lewat cabang ini krn selalu ===idx
     // pada pemanggilan awal) tidak punya "asal" di dalam batch ini.
     const departFromSite = i>0 ? b.schedule[i-1].site : null;
-    let start = (i===idx) ? cursor : findValidStart(row.site, cursor, departFromSite);
+    // ignoreCrewChange nempel di baris yg DITINGGALKAN (i-1), bukan baris ini — override "abaikan
+    // hari crew change" diatur lewat modal Adjust Durasi site tsb (lihat openAdjustDurationModal).
+    const ignoreCrewChange = i>0 && !!b.schedule[i-1].ignoreCrewChange;
+    let start = (i===idx) ? cursor : findValidStart(row.site, cursor, departFromSite, ignoreCrewChange);
     let d = start, counted=0, lastDate=start, iterations=0;
     while(counted < totalNeeded && iterations<730){
       if(!isBlocked(row.site,d)){ counted++; lastDate=d; }

@@ -170,13 +170,18 @@ const ACTIONS = {
     const newWorkDays = Math.max(0, Number(document.getElementById("adjWorkDays").value)||0);
     const newBufferDays = Math.max(0, Number(document.getElementById("adjBufferDays").value)||0);
     const note = document.getElementById("adjNote").value.trim();
+    const ignoreCcEl = document.getElementById("adjIgnoreCrewChange");
     const before = `${row.workDays}h+${row.bufferDays}buf`;
     row.workDays = newWorkDays;
     row.bufferDays = newBufferDays;
     row.adjustNote = note;
+    // Checkbox cuma dirender kalau ada site berikutnya + site ini punya hari crew change diatur
+    // (lihat openAdjustDurationModal) — kalau tidak dirender, ignoreCrewChange lama (kalaupun ada,
+    // sisa dari kondisi lain) TIDAK disentuh sama sekali di sini.
+    if(ignoreCcEl) row.ignoreCrewChange = ignoreCcEl.checked;
     recalcScheduleFrom(b, rowIdx);
     applyScheduleToPoints(b, b.team);
-    logChange(`Durasi site ${row.site} (${b.name}) diubah manual: ${before} → ${newWorkDays}h+${newBufferDays}buf${note?` — "${note}"`:""}`);
+    logChange(`Durasi site ${row.site} (${b.name}) diubah manual: ${before} → ${newWorkDays}h+${newBufferDays}buf${note?` — "${note}"`:""}${ignoreCcEl?(ignoreCcEl.checked?" — abaikan crew change diaktifkan":""):""}`);
     save();
     closeModal();
     renderGantt();
@@ -315,6 +320,10 @@ const ACTIONS = {
     askConfirm(`Kosongkan status, tanggal, dan catatan sampling untuk "${p?p.nama:id}"?`, ()=>{
       const tr = ensureTracking(id);
       tr.samplingStatus = ""; tr.actual = false; tr.dates.actual = ""; tr.samplingNote = "";
+      // p.status ikut dibalikin ke "scheduled" (bukan dibiarkan macet di done/pending/failed
+      // bekas Status Sampling sebelumnya) — biar S-Curve/Dashboard konsisten sama tabel ini
+      // yang baru saja dikosongkan.
+      if(p){ p.actualStart = ""; p.actualEnd = ""; p.status = "scheduled"; }
       logChange(`Status/tanggal/catatan sampling "${p?p.nama:id}" direset`);
       save(); renderTracking();
       toast("Data sampling titik ini dikosongkan.","ok");
@@ -332,6 +341,7 @@ const ACTIONS = {
       filled.forEach(p=>{
         const tr = ensureTracking(p.id);
         tr.samplingStatus = ""; tr.actual = false; tr.dates.actual = ""; tr.samplingNote = "";
+        p.actualStart = ""; p.actualEnd = ""; p.status = "scheduled";
       });
       logChange(`Reset massal status/tanggal/catatan sampling utk ${filled.length} titik (sesuai filter Tracking aktif)`);
       save(); renderTracking();

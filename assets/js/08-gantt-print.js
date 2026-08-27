@@ -10,6 +10,18 @@ function openAdjustDurationModal(batchId, rowIdx){
   const perSiteRatio = rule ? Number(b.team==="emisi"?rule.ratioEmisi:rule.ratioAmbient) : 0;
   const ratio = perSiteRatio>0 ? perSiteRatio : b.ratio;
   const normalWorkDays = row.count>0 ? Math.max(1, Math.ceil(row.count/ratio)) : 0;
+  // Opsi "abaikan crew change" cuma masuk akal kalau ADA site berikutnya utk dipindah ke, DAN
+  // site ini memang punya hari crew change diatur (kalau tidak, tidak ada apa2 utk diabaikan).
+  const nextRow = b.schedule[rowIdx+1];
+  const hasCrewChangeDay = rule && rule.crewChangeDay!=="" && rule.crewChangeDay!=null;
+  const crewChangeField = (nextRow && hasCrewChangeDay) ? `
+    <div class="field" style="margin-top:10px;">
+      <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer;">
+        <input type="checkbox" id="adjIgnoreCrewChange" ${row.ignoreCrewChange?"checked":""}>
+        Abaikan hari crew change ${escHtml(row.site)} (${DOW_LABEL[Number(rule.crewChangeDay)]}) saat pindah ke ${escHtml(nextRow.site)}
+      </label>
+      <div class="hint" style="margin-top:2px;">Kalau dicentang, tanggal pindah ke ${escHtml(nextRow.site)} boleh jatuh tepat di hari crew change ${escHtml(row.site)} (normalnya otomatis digeser maju ke hari valid berikutnya) — pakai kalau transportnya memang sudah dikoordinasikan khusus utk hari itu. Utk ubah hari crew change-nya sendiri secara permanen, buka <b>Aturan Site &amp; Rute</b>.</div>
+    </div>` : "";
   openModal(`
     <h3>Adjust Durasi — ${escHtml(row.site)} <span class="muted" style="font-weight:400;font-size:12px;">(${b.name})</span></h3>
     <div class="hint" style="margin-bottom:10px;">Normalnya <b>${normalWorkDays} hari kerja</b> (${row.count} titik &divide; rasio ${ratio}/hari). Saat ini: <b>${row.workDays} hari kerja + ${row.bufferDays} buffer</b>. Titik pantau tidak berubah — cuma durasinya.</div>
@@ -18,6 +30,7 @@ function openAdjustDurationModal(batchId, rowIdx){
       <div class="field"><label>Buffer (hari)</label><input type="number" min="0" id="adjBufferDays" value="${row.bufferDays}" style="width:90px;"></div>
     </div>
     <div class="field" style="margin-top:10px;"><label>Catatan / Alasan</label><textarea id="adjNote" rows="3" style="width:100%;padding:7px 9px;border:1px solid var(--gray-300);border-radius:6px;" placeholder="mis. dipercepat karena akses terbatas minggu depan">${escHtml(row.adjustNote||"")}</textarea></div>
+    ${crewChangeField}
     <div class="actions">
       <button class="btn ghost" data-action="closeModal">Batal</button>
       <button class="btn primary" data-action="saveAdjustDuration" data-batch-id="${b.id}" data-row-idx="${rowIdx}">Simpan &amp; Terapkan</button>
@@ -682,11 +695,22 @@ function buildDayGridView(rows){
     const color = r.team==="emisi" ? "#0ea5a0" : "#3d78c9";
     const adjustBtn = r.batch ? `<button class="btn small ghost" data-action="openAdjustDuration" data-batch-id="${r.batch.id}" data-row-idx="${r.rowIdx}" title="Adjust durasi manual (percepat/perpanjang) + catatan" style="padding:1px 6px;font-size:10px;">&#9998; Adjust</button>` : "";
     const dayDetailBtn = r.batch ? `<button class="btn small ghost" data-action="openDayDetail" data-batch-id="${r.batch.id}" data-row-idx="${r.rowIdx}" title="Custom manual: titik mana masuk hari mana (drag-drop), atau keluarkan titik dari batch ini" style="padding:1px 6px;font-size:10px;">&#128203; Detail Harian</button>` : "";
+    // Titik site ini (aktif + dikeluarkan) — dihitung sekali di sini, dipakai bareng oleh badge
+    // progress/dikeluarkan di label kiri DAN daftar pill "Titik Pantau" di kolom kanan, supaya
+    // angkanya selalu konsisten (1 sumber data, bukan dihitung ulang beda cara di 2 tempat).
+    const detailPts = r.batch ? allPointsForSite(r.batch, r.site) : [];
+    const excludedIds = r.batch ? (r.batch.excluded||[]) : [];
+    const activeSitePts = detailPts.filter(p=>!excludedIds.includes(p.id));
     // Badge "N dikeluarkan" — ringkasan cepat supaya kelihatan tanpa perlu buka Detail Harian dulu;
     // dedupeByGroup sama seperti daftar di modalnya, biar angkanya konsisten (1 kunjungan
     // ambient-family = 1 hitungan, bukan per parameter).
-    const excludedCount = r.batch ? dedupeByGroup((r.batch.excluded||[]).map(id=>DB.points.find(p=>p.id===id)).filter(p=>p && p.site===r.site)).length : 0;
+    const excludedCount = detailPts.filter(p=>excludedIds.includes(p.id)).length;
     const excludedBadge = excludedCount ? `<span class="badge b-red" style="font-size:9.5px;padding:1px 6px;" title="Titik yang dikeluarkan dari batch ini di site ${escHtml(r.site)} — buka Detail Harian utk lihat/kelola">&#9888; ${excludedCount} dikeluarkan</span>` : "";
+    // Badge progress "X/Y selesai" — X dihitung dari p.status==="done" (disetel dari Tracking BA/CoA
+    // pas "Status Sampling" ditandai "Sudah Disampling", lihat setSamplingStatus di 10-running-hour.js),
+    // Y cuma titik AKTIF (yang dikeluarkan tidak ikut dihitung, itu urusan excludedBadge sendiri).
+    const doneCount = activeSitePts.filter(p=>p.status==="done").length;
+    const progressBadge = activeSitePts.length ? `<span class="badge ${doneCount===activeSitePts.length?"b-green":"b-blue"}" style="font-size:9.5px;padding:1px 6px;" title="Titik aktif di site ${escHtml(r.site)} (batch ini) yang statusnya sudah Sudah Disampling di Tracking BA/CoA">${doneCount}/${activeSitePts.length} selesai</span>` : "";
     const dragHandle = r.batch ? `<span class="route-drag-handle" title="Tarik untuk ubah urutan site di batch ini">&#8942;&#8942;</span>` : "";
     // Tanggal tim pindah dari site INI ke site berikutnya di batch yang sama (kalau ada) — dipakai
     // menandai kolom perpindahan dgn anak panah di bawah, DAN ditulis sbg info singkat di kolom
@@ -695,8 +719,8 @@ function buildDayGridView(rows){
     // manapun digeser drag-drop, tidak perlu disinkronkan manual.
     const nextRow = (r.batch && r.rowIdx!=null) ? r.batch.schedule[r.rowIdx+1] : null;
     const transitionDate = nextRow ? nextRow.start : null;
-    const transitionInfoLine = nextRow ? `<br><span style="color:#c98a1a;">&#8594; Pindah ke ${escHtml(nextRow.site)}: mulai ${nextRow.start} <span class="muted" style="font-size:10px;">(tarik &#8594; di kalender utk geser)</span></span>` : "";
-    html += `<tr><td class="dg-td-label dg-col-sticky" draggable="${r.batch?"true":"false"}" data-batch-id="${r.batch?r.batch.id:""}" data-row-idx="${r.rowIdx}"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${dragHandle}<b>${escHtml(r.site)}</b>${adjustBtn}${dayDetailBtn}${excludedBadge}</div><div class="sub">${escHtml(r.batchName)} &middot; ${r.workDays} hari kerja${r.bufferDays?" + "+r.bufferDays+" buffer":""} &middot; ${r.start} &rarr; ${r.end}${r.adjustNote?`<br><span style="color:#a02a24;">&#9998; ${escHtml(r.adjustNote)}</span>`:""}${transitionInfoLine}</div></td>`;
+    const transitionInfoLine = nextRow ? `<br><span style="color:#c98a1a;">&#8594; Pindah ke ${escHtml(nextRow.site)}: mulai ${nextRow.start} <span class="muted" style="font-size:10px;">(tarik &#8594; di kalender utk geser)</span></span>${r.ignoreCrewChange?` <span class="badge b-amber" style="font-size:9px;padding:0 5px;" title="Diatur lewat tombol Adjust — tanggal pindah boleh jatuh tepat di hari crew change ${escHtml(r.site)}">Crew change diabaikan</span>`:""}` : "";
+    html += `<tr><td class="dg-td-label dg-col-sticky" draggable="${r.batch?"true":"false"}" data-batch-id="${r.batch?r.batch.id:""}" data-row-idx="${r.rowIdx}"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${dragHandle}<b>${escHtml(r.site)}</b>${adjustBtn}${dayDetailBtn}${progressBadge}${excludedBadge}</div><div class="sub">${escHtml(r.batchName)} &middot; ${r.workDays} hari kerja${r.bufferDays?" + "+r.bufferDays+" buffer":""} &middot; ${r.start} &rarr; ${r.end}${r.adjustNote?`<br><span style="color:#a02a24;">&#9998; ${escHtml(r.adjustNote)}</span>`:""}${transitionInfoLine}</div></td>`;
     for(let i=0;i<totalDays;i++){
       const dt = addDays(minDate,i);
       const inRange = dt>=r.start && dt<=r.end;
@@ -730,14 +754,26 @@ function buildDayGridView(rows){
         html += `<td class="${cls}" draggable="true" data-batch-id="${r.batch?r.batch.id:""}" data-row-idx="${r.rowIdx}" data-date="${dt}" style="background:${color};" title="${escHtml(title)}">${Number(dt.slice(8,10))}</td>`;
       }
     }
-    const detailPts = r.batch ? allPointsForSite(r.batch, r.site) : [];
-    const excludedIds = r.batch ? (r.batch.excluded||[]) : [];
+    // Pill diwarnai per status (done/failed, lihat p.status di 10-running-hour.js) supaya "sudah
+    // berapa dari berapa" (progressBadge di atas) bisa langsung ditelusuri titik mana saja tanpa
+    // buka Detail Harian. Yg dikeluarkan dgn alasan "batch2" ditandai "&rarr; Batch 2" tersendiri
+    // (alasan lain — notdue/tbc — tetap coret polos spt sebelumnya) — cukup jawab spesifik yg
+    // ditanya ("yg masuk ke batch 2 itu apa saja"), tidak perlu rincian semua alasan di sini.
     const pillsHtml = detailPts.map(p=>{
       const excl = excludedIds.includes(p.id);
       const siblings = AMBIENT_FAMILY.includes(p.kategori) ? DB.points.filter(x=>schedulingGroupKey(x)===schedulingGroupKey(p)) : [p];
       const suffix = siblings.length>1 ? ` (${siblings.length} parameter: ${siblings.map(s=>NONEMISI_LABEL[s.kategori]||s.kategori).join(", ")})` : "";
       const action = excl?"konfirmasi bisa disampling lagi":"tandai TIDAK bisa disampling periode ini";
-      return `<span class="pt-pill${excl?" excluded":""}" data-action="toggleExcludePoint" data-batch-id="${r.batch.id}" data-point-id="${p.id}" title="Klik untuk ${action}${suffix?" — semua parameter di titik ini ikut":""}">${escHtml(p.nama)}${escHtml(suffix)}</span>`;
+      let statusCls = "", reasonTag = "";
+      if(excl){
+        const reason = ((r.batch.excludeReasons||{})[p.id]||{}).reason;
+        if(reason==="batch2") reasonTag = ` <span class="pt-pill-tag tag-batch2">&rarr; Batch 2</span>`;
+      } else if(p.status==="done"){
+        statusCls = " done";
+      } else if(p.status==="failed"){
+        statusCls = " failed";
+      }
+      return `<span class="pt-pill${excl?" excluded":""}${statusCls}" data-action="toggleExcludePoint" data-batch-id="${r.batch.id}" data-point-id="${p.id}" title="Klik untuk ${action}${suffix?" — semua parameter di titik ini ikut":""}">${escHtml(p.nama)}${escHtml(suffix)}${reasonTag}</span>`;
     }).join("");
     html += `<td class="dg-td-detail">${pillsHtml || "-"}</td></tr>`;
   });

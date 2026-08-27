@@ -182,9 +182,13 @@ function isCrewChange(site, dateStr){
 // DITINGGALKAN (departFromSite, opsional — kosong utk site pertama tanpa asal), BUKAN di site yang
 // dituju. "Hari Terhold" (site benar-benar tutup/shutdown) beda lagi — itu tetap dicek di site
 // tujuan sendiri (isBlocked), karena itu soal site-nya tutup, bukan soal transportasinya.
-function findValidStart(site, fromDateStr, departFromSite){
+// ignoreCrewChange (opsional): override manual per-transisi dari modal Adjust Durasi ("Abaikan
+// Hari Crew Change") — dipakai kalau tim sudah koordinasi khusus shg transportasi tetap bisa
+// jalan meski hari itu jadwal rotasi kru site asal. isBlocked (Hari Terhold) TETAP dihormati
+// walau ignoreCrewChange aktif — itu soal site tujuan tutup total, bukan hal yg bisa dikompromi.
+function findValidStart(site, fromDateStr, departFromSite, ignoreCrewChange){
   let d = fromDateStr, iterations = 0;
-  while((isBlocked(site,d) || (departFromSite && isCrewChange(departFromSite,d))) && iterations < 730){ d = addDays(d,1); iterations++; }
+  while((isBlocked(site,d) || (departFromSite && !ignoreCrewChange && isCrewChange(departFromSite,d))) && iterations < 730){ d = addDays(d,1); iterations++; }
   return d;
 }
 function daysBetweenInclusive(start,end){
