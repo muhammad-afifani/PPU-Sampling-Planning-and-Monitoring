@@ -750,6 +750,13 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 .pt-pill{display:inline-block;padding:1px 7px;margin:1px 3px 1px 0;border-radius:10px;font-size:10.5px;cursor:pointer;background:var(--gray-100);border:1px solid var(--gray-300);color:var(--gray-900);}
 .pt-pill:hover{border-color:var(--teal-500);background:var(--teal-100);}
 .pt-pill.excluded{background:#fdeceb;border-color:#e0554f;color:#a02a24;text-decoration:line-through;opacity:.85;}
+/* Titik AKTIF (belum/tidak dikeluarkan) diwarnai per p.status — beda dari .excluded (coret,
+   dikeluarkan dari batch) krn "failed" di sini tetap bagian batch, cuma belum kesampaian
+   disampling; lihat progressBadge (X/Y selesai) yg dihitung dari warna hijau ini juga. */
+.pt-pill.done{background:#eafaf1;border-color:#3fb27f;color:#1c7a4f;}
+.pt-pill.failed{background:#fdeceb;border-color:#e0554f;color:#a02a24;}
+.pt-pill-tag{display:inline-block;font-size:8.5px;font-weight:700;margin-left:3px;padding:0 4px;border-radius:4px;vertical-align:middle;}
+.pt-pill-tag.tag-batch2{background:#fbeacb;color:#8a5c11;}
 
 /* Preview Persiapan per Site (Scheduling Tools) — kartu per-site collapsible (native <details>,
    state buka/tutup jadi otomatis "gratis" dari browser, tidak perlu di-render ulang tiap toggle)

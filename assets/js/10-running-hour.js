@@ -280,13 +280,23 @@ document.addEventListener("change", e=>{
     const id=e.target.dataset.id;
     const t = ensureTracking(id);
     t.samplingStatus = e.target.value;
+    const p = DB.points.find(x=>x.id===id);
     if(e.target.value==="sampled"){
       t.actual = true;
       if(!t.dates.actual) t.dates.actual = todayStr();
-      const p = DB.points.find(x=>x.id===id);
-      if(p){ p.actualStart = p.actualStart||t.dates.actual; p.actualEnd = t.dates.actual; }
+      if(p){ p.actualStart = p.actualStart||t.dates.actual; p.actualEnd = t.dates.actual; p.status = "done"; }
     } else {
+      // Status Sampling ini SATU-SATUNYA tempat p.status (dipakai S-Curve/Dashboard) disinkron
+      // dari hasil eksekusi lapangan — sebelumnya cuma DB.tracking[id] yang keupdate, p.status
+      // dibiarkan macet di "scheduled" walau sudah ditandai selesai/gagal di sini, jadi S-Curve
+      // tidak pernah menghitungnya. "Direncanakan Batch Berikutnya" = masih di-plan, cuma
+      // ditunda (Hold) — SAMA seperti titik yang di-exclude manual dgn alasan batch2 (lihat
+      // applyScheduleToPoints). "Tidak Disampling, Sebab Lain" = genuinely gagal periode ini.
       t.actual = false;
+      if(p){
+        p.actualStart = ""; p.actualEnd = "";
+        p.status = e.target.value==="deferred" ? "pending" : e.target.value==="other" ? "failed" : "scheduled";
+      }
     }
     save(); renderTracking();
   }
@@ -295,7 +305,7 @@ document.addEventListener("change", e=>{
     const t = ensureTracking(id);
     t.dates.actual = e.target.value;
     const p = DB.points.find(x=>x.id===id);
-    if(p && e.target.value){ p.actualStart = p.actualStart||e.target.value; p.actualEnd = e.target.value; }
+    if(p && e.target.value){ p.actualStart = p.actualStart||e.target.value; p.actualEnd = e.target.value; p.status = "done"; }
     save(); renderTracking();
   }
   if(e.target.dataset.action==="setSamplingNote"){
