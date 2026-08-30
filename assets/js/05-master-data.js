@@ -25,6 +25,39 @@ function dayCountGroupKey(p){
   if(p.kategori==="emisi" && normKS(p.kategoriSumber)==="FLARE" && DB.siteRules[p.site]?.flareOneDay) return p.site+"::FLARE";
   return schedulingGroupKey(p);
 }
+// Kelompokkan titik jadi "grup TAMPILAN" pakai schedulingGroupKey yang sama dgn di atas — dulu
+// cuma dipakai utk hitung hari kerja, sekarang dipakai juga utk daftar/tabel/cetak supaya
+// ambient-family di lokasi fisik yang sama (mis. "Kompleks Gunung Utara" ambient + kebisingan)
+// tampil SATU baris, bukan 1 baris per parameter (dari lapangan: kelihatan spt duplikat/bug &
+// bikin total titik pantau seolah dobel, padahal cuma 1 lokasi dgn beberapa parameter). DB.points
+// TIDAK diubah/digabung sama sekali — tetap N record independen (status/verifikasi/prediksi/riwayat
+// per parameter tidak hilang), ini murni transformasi tampilan. Dipakai di Database Titik Pantau
+// (tree & flat), cetak Daftar Titik Pantau, dan Berita Acara.
+function groupPointsForDisplay(pts){
+  const map = new Map();
+  pts.forEach(p=>{
+    const key = schedulingGroupKey(p);
+    if(!map.has(key)) map.set(key, []);
+    map.get(key).push(p);
+  });
+  return [...map.values()];
+}
+// Render 1 baris per anggota grup (masing2 diawali tag kategori kecil) kalau grupnya >1 anggota —
+// supaya kolom yang NILAINYA beda per parameter (Progress/Wajib/Prediksi/Verifikasi/Aksi) tetap
+// jelas "punya siapa" walau sekarang numpuk jadi 1 baris tabel. Grup 1 anggota (titik emisi biasa,
+// atau ambient-family yang kebetulan sendirian di lokasi itu) render APA ADANYA, tanpa tag —
+// tidak ada yang berubah secara visual dari sebelumnya.
+// Kalau SEMUA anggota kebetulan menghasilkan tampilan PERSIS SAMA (mis. 4 parameter di lokasi yang
+// sama-sama belum diverifikasi/masih "Hold") — cukup ditulis SEKALI + jumlah anggotanya, bukan
+// ditumpuk 4x isinya identik persis (cuma bikin baris makin tinggi tanpa nambah info baru).
+function groupStackHtml(group, renderFn){
+  if(group.length<=1) return renderFn(group[0]);
+  const rendered = group.map(renderFn);
+  if(rendered.every(h=>h===rendered[0])){
+    return `<div class="ms-stack-same">${rendered[0]}<span class="muted" style="font-size:9.5px;margin-left:4px;white-space:nowrap;">(${group.length} parameter)</span></div>`;
+  }
+  return `<div class="ms-stack">${group.map((p,i)=>`<div class="ms-stack-row"><span class="badge ${NONEMISI_BADGE[p.kategori]||"b-gray"} ms-stack-tag">${escHtml(NONEMISI_LABEL[p.kategori]||p.kategori)}</span><div class="ms-stack-val">${rendered[i]}</div></div>`).join("")}</div>`;
+}
 // Pengelompokan tree "Site -> Kategori Sumber" untuk titik emisi. Prioritas (paling spesifik
 // menang duluan): kapasitas kecil > Gas Engine (termasuk kompresor gas berkode GEK/1-U-xxxx) >
 // Turbin (gabungan compressor & generator) > Flare/Heater/Glycol Reboiler > Emergency/Diesel
@@ -257,12 +290,19 @@ function renderMasterTree(rows){
   sites.forEach(site=>{
     const sitePts = bySite[site];
     const expanded = activeFilter || masterExpanded.has(site);
-    const doneCount = sitePts.filter(p=>p.status==="done").length;
-    const wajibCount = sitePts.filter(p=>effectiveWajib(p)).length;
+    // Dihitung per GRUP (lokasi fisik), bukan per record mentah — 1 lokasi ambient+kebisingan
+    // dihitung 1 titik di sini, konsisten dgn baris tabel di bawah yang sekarang juga digabung
+    // (lihat groupPointsForDisplay) — supaya angka "N titik" tidak lagi kelihatan dobel dari
+    // seharusnya. "wajib" = grup yg SALAH SATU anggotanya wajib (1 anggota wajib = tetap perlu
+    // dikunjungi); "selesai" = grup yg SEMUA anggotanya sudah done (baru benar2 tuntas semua
+    // parameter di lokasi itu).
+    const siteGroups = groupPointsForDisplay(sitePts);
+    const doneCount = siteGroups.filter(g=>g.every(p=>p.status==="done")).length;
+    const wajibCount = siteGroups.filter(g=>g.some(p=>effectiveWajib(p))).length;
     html += `<div class="tree-site">
       <div class="tree-head" data-action="toggleMasterGroup" data-key="${escHtml(site)}">
         <span class="tree-caret">${expanded?"&#9660;":"&#9654;"}</span>
-        <b>${site}</b> <span class="muted" style="color:#9db3c9;">— ${sitePts.length} titik · ${wajibCount} wajib · ${doneCount} selesai</span>
+        <b>${site}</b> <span class="muted" style="color:#9db3c9;">— ${siteGroups.length} titik · ${wajibCount} wajib · ${doneCount} selesai</span>
       </div>`;
     if(expanded){
       const bySub = {};
@@ -272,36 +312,46 @@ function renderMasterTree(rows){
         const subKey = site+"::"+sg;
         const subExpanded = activeFilter || masterExpanded.has(subKey);
         const pts = bySub[sg];
+        // Titik ambient-family di lokasi (site+nama) yang sama digabung jadi 1 grup tampilan —
+        // 1 baris tabel per grup, bukan 1 baris per parameter (lihat groupPointsForDisplay).
+        // Dihitung sekali di sini (dipakai jumlah di judul subgrup MAUPUN baris tabel di bawah)
+        // supaya angkanya konsisten walau subgrup lagi diciutkan/dibuka.
+        const ptGroups = groupPointsForDisplay(pts);
         html += `<div class="tree-sub">
           <div class="tree-subhead" data-action="toggleMasterGroup" data-key="${escHtml(subKey)}">
             <span class="tree-caret">${subExpanded?"&#9660;":"&#9654;"}</span>
-            ${escHtml(sg)} <span class="muted">(${pts.length} titik)</span>
+            ${escHtml(sg)} <span class="muted">(${ptGroups.length} titik)</span>
           </div>`;
         if(subExpanded){
           html += `<table class="tree-table"><thead><tr>
             <th style="width:26px;">Progres</th><th>Nama / Spesifikasi</th><th>Parameter Wajib Pantau</th>
             <th style="width:90px;">${rhColumnLabel(currentPeriodStr())}</th><th style="width:150px;">Status</th><th style="width:150px;white-space:nowrap;">Prediksi</th><th style="width:130px;">${VERIF_TH_HTML}</th><th style="width:120px;"></th>
           </tr></thead><tbody>`;
-          pts.forEach(p=>{
-            const specLine = specLineFor(p);
-            const statusCell = wajibBadgeHtml(p);
+          ptGroups.forEach(group=>{
+            const p0 = group[0];
+            const specLine = specLineFor(p0);
             // Grup gabungan (Turbin/Gas Engine/Emergency/Ambient) mencakup lebih dari satu jenis
-            // sumber asli — tampilkan tag kecil biar tetap kelihatan jenis aslinya apa.
-            const subTag = (p.kategori==="emisi"
-              ? (p.kategoriSumber ? `<span class="badge b-gray" style="margin-left:5px;font-size:9.5px;">${escHtml(p.kategoriSumber)}</span>` : "")
-              : `<span class="badge ${NONEMISI_BADGE[p.kategori]||"b-gray"}" style="margin-left:5px;font-size:9.5px;">${escHtml(NONEMISI_LABEL[p.kategori]||p.kategori)}</span>`)
-              + (p.groupOverride ? `<span class="badge b-amber" style="margin-left:3px;font-size:9.5px;" title="Grup dipindah manual, otomatis harusnya: ${escHtml(autoSubgroupOf(p))}">dipindah manual</span>` : "");
+            // sumber asli — tampilkan tag kecil biar tetap kelihatan jenis aslinya apa. Kalau
+            // beberapa titik digabung jadi 1 baris (mis. Ambient+Kebisingan lokasi sama), tampilkan
+            // SEMUA kategori anggotanya di sini sekaligus (bukan cuma anggota pertama) — ini
+            // satu-satunya tempat "parameter apa saja" terlihat, krn baris per-parameter terpisah
+            // sudah tidak ada lagi.
+            const subTag = group.length>1
+              ? group.map(p=>`<span class="badge ${NONEMISI_BADGE[p.kategori]||"b-gray"}" style="margin-left:5px;font-size:9.5px;">${escHtml(NONEMISI_LABEL[p.kategori]||p.kategori)}</span>`).join("")
+              : (p0.kategori==="emisi"
+                  ? (p0.kategoriSumber ? `<span class="badge b-gray" style="margin-left:5px;font-size:9.5px;">${escHtml(p0.kategoriSumber)}</span>` : "")
+                  : `<span class="badge ${NONEMISI_BADGE[p0.kategori]||"b-gray"}" style="margin-left:5px;font-size:9.5px;">${escHtml(NONEMISI_LABEL[p0.kategori]||p0.kategori)}</span>`)
+                + (p0.groupOverride ? `<span class="badge b-amber" style="margin-left:3px;font-size:9.5px;" title="Grup dipindah manual, otomatis harusnya: ${escHtml(autoSubgroupOf(p0))}">dipindah manual</span>` : "");
             html += `<tr>
-              <td style="padding-left:34px;">${pointStatusBadge(p)}</td>
-              <td><b>${escHtml(p.nama)}</b>${subTag}${specLine?`<div class="muted" style="font-size:10.5px;">${escHtml(specLine)}</div>`:""}</td>
-              <td>${escHtml(p.parameter||"-")}${p.parameterCatatan?`<div class="muted" style="font-size:10px;">${escHtml(p.parameterCatatan)}</div>`:""}</td>
-              <td class="muted">${(()=>{const v=rhYearValue(p,currentPeriodStr()); return v!=null?v:"-";})()}</td>
-              <td>${statusCell}</td>
-              <td style="white-space:nowrap;">${prediksiCellHtml(p)}</td>
-              <td>${verifyCellHtml(p)}</td>
+              <td style="padding-left:34px;">${groupStackHtml(group, p=>pointStatusBadge(p))}</td>
+              <td><b>${escHtml(p0.nama)}</b>${subTag}${specLine?`<div class="muted" style="font-size:10.5px;">${escHtml(specLine)}</div>`:""}</td>
+              <td>${groupStackHtml(group, p=>escHtml(p.parameter||"-")+(p.parameterCatatan?`<div class="muted" style="font-size:10px;">${escHtml(p.parameterCatatan)}</div>`:""))}</td>
+              <td class="muted">${(()=>{const v=rhYearValue(p0,currentPeriodStr()); return v!=null?v:"-";})()}</td>
+              <td>${groupStackHtml(group, p=>wajibBadgeHtml(p))}</td>
+              <td style="white-space:nowrap;">${groupStackHtml(group, p=>prediksiCellHtml(p))}</td>
+              <td>${groupStackHtml(group, p=>verifyCellHtml(p))}</td>
               <td style="text-align:right;white-space:nowrap;">
-                <button class="btn small" data-action="editPoint" data-id="${p.id}">Edit</button>
-                <button class="btn small danger" data-action="deletePoint" data-id="${p.id}">Hapus</button>
+                ${groupStackHtml(group, p=>`<button class="btn small" data-action="editPoint" data-id="${p.id}">Edit</button> <button class="btn small danger" data-action="deletePoint" data-id="${p.id}">Hapus</button>`)}
               </td>
             </tr>`;
           });
@@ -317,22 +367,34 @@ function renderMasterTree(rows){
 // Kolom Tampilan Tabel Datar didefinisikan sbg data (bukan markup statis) supaya sebagian bisa
 // disembunyikan/ditampilkan lewat "Atur Kolom" tanpa menduplikasi logika render-nya. Nama Titik &
 // Aksi dikunci (locked:true) — identitas baris & tombol Edit/Hapus, tidak masuk akal disembunyikan.
+// groupVaries:true = nilai kolom ini BEDA per parameter (ambient/kebisingan/dst di lokasi yang
+// sama bisa punya parameter/status/wajib/prediksi/verifikasi/aksi masing2 sendiri) — dipakai
+// renderMasterFlat menumpuk isinya per anggota grup (lihat groupStackHtml). Kolom tanpa flag ini
+// dianggap SAMA utk semua anggota grup (site/nama sesuai definisi schedulingGroupKey; grup/sumber,
+// kapasitas, bahan bakar, RH cuma relevan/terisi di titik emisi jadi otomatis sama krn ambient-
+// family tidak pernah punya nilai itu; batch nyaris selalu sama krn dijadwalkan bareng 1 kunjungan)
+// — cukup diambil dari anggota pertama grup, tidak perlu ditumpuk berulang.
 const MASTER_FLAT_COLUMNS = [
   {key:"site", label:"Site", locked:false, th:()=>"Site", td:"", cell:p=>p.site},
+  // Bukan groupVaries: nilainya (NONEMISI_LABEL[kategori]) persis sama dgn tag kategori yg sudah
+  // ditambahkan groupStackHtml, jadi ditumpuk malah keliatan dobel ("Ambient Udara" 2x). Kolom
+  // "Grup / Sumber" di sebelah sudah menyebut semua kategori tergabung, cukup diambil dari
+  // anggota pertama grup.
   {key:"jenis", label:"Jenis Pantau", locked:false, th:()=>"Jenis Pantau", td:"", cell:p=>`<span class="badge b-gray">${escHtml(monitoringTypeLabel(p))}</span>`},
   {key:"nama", label:"Nama Titik", locked:true, th:()=>"Nama Titik", td:"", cell:p=>escHtml(p.nama)},
   {key:"grup", label:"Grup / Sumber", locked:false, th:()=>"Grup / Sumber", td:'class="muted" style="font-size:11.5px;"', cell:p=>`${escHtml(subgroupOf(p))}${p.kategori==="emisi"&&p.kategoriSumber?`<div style="font-size:10px;">${escHtml(p.kategoriSumber)}</div>`:""}`},
   {key:"kapasitas", label:"Kapasitas", locked:false, th:()=>"Kapasitas", td:'class="muted" style="font-size:11px;"', cell:p=>escHtml(p.kapasitas||"-")},
   {key:"bahanBakar", label:"Bahan Bakar", locked:false, th:()=>"Bahan Bakar", td:'class="muted" style="font-size:11px;"', cell:p=>escHtml(p.jenisBahanBakar||"-")},
-  {key:"parameter", label:"Parameter Wajib", locked:false, th:()=>"Parameter Wajib", td:'style="font-size:11.5px;"', cell:p=>escHtml(p.parameter||"-")},
+  {key:"parameter", label:"Parameter Wajib", locked:false, th:()=>"Parameter Wajib", td:'style="font-size:11.5px;"', cell:p=>escHtml(p.parameter||"-"), groupVaries:true},
+  {key:"periodePantau", label:"Periode Pantau", locked:false, th:()=>"Periode Pantau", td:'class="muted" style="font-size:11px;white-space:nowrap;"', cell:p=>escHtml(frekuensiTextFor(p)), groupVaries:true},
   {key:"rh", label:"RH/Tahun", locked:false, th:period=>rhColumnLabel(period), td:'class="muted"', cell:(p,period)=>{ const v=rhYearValue(p,period); return v!=null?v:"-"; }},
-  {key:"progress", label:"Progress", locked:false, th:()=>"Progress", td:"", cell:p=>pointStatusBadge(p)},
-  {key:"wajib", label:"Wajib", locked:false, th:()=>"Wajib", td:"", cell:p=>wajibBadgeHtml(p)},
-  {key:"prediksi", label:"Prediksi", locked:false, th:()=>"Prediksi", td:'style="white-space:nowrap;"', cell:p=>prediksiCellHtml(p)},
-  {key:"verifikasi", label:"Verifikasi", locked:false, th:()=>VERIF_TH_HTML, td:"", cell:p=>verifyCellHtml(p)},
+  {key:"progress", label:"Progress", locked:false, th:()=>"Progress", td:"", cell:p=>pointStatusBadge(p), groupVaries:true},
+  {key:"wajib", label:"Wajib", locked:false, th:()=>"Wajib", td:"", cell:p=>wajibBadgeHtml(p), groupVaries:true},
+  {key:"prediksi", label:"Prediksi", locked:false, th:()=>"Prediksi", td:'style="white-space:nowrap;"', cell:p=>prediksiCellHtml(p), groupVaries:true},
+  {key:"verifikasi", label:"Verifikasi", locked:false, th:()=>VERIF_TH_HTML, td:"", cell:p=>verifyCellHtml(p), groupVaries:true},
   {key:"batch", label:"Batch", locked:false, th:()=>"Batch", td:'class="muted" style="font-size:11px;"', cell:p=>escHtml(batchNameOf(p.batchId))},
   {key:"aksi", label:"Aksi", locked:true, th:()=>"Aksi", td:'style="white-space:nowrap;"', cell:p=>`<button class="btn small" data-action="editPoint" data-id="${p.id}">Edit</button>
-      <button class="btn small danger" data-action="deletePoint" data-id="${p.id}">Hapus</button>`},
+      <button class="btn small danger" data-action="deletePoint" data-id="${p.id}">Hapus</button>`, groupVaries:true},
 ];
 function masterHiddenCols(){ return DB.meta.masterHiddenCols || []; }
 function masterVisibleColumns(){
@@ -342,9 +404,13 @@ function masterVisibleColumns(){
 function renderMasterFlat(rows){
   const period = currentPeriodStr();
   const cols = masterVisibleColumns();
+  // Sama seperti tree view: titik ambient-family di lokasi yang sama digabung jadi 1 baris tabel
+  // (lihat groupPointsForDisplay) — kolom yang nilainya beda per parameter (groupVaries) ditumpuk
+  // di dalam sel yang sama, bukan bikin baris tabel terpisah lagi per parameter.
+  const groups = groupPointsForDisplay(rows);
   document.getElementById("masterTable").innerHTML = `
     <thead><tr>${cols.map(c=>`<th>${c.th(period)}</th>`).join("")}</tr></thead>
-    <tbody>${rows.map(p=>`<tr>${cols.map(c=>`<td ${c.td}>${c.cell(p,period)}</td>`).join("")}</tr>`).join("")}</tbody>`;
+    <tbody>${groups.map(group=>`<tr>${cols.map(c=>`<td ${c.td}>${c.groupVaries ? groupStackHtml(group, p=>c.cell(p,period)) : c.cell(group[0],period)}</td>`).join("")}</tr>`).join("")}</tbody>`;
 }
 // Modal "Atur Kolom" — checkbox per kolom yang bisa disembunyikan, diterapkan LANGSUNG tiap
 // dicentang/dikosongkan (bukan tombol "Terapkan" terpisah) supaya langsung kelihatan efeknya di
@@ -397,8 +463,11 @@ function renderMaster(){
   }
   const verifiedCount = DB.points.filter(p=>verifyStatus(p)==="verified").length;
   const staleCount = DB.points.filter(p=>verifyStatus(p)==="stale").length;
-  document.getElementById("masterCount").innerHTML = `${rows.length} dari ${DB.points.length} titik ditampilkan &middot; `
-    + `<b>${verifiedCount}</b> dari ${DB.points.length} titik sudah dicek`
+  // "Titik" di sini dihitung per lokasi (grup ambient-family digabung, konsisten dgn tabel di
+  // atasnya) supaya tidak kelihatan dobel; "parameter" tetap per record karena verifikasi memang
+  // dilakukan per parameter (1 lokasi ambient bisa punya sebagian parameter sudah dicek, sebagian belum).
+  document.getElementById("masterCount").innerHTML = `${groupPointsForDisplay(rows).length} dari ${groupPointsForDisplay(DB.points).length} titik ditampilkan &middot; `
+    + `<b>${verifiedCount}</b> dari ${DB.points.length} parameter sudah dicek`
     + (staleCount ? ` &middot; <span style="color:var(--amber-500);font-weight:700;">${staleCount} berubah sejak terakhir dicek</span>` : "");
   }catch(err){
     console.error("renderMaster error:", err);
