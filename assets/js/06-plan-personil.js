@@ -196,30 +196,35 @@ function buildRencanaPrintHtml(period, site, mode){
 
   const printedAt = new Date().toLocaleString("id-ID", {dateStyle:"long", timeStyle:"short"});
   const totalEmisi = pts.filter(p=>p.kategori==="emisi").length;
-  const totalAmbient = pts.length - totalEmisi;
+  // Titik ambient-family (ambient/kebisingan/kebauan/getaran) di lokasi yang sama dihitung SATU
+  // titik, bukan per parameter — konsisten dgn Database Titik Pantau (groupPointsForDisplay),
+  // supaya "Total Titik" di sini tidak kelihatan dobel dibanding yang di layar.
+  const totalAmbient = groupPointsForDisplay(pts.filter(p=>p.kategori!=="emisi")).length;
 
   const siteBlocks = sites.map(s=>{
     const sitePts = bySite[s].slice().sort((a,b)=>{
       const gi = subgroupOrderIdx(a)-subgroupOrderIdx(b);
       return gi!==0 ? gi : a.nama.localeCompare(b.nama);
     });
-    const wajibCount = sitePts.filter(p=>effectiveWajib(p, period)).length;
-    const rowsHtml = sitePts.map((p,i)=>{
-      const spec = specLineFor(p) || [p.kapasitas, p.jenisBahanBakar].filter(Boolean).join(", ") || "-";
+    const groups = groupPointsForDisplay(sitePts);
+    const wajibCount = groups.filter(g=>g.some(p=>effectiveWajib(p, period))).length;
+    const rowsHtml = groups.map((group,i)=>{
+      const p0 = group[0];
+      const spec = specLineFor(p0) || [p0.kapasitas, p0.jenisBahanBakar].filter(Boolean).join(", ") || "-";
       return `<tr>
         <td>${i+1}</td>
-        <td><span class="badge b-gray">${escHtml(monitoringTypeLabel(p))}</span></td>
-        <td><b>${escHtml(p.nama)}</b></td>
-        <td class="muted" style="font-size:8.5px;">${escHtml(subgroupOf(p))}${p.kategori==="emisi"&&p.kategoriSumber?`<div>${escHtml(p.kategoriSumber)}</div>`:""}</td>
+        <td><span class="badge b-gray">${escHtml(monitoringTypeLabel(p0))}</span></td>
+        <td><b>${escHtml(p0.nama)}</b></td>
+        <td class="muted" style="font-size:8.5px;">${escHtml(subgroupOf(p0))}${p0.kategori==="emisi"&&p0.kategoriSumber?`<div>${escHtml(p0.kategoriSumber)}</div>`:""}</td>
         <td>${escHtml(spec)}</td>
-        <td>${escHtml(p.parameter||"-")}</td>
-        <td>${wajibBadgeHtml(p, period)}</td>
-        <td>${pointStatusBadge(p)}</td>
-        <td style="white-space:nowrap;">${prediksiCellHtml(p, period)}</td>
+        <td>${groupStackHtml(group, p=>escHtml(p.parameter||"-"))}</td>
+        <td>${groupStackHtml(group, p=>wajibBadgeHtml(p, period))}</td>
+        <td>${groupStackHtml(group, p=>pointStatusBadge(p))}</td>
+        <td style="white-space:nowrap;">${groupStackHtml(group, p=>prediksiCellHtml(p, period))}</td>
       </tr>`;
     }).join("");
     return `<div class="pg-site">
-      <div class="pg-site-head"><span>Site ${escHtml(s)} (${sitePts.length} titik${mode==="all"?`, ${wajibCount} wajib periode ini`:""})</span></div>
+      <div class="pg-site-head"><span>Site ${escHtml(s)} (${groups.length} titik${mode==="all"?`, ${wajibCount} wajib periode ini`:""})</span></div>
       <table class="pg-table">
         <thead><tr><th style="width:16px;">No</th><th style="width:70px;">Jenis Pantau</th><th>Nama Titik</th><th style="width:110px;">Grup / Sumber</th><th style="width:90px;">Spesifikasi</th><th>Parameter Wajib</th><th style="width:110px;">Wajib Periode Ini</th><th style="width:70px;">Status</th><th style="width:80px;">Prediksi</th></tr></thead>
         <tbody>${rowsHtml}</tbody>
@@ -237,7 +242,7 @@ function buildRencanaPrintHtml(period, site, mode){
         <div class="sub" style="text-align:right;">Dicetak ${escHtml(printedAt)}</div>
       </div>
       <div class="pg-meta">
-        <div><b>Total Titik</b>${pts.length} titik</div>
+        <div><b>Total Titik</b>${totalEmisi+totalAmbient} titik</div>
         <div><b>Titik Emisi</b>${totalEmisi} titik</div>
         <div><b>Titik Ambient</b>${totalAmbient} titik (Ambient/Kebisingan/Kebauan/Getaran)</div>
         <div><b>Jumlah Site</b>${sites.length} site</div>
