@@ -101,8 +101,17 @@
         <span class="ms-icon" data-icon="moon" data-size="12" id="themeToggleIcon"></span>
         <span class="theme-toggle-label" id="themeToggleLabel">Mode Gelap</span>
       </button>
-      <div class="savebadge"><span class="ms-icon" data-icon="hard-drive" data-size="12"></span><span>Data tersimpan di localStorage</span></div>
-      <div class="storage-badge" id="storageUsageBadge" title="Ukuran data tersimpan = angka asli (real-time). Kuota browser = asli kalau browser mendukung Storage API, kalau tidak dipakai perkiraan konservatif."></div>
+      <div class="storage-collapsible closed" id="storageCollapsible">
+        <button class="storage-toggle" id="btnStorageToggle" type="button" title="Tampilkan/sembunyikan info penyimpanan localStorage">
+          <span class="ms-icon" data-icon="hard-drive" data-size="12"></span>
+          <span>Penyimpanan</span>
+          <span class="ms-icon storage-toggle-chevron" data-icon="chevron-down" data-size="11"></span>
+        </button>
+        <div class="storage-detail">
+          <div class="savebadge"><span class="ms-icon" data-icon="hard-drive" data-size="12"></span><span>Data tersimpan di localStorage</span></div>
+          <div class="storage-badge" id="storageUsageBadge" title="Ukuran data tersimpan = angka asli (real-time). Kuota browser = asli kalau browser mendukung Storage API, kalau tidak dipakai perkiraan konservatif."></div>
+        </div>
+      </div>
     </div>
   </div>
 
