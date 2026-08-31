@@ -65,22 +65,6 @@ document.getElementById("navMenu").addEventListener("click", e=>{
   setCollapsed(localStorage.getItem("phmSidebarCollapsed")==="1");
 })();
 
-// Info penyimpanan localStorage di kaki sidebar — diciutkan default (lihat .closed di HTML) supaya
-// tidak terus2an makan tempat; klik utk buka/tutup, preferensi terakhir diingat spt ciutkan sidebar
-// di atas (juga preferensi tampilan murni, bukan bagian data yg di-export/restore).
-(function(){
-  const wrap = document.getElementById("storageCollapsible");
-  const toggleBtn = document.getElementById("btnStorageToggle");
-  if(!wrap || !toggleBtn) return;
-  function setOpen(open){
-    wrap.classList.toggle("closed", !open);
-    toggleBtn.title = open ? "Sembunyikan info penyimpanan localStorage" : "Tampilkan info penyimpanan localStorage";
-    localStorage.setItem("phmStorageInfoOpen", open ? "1" : "0");
-  }
-  toggleBtn.addEventListener("click", ()=> setOpen(wrap.classList.contains("closed")));
-  setOpen(localStorage.getItem("phmStorageInfoOpen")==="1");
-})();
-
 // Toggle tema terang/gelap — atribut data-theme di <html> sudah distempel lebih dulu oleh inline
 // script anti-FOUC di <head> (index.html, jalan sebelum CSS/JS lain), jadi di sini cuma perlu BACA
 // nilai yg sudah ada itu (bukan tentukan ulang dari nol) supaya toggle & stempel awal selalu sinkron.
