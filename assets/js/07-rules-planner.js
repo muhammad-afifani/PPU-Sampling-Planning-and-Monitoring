@@ -410,6 +410,12 @@ function applyScheduleToPoints(b, team){
   const excluded = b.excluded||[];
   b.items.forEach(id=>{
     const p = DB.points.find(x=>x.id===id); if(!p) return;
+    // Titik yg SEBELUM baris ini dijalankan sudah tercatat sbg bagian batch ini (bukan baru
+    // masuk/pindah dari batch lain) — dipakai di bawah utk membedakan "jadwal batch ini cuma
+    // di-adjust/digeser" (jangan sentuh status hasil eksekusi lapangan) dari "titik ini baru
+    // dijadwalkan ke batch ini" (wajar direset ke scheduled, termasuk retry titik gagal/pending
+    // dari batch lama ke batch susulan).
+    const samebatch = p.batchId===b.id;
     p.batchId = b.id; p.team = team;
     if(excluded.includes(id)){
       // Ditandai "tidak bisa disampling periode ini" — lepas dari jadwal aktif tapi tetap
@@ -418,7 +424,15 @@ function applyScheduleToPoints(b, team){
       return;
     }
     const row = b.schedule.find(r=>r.site===p.site);
-    p.status = "scheduled";
+    // applyScheduleToPoints dipanggil ulang tiap jadwal batch ini di-generate/di-adjust/digeser
+    // (Adjust Durasi, drag-drop, Jalankan Ulang Jadwal Site Ini, dst) — kalau titik ini SUDAH ada
+    // di batch ini sebelumnya DAN statusnya sudah final hasil eksekusi lapangan (done/failed, dari
+    // Tracking BA/CoA), JANGAN diturunkan balik ke "scheduled" cuma krn tanggal/durasi jadwalnya
+    // diubah. Kalau tidak, badge "X/Y selesai" di Scheduling Tools bisa kelihatan hilang/salah
+    // walau titik itu sebenarnya sudah disampling (data di Tracking BA/CoA sendiri tetap benar,
+    // cuma p.status di sini yg ke-reset keliru — baru "kepulihkan" lagi kalau statusnya diubah-ubah
+    // manual di Tracking BA/CoA, karena itu yang nulis ulang p.status="done").
+    if(!samebatch || (p.status!=="done" && p.status!=="failed")) p.status = "scheduled";
     if(row){ p.planStart = row.start; p.planEnd = row.end; }
     ensureTracking(id).planned = true;
   });

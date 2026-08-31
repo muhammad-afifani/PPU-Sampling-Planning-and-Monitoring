@@ -158,6 +158,13 @@ const ACTIONS = {
     if(masterExpanded.has(key)) masterExpanded.delete(key); else masterExpanded.add(key);
     renderMaster();
   },
+  // Tombol manual "Refresh" di Scheduling Tools — semua kolom di halaman ini (progress badge,
+  // S-Curve, Site Preview, Transport Arrange) sudah dihitung ULANG dari DB.points/DB.batches
+  // tiap kali renderGantt() jalan (bukan disimpan/di-cache terpisah), jadi ini murni memanggil
+  // ulang render-nya. Ditambahkan sbg jaring pengaman/tombol "paksa muat ulang" kalau tampilan
+  // sempat kelihatan tidak sesuai — juga berguna kalau ada perubahan status dari halaman lain
+  // (mis. Tracking BA/CoA) yang belum kepakai di layar ini krn belum sempat pindah halaman.
+  refreshGanttPage:()=>{ renderGantt(); renderMaster(); toast("Scheduling Tools dimuat ulang.","ok"); },
   openAdjustDuration:(t)=>{ openAdjustDurationModal(t.dataset.batchId, Number(t.dataset.rowIdx)); },
   openDayDetail:(t)=>{ openDayDetailModal(t.dataset.batchId, Number(t.dataset.rowIdx)); },
   resetDayOverrides:(t)=>{ resetDayOverrides(t.dataset.batchId, Number(t.dataset.rowIdx)); },
