@@ -19,7 +19,8 @@
   }catch(e){ /* localStorage diblokir (mis. mode privat ketat) — biarkan default CSS (terang) */ }
 })();
 </script>
-<link rel="stylesheet" href="assets/css/style.css">
+<!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
+<link rel="stylesheet" href="assets/css/style.css?v=202609010643">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -1136,27 +1137,32 @@
 <input type="file" id="hiddenCsvFile" accept=".csv" style="display:none;">
 <div id="printGuideArea"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="assets/vendor/qrcode-generator.js"></script>
+<!-- Semua file lokal (CSS di <head> + script di bawah ini) diberi "?v=<timestamp>" SAMA supaya
+     browser tidak nyangkut di cache lama pas file-nya diupdate (pernah bikin user lihat versi
+     lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
+     ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
+     (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
+<script src="assets/vendor/qrcode-generator.js?v=202609010643"></script>
 
-<script src="assets/data/default-data.js"></script>
-<script src="assets/data/brand-assets.js"></script>
-<script src="assets/data/travel-routes.js"></script>
-<script src="assets/js/00-icons.js"></script>
-<script src="assets/js/01-state.js"></script>
-<script src="assets/js/02-nav-util.js"></script>
-<script src="assets/js/03-period-logic.js"></script>
-<script src="assets/js/04-dashboard.js"></script>
-<script src="assets/js/05-master-data.js"></script>
-<script src="assets/js/06-plan-personil.js"></script>
-<script src="assets/js/07-rules-planner.js"></script>
-<script src="assets/js/08-gantt-print.js"></script>
-<script src="assets/js/09-tracking-map.js"></script>
-<script src="assets/js/10-running-hour.js"></script>
-<script src="assets/js/11-berita-acara.js"></script>
-<script src="assets/js/12-data-page.js"></script>
-<script src="assets/js/13-hasil-db.js"></script>
-<script src="assets/js/14-hasil-dashboard.js"></script>
-<script src="assets/js/15-simulasi-h2s.js"></script>
-<script src="assets/js/16-actions-init.js"></script>
+<script src="assets/data/default-data.js?v=202609010643"></script>
+<script src="assets/data/brand-assets.js?v=202609010643"></script>
+<script src="assets/data/travel-routes.js?v=202609010643"></script>
+<script src="assets/js/00-icons.js?v=202609010643"></script>
+<script src="assets/js/01-state.js?v=202609010643"></script>
+<script src="assets/js/02-nav-util.js?v=202609010643"></script>
+<script src="assets/js/03-period-logic.js?v=202609010643"></script>
+<script src="assets/js/04-dashboard.js?v=202609010643"></script>
+<script src="assets/js/05-master-data.js?v=202609010643"></script>
+<script src="assets/js/06-plan-personil.js?v=202609010643"></script>
+<script src="assets/js/07-rules-planner.js?v=202609010643"></script>
+<script src="assets/js/08-gantt-print.js?v=202609010643"></script>
+<script src="assets/js/09-tracking-map.js?v=202609010643"></script>
+<script src="assets/js/10-running-hour.js?v=202609010643"></script>
+<script src="assets/js/11-berita-acara.js?v=202609010643"></script>
+<script src="assets/js/12-data-page.js?v=202609010643"></script>
+<script src="assets/js/13-hasil-db.js?v=202609010643"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202609010643"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202609010643"></script>
+<script src="assets/js/16-actions-init.js?v=202609010643"></script>
 </body>
 </html>
