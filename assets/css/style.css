@@ -215,25 +215,14 @@ nav .navbtn.hidden-by-search{display:none;}
 .theme-toggle:active{background:color-mix(in srgb, var(--ms-text) 14%, transparent);}
 .sidebar.collapsed .theme-toggle{justify-content:center;padding:4px;width:28px;}
 .sidebar.collapsed .theme-toggle-label{display:none;}
-.savebadge{display:inline-flex;align-items:center;gap:6px;font-size:11px;opacity:.6;margin-bottom:6px;}
-/* Indikator sisa kapasitas localStorage — diciutkan default (klik tombol utk buka) supaya tidak
-   terus2an makan tempat di kaki sidebar yang sudah padat menu; masih bisa dibuka kapan saja utk
-   lihat trennya sebelum benar2 mentok error (atau lihat versi selalu-terbuka di halaman Riwayat,
-   storage-badge-riwayat di bawah). Warna berubah bertahap sesuai ambang (lihat JS); lebar bar-fill
-   dianimasikan via transition supaya "mengisi" tiap kali angkanya update, bukan cuma pop langsung
-   ke lebar akhirnya. */
-.storage-collapsible{margin-top:2px;}
-.storage-toggle{display:flex;align-items:center;gap:6px;width:100%;padding:2px 0;border:none;background:none;cursor:pointer;font:inherit;font-size:11px;color:var(--ms-text);opacity:.6;text-align:left;}
-.storage-toggle:hover{opacity:.9;}
-.storage-toggle-chevron{margin-left:auto;}
-.storage-toggle-chevron svg{transition:transform .2s ease;}
-.storage-collapsible.closed .storage-toggle-chevron svg{transform:rotate(-90deg);}
-.storage-collapsible.closed .storage-detail{display:none;}
-.storage-detail{margin-top:6px;}
+/* Indikator sisa kapasitas localStorage TIDAK ditampilkan lagi di kaki sidebar (dulu ada, sempat
+   dibikin collapsible, tapi tetap dirasa mengganggu/tidak konsisten tampilnya) — cukup dilihat di
+   halaman Riwayat & Restore (storage-badge-riwayat di bawah), dekat fitur bersihkan snapshot yang
+   memang jadi tindak lanjutnya. Aturan .storage-badge di bawah masih dipakai elemen itu (class
+   dibagi bersama), bukan sisa yang tidak terpakai. */
 .storage-badge .bar-track{width:100%;height:6px;background:var(--ms-neutral-300);margin-top:3px;overflow:hidden;}
 .storage-badge .bar-fill{height:100%;transition:width 1.2s cubic-bezier(.16,1,.3,1);}
 .storage-badge span{display:block;font-size:11px;opacity:.55;margin-top:4px;}
-.sidebar.collapsed .storage-collapsible{display:none;}
 
 .storage-badge-riwayat{margin-top:4px;font-size:12.5px;color:var(--gray-700);max-width:360px;}
 .storage-badge-riwayat .bar-track{height:8px;background:var(--gray-200);}
