@@ -201,22 +201,16 @@ function renderBeritaAcara(){
   }
   const pts = site ? baFilteredPoints(site, team, includeKebauan) : [];
   const titikHeader = team==="emisi" ? "Sumber Emisi (Titik Sampling)" : "Titik Sampling";
-  // Ambient-family (ambient/kebisingan/kebauan/getaran) di lokasi yang sama digabung jadi 1 baris
-  // (lihat groupPointsForDisplay, dipakai juga di Database Titik Pantau) — kolom yang beda per
-  // parameter (Kewajiban Pemantauan, Status Pemantauan) ditumpuk di dalam sel yang sama, TIDAK
-  // menghilangkan input per-parameter (tiap <input> tetap py data-point-id sendiri2, listener
-  // "change" di bawah tetap kepakai apa adanya krn cuma cocokkan e.target, bukan peduli nesting).
-  const groups = groupPointsForDisplay(pts);
   document.getElementById("baPreviewTable").innerHTML = pts.length ? `
     <thead><tr><th style="width:34px;">No</th><th>Lokasi</th><th>Kategori</th><th>${titikHeader}</th><th>Kewajiban Pemantauan</th><th>Status Pemantauan</th></tr></thead>
-    <tbody>${groups.map((group,i)=>{ const p0 = group[0]; return `<tr>
+    <tbody>${pts.map((p,i)=>`<tr>
       <td>${i+1}</td>
       <td>Lapangan ${escHtml(site)}</td>
-      <td>${escHtml(baKategoriLabelFor(p0))}</td>
-      <td>${escHtml(p0.nama)}</td>
-      <td style="text-align:center;">${groupStackHtml(group, p=>frekuensiTextFor(p))}</td>
-      <td>${groupStackHtml(group, p=>`<input type="text" class="baStatusInput" data-point-id="${p.id}" data-batch-id="${batchId}" value="${escHtml(baStatusFor(p, batchId))}" placeholder="(kosong, isi manual)" style="width:100%;min-width:180px;border:1px solid var(--gray-300);border-radius:4px;padding:4px 6px;font:inherit;">`)}</td>
-    </tr>`; }).join("")}</tbody>` : "<div class='hint' style='padding:10px;'>Pilih Tim, Batch, dan Site yang sudah punya jadwal untuk melihat pratinjau.</div>";
+      <td>${escHtml(baKategoriLabelFor(p))}</td>
+      <td>${escHtml(p.nama)}</td>
+      <td style="text-align:center;">${frekuensiTextFor(p)}</td>
+      <td><input type="text" class="baStatusInput" data-point-id="${p.id}" data-batch-id="${batchId}" value="${escHtml(baStatusFor(p, batchId))}" placeholder="(kosong, isi manual)" style="width:100%;min-width:180px;border:1px solid var(--gray-300);border-radius:4px;padding:4px 6px;font:inherit;"></td>
+    </tr>`).join("")}</tbody>` : "<div class='hint' style='padding:10px;'>Pilih Tim, Batch, dan Site yang sudah punya jadwal untuk melihat pratinjau.</div>";
 }
 // Kolom Status Pemantauan di pratinjau BA bisa diketik manual — override disimpan per (batch,
 // titik) di b.baStatusOverrides & dibaca balik oleh baStatusFor (menang duluan dari semua logika
@@ -277,13 +271,8 @@ function buildBeritaAcaraHtml(){
   // Dikelompokkan per Kategori (jenis sumber emisi/ambient) — baris judul kelompok memisahkan
   // tiap kategori dgn jelas tanpa perlu bikin tabel terpisah-pisah (yang bikin thead/tfoot cetak
   // per halaman jadi ribet). Nomor urut tetap berjalan menerus dari 1 spt contoh BA yang sudah ada.
-  // Emisi tetap diseksi per kategoriSumber persis spt semula (Turbin/Flare/dst TIDAK berubah) —
-  // tapi seluruh ambient-family (ambient/kebisingan/kebauan/getaran) digabung jadi SATU seksi
-  // "Ambient & Lingkungan" (pakai GRP_AMBIENT yg sama dgn Database Titik Pantau), supaya baris per
-  // LOKASI-nya (lihat groupPointsForDisplay di bawah) tidak perlu dipecah ke 4 seksi berbeda yang
-  // isinya lokasi yang sama berulang-ulang.
   const grouped = {};
-  pts.forEach(p=>{ const k = p.kategori==="emisi" ? baKategoriLabelFor(p) : GRP_AMBIENT; (grouped[k]=grouped[k]||[]).push(p); });
+  pts.forEach(p=>{ const k = baKategoriLabelFor(p); (grouped[k]=grouped[k]||[]).push(p); });
   // Kategori berisi titik wajib pantau didahulukan drpd yg seluruhnya tidak-wajib, lalu di dalam
   // tiap kelompok itu diurutkan sesuai BA_KATEGORI_PRIORITY (Turbin/Flare/Gas Booster/H2S dulu),
   // sisanya alfabetis sbg fallback stabil — bukan alfabetis polos spt sebelumnya (yg bikin
@@ -297,20 +286,16 @@ function buildBeritaAcaraHtml(){
   let rows = "", rowNum = 0;
   kategoriList.forEach(kat=>{
     rows += `<tr class="pg-ba-kategori-row"><td colspan="6">${escHtml(kat)}</td></tr>`;
-    // Titik ambient-family di lokasi yang sama (mis. Ambient Udara + Kebisingan + Kebauan +
-    // Getaran di "Kompleks Gunung Utara") jadi SATU baris — kolom Kategori/Kewajiban/Status yang
-    // beda per parameter ditumpuk di dalam sel yang sama (lihat groupStackHtml), bukan diulang
-    // jadi baris terpisah per parameter. Titik emisi (selalu grup 1 anggota) tampil apa adanya.
-    groupPointsForDisplay(grouped[kat]).forEach(group=>{
+    grouped[kat].forEach(p=>{
       rowNum++;
-      const p0 = group[0];
+      const status = baStatusFor(p, batchId);
       rows += `<tr>
         <td>${rowNum}</td>
         <td>Lapangan ${escHtml(site)}</td>
-        <td>${escHtml(baKategoriLabelFor(p0))}</td>
-        <td>${escHtml(p0.nama)}</td>
-        <td style="text-align:center;">${groupStackHtml(group, p=>frekuensiTextFor(p))}</td>
-        <td>${groupStackHtml(group, p=>baStatusFor(p, batchId)||"&nbsp;")}</td>
+        <td>${escHtml(kat)}</td>
+        <td>${escHtml(p.nama)}</td>
+        <td style="text-align:center;">${frekuensiTextFor(p)}</td>
+        <td>${status||"&nbsp;"}</td>
       </tr>`;
     });
   });
