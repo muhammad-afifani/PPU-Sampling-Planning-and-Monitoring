@@ -1479,6 +1479,21 @@ function buildGanttSVG(batches){
 }
 function escSvg(s){ return escHtml(s); }
 
+// Label/warna/deskripsi status dipakai bareng oleh baris panel "Distribusi Status" DAN judul modal
+// drilldown-nya (lihat openScurveStatusDrilldownModal) — satu sumber supaya keduanya tidak pernah
+// beda kata/warna. Key = nilai p.status asli (bukan label tampilan).
+const SCURVE_STATUS_META = {
+  done: {label:"Done", badgeClass:"b-green", barColor:"var(--green-500)", desc:"Titik yang sudah selesai disampling, datanya sudah tercatat di Tracking BA/CoA."},
+  scheduled: {label:"Scheduled", badgeClass:"b-blue", barColor:"var(--teal-500)", desc:"Titik yang sudah masuk jadwal batch aktif, menunggu waktu sampling di lapangan."},
+  pending: {label:"Hold", badgeClass:"b-gray", barColor:"var(--gray-500)", desc:"Titik yang sedang tidak dipantau (hold) — belum/tidak masuk jadwal batch manapun periode ini."},
+  failed: {label:"Gagal", badgeClass:"b-red", barColor:"var(--red-500)", desc:"Titik yang gagal/tidak jadi disampling pada batch sebelumnya — perlu dijadwalkan ulang."},
+};
+// Titik per status utk S-Curve yang SEDANG ditampilkan (dipakai drilldown "Distribusi Status") —
+// diisi ulang tiap buildSCurveSVG dipanggil. Cukup 1 state global sederhana krn S-Curve yang
+// interaktif di layar cuma ada di 1 halaman aktif kapan saja (Dashboard ATAU Scheduling Tools,
+// tidak pernah dua2nya sekaligus dlm SPA ini).
+let scurveStatusGroups = {};
+
 function buildSCurveSVG(batches, points, view){
   let relevant = points.filter(p=>p.planStart && p.planEnd && effectiveWajib(p) && !p.tidakBeroperasi);
   if(view==="emisi") relevant = relevant.filter(p=>p.kategori==="emisi");
@@ -1555,20 +1570,135 @@ function buildSCurveSVG(batches, points, view){
   svg = `<div class="hint" style="margin-bottom:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">${doneNow} dari ${total} titik selesai (${Math.round(doneNow/total*100)}%) ${deltaHtml}</div>` + svg;
   svg += `<div class="legend"><span class="item"><span class="sw" style="background:#3d78c9"></span>Rencana (kumulatif)</span><span class="item"><span class="sw" style="background:#3fb27f"></span>Aktual (kumulatif)</span><span class="item"><span class="sw" style="background:#e0a53d"></span>Hari ini</span></div>`;
   // Panel status di sebelah kanan chart — supaya ruang di samping S-Curve tidak kosong, dan
-  // sekalian kasih sudut pandang lain (distribusi status) dari data yang sama.
-  const statusCounts = {done:0, scheduled:0, pending:0, failed:0};
-  relevant.forEach(p=>{ statusCounts[p.status] = (statusCounts[p.status]||0)+1; });
+  // sekalian kasih sudut pandang lain (distribusi status) dari data yang sama. Titik per status
+  // disimpan di scurveStatusGroups (bukan cuma dihitung) supaya baris di bawah ini bisa diklik utk
+  // buka daftar lengkapnya (lihat distributionBarRow & openScurveStatusDrilldownModal).
+  const statusGroups = {done:[], scheduled:[], pending:[], failed:[]};
+  relevant.forEach(p=>{ (statusGroups[p.status]=statusGroups[p.status]||[]).push(p); });
+  scurveStatusGroups = statusGroups;
   const statusPanel = `<div style="min-width:170px;flex-shrink:0;">
     <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Distribusi Status</div>
-    ${distributionBarRow("Done", statusCounts.done, total, "var(--green-500)")}
-    ${distributionBarRow("Scheduled", statusCounts.scheduled, total, "var(--teal-500)")}
-    ${distributionBarRow("Hold", statusCounts.pending, total, "var(--gray-500)")}
-    ${distributionBarRow("Gagal", statusCounts.failed, total, "var(--red-500)")}
+    ${["done","scheduled","pending","failed"].map(key=>{
+      const meta = SCURVE_STATUS_META[key];
+      return distributionBarRow(meta.label, statusGroups[key].length, total, meta.barColor, key);
+    }).join("")}
   </div>`;
   const combined = `<div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;">
     <div style="flex:2;min-width:280px;">${svg}</div>
     ${statusPanel}
   </div>`;
   return combined;
+}
+// Info paling relevan per status utk ditampilkan di kolom kanan baris drilldown — beda2 krn
+// pertanyaan "kenapa/kapan" jawabannya beda tiap status (tanggal selesai vs jendela rencana vs
+// alasan hold vs catatan gagal), bukan cuma ulang badge status yang sudah jelas dari judul modal.
+function scurveDrilldownContextHtml(p, status){
+  if(status==="done"){
+    return p.actualEnd ? `<b>${escHtml(fmtTanggalIndo(p.actualEnd))}</b>` : `<span class="muted">Tanggal selesai belum tercatat</span>`;
+  }
+  if(status==="scheduled"){
+    if(!p.planStart) return `<span class="muted">-</span>`;
+    const range = p.planStart===p.planEnd ? escHtml(fmtTanggalIndo(p.planStart)) : `${escHtml(fmtTanggalIndo(p.planStart))} &ndash; ${escHtml(fmtTanggalIndo(p.planEnd))}`;
+    return `<b>${range}</b><div class="muted" style="font-size:10px;margin-top:2px;">${escHtml(batchNameOf(p.batchId))}</div>`;
+  }
+  if(status==="failed"){
+    const note = ensureTracking(p.id).samplingNote;
+    return note ? escHtml(note) : `<span class="muted">Tidak ada catatan tercatat</span>`;
+  }
+  // pending (Hold)
+  const reason = p.holdReason ? HOLD_REASON_LABELS[p.holdReason] : "";
+  return reason ? escHtml(reason) : `<span class="muted">Belum ada alasan tercatat</span>`;
+}
+// Modal drilldown dibuka dari klik baris "Distribusi Status" di panel S-Curve — daftar titik utk
+// status itu, dikelompokkan per site (ambient-family di lokasi sama digabung 1 baris spt Database
+// Titik Pantau, lihat groupPointsForDisplay) + kotak cari cepat. Datanya dari scurveStatusGroups
+// (diisi ulang tiap buildSCurveSVG jalan) — persis titik2 yang lagi dihitung di S-Curve/panel yang
+// SEDANG ditampilkan (sudah lewat filter effectiveWajib/tidakBeroperasi/tim yang sama).
+function openScurveStatusDrilldownModal(status){
+  const meta = SCURVE_STATUS_META[status];
+  const pts = (scurveStatusGroups[status]||[]).slice().sort((a,b)=> a.site===b.site ? a.nama.localeCompare(b.nama) : a.site.localeCompare(b.site));
+  if(!meta || !pts.length) return;
+
+  const bySite = {};
+  pts.forEach(p=>{ (bySite[p.site]=bySite[p.site]||[]).push(p); });
+  const sites = Object.keys(bySite).sort((a,b)=>{
+    const ia = MASTER_SITE_ORDER.indexOf(a), ib = MASTER_SITE_ORDER.indexOf(b);
+    return (ia<0?99:ia)-(ib<0?99:ib);
+  });
+
+  // rawTotal = persis angka yg barusan diklik di panel (S-Curve menghitung progress PER PARAMETER,
+  // bukan per lokasi — lihat catatan di applyScheduleToPoints/S-Curve done-counting) — dipakai sbg
+  // angka UTAMA di judul supaya tidak pernah beda dari yg diklik user. groupedTotal (baris yg BENERAN
+  // dirender, ambient-family di lokasi sama digabung 1 baris spt Database Titik Pantau) cuma dipakai
+  // sbg keterangan tambahan kalau memang beda dari rawTotal, bukan menggantikannya.
+  const rawTotal = pts.length;
+  let groupedTotal = 0;
+  const listHtml = sites.map(site=>{
+    const groups = groupPointsForDisplay(bySite[site]);
+    groupedTotal += groups.length;
+    const rows = groups.map(group=>{
+      const p0 = group[0];
+      const subTag = group.length>1
+        ? group.map(p=>`<span class="badge ${NONEMISI_BADGE[p.kategori]||"b-gray"}" style="font-size:9px;margin-left:4px;">${escHtml(NONEMISI_LABEL[p.kategori]||p.kategori)}</span>`).join("")
+        : `<span class="muted" style="font-size:10.5px;">${escHtml(monitoringTypeLabel(p0))}${p0.kategori==="emisi"&&p0.kategoriSumber?" &middot; "+escHtml(p0.kategoriSumber):""}</span>`;
+      const context = groupStackHtml(group, p=>scurveDrilldownContextHtml(p, status));
+      return `<div class="scurve-dd-row" data-search="${escHtml((p0.nama+" "+site).toLowerCase())}" data-raw-count="${group.length}">
+        <div class="scurve-dd-row-main">
+          <div class="scurve-dd-row-name">${escHtml(p0.nama)}</div>
+          <div class="scurve-dd-row-sub">${subTag}</div>
+        </div>
+        <div class="scurve-dd-row-context">${context}</div>
+      </div>`;
+    }).join("");
+    const siteRawCount = bySite[site].length;
+    return `<div class="scurve-dd-site" data-site-block>
+      <div class="scurve-dd-site-head"><span>${escHtml(site)}</span><span class="scurve-dd-site-count" data-full-text="${siteRawCount} titik${groups.length!==siteRawCount?` (${groups.length} lokasi)`:""}">${siteRawCount} titik${groups.length!==siteRawCount?` (${groups.length} lokasi)`:""}</span></div>
+      ${rows}
+    </div>`;
+  }).join("");
+  const lokasiNote = groupedTotal!==rawTotal ? ` <span class="muted" style="font-weight:400;font-size:11.5px;">(${groupedTotal} lokasi &mdash; ambient/kebisingan/kebauan/getaran di titik yang sama digabung 1 baris)</span>` : "";
+
+  openModal(`
+    <h3><span class="badge ${meta.badgeClass}" style="font-size:12px;vertical-align:1px;">${meta.label}</span> <span style="font-weight:400;font-size:13px;">&mdash; ${rawTotal} titik</span>${lokasiNote}</h3>
+    <div style="margin-bottom:10px;">
+      <div class="hint" style="margin-bottom:8px;">${meta.desc}</div>
+      <input type="text" id="scurveDrilldownSearch" placeholder="Cari nama titik atau site..." style="width:100%;padding:7px 9px;border:1px solid var(--gray-300);border-radius:6px;font:inherit;">
+    </div>
+    <div class="scurve-drilldown-body">
+      <div id="scurveDrilldownList">${listHtml}</div>
+      <div id="scurveDrilldownEmpty" class="hint" style="display:none;padding:24px 0;text-align:center;">Tidak ada titik yang cocok dengan pencarian.</div>
+    </div>
+    <div class="actions"><span class="muted" id="scurveDrilldownCount" style="margin-right:auto;font-size:11.5px;">${groupedTotal} baris ditampilkan</span><button class="btn ghost" data-action="closeModal">Tutup</button></div>
+  `, {wide:true, scrollBody:true});
+
+  wireScrollShadow(document.querySelector(".scurve-drilldown-body"));
+  wireScurveDrilldownSearch(groupedTotal);
+}
+// Filter lokal dalam modal drilldown — cocokkan ke data-search (nama titik + nama site sekaligus,
+// lowercase) tiap baris; grup site yang semua barisnya kefilter habis ikut disembunyikan seluruhnya
+// (bukan cuma barisnya) supaya tidak nyisa judul site kosong tanpa isi. Angka "N titik (M lokasi)"
+// di kepala tiap site juga dihitung ULANG dari baris yang KELIHATAN saat ini (bukan dibiarkan diam
+// nunjuk angka awal sebelum difilter) — biar tidak pernah kelihatan nyasar/tidak sinkron dgn isi
+// yang benar2 tampil di bawahnya. Balik ke teks aslinya (data-full-text) begitu kotak cari dikosongkan.
+function wireScurveDrilldownSearch(groupedTotal){
+  const input = document.getElementById("scurveDrilldownSearch");
+  if(!input) return;
+  input.addEventListener("input", ()=>{
+    const q = input.value.trim().toLowerCase();
+    let visibleCount = 0;
+    document.querySelectorAll("#scurveDrilldownList [data-site-block]").forEach(block=>{
+      let anyVisible = false, siteRaw = 0, siteGrouped = 0;
+      block.querySelectorAll(".scurve-dd-row").forEach(row=>{
+        const match = !q || row.dataset.search.includes(q);
+        row.style.display = match ? "" : "none";
+        if(match){ anyVisible = true; visibleCount++; siteGrouped++; siteRaw += Number(row.dataset.rawCount)||1; }
+      });
+      block.style.display = anyVisible ? "" : "none";
+      const countEl = block.querySelector(".scurve-dd-site-count");
+      if(countEl) countEl.textContent = q ? `${siteRaw} titik${siteGrouped!==siteRaw?` (${siteGrouped} lokasi)`:""}` : countEl.dataset.fullText;
+    });
+    document.getElementById("scurveDrilldownEmpty").style.display = visibleCount ? "none" : "block";
+    document.getElementById("scurveDrilldownCount").textContent = q ? `${visibleCount} dari ${groupedTotal} baris ditampilkan` : `${groupedTotal} baris ditampilkan`;
+  });
 }
 

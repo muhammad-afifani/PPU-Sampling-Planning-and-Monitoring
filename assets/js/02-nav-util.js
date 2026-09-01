@@ -207,9 +207,14 @@ function progressBarRow(label, done, total, color){
     <div class="progressbar"><div style="width:${pct}%;background:${c};"></div></div>
   </div>`;
 }
-function distributionBarRow(label, count, grandTotal, color){
+// statusKey opsional: kalau diisi (dan count>0) baris jadi bisa diklik — dipakai panel "Distribusi
+// Status" di S-Curve utk buka drilldown daftar titiknya (lihat openScurveStatusDrilldownModal di
+// 08-gantt-print.js). Tanpa statusKey (mis. dipakai di tempat lain nanti) baris tetap statis spt semula.
+function distributionBarRow(label, count, grandTotal, color, statusKey){
   const pct = grandTotal? Math.round(count/grandTotal*100) : 0;
-  return `<div style="margin-bottom:9px;">
+  const clickable = statusKey && count>0;
+  const attrs = clickable ? `data-action="openScurveStatusDrilldown" data-status="${statusKey}" title="Klik untuk lihat daftar titik ${escHtml(label)}"` : "";
+  return `<div class="dist-row${clickable?" dist-row-clickable":""}" ${attrs}>
     <div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;margin-bottom:3px;"><span>${escHtml(label)}</span><b>${count}</b></div>
     <div class="progressbar"><div style="width:${pct}%;background:${color||"var(--teal-500)"};"></div></div>
   </div>`;
