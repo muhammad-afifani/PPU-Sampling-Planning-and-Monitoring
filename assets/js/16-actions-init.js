@@ -165,6 +165,7 @@ const ACTIONS = {
   // sempat kelihatan tidak sesuai — juga berguna kalau ada perubahan status dari halaman lain
   // (mis. Tracking BA/CoA) yang belum kepakai di layar ini krn belum sempat pindah halaman.
   refreshGanttPage:()=>{ renderGantt(); renderMaster(); toast("Scheduling Tools dimuat ulang.","ok"); },
+  openScurveStatusDrilldown:(t)=>{ openScurveStatusDrilldownModal(t.dataset.status); },
   openAdjustDuration:(t)=>{ openAdjustDurationModal(t.dataset.batchId, Number(t.dataset.rowIdx)); },
   openDayDetail:(t)=>{ openDayDetailModal(t.dataset.batchId, Number(t.dataset.rowIdx)); },
   resetDayOverrides:(t)=>{ resetDayOverrides(t.dataset.batchId, Number(t.dataset.rowIdx)); },
