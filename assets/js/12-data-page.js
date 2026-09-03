@@ -1,6 +1,18 @@
 /* =========================================================
    DATA PAGE
 ========================================================= */
+// `fetch(url, {cache:"no-store"})` cuma matiin cache LOKAL browser — file backup lengkap dari
+// online (checkFullBackupUpdate/checkRepoBackupUpdate di bawah) biasanya diambil lewat
+// raw.githubusercontent.com, yang jalan di belakang CDN (Fastly) dgn cache sendiri yg TIDAK peduli
+// header cache browser sama sekali. Efeknya: push backup baru ke repo lalu LANGSUNG ambil dari
+// perangkat lain bisa saja masih dapat versi lama dari CDN edge selama beberapa menit — persis
+// gejala "sudah export yang terbaru tapi pas di-import di device lain datanya lama/kosong". Query
+// param unik di URL (nilainya tidak dipakai server, cuma bikin URL-nya beda tiap panggilan) memaksa
+// CDN anggap ini request baru & ambil ulang dari origin — teknik yg sama dipakai utk cache-busting
+// asset CSS/JS lokal (lihat ?v= di index.html).
+function cacheBustUrl(url){
+  return url + (url.includes("?") ? "&" : "?") + "_cb=" + Date.now();
+}
 // Ringkasan isi file SEBELUM di-download — supaya user bisa cek sendiri dgn mata "file yg baru
 // aku buat ini beneran isinya lengkap ya" TANPA harus kirim dulu ke laptop lain buat tahu, karena
 // mekanisme export/import-nya sendiri sudah diverifikasi benar berkali-kali; kalau ada yg hilang,
@@ -73,7 +85,7 @@ async function checkFullBackupUpdate(){
   const url = document.getElementById("fullBackupUrl").value.trim();
   if(!url){ toast("Isi dulu URL backup lengkap.","err"); return; }
   try{
-    const res = await fetch(url, {cache:"no-store"});
+    const res = await fetch(cacheBustUrl(url), {cache:"no-store"});
     if(!res.ok) throw new Error("HTTP "+res.status);
     const data = await res.json();
     handleFullBackupPackage(data, url.split("/").pop()||url);
@@ -92,7 +104,7 @@ const REPO_CONTENTS_API = "https://api.github.com/repos/muhammad-afifani/PPU-Sam
 const BACKUP_FILENAME_RE = /^phm_emisi_backup_\d{4}-\d{2}-\d{2}\.json$/;
 async function checkRepoBackupUpdate(){
   try{
-    const res = await fetch(REPO_CONTENTS_API, {cache:"no-store"});
+    const res = await fetch(cacheBustUrl(REPO_CONTENTS_API), {cache:"no-store"});
     if(!res.ok) throw new Error("HTTP "+res.status);
     const files = await res.json();
     const backups = (Array.isArray(files)?files:[]).filter(f=>BACKUP_FILENAME_RE.test(f.name));
@@ -101,7 +113,7 @@ async function checkRepoBackupUpdate(){
     // tidak perlu parsing tanggal terpisah.
     backups.sort((a,b)=> b.name.localeCompare(a.name));
     const latest = backups[0];
-    const dataRes = await fetch(latest.download_url, {cache:"no-store"});
+    const dataRes = await fetch(cacheBustUrl(latest.download_url), {cache:"no-store"});
     if(!dataRes.ok) throw new Error("HTTP "+dataRes.status);
     const data = await dataRes.json();
     handleFullBackupPackage(data, latest.name);
