@@ -249,7 +249,7 @@ function renderSamplingEmisiTable(pts){
       const t = ensureTracking(p.id);
       const status = t.samplingStatus||"";
       const isFilled = status || t.dates.actual || t.samplingNote;
-      const notePlaceholder = status==="deferred" ? "mis. Batch 2" : status==="other" ? "mis. Under Maintenance" : "";
+      const notePlaceholder = status==="deferred" ? "mis. Batch 2" : status==="other" ? "mis. Under Maintenance" : status==="notdue" ? "kosongkan = teks otomatis periode lalu" : "";
       return `<tr>
         <td>${p.site}</td>
         <td><b>${escHtml(p.nama)}</b></td>
@@ -260,6 +260,7 @@ function renderSamplingEmisiTable(pts){
           <option value="sampled" ${status==="sampled"?"selected":""}>${SAMPLING_STATUS_LABELS.sampled}</option>
           <option value="deferred" ${status==="deferred"?"selected":""}>${SAMPLING_STATUS_LABELS.deferred}</option>
           <option value="other" ${status==="other"?"selected":""}>${SAMPLING_STATUS_LABELS.other}</option>
+          <option value="notdue" ${status==="notdue"?"selected":""}>${SAMPLING_STATUS_LABELS.notdue}</option>
         </select></td>
         <td><input type="date" data-action="setSamplingDate" data-id="${p.id}" value="${t.dates.actual||""}" ${status!=="sampled"?"disabled":""} style="width:100%;"></td>
         <td><input type="text" data-action="setSamplingNote" data-id="${p.id}" value="${escHtml(t.samplingNote||"")}" placeholder="${notePlaceholder}" style="width:100%;" ${status==="sampled"?"disabled":""}></td>
@@ -292,10 +293,12 @@ document.addEventListener("change", e=>{
       // tidak pernah menghitungnya. "Direncanakan Batch Berikutnya" = masih di-plan, cuma
       // ditunda (Hold) — SAMA seperti titik yang di-exclude manual dgn alasan batch2 (lihat
       // applyScheduleToPoints). "Tidak Disampling, Sebab Lain" = genuinely gagal periode ini.
+      // "Belum Masuk Periode Sampling" = SAMA seperti deferred (Hold, bukan gagal) — titik ini
+      // memang tidak seharusnya diproses periode ini (biasanya sudah dieliminasi dari batch juga).
       t.actual = false;
       if(p){
         p.actualStart = ""; p.actualEnd = "";
-        p.status = e.target.value==="deferred" ? "pending" : e.target.value==="other" ? "failed" : "scheduled";
+        p.status = (e.target.value==="deferred" || e.target.value==="notdue") ? "pending" : e.target.value==="other" ? "failed" : "scheduled";
       }
     }
     save(); renderTracking();

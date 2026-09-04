@@ -79,6 +79,16 @@ function baStatusFor(p, selectedBatchId){
     if(t.samplingStatus==="sampled") return `Dipantau ${escHtml(fmtTanggalIndo(t.dates.actual))}`;
     if(t.samplingStatus==="deferred") return escHtml(t.samplingNote || "Batch Berikutnya");
     if(t.samplingStatus==="other") return escHtml(t.samplingNote || "Tidak Disampling");
+    // "Belum Masuk Periode Sampling" (mis. tercentang tidak sengaja di Perencanaan Batch lalu
+    // sudah dieliminasi) — sengaja dibuat MENIRU PERSIS format frasa otomatis di bawah
+    // (!isDueThisPeriod) supaya BA-nya konsisten dgn titik yang genuinely belum jatuh tempo,
+    // walau titik ini sebenarnya due secara aturan tapi manual dikeluarkan dari periode ini.
+    if(t.samplingStatus==="notdue"){
+      if(t.samplingNote) return escHtml(t.samplingNote);
+      if(p.pemantauanTerakhir) return escHtml(`Sudah dipantau periode lalu (${p.pemantauanTerakhir})`);
+      if(p.prediksiBerikutnya) return escHtml(`Prediksi pantau berikutnya ${p.prediksiBerikutnya}`);
+      return "Belum Masuk Periode Sampling";
+    }
   }
   const siblingDate = ambientSiblingSampledDate(p);
   if(siblingDate) return `Dipantau ${escHtml(fmtTanggalIndo(siblingDate))}`;
