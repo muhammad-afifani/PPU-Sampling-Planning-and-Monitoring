@@ -36,10 +36,15 @@ const TRACK_STEPS = [
   ["finalReceived","SHU Asli Terbit"],["simpelInput","Input SIMPEL PPU"]
 ];
 // Status eksekusi sampling lapangan per titik (Tahap 1) — terpisah dari checklist dokumen (Tahap 2).
+// "notdue" = titik ini SEHARUSNYA tidak masuk periode ini sama sekali (mis. kecentang tidak
+// sengaja di Perencanaan Batch lalu sudah di-eleminasi dari batch) — dipakai supaya Berita Acara
+// menampilkan teks "sudah dipantau periode lalu" yang sama seperti titik yang otomatis belum jatuh
+// tempo, tanpa harus menghapus/mengulang data batch & tracking yang sudah terlanjur diisi.
 const SAMPLING_STATUS_LABELS = {
   sampled: "Sudah Disampling",
   deferred: "Direncanakan Batch Berikutnya",
-  other: "Tidak Disampling, Sebab Lain"
+  other: "Tidak Disampling, Sebab Lain",
+  notdue: "Belum Masuk Periode Sampling"
 };
 // Satu sumber kebenaran untuk bentuk record DB.tracking[id] — dipakai di semua tempat yang perlu
 // bikin/pastikan record ini ada, supaya field baru (samplingStatus/samplingNote) tidak ketinggalan
