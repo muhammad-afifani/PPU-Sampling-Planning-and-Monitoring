@@ -1573,15 +1573,30 @@ function buildSCurveSVG(batches, points, view){
   // sekalian kasih sudut pandang lain (distribusi status) dari data yang sama. Titik per status
   // disimpan di scurveStatusGroups (bukan cuma dihitung) supaya baris di bawah ini bisa diklik utk
   // buka daftar lengkapnya (lihat distributionBarRow & openScurveStatusDrilldownModal).
+  // SENGAJA pakai populasi lebih LUAS drpd `relevant` (yang dipakai kurva itu sendiri, wajib py
+  // planStart/planEnd supaya bisa digambar di sumbu waktu) — titik yang dieliminasi dari batch aktif
+  // (Scheduling Tools) atau belum pernah dijadwalkan sama sekali TIDAK punya planStart/planEnd
+  // (lihat applyScheduleToPoints), padahal itu PERSIS definisi "Hold" (titik wajib yang sedang tidak
+  // aktif dijadwalkan). Kalau ikut disaring pakai syarat tanggal yang sama, titik2 itu jadi seolah
+  // tidak pernah ada sama sekali di panel ini (bukan cuma "tidak masuk Hold", tapi hilang total dari
+  // semua kategori TERMASUK totalnya) — padahal kartu "Titik Wajib Pantau" & "Rekap per Site" di
+  // Dashboard (04-dashboard.js, effectiveWajib doang tanpa syarat tanggal) tetap menghitungnya.
+  // Populasi di sini disamakan cakupannya dgn itu supaya jumlahnya konsisten & titik yang dieliminasi/
+  // ditunda ke batch berikutnya tetap kelihatan sebagai Hold, bukan hilang diam-diam.
+  let statusPts = points.filter(p=>effectiveWajib(p) && !p.tidakBeroperasi);
+  if(view==="emisi") statusPts = statusPts.filter(p=>p.kategori==="emisi");
+  if(view==="ambient") statusPts = statusPts.filter(p=>p.kategori!=="emisi");
   const statusGroups = {done:[], scheduled:[], pending:[], failed:[]};
-  relevant.forEach(p=>{ (statusGroups[p.status]=statusGroups[p.status]||[]).push(p); });
+  statusPts.forEach(p=>{ (statusGroups[p.status]=statusGroups[p.status]||[]).push(p); });
   scurveStatusGroups = statusGroups;
+  const statusTotal = statusPts.length;
   const statusPanel = `<div style="min-width:170px;flex-shrink:0;">
     <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Distribusi Status</div>
     ${["done","scheduled","pending","failed"].map(key=>{
       const meta = SCURVE_STATUS_META[key];
-      return distributionBarRow(meta.label, statusGroups[key].length, total, meta.barColor, key);
+      return distributionBarRow(meta.label, statusGroups[key].length, statusTotal, meta.barColor, key);
     }).join("")}
+    <div class="hint" style="margin-top:4px;">Mencakup SEMUA titik wajib pantau (${statusTotal}) — beda dari kurva di samping yang cuma menghitung titik yang sudah masuk jadwal aktif (${total}).</div>
   </div>`;
   const combined = `<div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;">
     <div style="flex:2;min-width:280px;">${svg}</div>
@@ -1605,7 +1620,16 @@ function scurveDrilldownContextHtml(p, status){
     const note = ensureTracking(p.id).samplingNote;
     return note ? escHtml(note) : `<span class="muted">Tidak ada catatan tercatat</span>`;
   }
-  // pending (Hold)
+  // pending (Hold) — dua sumber alasan yang TERPISAH, dicek berurutan: alasan eliminasi per-batch
+  // (b.excludeReasons, diisi lewat Scheduling Tools — batch2/notdue/tbc) lebih spesifik & lebih
+  // sering relevan drpd p.holdReason (field manual di Database Titik Pantau, utk kasus lain spt
+  // "Sudah Tidak Ada di Tempat"), jadi diprioritaskan duluan kalau ada.
+  const batch = p.batchId ? DB.batches.find(x=>x.id===p.batchId) : null;
+  const excludeInfo = batch && batch.excludeReasons ? batch.excludeReasons[p.id] : null;
+  if(excludeInfo){
+    const label = EXCLUDE_REASON_LABELS[excludeInfo.reason] || excludeInfo.reason;
+    return escHtml(excludeInfo.note ? `${label} — ${excludeInfo.note}` : label);
+  }
   const reason = p.holdReason ? HOLD_REASON_LABELS[p.holdReason] : "";
   return reason ? escHtml(reason) : `<span class="muted">Belum ada alasan tercatat</span>`;
 }
