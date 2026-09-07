@@ -22,7 +22,8 @@ function freshDB(){
     coordVerification: {},
     rhMonths: [...RH_MONTHS_DEFAULT],
     rhMonthly: JSON.parse(JSON.stringify(RH_MONTHLY_DEFAULT)),
-    hasilPemantauan: [...DEFAULT_HASIL_PEMANTAUAN]
+    hasilPemantauan: [...DEFAULT_HASIL_PEMANTAUAN],
+    dokumentasiFoto: {}
   };
 }
 function uid(pfx){ return pfx+"_"+Math.random().toString(36).slice(2,9); }
@@ -45,6 +46,7 @@ function migrateDB(){
   if(!DB.snapshots) DB.snapshots = [];
   if(!DB.pointCoords) DB.pointCoords = {...POINT_COORDS};
   if(!DB.coordVerification) DB.coordVerification = {};
+  if(!DB.dokumentasiFoto) DB.dokumentasiFoto = {};
   if(!DB.rhMonths) DB.rhMonths = [...RH_MONTHS_DEFAULT];
   if(!DB.rhMonthly) DB.rhMonthly = JSON.parse(JSON.stringify(RH_MONTHLY_DEFAULT));
   if(!DB.meta) DB.meta = {semester:"S1", tahun:new Date().getFullYear(), lastBatchIdEmisi:0, lastBatchIdAmbient:0};

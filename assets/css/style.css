@@ -989,4 +989,29 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 .coord-row{cursor:pointer;}
 .coord-row:hover td{background:var(--teal-100);}
 .coord-tbl{table-layout:fixed;width:100%;}
+
+/* Dokumentasi Foto Sampling */
+.dokfoto-storage-hint{margin-bottom:14px;}
+.dokfoto-point-card{}
+.dokfoto-point-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;}
+.dokfoto-cat{margin-bottom:16px;}
+.dokfoto-cat:last-child{margin-bottom:0;}
+.dokfoto-cat-label{font-size:12px;font-weight:700;color:var(--gray-700);margin-bottom:7px;}
+.dokfoto-thumbstrip{display:flex;flex-wrap:wrap;gap:9px;}
+.dokfoto-thumb{position:relative;width:112px;border-radius:8px;overflow:hidden;border:1px solid var(--gray-200);background:var(--gray-100);flex-shrink:0;}
+.dokfoto-thumb img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in;}
+/* Tombol edit/hapus SELALU tampil (bukan cuma :hover) — target utama tools ini dipakai lewat HP di
+   lapangan, yang tidak punya konsep hover sama sekali. */
+.dokfoto-thumb-edit,.dokfoto-thumb-del{position:absolute;top:4px;width:21px;height:21px;border-radius:50%;border:none;background:rgba(10,15,25,.6);color:#fff;font-size:12px;line-height:21px;text-align:center;cursor:pointer;padding:0;}
+.dokfoto-thumb-edit{right:29px;}
+.dokfoto-thumb-del{right:4px;}
+.dokfoto-thumb-edit:hover,.dokfoto-thumb-del:hover{background:rgba(10,15,25,.88);}
+.dokfoto-add-btn{width:112px;flex-shrink:0;border:1.5px dashed var(--gray-300);border-radius:8px;background:transparent;color:var(--gray-500);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;padding:4px;line-height:1.3;}
+.dokfoto-add-btn:hover{border-color:var(--teal-500);color:var(--teal-500);}
+/* Panggung crop/zoom — background gelap solid (bukan var(--surface-card)) supaya batas foto vs
+   area kosong di luar rasio target selalu jelas kelihatan di kedua tema terang/gelap. touch-action:
+   none WAJIB ada, tanpanya gestur geser di HP kebaca browser sbg scroll halaman, bukan drag foto. */
+.dokfoto-crop-stage{width:100%;max-width:380px;margin:0 auto;background:#111;border-radius:8px;overflow:hidden;position:relative;cursor:grab;touch-action:none;user-select:none;}
+.dokfoto-crop-stage:active{cursor:grabbing;}
+.dokfoto-crop-stage canvas{width:100%;height:100%;display:block;}
 .coord-tbl .coord-nama{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}

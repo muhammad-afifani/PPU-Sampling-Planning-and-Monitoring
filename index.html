@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202609042108">
+<link rel="stylesheet" href="assets/css/style.css?v=202609070121">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -71,6 +71,7 @@
         <div class="navgroup-items">
           <button class="navbtn" data-page="tracking" data-group="exec" data-label="Tracking BA / CoA" title="Tracking BA / CoA"><span class="navbtn-icon ms-icon" data-icon="clipboard-check"></span><span class="label">Tracking BA / CoA</span></button>
           <button class="navbtn" data-page="beritaacara" data-group="exec" data-label="Berita Acara" title="Berita Acara"><span class="navbtn-icon ms-icon" data-icon="file-text"></span><span class="label">Berita Acara</span></button>
+          <button class="navbtn" data-page="dokumentasi" data-group="exec" data-label="Dokumentasi Foto Sampling" title="Dokumentasi Foto Sampling"><span class="navbtn-icon ms-icon" data-icon="camera"></span><span class="label">Dokumentasi Foto Sampling</span></button>
           <button class="navbtn" data-page="runninghour" data-group="exec" data-label="Running Hour Detail" title="Running Hour Detail"><span class="navbtn-icon ms-icon" data-icon="gauge"></span><span class="label">Running Hour Detail</span></button>
         </div>
       </div>
@@ -525,6 +526,22 @@
         <div class="hint" style="margin-top:-6px;">Menampilkan SELURUH titik terdaftar di site ini (bukan cuma yang masuk batch terpilih), dengan status pemantauan mengikuti Tahap 1 Sampling Emisi di halaman Tracking. Untuk mengubah status/tanggal/catatan tiap titik, kembali ke halaman Tracking BA/CoA.</div>
         <div class="tablewrap"><table id="baPreviewTable"></table></div>
       </div>
+    </div>
+
+    <!-- DOKUMENTASI FOTO SAMPLING -->
+    <div class="page" id="page-dokumentasi">
+      <div class="stickytop">
+      <div class="pagehead"><div><h2>Dokumentasi Foto Sampling</h2><div class="desc">Lampiran foto per titik mengikuti format "Data Pendukung/Lampiran SIMPEL PPU": Petugas Laboratorium/PPC, Peralatan Sampling, Aktivitas Sampling (boleh lebih dari 1 foto tiap kategori), dan bukti screenshot BA yang sudah ditandatangani. Foto ikut tersimpan &amp; ter-backup lewat Export/Import Semua Data (JSON) di halaman Data.</div></div>
+      </div>
+      <div class="toolbar card" style="padding:12px 14px;">
+        <div class="field"><label>Tim</label><select id="dokTeam"><option value="">Semua</option><option value="emisi">Emisi</option><option value="ambient">Ambient</option></select></div>
+        <div class="field"><label>Batch</label><select id="dokBatch"><option value="">Semua</option></select></div>
+        <div class="field"><label>Site</label><select id="dokSite"><option value="">Semua</option></select></div>
+        <span class="spacer"></span>
+        <div class="hint" style="margin:0;">Total penyimpanan foto saat ini: <b id="dokFotoStorageSize">0 KB</b></div>
+      </div>
+      </div>
+      <div id="dokFotoList"></div>
     </div>
 
     <!-- RUNNING HOUR DETAIL -->
@@ -1135,6 +1152,7 @@
 
 <div class="overlay" id="overlay"><div class="modal" id="modalBox"></div></div>
 <input type="file" id="hiddenCsvFile" accept=".csv" style="display:none;">
+<input type="file" id="hiddenPhotoFile" accept="image/*" multiple style="display:none;">
 <div id="printGuideArea"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <!-- Semua file lokal (CSS di <head> + script di bawah ini) diberi "?v=<timestamp>" SAMA supaya
@@ -1142,27 +1160,28 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202609042108"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202609070121"></script>
 
-<script src="assets/data/default-data.js?v=202609042108"></script>
-<script src="assets/data/brand-assets.js?v=202609042108"></script>
-<script src="assets/data/travel-routes.js?v=202609042108"></script>
-<script src="assets/js/00-icons.js?v=202609042108"></script>
-<script src="assets/js/01-state.js?v=202609042108"></script>
-<script src="assets/js/02-nav-util.js?v=202609042108"></script>
-<script src="assets/js/03-period-logic.js?v=202609042108"></script>
-<script src="assets/js/04-dashboard.js?v=202609042108"></script>
-<script src="assets/js/05-master-data.js?v=202609042108"></script>
-<script src="assets/js/06-plan-personil.js?v=202609042108"></script>
-<script src="assets/js/07-rules-planner.js?v=202609042108"></script>
-<script src="assets/js/08-gantt-print.js?v=202609042108"></script>
-<script src="assets/js/09-tracking-map.js?v=202609042108"></script>
-<script src="assets/js/10-running-hour.js?v=202609042108"></script>
-<script src="assets/js/11-berita-acara.js?v=202609042108"></script>
-<script src="assets/js/12-data-page.js?v=202609042108"></script>
-<script src="assets/js/13-hasil-db.js?v=202609042108"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202609042108"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202609042108"></script>
-<script src="assets/js/16-actions-init.js?v=202609042108"></script>
+<script src="assets/data/default-data.js?v=202609070121"></script>
+<script src="assets/data/brand-assets.js?v=202609070121"></script>
+<script src="assets/data/travel-routes.js?v=202609070121"></script>
+<script src="assets/js/00-icons.js?v=202609070121"></script>
+<script src="assets/js/01-state.js?v=202609070121"></script>
+<script src="assets/js/02-nav-util.js?v=202609070121"></script>
+<script src="assets/js/03-period-logic.js?v=202609070121"></script>
+<script src="assets/js/04-dashboard.js?v=202609070121"></script>
+<script src="assets/js/05-master-data.js?v=202609070121"></script>
+<script src="assets/js/06-plan-personil.js?v=202609070121"></script>
+<script src="assets/js/07-rules-planner.js?v=202609070121"></script>
+<script src="assets/js/08-gantt-print.js?v=202609070121"></script>
+<script src="assets/js/09-tracking-map.js?v=202609070121"></script>
+<script src="assets/js/10-running-hour.js?v=202609070121"></script>
+<script src="assets/js/11-berita-acara.js?v=202609070121"></script>
+<script src="assets/js/12-data-page.js?v=202609070121"></script>
+<script src="assets/js/13-hasil-db.js?v=202609070121"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202609070121"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202609070121"></script>
+<script src="assets/js/16-actions-init.js?v=202609070121"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202609070121"></script>
 </body>
 </html>
