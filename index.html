@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202609070121">
+<link rel="stylesheet" href="assets/css/style.css?v=202609070208">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -537,6 +537,7 @@
         <div class="field"><label>Tim</label><select id="dokTeam"><option value="">Semua</option><option value="emisi">Emisi</option><option value="ambient">Ambient</option></select></div>
         <div class="field"><label>Batch</label><select id="dokBatch"><option value="">Semua</option></select></div>
         <div class="field"><label>Site</label><select id="dokSite"><option value="">Semua</option></select></div>
+        <div class="field"><label>&nbsp;</label><div style="display:flex;gap:8px;"><button class="btn small ghost" data-action="expandAllDokFoto">Buka Semua</button><button class="btn small ghost" data-action="collapseAllDokFoto">Tutup Semua</button></div></div>
         <span class="spacer"></span>
         <div class="hint" style="margin:0;">Total penyimpanan foto saat ini: <b id="dokFotoStorageSize">0 KB</b></div>
       </div>
@@ -1160,28 +1161,28 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202609070121"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202609070208"></script>
 
-<script src="assets/data/default-data.js?v=202609070121"></script>
-<script src="assets/data/brand-assets.js?v=202609070121"></script>
-<script src="assets/data/travel-routes.js?v=202609070121"></script>
-<script src="assets/js/00-icons.js?v=202609070121"></script>
-<script src="assets/js/01-state.js?v=202609070121"></script>
-<script src="assets/js/02-nav-util.js?v=202609070121"></script>
-<script src="assets/js/03-period-logic.js?v=202609070121"></script>
-<script src="assets/js/04-dashboard.js?v=202609070121"></script>
-<script src="assets/js/05-master-data.js?v=202609070121"></script>
-<script src="assets/js/06-plan-personil.js?v=202609070121"></script>
-<script src="assets/js/07-rules-planner.js?v=202609070121"></script>
-<script src="assets/js/08-gantt-print.js?v=202609070121"></script>
-<script src="assets/js/09-tracking-map.js?v=202609070121"></script>
-<script src="assets/js/10-running-hour.js?v=202609070121"></script>
-<script src="assets/js/11-berita-acara.js?v=202609070121"></script>
-<script src="assets/js/12-data-page.js?v=202609070121"></script>
-<script src="assets/js/13-hasil-db.js?v=202609070121"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202609070121"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202609070121"></script>
-<script src="assets/js/16-actions-init.js?v=202609070121"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202609070121"></script>
+<script src="assets/data/default-data.js?v=202609070208"></script>
+<script src="assets/data/brand-assets.js?v=202609070208"></script>
+<script src="assets/data/travel-routes.js?v=202609070208"></script>
+<script src="assets/js/00-icons.js?v=202609070208"></script>
+<script src="assets/js/01-state.js?v=202609070208"></script>
+<script src="assets/js/02-nav-util.js?v=202609070208"></script>
+<script src="assets/js/03-period-logic.js?v=202609070208"></script>
+<script src="assets/js/04-dashboard.js?v=202609070208"></script>
+<script src="assets/js/05-master-data.js?v=202609070208"></script>
+<script src="assets/js/06-plan-personil.js?v=202609070208"></script>
+<script src="assets/js/07-rules-planner.js?v=202609070208"></script>
+<script src="assets/js/08-gantt-print.js?v=202609070208"></script>
+<script src="assets/js/09-tracking-map.js?v=202609070208"></script>
+<script src="assets/js/10-running-hour.js?v=202609070208"></script>
+<script src="assets/js/11-berita-acara.js?v=202609070208"></script>
+<script src="assets/js/12-data-page.js?v=202609070208"></script>
+<script src="assets/js/13-hasil-db.js?v=202609070208"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202609070208"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202609070208"></script>
+<script src="assets/js/16-actions-init.js?v=202609070208"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202609070208"></script>
 </body>
 </html>
