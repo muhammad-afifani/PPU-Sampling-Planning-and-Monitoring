@@ -106,13 +106,27 @@ function deleteDokFoto(pointId, cat, photoId){
   });
 }
 
+/* ---------- Judul umum "Nama Titik — tanggal sampling", dipakai di lightbox & editor crop supaya
+   konsisten dengan format contoh Lampiran SIMPEL PPU (Kode Cerobong/Sumber Emisi di kepala tiap
+   lampiran foto). ---------- */
+function dokFotoPointCaptionHtml(pointId){
+  const p = DB.points.find(x=>x.id===pointId);
+  if(!p) return { title: "", sub: "" };
+  const t = ensureTracking(pointId);
+  const kategoriLabel = p.kategori==="emisi" ? (p.kategoriSumber||"-") : (NONEMISI_LABEL[p.kategori]||p.kategori);
+  const dateInfo = (t.samplingStatus==="sampled" && t.dates.actual) ? ` &middot; Disampling ${fmtTanggalIndo(t.dates.actual)}` : "";
+  return { title: escHtml(p.nama), sub: `${escHtml(p.site)} &middot; ${escHtml(kategoriLabel)}${dateInfo}` };
+}
+
 /* ---------- Lightbox (lihat penuh) ---------- */
 function openDokFotoLightbox(pointId, cat, photoId){
   const photo = (ensureDokFoto(pointId)[cat]||[]).find(p=>p.id===photoId);
   if(!photo) return;
+  const cap = dokFotoPointCaptionHtml(pointId);
   openModal(`
-    <h3>${escHtml(dokFotoCatMeta(cat).label)}</h3>
-    <div style="text-align:center;background:var(--gray-100);border-radius:8px;padding:10px;">
+    <h3>${cap.title} <span class="muted" style="font-weight:400;font-size:13px;">&mdash; ${escHtml(dokFotoCatMeta(cat).label)}</span></h3>
+    <div class="hint" style="margin-top:-6px;">${cap.sub}</div>
+    <div style="text-align:center;background:var(--gray-100);border-radius:8px;padding:10px;margin-top:10px;">
       <img src="${photo.dataUrl}" style="max-width:100%;max-height:65vh;border-radius:4px;">
     </div>
     <div class="actions">
@@ -152,8 +166,9 @@ function openDokFotoCrop(pointId, cat, photoId){
   if(!photo || !meta) return;
   const ratio = meta.ratio;
   const canvasW = 380, canvasH = Math.round(canvasW/ratio);
+  const cap = dokFotoPointCaptionHtml(pointId);
   openModal(`
-    <h3>Atur Crop / Zoom — ${escHtml(meta.label)}</h3>
+    <h3>Atur Crop / Zoom — ${cap.title} <span class="muted" style="font-weight:400;font-size:13px;">&mdash; ${escHtml(meta.label)}</span></h3>
     <div class="hint" style="margin-top:-6px;">Geser foto di area gelap untuk memindahkan posisi, geser slider untuk memperbesar bagian yang ditampilkan. Foto asli tidak berubah sampai "Simpan" ditekan.</div>
     <div class="dokfoto-crop-stage" id="dokFotoCropStage" style="max-width:${canvasW}px;aspect-ratio:${ratio};">
       <canvas id="dokFotoCropCanvas" width="${canvasW}" height="${canvasH}"></canvas>
@@ -290,13 +305,23 @@ function dokFotoThumbHtml(pointId, cat){
       <button class="dokfoto-thumb-del" data-action="deleteDokFoto" data-point="${pointId}" data-cat="${cat.key}" data-id="${ph.id}" title="Hapus">&times;</button>
     </div>`).join("");
   return `<div class="dokfoto-cat">
-    <div class="dokfoto-cat-label">${escHtml(meta.label)} <span class="muted">(${photos.length} foto)</span></div>
-    <div class="dokfoto-thumbstrip">
+    <div class="dokfoto-cat-label">${escHtml(meta.label)} <span class="muted" style="font-weight:400;">(${photos.length} foto)</span></div>
+    <div class="dokfoto-thumbgrid">
       ${thumbs}
-      <button class="dokfoto-add-btn" style="aspect-ratio:${meta.ratio};" data-action="triggerAddDokFoto" data-point="${pointId}" data-cat="${cat.key}">+ Tambah<br>Foto</button>
+      <button class="dokfoto-add-btn" style="aspect-ratio:${meta.ratio};" data-action="triggerAddDokFoto" data-point="${pointId}" data-cat="${cat.key}">+ Tambah Foto</button>
     </div>
   </div>`;
 }
+// Status buka/tutup tiap kartu titik (<details>) — disimpan di memori terpisah dari DB (murni
+// preferensi tampilan, sama seperti spExpanded di 08-gantt-print.js) supaya TIDAK ke-reset ke
+// default tiap kali halaman ini di-render ulang (tambah/hapus/crop foto memanggil renderDokumentasiFoto
+// lagi, kalau statusnya tidak disimpan terpisah, kartu yang baru saja diciutkan user akan otomatis
+// kebuka lagi begitu ada 1 foto ditambahkan di kartu manapun).
+const dokFotoExpanded = {};
+document.getElementById("dokFotoList").addEventListener("toggle", e=>{
+  const d = e.target.closest(".dokfoto-point-card");
+  if(d) dokFotoExpanded[d.dataset.pointId] = d.open;
+}, true);
 function renderDokumentasiFoto(){
   refreshDokBatchSelect();
   refreshDokSiteSelect();
@@ -311,14 +336,20 @@ function renderDokumentasiFoto(){
   el.innerHTML = pts.map(p=>{
     const t = ensureTracking(p.id);
     const statusLabel = t.samplingStatus ? (SAMPLING_STATUS_LABELS[t.samplingStatus]||t.samplingStatus) : "Belum diisi statusnya";
-    const kategoriLabel = p.kategori==="emisi" ? (p.kategoriSumber||"-") : (NONEMISI_LABEL[p.kategori]||p.kategori);
-    return `<div class="card dokfoto-point-card">
-      <div class="dokfoto-point-head">
-        <div><b>${escHtml(p.nama)}</b> <span class="muted">(${escHtml(p.site)} &middot; ${escHtml(kategoriLabel)})</span></div>
+    const cap = dokFotoPointCaptionHtml(p.id);
+    const isOpen = dokFotoExpanded[p.id]!==false; // default terbuka
+    return `<details class="card dokfoto-point-card" data-point-id="${p.id}" ${isOpen?"open":""}>
+      <summary class="dokfoto-point-summary">
+        <div>
+          <div class="dokfoto-point-title"><span class="dokfoto-point-chevron">&#9662;</span><b>${cap.title}</b></div>
+          <div class="dokfoto-point-sub">${cap.sub}</div>
+        </div>
         <span class="badge ${t.samplingStatus==="sampled"?"b-green":"b-teal"}">${escHtml(statusLabel)}</span>
+      </summary>
+      <div class="dokfoto-point-body">
+        ${DOKFOTO_CATEGORIES.map(cat=>dokFotoThumbHtml(p.id, cat)).join("")}
       </div>
-      ${DOKFOTO_CATEGORIES.map(cat=>dokFotoThumbHtml(p.id, cat)).join("")}
-    </div>`;
+    </details>`;
   }).join("");
 }
 document.getElementById("dokTeam").addEventListener("change", ()=>{ refreshDokBatchSelect(); renderDokumentasiFoto(); });
@@ -336,5 +367,11 @@ Object.assign(ACTIONS, {
   openDokFotoLightbox:(t)=>openDokFotoLightbox(t.dataset.point, t.dataset.cat, t.dataset.id),
   openDokFotoCrop:(t)=>openDokFotoCrop(t.dataset.point, t.dataset.cat, t.dataset.id),
   deleteDokFoto:(t)=>deleteDokFoto(t.dataset.point, t.dataset.cat, t.dataset.id),
-  resetDokFotoCrop, saveDokFotoCrop
+  resetDokFotoCrop, saveDokFotoCrop,
+  expandAllDokFoto:()=>{
+    document.querySelectorAll("#dokFotoList .dokfoto-point-card").forEach(d=>{ d.open=true; dokFotoExpanded[d.dataset.pointId]=true; });
+  },
+  collapseAllDokFoto:()=>{
+    document.querySelectorAll("#dokFotoList .dokfoto-point-card").forEach(d=>{ d.open=false; dokFotoExpanded[d.dataset.pointId]=false; });
+  }
 });
