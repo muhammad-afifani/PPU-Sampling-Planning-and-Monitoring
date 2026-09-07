@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202609070208">
+<link rel="stylesheet" href="assets/css/style.css?v=202609070247">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -532,6 +532,7 @@
     <div class="page" id="page-dokumentasi">
       <div class="stickytop">
       <div class="pagehead"><div><h2>Dokumentasi Foto Sampling</h2><div class="desc">Lampiran foto per titik mengikuti format "Data Pendukung/Lampiran SIMPEL PPU": Petugas Laboratorium/PPC, Peralatan Sampling, Aktivitas Sampling (boleh lebih dari 1 foto tiap kategori), dan bukti screenshot BA yang sudah ditandatangani. Foto ikut tersimpan &amp; ter-backup lewat Export/Import Semua Data (JSON) di halaman Data.</div></div>
+        <div class="toolbar"><button class="btn primary" data-action="printAllVisibleDokFotoLampiran">Cetak Semua yang Tampil (PDF)</button></div>
       </div>
       <div class="toolbar card" style="padding:12px 14px;">
         <div class="field"><label>Tim</label><select id="dokTeam"><option value="">Semua</option><option value="emisi">Emisi</option><option value="ambient">Ambient</option></select></div>
@@ -542,7 +543,7 @@
         <div class="hint" style="margin:0;">Total penyimpanan foto saat ini: <b id="dokFotoStorageSize">0 KB</b></div>
       </div>
       </div>
-      <div id="dokFotoList"></div>
+      <div id="dokFotoList" class="dokfoto-list"></div>
     </div>
 
     <!-- RUNNING HOUR DETAIL -->
@@ -1092,7 +1093,9 @@
       <div class="card card-accent-green" style="border-width:2px;">
         <h3 class="accent-green-heading">📦 Backup Lengkap — gunakan fitur ini untuk berbagi atau memindahkan data ke perangkat lain</h3>
         <p class="hint" style="font-weight:600;color:var(--heading);">Berisi seluruh data: titik pantau, personil, aturan, batch, jadwal (termasuk yang sudah difinalisasi), tracking, running hour, dan hasil pemantauan — seluruh isi aplikasi ini.</p>
-        <div class="toolbar">
+        <label class="checkline" style="margin-top:4px;"><input type="checkbox" id="exportIncludePhotos"> Sertakan foto Dokumentasi Sampling</label>
+        <div class="hint" style="margin-top:2px;">Foto bisa membuat ukuran file jauh lebih besar. Kosongkan kalau cuma perlu backup data teks (batch/tracking/hasil pemantauan dst) — foto dokumentasi yang SUDAH ADA di perangkat ini tidak akan ikut terhapus saat file hasil export ini nanti di-import lagi (baik di perangkat ini maupun perangkat lain).</div>
+        <div class="toolbar" style="margin-top:8px;">
           <button class="btn primary" data-action="exportAll">Export Semua Data (.json)</button>
         </div>
         <div class="filebox" style="margin-top:10px;">
@@ -1161,28 +1164,28 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202609070208"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202609070247"></script>
 
-<script src="assets/data/default-data.js?v=202609070208"></script>
-<script src="assets/data/brand-assets.js?v=202609070208"></script>
-<script src="assets/data/travel-routes.js?v=202609070208"></script>
-<script src="assets/js/00-icons.js?v=202609070208"></script>
-<script src="assets/js/01-state.js?v=202609070208"></script>
-<script src="assets/js/02-nav-util.js?v=202609070208"></script>
-<script src="assets/js/03-period-logic.js?v=202609070208"></script>
-<script src="assets/js/04-dashboard.js?v=202609070208"></script>
-<script src="assets/js/05-master-data.js?v=202609070208"></script>
-<script src="assets/js/06-plan-personil.js?v=202609070208"></script>
-<script src="assets/js/07-rules-planner.js?v=202609070208"></script>
-<script src="assets/js/08-gantt-print.js?v=202609070208"></script>
-<script src="assets/js/09-tracking-map.js?v=202609070208"></script>
-<script src="assets/js/10-running-hour.js?v=202609070208"></script>
-<script src="assets/js/11-berita-acara.js?v=202609070208"></script>
-<script src="assets/js/12-data-page.js?v=202609070208"></script>
-<script src="assets/js/13-hasil-db.js?v=202609070208"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202609070208"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202609070208"></script>
-<script src="assets/js/16-actions-init.js?v=202609070208"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202609070208"></script>
+<script src="assets/data/default-data.js?v=202609070247"></script>
+<script src="assets/data/brand-assets.js?v=202609070247"></script>
+<script src="assets/data/travel-routes.js?v=202609070247"></script>
+<script src="assets/js/00-icons.js?v=202609070247"></script>
+<script src="assets/js/01-state.js?v=202609070247"></script>
+<script src="assets/js/02-nav-util.js?v=202609070247"></script>
+<script src="assets/js/03-period-logic.js?v=202609070247"></script>
+<script src="assets/js/04-dashboard.js?v=202609070247"></script>
+<script src="assets/js/05-master-data.js?v=202609070247"></script>
+<script src="assets/js/06-plan-personil.js?v=202609070247"></script>
+<script src="assets/js/07-rules-planner.js?v=202609070247"></script>
+<script src="assets/js/08-gantt-print.js?v=202609070247"></script>
+<script src="assets/js/09-tracking-map.js?v=202609070247"></script>
+<script src="assets/js/10-running-hour.js?v=202609070247"></script>
+<script src="assets/js/11-berita-acara.js?v=202609070247"></script>
+<script src="assets/js/12-data-page.js?v=202609070247"></script>
+<script src="assets/js/13-hasil-db.js?v=202609070247"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202609070247"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202609070247"></script>
+<script src="assets/js/16-actions-init.js?v=202609070247"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202609070247"></script>
 </body>
 </html>

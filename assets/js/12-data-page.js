@@ -17,11 +17,23 @@ function cacheBustUrl(url){
 // aku buat ini beneran isinya lengkap ya" TANPA harus kirim dulu ke laptop lain buat tahu, karena
 // mekanisme export/import-nya sendiri sudah diverifikasi benar berkali-kali; kalau ada yg hilang,
 // gejalanya akan kelihatan di ringkasan INI, bukan baru ketahuan pas dibuka di laptop lain.
+// "Sertakan foto Dokumentasi Sampling" (checkbox #exportIncludePhotos, default KOSONG) — foto
+// tersimpan sbg data-URI (base64) yang gampang membengkakkan ukuran file jadi puluhan MB kalau
+// titiknya banyak, sedangkan kebutuhan export paling umum (pindah data teks antar device/backup
+// harian) tidak butuh fotonya. Kalau dikosongkan, dokumentasiFoto diganti {} DAN ditandai
+// _dokFotoExcluded:true (properti sementara, bukan bagian skema DB) — dibaca applyFullBackupImport
+// supaya foto yang SUDAH ADA di device tujuan TIDAK ikut terhapus cuma krn file yg diimport memang
+// sengaja tidak menyertakan foto (beda dgn file yang foto-nya betul-betul kosong krn belum diisi).
 function exportAll(){
   const finalizedCount = DB.batches.filter(b=>b.finalized).length;
-  const summary = `Mengekspor: ${DB.points.length} titik, ${DB.batches.length} batch (${finalizedCount} sudah final), ${DB.personil.length} personil, ${DB.hasilPemantauan.length} data hasil pemantauan, ${Object.keys(DB.tracking||{}).length} tracking. Dari session browser INI — cek angkanya sesuai yang kamu kerjakan sebelum dikirim ke laptop lain.`;
+  const includePhotos = document.getElementById("exportIncludePhotos").checked;
+  const data = includePhotos ? DB : {...DB, dokumentasiFoto:{}, _dokFotoExcluded:true};
+  const fotoNote = includePhotos
+    ? ` Foto Dokumentasi Sampling ${fmtBytes(dokFotoStorageBytes())} ikut disertakan.`
+    : ` Foto Dokumentasi Sampling TIDAK disertakan (centang opsinya kalau perlu pindah foto ke perangkat lain).`;
+  const summary = `Mengekspor: ${DB.points.length} titik, ${DB.batches.length} batch (${finalizedCount} sudah final), ${DB.personil.length} personil, ${DB.hasilPemantauan.length} data hasil pemantauan, ${Object.keys(DB.tracking||{}).length} tracking.${fotoNote} Dari session browser INI — cek angkanya sesuai yang kamu kerjakan sebelum dikirim ke laptop lain.`;
   toast(summary, DB.batches.length ? "ok" : "err");
-  downloadBlob(JSON.stringify(DB,null,2), `phm_emisi_backup_${todayStr()}.json`, "application/json");
+  downloadBlob(JSON.stringify(data,null,2), `phm_emisi_backup_${todayStr()}.json`, "application/json");
 }
 // Satu handler dipakai bareng utk 2 jalur backup-lengkap (pilih file, cek update online) — supaya
 // validasi & cara terapnya identik di manapun sumbernya. Selalu tampilkan perbandingan "punya kamu
@@ -41,10 +53,17 @@ function handleFullBackupPackage(data, sourceLabel){
   pendingFullBackup = {data, sourceLabel};
   const curFinalized = DB.batches.filter(b=>b.finalized).length;
   const newFinalized = data.batches.filter(b=>b.finalized).length;
+  // File yg sengaja tidak menyertakan foto (_dokFotoExcluded, lihat exportAll) TIDAK akan menghapus
+  // foto yang sudah ada di device ini — perlu ditulis di sini supaya user yang lihat "0 foto" di
+  // ringkasan file tidak salah paham kalau foto lokalnya bakal ikut kehapus.
+  const fotoNote = data._dokFotoExcluded
+    ? `Foto Dokumentasi Sampling TIDAK disertakan di file ini — foto yang sudah ada di perangkat ini <b>akan tetap disimpan</b>, tidak ikut terhapus.`
+    : `Foto Dokumentasi Sampling: ${Object.keys(data.dokumentasiFoto||{}).length} titik di file ini (akan MENIMPA foto yang sudah ada di perangkat ini).`;
   openModal(`
     <h3>Restore Backup Lengkap</h3>
     <p class="hint"><b>Data kamu SAAT INI</b> (akan hilang kalau lanjut): ${DB.points.length} titik, ${DB.batches.length} batch (${curFinalized} final), ${DB.personil.length} personil, ${Object.keys(DB.tracking||{}).length} tracking.</p>
     <p class="hint"><b>Data DARI "${escHtml(sourceLabel)}"</b>: ${data.points.length} titik, ${data.batches.length} batch (${newFinalized} final), ${data.personil.length} personil, ${Object.keys(data.tracking||{}).length} tracking.</p>
+    <p class="hint">${fotoNote}</p>
     <p style="font-weight:700;color:#a02a24;">Ini akan MENIMPA SELURUH data kamu saat ini dengan data di atas. Ada snapshot pengaman otomatis sebelum diterapkan (bisa di-undo lewat Riwayat &amp; Restore kalau salah pilih).</p>
     <div class="actions">
       <button class="btn ghost" data-action="closeModal">Batal</button>
@@ -57,10 +76,16 @@ function applyFullBackupImport(){
   const {data, sourceLabel} = pending;
   snapshotBefore(`Sebelum import backup "${sourceLabel}"`);
   const keepSnapshots = DB.snapshots, keepLog = DB.activityLog;
+  const keepDokFoto = DB.dokumentasiFoto;
+  const dokFotoWasExcluded = !!data._dokFotoExcluded;
   DB = data;
   migrateDB();
   if(!DB.snapshots.length) DB.snapshots = keepSnapshots; else DB.snapshots = keepSnapshots.concat(DB.snapshots).slice(0,8);
   if(!DB.activityLog.length) DB.activityLog = keepLog;
+  // File export yg sengaja tidak menyertakan foto tidak boleh diam-diam menghapus foto yang sudah
+  // ada di perangkat ini — lihat catatan _dokFotoExcluded di exportAll (12-data-page.js).
+  if(dokFotoWasExcluded) DB.dokumentasiFoto = keepDokFoto;
+  delete DB._dokFotoExcluded;
   logChange(`Import backup dari "${sourceLabel}"`);
   save();
   closeModal();
