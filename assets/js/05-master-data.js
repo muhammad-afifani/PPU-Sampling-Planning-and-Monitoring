@@ -480,7 +480,7 @@ function renderMaster(){
 });
 
 function pointFormHtml(p){
-  p = p || {id:"", site:"", kategori:"emisi", nama:"", kategoriSumber:"", regulasi:"", parameter:"", parameterCatatan:"", wajib:true, frekuensiBulan:6, tidakBeroperasi:false, alasanTidakWajib:"", kapasitas:"", kapasitasKW:"", kategoriKapasitas:"", jenisBahanBakar:"", runningHour:"", pemantauanTerakhir:"", prediksiBerikutnya:"", lastSampling:"", keterangan:"", groupOverride:"", holdReason:""};
+  p = p || {id:"", site:"", kategori:"emisi", nama:"", kategoriSumber:"", regulasi:"", parameter:"", parameterCatatan:"", wajib:true, frekuensiBulan:6, tidakBeroperasi:false, alasanTidakWajib:"", kapasitas:"", kapasitasKW:"", kategoriKapasitas:"", jenisBahanBakar:"", runningHour:"", pemantauanTerakhir:"", prediksiBerikutnya:"", lastSampling:"", keterangan:"", groupOverride:"", holdReason:"", stackHeight:"", stackDiameter:""};
   return `
   <h3>${p.id?"Edit":"Tambah"} Titik Pantau</h3>
   <div class="grid cols-2">
@@ -507,6 +507,11 @@ function pointFormHtml(p){
     <div class="field"><label>Kapasitas (KW)</label><input type="number" id="f_kapasitasKW" value="${p.kapasitasKW||""}"></div>
     <div class="field"><label>Jenis Bahan Bakar</label><input type="text" id="f_bahanBakar" value="${escHtml(p.jenisBahanBakar||"")}" placeholder="Gas / Minyak"></div>
   </div>
+  <div class="grid cols-2" style="margin-top:10px;">
+    <div class="field"><label>Tinggi Cerobong (m)</label><input type="number" step="0.1" min="0" id="f_stackHeight" value="${p.stackHeight||""}"></div>
+    <div class="field"><label>Diameter Cerobong (m)</label><input type="number" step="0.05" min="0" id="f_stackDiameter" value="${p.stackDiameter||""}"></div>
+  </div>
+  <div class="hint" style="margin-top:-2px;">Dipakai Model Dispersi Emisi untuk menghitung tinggi efektif plume. Opsional untuk titik emisi — kalau kosong, model memakai perkiraan standar per jenis sumber (ditandai "~" di tampilannya).</div>
   <div class="field" style="margin-top:10px;"><label>Grup Tree (pindah manual, opsional)</label><select id="f_groupOverride">
     <option value="">Otomatis${p.id?` — saat ini: "${escHtml(autoSubgroupOf(p))}"`:""}</option>
     ${ALL_TREE_GROUPS.map(g=>`<option value="${escHtml(g)}" ${p.groupOverride===g?"selected":""}>${escHtml(g)}</option>`).join("")}
@@ -570,6 +575,8 @@ function savePoint(id){
     kapasitas: document.getElementById("f_kapasitas").value.trim(),
     kapasitasKW: document.getElementById("f_kapasitasKW").value ? Number(document.getElementById("f_kapasitasKW").value) : null,
     jenisBahanBakar: document.getElementById("f_bahanBakar").value.trim(),
+    stackHeight: document.getElementById("f_stackHeight").value ? Number(document.getElementById("f_stackHeight").value) : null,
+    stackDiameter: document.getElementById("f_stackDiameter").value ? Number(document.getElementById("f_stackDiameter").value) : null,
     runningHour: document.getElementById("f_runningHour").value ? Number(document.getElementById("f_runningHour").value) : null,
     pemantauanTerakhir: document.getElementById("f_pemantauanTerakhir").value.trim(),
     prediksiBerikutnya: document.getElementById("f_prediksi").value.trim(),
@@ -622,6 +629,7 @@ function importPointsCsv(){
           wajib: /^(1|true|ya|wajib)$/i.test(r.wajib||""), frekuensiBulan: r.frekuensiBulan?Number(r.frekuensiBulan):"",
           tidakBeroperasi: /^(1|true|ya)$/i.test(r.tidakBeroperasi||""), kapasitas:r.kapasitas||"",
           kapasitasKW: r.kapasitasKW?Number(r.kapasitasKW):null, jenisBahanBakar:r.jenisBahanBakar||"",
+          stackHeight: r.stackHeight?Number(r.stackHeight):null, stackDiameter: r.stackDiameter?Number(r.stackDiameter):null,
           runningHour: r.runningHour?Number(r.runningHour):null, pemantauanTerakhir:r.pemantauanTerakhir||"",
           prediksiBerikutnya:r.prediksiBerikutnya||"", alasanTidakWajib:r.alasanTidakWajib||"",
           lastSampling:r.lastSampling||""
@@ -643,7 +651,7 @@ function importPointsCsv(){
   inp.click();
 }
 function exportPointsCsv(){
-  const headers=["id","site","kategori","nama","kategoriSumber","regulasi","parameter","parameterCatatan","wajib","frekuensiBulan","tidakBeroperasi","alasanTidakWajib","kapasitas","kapasitasKW","jenisBahanBakar","runningHour","pemantauanTerakhir","prediksiBerikutnya","lastSampling","status","batchId"];
+  const headers=["id","site","kategori","nama","kategoriSumber","regulasi","parameter","parameterCatatan","wajib","frekuensiBulan","tidakBeroperasi","alasanTidakWajib","kapasitas","kapasitasKW","jenisBahanBakar","stackHeight","stackDiameter","runningHour","pemantauanTerakhir","prediksiBerikutnya","lastSampling","status","batchId"];
   csvExport(headers, DB.points, "titik_pantau_export.csv");
 }
 
