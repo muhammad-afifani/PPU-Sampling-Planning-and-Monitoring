@@ -113,6 +113,7 @@ function renderPage(p){
   if(p==="lokasi") renderMap();
   if(p==="data") renderDataStatus();
   if(p==="beritaacara") renderBeritaAcara();
+  if(p==="dokumentasi") renderDokumentasiFoto();
   syncStickyOffset(p);
 }
 // Ukur tinggi header sticky (.stickytop) halaman aktif lalu simpan sebagai custom property

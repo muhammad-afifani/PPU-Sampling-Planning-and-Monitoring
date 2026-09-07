@@ -602,6 +602,7 @@ function savePoint(id){
 function deletePoint(id){
   askConfirm("Hapus titik pantau ini?", ()=>{
     DB.points = DB.points.filter(p=>p.id!==id);
+    delete DB.dokumentasiFoto[id]; // ikut hapus foto dokumentasi titik ini, kalau ada
     touchDataset("points"); save(); renderMaster(); toast("Titik pantau dihapus.");
   });
 }
