@@ -26,6 +26,12 @@ const DISPERSI_MASS_PARAMS = {
 // jadi bukan fenomena dispersi cerobong seperti 4 parameter di atas — lihat Dashboard Hasil
 // Pemantauan untuk data itu.
 const DISPERSI_COMPLIANCE_EXTRA = ["Opasitas"];
+// Mode ke-5 (bukan pencemar spesifik): pola sebaran KESELURUHAN gas buang berdasarkan laju alir
+// tercatat saja (tanpa dikalikan konsentrasi) — jawaban atas "arahnya kemana keluaran cerobongnya"
+// terlepas dari kadar polutan tertentu. Tidak dipakai utk beban/kepatuhan (itu perlu parameter riil).
+const DISPERSI_FLOW_MODE_KEY = "FLOW";
+const DISPERSI_FLOW_MODE_META = {label:"Keluaran Cerobong (Semua Arah)", desc:"Pola sebaran KESELURUHAN gas buang berdasarkan laju alir tercatat (bukan konsentrasi pencemar tertentu) — menunjukkan ke arah mana asap/gas buang bergerak, bukan beban pencemar. Pilih salah satu parameter pencemar untuk melihat beban & kepatuhan baku mutu."};
+function dispersiIsFlowMode(){ return dispersiState.param===DISPERSI_FLOW_MODE_KEY; }
 
 /* ---------- Pengelompokan jenis sumber (utk warna & default geometri cerobong) dari 17 nilai
    kategoriSumber riil yang jauh lebih rinci dari sekadar 6-7 tipe generik ---------- */
@@ -178,6 +184,14 @@ function dispersiEmissionRateGs(concRec, flowRec){
   if(!concRec || !flowRec || concRec.resultNumeric==null || flowRec.resultNumeric==null) return null;
   return concRec.resultNumeric * flowRec.resultNumeric / 1000;
 }
+// Mode "Keluaran Cerobong": pakai laju alir APA ADANYA sbg kekuatan sumber (bukan g/s riil) —
+// hanya utk bentuk/pola sebaran relatif antar titik & sektor angin, bukan angka beban yg berarti,
+// jadi tidak perlu konversi densitas gas buang yg presisi (skala warna selalu dinormalisasi relatif).
+function dispersiFlowOnlyQgs(stack, sel){
+  const recs = sel.periods.map(p=>dispersiFlowRecord(stack.id, p)).filter(r=>r && r.resultNumeric!=null);
+  if(!recs.length) return null;
+  return recs.reduce((a,r)=>a+r.resultNumeric,0)/recs.length;
+}
 // Hasil lengkap 1 stack+param pada SATU periode literal (bukan agregat tahun) — null kalau
 // datanya memang tidak ada (konsentrasi atau laju alir tidak tercatat pada periode itu).
 function dispersiBebanSinglePeriode(stack, param, periode){
@@ -251,8 +265,8 @@ function dispersiPeriodDateRange(sel){
 let dispersiState = {
   site: null, param: "NOx", sel: null, stability: "D", windMode: "live", mapLayer: "satellite",
   selectedStackIds: null,
-  wind: {speed:null, dirFrom:null, updatedAt:null, error:null, loading:false},
-  periodWind: {loading:false, error:null, avgSpeed:null, dominantDeg:null, dominantLabel:null, sampleCount:0, clamped:false, history:[], historyLabel:""}
+  wind: {speed:null, dirFrom:null, temp:null, humidity:null, updatedAt:null, error:null, loading:false, history:[], historyLabel:""},
+  periodWind: {loading:false, error:null, avgSpeed:null, avgTemp:null, avgHumidity:null, dominantDeg:null, dominantLabel:null, sampleCount:0, clamped:false, history:[], historyLabel:""}
 };
 function dispersiEnsureState(){
   const sites = dispersiSiteList();
@@ -277,7 +291,7 @@ function dispersiEnsureState(){
 // (arah/kecepatan angin baru) dan panel angin/rose/tabel perlu re-render, tapi peta itu sendiri
 // TIDAK perlu di-init ulang (lihat dispersiRenderSidePanels).
 function dispersiRefreshMapAndPanels(){
-  dispersiUpdatePlume();
+  dispersiScheduleUpdatePlume();
   dispersiRenderSidePanels();
 }
 async function dispersiFetchLiveWind(){
@@ -285,13 +299,27 @@ async function dispersiFetchLiveWind(){
   if(!center) return;
   dispersiState.wind.loading = true;
   try{
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${center.lat}&longitude=${center.lng}&current=wind_speed_10m,wind_direction_10m&hourly=wind_speed_10m,wind_direction_10m&past_days=7&forecast_days=1&wind_speed_unit=ms`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${center.lat}&longitude=${center.lng}&current=wind_speed_10m,wind_direction_10m,temperature_2m,relative_humidity_2m&hourly=wind_speed_10m,wind_direction_10m&past_days=7&forecast_days=1&wind_speed_unit=ms`;
     const res = await fetch(url);
     if(!res.ok) throw new Error("bad response");
     const data = await res.json();
-    dispersiState.wind = {speed:data.current.wind_speed_10m, dirFrom:data.current.wind_direction_10m, updatedAt:new Date().toISOString(), error:null, loading:false};
+    // hourly 7-hari-terakhir yg SAMA dgn dipakai utk current dipakai juga utk wind rose mode Live —
+    // sebelumnya dibuang begitu saja shg wind rose selalu kosong/kelihatan rusak di mode Live.
+    const dirs = data.hourly.wind_direction_10m||[], speeds = data.hourly.wind_speed_10m||[];
+    const hist = dirs.map((d,i)=>({dir:d,speed:speeds[i]})).filter(h=>h.dir!=null && h.speed!=null);
+    dispersiState.wind = {
+      speed:data.current.wind_speed_10m, dirFrom:data.current.wind_direction_10m,
+      temp:data.current.temperature_2m, humidity:data.current.relative_humidity_2m,
+      updatedAt:new Date().toISOString(), error:null, loading:false,
+      history:hist, historyLabel:"7 hari terakhir"
+    };
   }catch(err){
-    dispersiState.wind = {speed: dispersiState.wind.speed, dirFrom: dispersiState.wind.dirFrom, updatedAt:new Date().toISOString(), error:"Gagal memuat data angin live (perlu koneksi internet ke Open-Meteo) — memakai nilai terakhir.", loading:false};
+    dispersiState.wind = {
+      speed: dispersiState.wind.speed, dirFrom: dispersiState.wind.dirFrom,
+      temp: dispersiState.wind.temp, humidity: dispersiState.wind.humidity,
+      updatedAt:new Date().toISOString(), error:"Gagal memuat data angin live (perlu koneksi internet ke Open-Meteo) — memakai nilai terakhir.", loading:false,
+      history: dispersiState.wind.history||[], historyLabel: dispersiState.wind.historyLabel||"7 hari terakhir"
+    };
   }
   dispersiRefreshMapAndPanels();
 }
@@ -306,7 +334,7 @@ async function dispersiFetchPeriodWind(){
     const endDate = end>maxEndDate ? maxEndDate : end;
     const clamped = endDate!==end;
     if(endDate<start) throw new Error("range too recent");
-    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${center.lat}&longitude=${center.lng}&start_date=${start}&end_date=${endDate}&hourly=wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&timezone=auto`;
+    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${center.lat}&longitude=${center.lng}&start_date=${start}&end_date=${endDate}&hourly=wind_speed_10m,wind_direction_10m,temperature_2m,relative_humidity_2m&wind_speed_unit=ms&timezone=auto`;
     const res = await fetch(url);
     if(!res.ok) throw new Error("bad response");
     const data = await res.json();
@@ -314,15 +342,19 @@ async function dispersiFetchPeriodWind(){
     const hist = dirs.map((d,i)=>({dir:d,speed:speeds[i]})).filter(h=>h.dir!=null && h.speed!=null);
     if(!hist.length) throw new Error("no data");
     const avgSpeed = hist.reduce((a,h)=>a+h.speed,0)/hist.length;
+    const temps = (data.hourly.temperature_2m||[]).filter(v=>v!=null);
+    const hums = (data.hourly.relative_humidity_2m||[]).filter(v=>v!=null);
+    const avgTemp = temps.length ? temps.reduce((a,b)=>a+b,0)/temps.length : null;
+    const avgHumidity = hums.length ? hums.reduce((a,b)=>a+b,0)/hums.length : null;
     const N=16, bins=new Array(N).fill(0);
     hist.forEach(h=>{ bins[Math.round(h.dir/(360/N))%N]++; });
     let maxI=0; bins.forEach((v,i)=>{ if(v>bins[maxI]) maxI=i; });
     dispersiState.periodWind = {
-      loading:false, error:null, avgSpeed, dominantDeg:maxI*(360/N), dominantLabel:dispersiCompassLabel16(maxI*(360/N)),
+      loading:false, error:null, avgSpeed, avgTemp, avgHumidity, dominantDeg:maxI*(360/N), dominantLabel:dispersiCompassLabel16(maxI*(360/N)),
       sampleCount:hist.length, clamped, history:hist, historyLabel:`${start} – ${endDate}`
     };
   }catch(err){
-    dispersiState.periodWind = {loading:false, error:"Data angin historis Open-Meteo untuk rentang ini belum tersedia.", avgSpeed:null, dominantDeg:null, dominantLabel:null, sampleCount:0, clamped:false, history:[], historyLabel:""};
+    dispersiState.periodWind = {loading:false, error:"Data angin historis Open-Meteo untuk rentang ini belum tersedia.", avgSpeed:null, avgTemp:null, avgHumidity:null, dominantDeg:null, dominantLabel:null, sampleCount:0, clamped:false, history:[], historyLabel:""};
   }
   dispersiRefreshMapAndPanels();
 }
@@ -341,6 +373,18 @@ function dispersiBuildTileLayer(mode){
   if(mode==="street") return L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:21, maxNativeZoom:19, attribution:"&copy; OpenStreetMap contributors"});
   return L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {maxZoom:21, maxNativeZoom:17, attribution:"Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics"});
 }
+// Bingkai peta mengikuti SEBARAN NYATA titik site ini (fitBounds), bukan setView+zoom tetap —
+// beberapa site (mis. SPU) titik-titiknya tersebar puluhan km (beberapa platform/cluster berbeda,
+// bukan satu lokasi kompak), jadi zoom tetap yg dipusatkan ke rata-rata koordinat bisa sama sekali
+// tidak menampilkan titik manapun di layar. fitBounds selalu menampilkan SEMUA titik site terpilih.
+function dispersiFitSiteBounds(){
+  if(!dispersiMapInstance) return;
+  const stacks = dispersiStacks().filter(s=>s.site===dispersiState.site);
+  if(!stacks.length) return;
+  if(stacks.length===1){ dispersiMapInstance.setView([stacks[0].lat, stacks[0].lng], 14); return; }
+  const bounds = L.latLngBounds(stacks.map(s=>[s.lat,s.lng]));
+  dispersiMapInstance.fitBounds(bounds, {padding:[50,50], maxZoom:15});
+}
 function dispersiInitMap(){
   if(dispersiMapInstance) return;
   const el = document.getElementById("dispersiMap");
@@ -348,16 +392,22 @@ function dispersiInitMap(){
     el.innerHTML = "<div class='hint' style='padding:20px;'>Peta tidak bisa dimuat — perlu koneksi internet saat pertama kali buka halaman ini (untuk load tile peta). Coba refresh setelah online.</div>";
     return;
   }
-  const center = dispersiSiteCenter(dispersiState.site) || {lat:-0.75,lng:117.4};
-  dispersiMapInstance = L.map(el, {maxZoom:21}).setView([center.lat, center.lng], 13);
+  dispersiMapInstance = L.map(el, {maxZoom:21}).setView([-0.75,117.4], 9);
   dispersiTileLayer = dispersiBuildTileLayer(dispersiState.mapLayer).addTo(dispersiMapInstance);
   dispersiMarkersLayer = L.layerGroup().addTo(dispersiMapInstance);
   if(window.ResizeObserver){
     new ResizeObserver(()=>{ if(dispersiMapInstance) dispersiMapInstance.invalidateSize(); }).observe(el);
   }
   [30,150,500,1200].forEach(ms=>setTimeout(()=>{ if(dispersiMapInstance) dispersiMapInstance.invalidateSize(); }, ms));
+  // Plume dihitung ULANG tiap kali tampilan peta berubah (zoom atau geser) — sebelumnya plume
+  // adalah gambar statis terikat ke kotak geografis tetap di sekitar titik, jadi kalau di-zoom out
+  // kelihatan seperti "kepotong" (di luar kotak itu kosong) dan kalau di-zoom in jadi blur (piksel
+  // gambar yg sama diperbesar). Sekarang kotak & resolusinya SELALU mengikuti area yang benar-benar
+  // sedang terlihat, jadi selalu tajam & tidak pernah terpotong — didebounce 350ms supaya tidak
+  // menghitung ulang tiap frame animasi zoom/geser, cukup sekali setelah gestur selesai.
+  dispersiMapInstance.on("zoomend moveend", ()=>dispersiScheduleUpdatePlume(350));
   dispersiDrawMarkers();
-  dispersiUpdatePlume();
+  dispersiFitSiteBounds();
 }
 function dispersiSetMapLayer(mode){
   if(mode===dispersiState.mapLayer) return;
@@ -386,60 +436,121 @@ function dispersiToggleStack(id){
   if(dispersiState.selectedStackIds.has(id)) dispersiState.selectedStackIds.delete(id);
   else dispersiState.selectedStackIds.add(id);
   dispersiDrawMarkers();
-  dispersiUpdatePlume();
+  dispersiScheduleUpdatePlume();
   dispersiRenderSidePanels();
 }
+// Toggle SEMUA titik jenis sumber (tipe) tertentu di site aktif sekaligus — jalan pintas dari
+// klik satu-satu tiap marker. "Aktif" (semua anggota tipe ini sudah kepilih) -> klik lagi = keluarkan
+// semuanya; kalau campuran/belum ada yg kepilih -> klik = masukkan semuanya.
+function dispersiToggleTipe(el){
+  const key = el.dataset.val;
+  const stacksOfType = dispersiStacks().filter(s=>s.site===dispersiState.site && s.tipe.key===key);
+  if(!stacksOfType.length) return;
+  const allSelected = stacksOfType.every(s=>dispersiState.selectedStackIds.has(s.id));
+  stacksOfType.forEach(s=>{ if(allSelected) dispersiState.selectedStackIds.delete(s.id); else dispersiState.selectedStackIds.add(s.id); });
+  dispersiDrawMarkers();
+  dispersiScheduleUpdatePlume();
+  dispersiRenderSidePanels();
+  dispersiRenderTipeChips();
+}
+function dispersiTipeChipsHtml(){
+  const stacksAtSite = dispersiStacks().filter(s=>s.site===dispersiState.site);
+  const byTipe = {};
+  stacksAtSite.forEach(s=>{ (byTipe[s.tipe.key] = byTipe[s.tipe.key]||[]).push(s); });
+  const keys = Object.keys(byTipe).sort((a,b)=>byTipe[b].length-byTipe[a].length);
+  if(!keys.length) return "";
+  return keys.map(key=>{
+    const list = byTipe[key];
+    const allSelected = list.every(s=>dispersiState.selectedStackIds.has(s.id));
+    const someSelected = list.some(s=>dispersiState.selectedStackIds.has(s.id));
+    const color = list[0].tipe.color;
+    return `<button type="button" class="chip-toggle ${allSelected?"active":""}" data-action="dispersiToggleTipe" data-val="${escHtml(key)}" style="${someSelected&&!allSelected?"box-shadow:inset 0 0 0 1.5px "+color+";":""}">
+      <span style="width:7px;height:7px;border-radius:50%;background:${color};display:inline-block;margin-right:5px;"></span>${escHtml(key)} (${list.length})
+    </button>`;
+  }).join("");
+}
+function dispersiRenderTipeChips(){
+  const el = document.getElementById("dispersiTipeChips");
+  if(el) el.innerHTML = dispersiTipeChipsHtml();
+}
+// Status render plume ("loading"/"no-data"/"ready") ditampilkan di #dispersiPlumeStatus supaya
+// user bisa bedakan "lagi dihitung", "memang tidak ada data", atau "beneran macet" — sebelumnya
+// diam saja tanpa indikasi apapun kalau plume tidak muncul.
+function dispersiSetPlumeStatus(status, message){
+  const el = document.getElementById("dispersiPlumeStatus");
+  if(!el) return;
+  if(status==="loading"){ el.style.color="var(--gray-500)"; el.textContent = "⏳ Menghitung plume…"; }
+  else if(status==="no-data"){ el.style.color="#8a5c11"; el.textContent = message||"Tidak ada data untuk ditampilkan."; }
+  else if(status==="ready"){ el.style.color="var(--green-500)"; el.textContent = "✓ Plume terhitung · "+new Date().toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit",second:"2-digit"}); }
+  else { el.textContent = ""; }
+}
+let dispersiPlumeComputeTimer = null;
+// Dipanggil dari SEMUA pemicu perubahan (ganti site/parameter/periode/stabilitas/seleksi titik/
+// mode angin/zoom-geser peta) — didebounce supaya perubahan yg beruntun (mis. gestur zoom) tidak
+// memicu hitungan berat berkali-kali, dan status "Menghitung..." langsung tampil sebelum hitungan
+// beratnya (sinkron, bisa makan waktu) mulai — beri browser kesempatan mengecat teks itu dulu.
+function dispersiScheduleUpdatePlume(delay){
+  dispersiSetPlumeStatus("loading");
+  clearTimeout(dispersiPlumeComputeTimer);
+  dispersiPlumeComputeTimer = setTimeout(dispersiComputePlumeNow, delay==null?15:delay);
+}
 // Grid konsentrasi 200x200 (CALC) dihitung lalu diperhalus (box blur 3x) supaya batas antar-band
-// jadi kurva mulus (bukan kotak-kotak piksel), dibagi 8 band non-linear (akar pangkat 0.55 spy band
-// rendah tidak keliatan kepipihkan oleh puncak plume), lalu diupscale ke 900px (OUT) dengan
-// image-smoothing kualitas tinggi sebelum ditempel sbg imageOverlay georeferensi — ini yang
-// bikin tepian plume tetap halus walau di-zoom, bukan pecah jadi kotak piksel kasar.
-function dispersiUpdatePlume(){
+// jadi kurva mulus, dibagi 8 band non-linear (akar pangkat 0.55 spy band rendah tidak keliatan
+// kepipihkan oleh puncak plume), lalu diupscale dgn image-smoothing kualitas tinggi ke ukuran
+// output sebelum ditempel sbg imageOverlay georeferensi. Kotak geografis & resolusi efektifnya
+// SELALU mengikuti VIEWPORT peta saat ini (bukan kotak tetap di sekitar titik) — supaya tidak
+// pernah "kepotong" saat zoom out (kotaknya toh selalu sebesar yg kelihatan) atau blur saat zoom in
+// (dihitung ulang dgn kotak yg lebih kecil = piksel dunia-nyata lebih rapat).
+function dispersiComputePlumeNow(){
   if(!dispersiMapInstance) return;
   if(dispersiPlumeLayerObj){ dispersiMapInstance.removeLayer(dispersiPlumeLayerObj); dispersiPlumeLayerObj=null; }
-  if(!DISPERSI_MASS_PARAMS[dispersiState.param]) return;
+  const flowMode = dispersiIsFlowMode();
+  if(!flowMode && !DISPERSI_MASS_PARAMS[dispersiState.param]){ dispersiSetPlumeStatus("no-data","Parameter tidak dikenal."); return; }
   const sel = dispersiResolveSelection(dispersiState.sel);
-  if(!sel) return;
+  if(!sel){ dispersiSetPlumeStatus("no-data","Periode data belum dipilih."); return; }
   const stacks = dispersiStacks().filter(s=>s.site===dispersiState.site && dispersiState.selectedStackIds.has(s.id));
-  if(!stacks.length) return;
+  if(!stacks.length){ dispersiSetPlumeStatus("no-data",'Tidak ada titik terpilih di peta — klik titik, atau tombol "Pilih Semua".'); return; }
   const sources = stacks.map(s=>{
+    if(flowMode){
+      const q = dispersiFlowOnlyQgs(s, sel);
+      return q==null ? null : {stack:s, Qgs:q};
+    }
     const b = dispersiBebanForSelection(s, dispersiState.param, sel);
     if(!b || b.Qgs==null) return null;
     return {stack:s, Qgs:b.Qgs};
   }).filter(Boolean);
-  if(!sources.length) return;
+  if(!sources.length){ dispersiSetPlumeStatus("no-data","Tidak ada data konsentrasi/laju alir pada titik & periode yang dipilih untuk parameter ini."); return; }
 
   let windCases;
   if(dispersiState.windMode==="periode"){
     const hist = dispersiState.periodWind.history;
-    if(!hist.length) return;
+    if(!hist.length){ dispersiSetPlumeStatus("no-data",'Data angin periode belum tersedia — coba "Refresh Angin".'); return; }
     const N=16, bins=new Array(N).fill(0), speedSum=new Array(N).fill(0);
     hist.forEach(h=>{ const idx=Math.round(h.dir/(360/N))%N; bins[idx]++; speedSum[idx]+=h.speed; });
     const total = hist.length;
     windCases = [];
     for(let i=0;i<N;i++){ if(bins[i]) windCases.push({dirFrom:i*(360/N), u:Math.max(speedSum[i]/bins[i],0.5), weight:bins[i]/total}); }
   } else {
-    if(dispersiState.wind.dirFrom==null) return;
+    if(dispersiState.wind.dirFrom==null){ dispersiSetPlumeStatus("no-data",'Data angin live belum tersedia — coba "Refresh Angin".'); return; }
     windCases = [{dirFrom:dispersiState.wind.dirFrom, u:Math.max(dispersiState.wind.speed||2,0.5), weight:1}];
   }
-  if(!windCases.length) return;
+  if(!windCases.length){ dispersiSetPlumeStatus("no-data","Data angin tidak cukup untuk dihitung."); return; }
 
-  const originLat = stacks.reduce((a,s)=>a+s.lat,0)/stacks.length;
-  const originLng = stacks.reduce((a,s)=>a+s.lng,0)/stacks.length;
-  const HALF_M = 6000;
-  const bounds = [
-    [originLat-HALF_M/dispersiMetersPerDegLat(), originLng-HALF_M/dispersiMetersPerDegLng(originLat)],
-    [originLat+HALF_M/dispersiMetersPerDegLat(), originLng+HALF_M/dispersiMetersPerDegLng(originLat)]
-  ];
+  const viewBounds = dispersiMapInstance.getBounds();
+  const sw = viewBounds.getSouthWest(), ne = viewBounds.getNorthEast();
+  const centerLat = (sw.lat+ne.lat)/2, centerLng = (sw.lng+ne.lng)/2;
+  const halfWidthM = Math.max(200, Math.abs(ne.lng-sw.lng)/2 * dispersiMetersPerDegLng(centerLat));
+  const halfHeightM = Math.max(200, Math.abs(ne.lat-sw.lat)/2 * dispersiMetersPerDegLat());
+  const bounds = [[sw.lat, sw.lng],[ne.lat, ne.lng]];
   const CALC=200, OUT=900;
   const canvas = document.createElement("canvas"); canvas.width=CALC; canvas.height=CALC;
   const ctx = canvas.getContext("2d");
   const grid = new Float32Array(CALC*CALC);
-  const originXY = sources.map(src=>dispersiToLocalXY(src.stack.lat, src.stack.lng, originLat, originLng));
+  const originXY = sources.map(src=>dispersiToLocalXY(src.stack.lat, src.stack.lng, centerLat, centerLng));
   for(let py=0; py<CALC; py++){
-    const worldY = (0.5-py/CALC)*HALF_M*2;
+    const worldY = (0.5-py/CALC)*halfHeightM*2;
     for(let px=0; px<CALC; px++){
-      const worldX = (px/CALC-0.5)*HALF_M*2;
+      const worldX = (px/CALC-0.5)*halfWidthM*2;
       let total = 0;
       for(let wc=0; wc<windCases.length; wc++){
         const bearing = dispersiPlumeBearing(windCases[wc].dirFrom);
@@ -478,24 +589,22 @@ function dispersiUpdatePlume(){
   let maxV = 0.0001;
   for(let i=0;i<smooth.length;i++){ if(smooth[i]>maxV) maxV = smooth[i]; }
 
+  // 8 band warna TANPA garis tepi putih (dihapus per feedback — kelihatan blur/kotak-kotak di
+  // resolusi/zoom tertentu) — transisi antar band sekarang murni dari gradasi warnanya sendiri.
   const BANDS=8;
   const bandOf = (frac)=>Math.min(BANDS-1, Math.floor(Math.pow(frac,0.55)*BANDS));
-  const bandIdx = new Int16Array(CALC*CALC);
-  for(let i=0;i<smooth.length;i++){ const frac=smooth[i]/maxV; bandIdx[i] = frac<0.02 ? -1 : bandOf(frac); }
   const imgData = ctx.createImageData(CALC,CALC);
   for(let py=0; py<CALC; py++){
     for(let px=0; px<CALC; px++){
       const i = py*CALC+px;
-      const b = bandIdx[i];
+      const frac = smooth[i]/maxV;
       const di = i*4;
-      if(b===-1){ imgData.data[di+3]=0; continue; }
-      const frac = (b+0.5)/BANDS;
-      const [r,g,bl] = dispersiColorForFrac(frac);
-      let isEdge=false;
-      if(px<CALC-1 && bandIdx[i+1]!==b && bandIdx[i+1]!==-1) isEdge=true;
-      if(py<CALC-1 && bandIdx[i+CALC]!==b && bandIdx[i+CALC]!==-1) isEdge=true;
-      if(isEdge){ imgData.data[di]=255; imgData.data[di+1]=255; imgData.data[di+2]=255; imgData.data[di+3]=218; }
-      else { imgData.data[di]=r; imgData.data[di+1]=g; imgData.data[di+2]=bl; imgData.data[di+3]=Math.round(Math.min(0.85,0.28+frac*0.6)*255); }
+      if(frac<0.02){ imgData.data[di+3]=0; continue; }
+      const b = bandOf(frac);
+      const bandFrac = (b+0.5)/BANDS;
+      const [r,g,bl] = dispersiColorForFrac(bandFrac);
+      imgData.data[di]=r; imgData.data[di+1]=g; imgData.data[di+2]=bl;
+      imgData.data[di+3]=Math.round(Math.min(0.85,0.28+bandFrac*0.6)*255);
     }
   }
   ctx.putImageData(imgData,0,0);
@@ -504,6 +613,7 @@ function dispersiUpdatePlume(){
   octx.imageSmoothingEnabled = true; octx.imageSmoothingQuality = "high";
   octx.drawImage(canvas,0,0,CALC,CALC,0,0,OUT,OUT);
   dispersiPlumeLayerObj = L.imageOverlay(outCanvas.toDataURL(), bounds, {opacity:1}).addTo(dispersiMapInstance);
+  dispersiSetPlumeStatus("ready");
 }
 
 /* ---------- Builder tabel/panel (dipakai bareng oleh tampilan layar & export PDF) ---------- */
@@ -602,6 +712,9 @@ function dispersiWindPanelHtml(){
   const s = dispersiState;
   if(s.windMode==="live"){
     const blowTo = ((s.wind.dirFrom||0)+180)%360;
+    const extra = [];
+    if(s.wind.temp!=null) extra.push(`${dispersiFmt(s.wind.temp,1)}°C`);
+    if(s.wind.humidity!=null) extra.push(`Kelembapan ${dispersiFmt(s.wind.humidity,0)}%`);
     return `<div style="display:flex;gap:16px;align-items:center;">
       <div style="position:relative;width:88px;height:88px;flex-shrink:0;">
         <div style="position:absolute;inset:0;border:2px solid var(--gray-200);border-radius:50%;"></div>
@@ -612,18 +725,23 @@ function dispersiWindPanelHtml(){
       </div>
       <div>
         <div style="font-family:var(--font-mono);font-size:22px;font-weight:800;color:var(--heading);">${s.wind.speed!=null?dispersiFmt(s.wind.speed,1):"—"} <span style="font-size:12px;font-weight:600;color:var(--gray-500);">m/s</span></div>
-        <div style="font-size:12px;color:var(--gray-700);margin-top:2px;">dari ${s.wind.dirFrom!=null?dispersiCompassLabel(blowTo):"—"} (${s.wind.dirFrom!=null?Math.round(s.wind.dirFrom):"—"}°)</div>
+        <div style="font-size:12px;color:var(--gray-700);margin-top:2px;">dari ${s.wind.dirFrom!=null?dispersiCompassLabel(s.wind.dirFrom):"—"} (${s.wind.dirFrom!=null?Math.round(s.wind.dirFrom):"—"}°)</div>
+        ${extra.length?`<div style="font-size:11.5px;color:var(--gray-700);margin-top:3px;">${extra.join(" &middot; ")}</div>`:""}
         <div style="font-size:10.5px;color:var(--gray-500);margin-top:5px;">Sumber: Open-Meteo &middot; ${s.wind.updatedAt?new Date(s.wind.updatedAt).toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"}):"—"} &middot; auto-refresh 5 menit</div>
       </div>
     </div>
     ${s.wind.error?`<div style="font-size:11px;color:#a02a24;margin-top:8px;">${escHtml(s.wind.error)}</div>`:""}`;
   }
   const pw = s.periodWind;
+  const extraRows = [];
+  if(pw.avgTemp!=null) extraRows.push(`<div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Suhu Rata-rata</div><div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--gray-700);">${dispersiFmt(pw.avgTemp,1)}°C</div></div>`);
+  if(pw.avgHumidity!=null) extraRows.push(`<div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Kelembapan Rata-rata</div><div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--gray-700);">${dispersiFmt(pw.avgHumidity,0)}%</div></div>`);
   return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
     <div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Rata-rata Kecepatan</div><div style="font-family:var(--font-mono);font-size:18px;font-weight:800;color:var(--heading);">${pw.avgSpeed!=null?dispersiFmt(pw.avgSpeed,1):"—"} <span style="font-size:11px;font-weight:600;color:var(--gray-500);">m/s</span></div></div>
     <div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Arah Dominan</div><div style="font-family:var(--font-mono);font-size:18px;font-weight:800;color:var(--heading);">${pw.dominantLabel||"—"}</div></div>
     <div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Sampel Per Jam</div><div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--gray-700);">${pw.sampleCount}</div></div>
     <div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Rentang Dipakai</div><div style="font-size:11px;font-weight:600;color:var(--gray-700);">${escHtml(pw.historyLabel||"—")}</div></div>
+    ${extraRows.join("")}
   </div>
   ${pw.error?`<div style="font-size:11px;color:#a02a24;margin-top:8px;">${escHtml(pw.error)}</div>`:""}
   ${pw.clamped?`<div style="font-size:10.5px;color:#8a5c11;margin-top:6px;">Delay arsip Open-Meteo ~5 hari — tanggal akhir dipotong ke data terbaru yang tersedia.</div>`:""}`;
@@ -632,6 +750,19 @@ function dispersiDashboardStatsHtml(){
   const stacks = dispersiSelectedStacks();
   const totalEmisi = dispersiStacks().filter(s=>s.site===dispersiState.site).length;
   const sel = dispersiResolveSelection(dispersiState.sel);
+  const windNow = dispersiState.windMode==="live"
+    ? (dispersiState.wind.speed!=null ? `${dispersiFmt(dispersiState.wind.speed,1)} m/s, dari ${dispersiCompassLabel(dispersiState.wind.dirFrom)}` : "—")
+    : (dispersiState.periodWind.avgSpeed!=null ? `${dispersiFmt(dispersiState.periodWind.avgSpeed,1)} m/s, dominan ${dispersiState.periodWind.dominantLabel}` : "—");
+  if(dispersiIsFlowMode()){
+    const withData = stacks.filter(s=>dispersiFlowOnlyQgs(s, sel)!=null).length;
+    return `<div class="grid cols-4">
+      <div class="stat"><div class="num">${withData}/${totalEmisi}</div><div class="lbl">Titik dgn Data Laju Alir &middot; ${escHtml(dispersiState.site||"")}</div></div>
+      <div class="stat"><div class="num">${stacks.length}</div><div class="lbl">Titik Ditampilkan di Peta</div></div>
+      <div class="stat"><div class="num">${escHtml(dispersiState.stability)}</div><div class="lbl">Kelas Stabilitas Atmosfer</div></div>
+      <div class="stat"><div class="num">${dispersiState.windMode==="live"?"Live":"Periode"}</div><div class="lbl">Sumber Angin Plume</div></div>
+    </div>
+    <div class="hint" style="margin-top:8px;">Mode Keluaran Cerobong: pola sebaran KESELURUHAN gas buang, bukan beban pencemar teregulasi. Angin saat ini (${dispersiState.windMode==="live"?"Live":"rata-rata Periode"}): <b>${windNow}</b> &middot; Periode data: <b>${escHtml(dispersiSelectionLabel(dispersiState.sel))}</b></div>`;
+  }
   let withData=0, bebanBulanTotal=0, bebanTahunTotal=0, exceedCount=0;
   stacks.forEach(s=>{
     const b = dispersiBebanForSelection(s, dispersiState.param, sel);
@@ -641,9 +772,6 @@ function dispersiDashboardStatsHtml(){
       if(c && c.rec.statusBakuMutu==="exceed") exceedCount++;
     });
   });
-  const windNow = dispersiState.windMode==="live"
-    ? (dispersiState.wind.speed!=null ? `${dispersiFmt(dispersiState.wind.speed,1)} m/s, dari ${dispersiCompassLabel(((dispersiState.wind.dirFrom||0)+180)%360)}` : "—")
-    : (dispersiState.periodWind.avgSpeed!=null ? `${dispersiFmt(dispersiState.periodWind.avgSpeed,1)} m/s, dominan ${dispersiState.periodWind.dominantLabel}` : "—");
   return `<div class="grid cols-4">
     <div class="stat"><div class="num">${withData}/${totalEmisi}</div><div class="lbl">Titik dgn Data Dispersi &middot; ${escHtml(dispersiState.site||"")}</div></div>
     <div class="stat good"><div class="num">${dispersiFmt(bebanBulanTotal,1)}</div><div class="lbl">Total kg ${escHtml(dispersiState.param)}/bulan (terpilih)</div></div>
@@ -657,6 +785,11 @@ function dispersiDashboardStatsHtml(){
 function dispersiChip(active, action, val, label){
   return `<button type="button" class="chip-toggle ${active?"active":""}" data-action="${action}" data-val="${escHtml(val)}">${escHtml(label)}</button>`;
 }
+function dispersiParamChipsHtml(){
+  return Object.keys(DISPERSI_MASS_PARAMS).map(p=>dispersiChip(p===dispersiState.param,"dispersiSetParam",p,DISPERSI_MASS_PARAMS[p].label)).join("")
+    + dispersiChip(dispersiState.param===DISPERSI_FLOW_MODE_KEY, "dispersiSetParam", DISPERSI_FLOW_MODE_KEY, DISPERSI_FLOW_MODE_META.label);
+}
+function dispersiCurrentParamMeta(){ return dispersiIsFlowMode() ? DISPERSI_FLOW_MODE_META : DISPERSI_MASS_PARAMS[dispersiState.param]; }
 let dispersiWindFetchedOnce = false;
 function renderDispersi(){
   dispersiEnsureState();
@@ -667,7 +800,7 @@ function renderDispersi(){
   }
   if(!dispersiWindFetchedOnce){ dispersiWindFetchedOnce = true; dispersiRefreshWind(); }
   document.getElementById("dispersiSiteChips").innerHTML = sites.map(s=>dispersiChip(s===dispersiState.site,"dispersiSetSite",s,s)).join("");
-  document.getElementById("dispersiParamChips").innerHTML = Object.keys(DISPERSI_MASS_PARAMS).map(p=>dispersiChip(p===dispersiState.param,"dispersiSetParam",p,DISPERSI_MASS_PARAMS[p].label)).join("");
+  document.getElementById("dispersiParamChips").innerHTML = dispersiParamChipsHtml();
   const periodSel = document.getElementById("dispersiPeriode");
   const periodOptions = dispersiPeriodList().map(({periode})=>`<option value="${periode}">${periode}</option>`).join("")
     + dispersiYearList().filter(y=>y.periods.length>1).map(y=>`<option value="Y:${y.tahun}">Tahun ${y.tahun} (rata-rata S1+S2)</option>`).join("");
@@ -678,16 +811,17 @@ function renderDispersi(){
   document.getElementById("dispersiPeriodeBtn").classList.toggle("active", dispersiState.windMode==="periode");
   document.getElementById("dispersiSatBtn").classList.toggle("active", dispersiState.mapLayer==="satellite");
   document.getElementById("dispersiStreetBtn").classList.toggle("active", dispersiState.mapLayer==="street");
-  document.getElementById("dispersiParamDesc").textContent = DISPERSI_MASS_PARAMS[dispersiState.param].desc;
+  document.getElementById("dispersiParamDesc").textContent = dispersiCurrentParamMeta().desc;
 
   document.getElementById("dispersiStats").innerHTML = dispersiDashboardStatsHtml();
 
+  // fitBounds SENGAJA tidak dipanggil di sini (cuma di dispersiSetSite/dispersiInitMap) — dipanggil
+  // di tiap render akan mereset pan/zoom user tiap ganti parameter/mode angin/layer peta, padahal
+  // yg diinginkan adalah plume mengikuti VIEW SAAT INI, bukan paksa balik ke framing awal site.
   if(!dispersiMapInstance) dispersiInitMap();
   else {
-    const center = dispersiSiteCenter(dispersiState.site);
-    if(center) dispersiMapInstance.setView([center.lat,center.lng], 13);
     dispersiDrawMarkers();
-    dispersiUpdatePlume();
+    dispersiScheduleUpdatePlume();
   }
   dispersiRenderSidePanels();
   dispersiEnsureWindTimer();
@@ -697,33 +831,52 @@ function renderDispersi(){
 function dispersiRenderSidePanels(){
   const stacks = dispersiSelectedStacks();
   const sel = dispersiResolveSelection(dispersiState.sel);
+  const flowMode = dispersiIsFlowMode();
+  const windHist = dispersiState.windMode==="live" ? dispersiState.wind.history : dispersiState.periodWind.history;
+  const windHistLabel = dispersiState.windMode==="live" ? dispersiState.wind.historyLabel : dispersiState.periodWind.historyLabel;
   document.getElementById("dispersiWindPanel").innerHTML = dispersiWindPanelHtml();
-  document.getElementById("dispersiWindRose").innerHTML = dispersiWindRoseHtml(dispersiState.windMode==="live" ? [] : dispersiState.periodWind.history);
-  document.getElementById("dispersiBebanTable").innerHTML = dispersiBebanRowsHtml(stacks, dispersiState.param, sel);
+  const roseLabelEl = document.getElementById("dispersiWindRoseLabel");
+  if(roseLabelEl) roseLabelEl.textContent = windHistLabel ? " · "+windHistLabel : "";
+  document.getElementById("dispersiWindRose").innerHTML = dispersiWindRoseHtml(windHist);
+  const naNote = `<tr><td colspan="7" style="text-align:center;color:var(--gray-500);padding:14px;">Tidak berlaku utk mode "${escHtml(DISPERSI_FLOW_MODE_META.label)}" — pilih salah satu parameter pencemar (NOx/SO₂/CO/Partikulat) untuk melihat beban.</td></tr>`;
+  document.getElementById("dispersiBebanTable").innerHTML = flowMode ? naNote : dispersiBebanRowsHtml(stacks, dispersiState.param, sel);
   document.getElementById("dispersiComplianceTable").innerHTML = dispersiComplianceRowsHtml(stacks, sel);
   // Kedua tabel ringkasan ini SENGAJA lintas-site (dispersiStacks() penuh, bukan stacks yg
   // di-scope ke site+seleksi map saat ini) — tujuannya beri konteks gambaran besar (semua site,
   // semua jenis sumber) sebagai pelengkap peta yang fokus ke satu site, bukan duplikat filter peta.
   const allStacks = dispersiStacks();
-  document.getElementById("dispersiSummaryTipe").innerHTML = dispersiSummaryTableHtml(allStacks, dispersiState.param, sel, s=>s.tipe.key, {head:"Jenis Sumber", row:k=>k}, s=>s.tipe.color);
-  document.getElementById("dispersiSummarySite").innerHTML = dispersiSummaryTableHtml(allStacks, dispersiState.param, sel, s=>s.site, {head:"Site", row:k=>k});
-  document.getElementById("dispersiTrend").innerHTML = dispersiTrendHtml();
+  const naHint = `<div class="hint">Tidak berlaku utk mode "${escHtml(DISPERSI_FLOW_MODE_META.label)}" — pilih parameter pencemar.</div>`;
+  document.getElementById("dispersiSummaryTipe").innerHTML = flowMode ? naHint : dispersiSummaryTableHtml(allStacks, dispersiState.param, sel, s=>s.tipe.key, {head:"Jenis Sumber", row:k=>k}, s=>s.tipe.color);
+  document.getElementById("dispersiSummarySite").innerHTML = flowMode ? naHint : dispersiSummaryTableHtml(allStacks, dispersiState.param, sel, s=>s.site, {head:"Site", row:k=>k});
+  document.getElementById("dispersiTrend").innerHTML = flowMode ? naHint : dispersiTrendHtml();
+  dispersiRenderTipeChips();
 }
 function dispersiSetSite(el){
   dispersiState.site = el.dataset.val;
   dispersiState.selectedStackIds = new Set(dispersiStacks().filter(s=>s.site===dispersiState.site).map(s=>s.id));
   dispersiRefreshWind();
   renderDispersi();
+  // Reframe peta ke titik-titik site BARU — satu-satunya kasus yg boleh mereset pan/zoom user,
+  // krn site sebelumnya bisa jadi ada di lokasi geografis yg sama sekali berbeda.
+  if(dispersiMapInstance) dispersiFitSiteBounds();
 }
-function dispersiSetParam(el){ dispersiState.param = el.dataset.val; dispersiUpdatePlume(); dispersiRenderSidePanels(); document.getElementById("dispersiParamChips").innerHTML = Object.keys(DISPERSI_MASS_PARAMS).map(p=>dispersiChip(p===dispersiState.param,"dispersiSetParam",p,DISPERSI_MASS_PARAMS[p].label)).join(""); document.getElementById("dispersiParamDesc").textContent = DISPERSI_MASS_PARAMS[dispersiState.param].desc; document.getElementById("dispersiStats").innerHTML = dispersiDashboardStatsHtml(); }
-function dispersiOnPeriodeChange(){ dispersiState.sel = document.getElementById("dispersiPeriode").value; dispersiRefreshWind(); dispersiUpdatePlume(); dispersiRenderSidePanels(); document.getElementById("dispersiStats").innerHTML = dispersiDashboardStatsHtml(); }
-function dispersiOnStabilityChange(){ dispersiState.stability = document.getElementById("dispersiStability").value; dispersiUpdatePlume(); }
+function dispersiSetParam(el){
+  dispersiState.param = el.dataset.val;
+  dispersiScheduleUpdatePlume();
+  dispersiRenderSidePanels();
+  document.getElementById("dispersiParamChips").innerHTML = dispersiParamChipsHtml();
+  document.getElementById("dispersiParamDesc").textContent = dispersiCurrentParamMeta().desc;
+  document.getElementById("dispersiStats").innerHTML = dispersiDashboardStatsHtml();
+}
+function dispersiOnPeriodeChange(){ dispersiState.sel = document.getElementById("dispersiPeriode").value; dispersiRefreshWind(); dispersiScheduleUpdatePlume(); dispersiRenderSidePanels(); document.getElementById("dispersiStats").innerHTML = dispersiDashboardStatsHtml(); }
+function dispersiOnStabilityChange(){ dispersiState.stability = document.getElementById("dispersiStability").value; dispersiScheduleUpdatePlume(); }
 function dispersiSetWindModeLive(){ dispersiState.windMode="live"; dispersiRefreshWind(); renderDispersi(); }
 function dispersiSetWindModePeriode(){ dispersiState.windMode="periode"; dispersiRefreshWind(); renderDispersi(); }
 function dispersiSetMapLayerSat(){ dispersiSetMapLayer("satellite"); }
 function dispersiSetMapLayerStreet(){ dispersiSetMapLayer("street"); }
-function dispersiSelectAllAtSite(){ dispersiState.selectedStackIds = new Set(dispersiStacks().filter(s=>s.site===dispersiState.site).map(s=>s.id)); dispersiDrawMarkers(); dispersiUpdatePlume(); dispersiRenderSidePanels(); }
-function dispersiDeselectAll(){ dispersiState.selectedStackIds = new Set(); dispersiDrawMarkers(); dispersiUpdatePlume(); dispersiRenderSidePanels(); }
+function dispersiSelectAllAtSite(){ dispersiState.selectedStackIds = new Set(dispersiStacks().filter(s=>s.site===dispersiState.site).map(s=>s.id)); dispersiDrawMarkers(); dispersiScheduleUpdatePlume(); dispersiRenderSidePanels(); }
+function dispersiDeselectAll(){ dispersiState.selectedStackIds = new Set(); dispersiDrawMarkers(); dispersiScheduleUpdatePlume(); dispersiRenderSidePanels(); }
+function dispersiManualRefreshPlume(){ dispersiScheduleUpdatePlume(0); }
 
 /* ---------- Export PDF: Laporan Beban Emisi ---------- */
 function dispersiReportFilename(){
@@ -797,7 +950,8 @@ async function printDispersiReport(){
 Object.assign(ACTIONS, {
   dispersiSetSite, dispersiSetParam, dispersiOnPeriodeChange, dispersiOnStabilityChange,
   dispersiSetWindModeLive, dispersiSetWindModePeriode, dispersiSetMapLayerSat, dispersiSetMapLayerStreet,
-  dispersiRefreshWind, dispersiSelectAllAtSite, dispersiDeselectAll, printDispersiReport
+  dispersiRefreshWind, dispersiSelectAllAtSite, dispersiDeselectAll, printDispersiReport,
+  dispersiToggleTipe, dispersiManualRefreshPlume
 });
 document.addEventListener("change", e=>{
   if(e.target.id==="dispersiPeriode") dispersiOnPeriodeChange();
