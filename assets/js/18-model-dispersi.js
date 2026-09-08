@@ -565,11 +565,42 @@ function dispersiScheduleUpdatePlume(delay){
   // terisi/dikosongkan di dalam dispersiComputePlumeNow (jalan async lewat setTimeout ini) —
   // tanpa refresh eksplisit di sini, panel itu akan tampil basi (nilai hitungan sebelumnya) sampai
   // ada pemicu render lain yang tidak berhubungan sama sekali dengan selesainya hitungan plume ini.
-  dispersiPlumeComputeTimer = setTimeout(()=>{ dispersiComputePlumeNow(); dispersiRefreshAmbientImpactPanel(); }, delay==null?15:delay);
+  dispersiPlumeComputeTimer = setTimeout(()=>{ dispersiComputePlumeNow(); dispersiRefreshAmbientImpactPanel(); dispersiRefreshLegend(); }, delay==null?15:delay);
 }
 function dispersiRefreshAmbientImpactPanel(){
   const el = document.getElementById("dispersiAmbientImpact");
   if(el) el.innerHTML = dispersiAmbientImpactHtml();
+}
+function dispersiRefreshLegend(){
+  const el = document.getElementById("dispersiLegend");
+  if(el) el.innerHTML = dispersiLegendHtml();
+}
+// Legenda gradien warna plume — warnanya di-normalisasi ulang tiap plume dihitung ulang (puncak
+// lokal saat ini = warna paling merah), jadi legendanya HARUS ikut dihitung ulang setiap saat itu
+// juga (bukan skala tetap) supaya angka yang ditampilkan sesuai warna yang benar-benar kelihatan
+// di peta saat itu — sesuai keluhan "setiap digeser warnanya jadi dynamic, kasih tau ini apa".
+function dispersiLegendHtml(){
+  const gradientCss = DISPERSI_COLOR_STOPS.map(([f,c])=>`rgb(${c[0]},${c[1]},${c[2]}) ${(f*100).toFixed(0)}%`).join(", ");
+  if(!dispersiPlumeLayerObj){
+    return `<div class="hint" style="margin-top:6px;">Legenda warna akan muncul setelah plume berhasil dihitung (lihat status di atas).</div>`;
+  }
+  const qualitative = dispersiIsQualitativeMode();
+  const bar = `<div style="height:10px;border-radius:5px;background:linear-gradient(to right, ${gradientCss});border:1px solid var(--gray-300);"></div>`;
+  if(qualitative){
+    return `<div style="margin-top:8px;">
+      ${bar}
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--gray-500);margin-top:3px;"><span>Rendah</span><span>Sedang</span><span>Tinggi (relatif thd puncak lokal)</span></div>
+      <div class="hint" style="margin-top:4px;">Skala RELATIF (${dispersiIsFlowMode()?"pola keluaran cerobong":"opasitas × laju alir"}) — bukan konsentrasi terukur, jadi tanpa satuan. Warna dinormalisasi ulang tiap plume dihitung ulang (peta digeser/zoom/ganti filter), jadi bukan skala tetap antar tampilan.</div>
+    </div>`;
+  }
+  const peak = dispersiState.lastPeakConcUgm3;
+  const decimals = peak==null ? 1 : (peak<1 ? 3 : peak<10 ? 2 : 1);
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(f=>dispersiFmt((peak||0)*f, decimals));
+  return `<div style="margin-top:8px;">
+    ${bar}
+    <div style="display:flex;justify-content:space-between;font-size:10px;font-family:var(--font-mono);color:var(--gray-500);margin-top:3px;">${ticks.map(t=>`<span>${t}</span>`).join("")}</div>
+    <div class="hint" style="margin-top:4px;">Konsentrasi ground-level (µg/m&sup3;) — merah = puncak lokal saat ini (<b>${dispersiFmt(peak,decimals)} µg/m&sup3;</b>), biru tua = mendekati nol. Skala dinormalisasi ulang tiap plume dihitung ulang (peta digeser/zoom/ganti filter/angin), jadi warna yang sama bisa berarti nilai berbeda antar tampilan — selalu baca angka di sini, bukan cuma warnanya.</div>
+  </div>`;
 }
 // Grid konsentrasi 200x200 (CALC) dihitung lalu diperhalus (box blur 3x) supaya batas antar-band
 // jadi kurva mulus, dibagi 8 band non-linear (akar pangkat 0.55 spy band rendah tidak keliatan
@@ -999,6 +1030,7 @@ function dispersiRenderSidePanels(){
   document.getElementById("dispersiWindRose").innerHTML = dispersiWindRoseHtml(windHist);
   document.getElementById("dispersiWindTrend").innerHTML = dispersiWindTrendHtml(windHist);
   document.getElementById("dispersiAmbientImpact").innerHTML = dispersiAmbientImpactHtml();
+  dispersiRefreshLegend();
   const naNote = `<tr><td colspan="7" style="text-align:center;color:var(--gray-500);padding:14px;">Tidak berlaku utk mode "${escHtml(dispersiCurrentParamMeta().label)}" (pola relatif) — pilih salah satu parameter bersatuan massa (NOx/SO₂/CO/Partikulat) untuk melihat beban.</td></tr>`;
   document.getElementById("dispersiBebanTable").innerHTML = qualitativeMode ? naNote : dispersiBebanRowsHtml(stacks, dispersiState.param, sel);
   document.getElementById("dispersiComplianceTable").innerHTML = dispersiComplianceRowsHtml(stacks, sel);
@@ -1060,17 +1092,21 @@ function printDispersiReport(){
     </div>
     <div class="checkline" style="margin-top:12px;"><label><input type="checkbox" id="dispPrintIncludeMap"> Sertakan gambar peta sebaran (prototipe)</label></div>
     <div class="hint" style="margin-top:2px;">Kalau tidak dicentang, laporan hanya berisi data angka (tanpa gambar peta) — cocok utk laporan resmi. Gambar peta memakai kondisi angin/parameter yang sedang aktif di layar saat ini.</div>
+    <div class="field" style="margin-top:12px;"><label>Orientasi Kertas</label>
+      <select id="dispPrintOrientation"><option value="landscape" selected>Lanskap (Landscape)</option><option value="portrait">Potret (Portrait)</option></select>
+    </div>
     <div class="actions"><button class="btn ghost" data-action="closeModal">Batal</button><button class="btn primary" data-action="doPrintDispersiReport">Cetak</button></div>
   `);
 }
 async function doPrintDispersiReport(){
   const selectedPeriods = [...document.querySelectorAll(".dispPrintPeriode:checked")].map(el=>el.value);
   const includeMap = document.getElementById("dispPrintIncludeMap").checked;
+  const orientation = document.getElementById("dispPrintOrientation").value;
   if(!selectedPeriods.length){ toast("Pilih minimal 1 periode.","err"); return; }
   const html = buildDispersiReportHtml(selectedPeriods, includeMap);
   closeModal();
   if(!html){ toast("Tidak ada titik terpilih dengan data pada periode yang dipilih.","err"); return; }
-  setPrintOrientation("landscape", 15);
+  setPrintOrientation(orientation, 15);
   document.getElementById("printGuideArea").innerHTML = html;
   // Tunggu logo kop (SKK Migas/PHM, selalu ada) + gambar peta opsional selesai decode dulu — sama
   // spt printBeritaAcara/printDokFotoLampiran, supaya hasil cetak/PDF tidak menangkap kondisi
@@ -1095,9 +1131,12 @@ function buildDispersiReportHtml(selectedPeriods, includeMap){
 
   // Beban per semester: data PERSIS periode itu (dispersiBebanSinglePeriode, TANPA carry-forward)
   // — laporan cetak menunjukkan apa adanya kapan/berapa hasil sampling sesungguhnya, bukan
-  // kenyamanan tampilan interaktif yg "meneruskan" nilai lama.
-  let bebanRows = "", no=1;
+  // kenyamanan tampilan interaktif yg "meneruskan" nilai lama. Dikelompokkan PER PERIODE (bukan
+  // satu tabel besar tercampur per titik) supaya tiap semester jadi seksi laporan yang berdiri
+  // sendiri & gampang dibandingkan — bukan daftar mentah yang meloncat-loncat periode per baris.
+  const byPeriode = {};
   const byStackParamYear = {};
+  const summaryByPeriodeParam = {};
   stacks.forEach(s=>{
     massParams.forEach(param=>{
       periodsSorted.forEach(({periode})=>{
@@ -1107,14 +1146,28 @@ function buildDispersiReportHtml(selectedPeriods, includeMap){
         const bebanSemesterKg = r.bebanTahunKg!=null ? r.bebanTahunKg/2 : null;
         const key = s.id+"|"+param+"|"+tahun;
         (byStackParamYear[key] = byStackParamYear[key]||[]).push({sem, bebanSemesterKg, stack:s, param, tahun});
-        bebanRows += `<tr><td>${no++}</td><td>${escHtml(s.nama)}</td><td>${escHtml(param)}</td><td>${escHtml(periode)}</td>
-          <td style="text-align:right;">${escHtml(r.concRec.dateOfSampling||"—")}</td>
-          <td style="text-align:right;">${dispersiFmt(r.concRec.resultNumeric,1)} ${escHtml(r.concRec.unit)}</td>
-          <td style="text-align:right;">${dispersiFmt(r.flowRec.resultNumeric,1)} m&sup3;/s</td>
-          <td style="text-align:right;">${dispersiFmt(r.runningHour,0)} j <span style="color:#777;">(${dispersiFmt(r.runningHour!=null?r.runningHour/12:null,0)} j/bln)</span></td>
-          <td style="text-align:right;font-weight:700;">${dispersiFmt(bebanSemesterKg,1)} kg</td></tr>`;
+        (byPeriode[periode] = byPeriode[periode]||[]).push({stack:s, param, r, bebanSemesterKg});
+        const sKey = periode+"|"+param;
+        summaryByPeriodeParam[sKey] = summaryByPeriodeParam[sKey] || {periode, param, total:0, titik:0};
+        summaryByPeriodeParam[sKey].total += bebanSemesterKg||0;
+        summaryByPeriodeParam[sKey].titik++;
       });
     });
+  });
+  let bebanSections = "";
+  periodsSorted.forEach(({periode})=>{
+    const rows = byPeriode[periode];
+    if(!rows || !rows.length) return;
+    let no=1;
+    const trs = rows.map(({stack:s, param, r, bebanSemesterKg})=>`<tr><td>${no++}</td><td>${escHtml(s.nama)}</td><td>${escHtml(param)}</td>
+      <td style="text-align:right;">${escHtml(r.concRec.dateOfSampling||"—")}</td>
+      <td style="text-align:right;">${dispersiFmt(r.concRec.resultNumeric,1)} ${escHtml(r.concRec.unit)}</td>
+      <td style="text-align:right;">${dispersiFmt(r.flowRec.resultNumeric,1)} m&sup3;/s</td>
+      <td style="text-align:right;">${dispersiFmt(r.runningHour,0)} j <span style="color:#777;">(${dispersiFmt(r.runningHour!=null?r.runningHour/12:null,0)} j/bln)</span></td>
+      <td style="text-align:right;font-weight:700;">${dispersiFmt(bebanSemesterKg,1)} kg</td></tr>`).join("");
+    bebanSections += `<div style="font-weight:700;font-size:12px;margin:12px 0 5px;color:#0d1f38;">Semester ${escHtml(periode)} <span style="font-weight:400;color:#777;">(${rows.length} data)</span></div>
+      <table class="pg-ba-table"><thead><tr><th style="width:22px;">No</th><th>Titik</th><th>Parameter</th><th>Tgl Sampling</th><th style="text-align:right;">Konsentrasi</th><th style="text-align:right;">Laju Alir</th><th style="text-align:right;">Jam Operasi (per bulan)</th><th style="text-align:right;">Beban Semester</th></tr></thead>
+        <tbody>${trs}</tbody></table>`;
   });
   // Total tahunan HANYA kalau S1 & S2 tahun itu SAMA-SAMA ada datanya — bukan hasil ekstrapolasi
   // 1 semester, sesuai permintaan "kalau setahun ya harus complete dulu datanya".
@@ -1127,6 +1180,10 @@ function buildDispersiReportHtml(selectedPeriods, includeMap){
       annualRows += `<tr><td>${escHtml(stack.nama)}</td><td>${escHtml(param)}</td><td>${escHtml(tahun)}</td><td style="text-align:right;font-weight:700;">${dispersiFmt(total,1)} kg</td><td style="text-align:right;font-weight:700;">${dispersiFmt(total/1000,3)} ton</td></tr>`;
     }
   });
+  // Ringkasan: rekap "total berapa" per semester x parameter, ditaruh di awal laporan (sebelum
+  // rincian) spy pembaca langsung dapat angka intinya tanpa perlu menjumlah sendiri dari tabel rinci.
+  const summaryRows = Object.values(summaryByPeriodeParam).sort((a,b)=> (a.periode<b.periode?-1:a.periode>b.periode?1:0) || a.param.localeCompare(b.param))
+    .map(g=>`<tr><td>${escHtml(g.periode)}</td><td>${escHtml(g.param)}</td><td style="text-align:right;">${g.titik}</td><td style="text-align:right;font-weight:700;">${dispersiFmt(g.total,1)} kg</td><td style="text-align:right;font-weight:700;">${dispersiFmt(g.total/1000,3)} ton</td></tr>`).join("");
 
   const STATUS_LABEL = {ok:"Memenuhi", exceed:"Melebihi", not_applicable:"Tidak Dipersyaratkan", not_evaluated:"Belum Dievaluasi"};
   let complianceRows = "", cno=1;
@@ -1166,9 +1223,12 @@ function buildDispersiReportHtml(selectedPeriods, includeMap){
       <tr><td>Jumlah Titik</td><td>:</td><td>${stacks.length} titik emisi</td></tr>
       <tr><td>Tanggal Cetak</td><td>:</td><td>${genDate}</td></tr></table>
 
-    <div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;">Beban Emisi per Semester</div>
-    <table class="pg-ba-table"><thead><tr><th style="width:22px;">No</th><th>Titik</th><th>Parameter</th><th>Periode</th><th>Tgl Sampling</th><th style="text-align:right;">Konsentrasi</th><th style="text-align:right;">Laju Alir</th><th style="text-align:right;">Jam Operasi (per bulan)</th><th style="text-align:right;">Beban Semester</th></tr></thead>
-      <tbody>${bebanRows||`<tr><td colspan="9" style="text-align:center;">Tidak ada data pada periode yang dipilih.</td></tr>`}</tbody></table>
+    <div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;">Ringkasan Beban Emisi (Total per Semester &amp; Parameter)</div>
+    <table class="pg-ba-table"><thead><tr><th>Periode</th><th>Parameter</th><th style="text-align:right;">Jumlah Titik</th><th style="text-align:right;">Total (kg)</th><th style="text-align:right;">Total (ton)</th></tr></thead>
+      <tbody>${summaryRows||`<tr><td colspan="5" style="text-align:center;">Tidak ada data pada periode yang dipilih.</td></tr>`}</tbody></table>
+
+    <div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;">Rincian Beban Emisi per Semester</div>
+    ${bebanSections || `<div style="font-size:11px;color:#777;margin:6px 0;">Tidak ada data pada periode yang dipilih.</div>`}
 
     ${annualRows ? `<div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;">Total Tahunan (hanya kalau S1 &amp; S2 tahun sama-sama lengkap)</div>
     <table class="pg-ba-table"><thead><tr><th>Titik</th><th>Parameter</th><th>Tahun</th><th style="text-align:right;">Total kg</th><th style="text-align:right;">Total ton</th></tr></thead>
