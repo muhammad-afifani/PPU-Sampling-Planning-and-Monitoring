@@ -139,7 +139,7 @@ function dispersiStacks(){
     const tipe = dispersiEngineType(p.kategoriSumber);
     return {
       id: p.id, nama: p.nama, site: p.site, kategoriSumber: p.kategoriSumber,
-      lat: coord[0], lng: coord[1], tipe,
+      lat: coord[0], lng: coord[1], tipe, frekuensiBulan: p.frekuensiBulan,
       stackHeight: p.stackHeight!=null ? p.stackHeight : tipe.height,
       stackHeightIsDefault: p.stackHeight==null,
       stackDiameter: p.stackDiameter!=null ? p.stackDiameter : tipe.diameter,
@@ -255,16 +255,43 @@ function dispersiPriorPeriods(periode){
   if(targetOrder==null) return [];
   return allPeriods.filter(p=>p.order<targetOrder).sort((a,b)=>b.order-a.order);
 }
+// RH "ekuivalen tahunan" utk PERIODE TARGET (bukan periode sumber konsentrasi) — dari log RH
+// BULANAN (DB.rhMonthly, diisi terpisah dari hasil sampling di halaman Running Hour Detail), krn
+// mesin yg TIDAK dijadwalkan sampling ulang semester ini (khususnya sumber 1x/tahun) tetap
+// beroperasi & jam jalannya tetap tercatat tiap bulan terlepas dari jadwal sampling gas cerobong.
+// Dikembalikan sbg figur x2 (bukan RH riil semester itu apa adanya) krn seluruh pipeline
+// bebanTahunKg di bawah menganggap "runningHour" sbg estimasi TAHUNAN (dibagi /2 lagi nanti di
+// laporan per-semester, /12 utk per-bulan) — x2 di sini "dibatalkan" oleh /2 itu, hasil bersihnya =
+// RH riil semester target apa adanya. null kalau titik itu memang belum ada riwayat RH bulanan
+// sama sekali (fallback ke RH milik record sampling sumber, lihat pemanggil).
+function dispersiCarryForwardAnnualRH(stack, periode){
+  const {sem, tahun} = hasilPeriodParts(periode);
+  if(sem==null) return null;
+  const semRH = semesterRhSum(stack.nama, sem, tahun);
+  return semRH!=null ? semRH*2 : null;
+}
 // Engine yg frekuensi pemantauannya lebih jarang dari 1x/semester (mis. wajib 1x/tahun, jadwalnya
 // cuma jatuh di salah satu semester) SEHARUSNYA masih dianggap "berlaku" pakai hasil terakhirnya
 // di periode2 lain sampai jadwal sampling berikutnya — bukan tiba2 jadi lubang/kosong di semester
 // yg bukan gilirannya. carriedFrom ditandai supaya UI bisa memberi tahu ini bukan data baru.
+// PENTING: konsentrasi & laju alir ikut dari periode SUMBER (persis hasil sampling itu), tapi jam
+// operasi (runningHour) dipakai milik periode TARGET (dispersiCarryForwardAnnualRH) — semester yg
+// tidak disampling ulang tetap py jam operasi sendiri (mesin tetap jalan), bukan ikut jam operasi
+// semester lama saat sampling terakhir terjadi.
 function dispersiBebanCarryForward(stack, param, periode){
   const exact = dispersiBebanSinglePeriode(stack, param, periode);
   if(exact) return exact;
   for(const p of dispersiPriorPeriods(periode)){
     const r = dispersiBebanSinglePeriode(stack, param, p.periode);
-    if(r) return {...r, carriedFrom: p.periode};
+    if(!r) continue;
+    const targetRH = dispersiCarryForwardAnnualRH(stack, periode);
+    const runningHour = targetRH!=null ? targetRH : r.runningHour;
+    const bebanTahunKg = runningHour!=null ? r.bebanJamKg*runningHour : null;
+    return {
+      ...r, runningHour, carriedFrom: p.periode,
+      bebanBulanKg: bebanTahunKg!=null ? bebanTahunKg/12 : null,
+      bebanTahunKg, bebanTahunTon: bebanTahunKg!=null ? bebanTahunKg/1000 : null
+    };
   }
   return null;
 }
@@ -1084,7 +1111,7 @@ function printDispersiReport(){
   const periods = dispersiPeriodList();
   openModal(`
     <h3>Preferensi Cetak Laporan Beban Emisi</h3>
-    <div class="hint" style="margin-bottom:10px;">Mengikuti site &amp; titik yang sedang dipilih di peta: <b>${escHtml(dispersiState.site)}</b>, ${stacks.length} titik. Beban dihitung PER SEMESTER dari data riil masing-masing periode (bukan estimasi tahunan) — total tahunan hanya muncul kalau semester 1 &amp; 2 pada tahun yang sama-sama tercentang &amp; punya data lengkap.</div>
+    <div class="hint" style="margin-bottom:10px;">Mengikuti site &amp; titik yang sedang dipilih di peta: <b>${escHtml(dispersiState.site)}</b>, ${stacks.length} titik. Beban dihitung PER SEMESTER, jam operasi selalu dari semester yang dilaporkan (riwayat Running Hour bulanan) — konsentrasi pakai hasil sampling semester itu kalau ada, atau hasil terakhir yang masih berlaku (ditandai &dagger;) utk titik yang frekuensi pemantauannya lebih jarang dari 1x/semester. Total tahunan hanya muncul kalau semester 1 &amp; 2 pada tahun yang sama-sama tercentang &amp; punya beban (riil maupun &dagger;).</div>
     <div class="field"><label>Periode yang Dicetak</label>
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;">
         ${periods.map(p=>`<label class="checkline"><input type="checkbox" class="dispPrintPeriode" value="${escHtml(p.periode)}" checked> ${escHtml(p.periode)}</label>`).join("")}
@@ -1129,18 +1156,24 @@ function buildDispersiReportHtml(selectedPeriods, includeMap){
   const compParams = massParams.concat(["Opasitas"]);
   const periodsSorted = dispersiPeriodList().filter(p=>selectedPeriods.includes(p.periode));
 
-  // Beban per semester: data PERSIS periode itu (dispersiBebanSinglePeriode, TANPA carry-forward)
-  // — laporan cetak menunjukkan apa adanya kapan/berapa hasil sampling sesungguhnya, bukan
-  // kenyamanan tampilan interaktif yg "meneruskan" nilai lama. Dikelompokkan PER PERIODE (bukan
-  // satu tabel besar tercampur per titik) supaya tiap semester jadi seksi laporan yang berdiri
-  // sendiri & gampang dibandingkan — bukan daftar mentah yang meloncat-loncat periode per baris.
+  // Beban per semester: PAKAI carry-forward (dispersiBebanCarryForward) — titik yg frekuensi
+  // pemantauannya lebih jarang dari 1x/semester (mis. wajib 1x/tahun) TIDAK disampling ulang tiap
+  // semester, tapi konsentrasinya tetap berlaku sepanjang siklusnya, jadi semester yg bukan
+  // gilirannya tetap dihitung bebannya pakai hasil sampling terakhir — bukan jadi lubang/kosong di
+  // laporan. Jam operasi (runningHour) tetap dari SEMESTER INI SENDIRI (log RH bulanan), bukan ikut
+  // semester lama saat sampling terakhir terjadi — lihat dispersiBebanCarryForward. Baris yg
+  // konsentrasinya di-carry-forward ditandai "†" + tanggal sampling ASLI supaya transparan, dan
+  // Frekuensi Pantau ditampilkan per titik spy jelas kenapa ada yg begitu. Dikelompokkan PER
+  // PERIODE (bukan satu tabel besar tercampur per titik) supaya tiap semester jadi seksi laporan
+  // yang berdiri sendiri & gampang dibandingkan — bukan daftar mentah yang meloncat-loncat periode
+  // per baris.
   const byPeriode = {};
   const byStackParamYear = {};
   const summaryByPeriodeParam = {};
   stacks.forEach(s=>{
     massParams.forEach(param=>{
       periodsSorted.forEach(({periode})=>{
-        const r = dispersiBebanSinglePeriode(s, param, periode);
+        const r = dispersiBebanCarryForward(s, param, periode);
         if(!r) return;
         const {sem, tahun} = hasilPeriodParts(periode);
         const bebanSemesterKg = r.bebanTahunKg!=null ? r.bebanTahunKg/2 : null;
@@ -1154,19 +1187,26 @@ function buildDispersiReportHtml(selectedPeriods, includeMap){
       });
     });
   });
-  let bebanSections = "";
+  let bebanSections = "", anyCarried = false;
   periodsSorted.forEach(({periode})=>{
     const rows = byPeriode[periode];
     if(!rows || !rows.length) return;
     let no=1;
-    const trs = rows.map(({stack:s, param, r, bebanSemesterKg})=>`<tr><td>${no++}</td><td>${escHtml(s.nama)}</td><td>${escHtml(param)}</td>
-      <td style="text-align:right;">${escHtml(r.concRec.dateOfSampling||"—")}</td>
+    const trs = rows.map(({stack:s, param, r, bebanSemesterKg})=>{
+      if(r.carriedFrom) anyCarried = true;
+      const dateCell = r.carriedFrom
+        ? `${escHtml(r.concRec.dateOfSampling||"—")} <span style="color:#8a5c11;font-weight:700;">&dagger;</span>`
+        : escHtml(r.concRec.dateOfSampling||"—");
+      return `<tr><td>${no++}</td><td>${escHtml(s.nama)}</td><td>${escHtml(param)}</td>
+      <td style="text-align:center;">${escHtml(frekuensiLabelShort(s.frekuensiBulan))}</td>
+      <td style="text-align:right;">${dateCell}</td>
       <td style="text-align:right;">${dispersiFmt(r.concRec.resultNumeric,1)} ${escHtml(r.concRec.unit)}</td>
       <td style="text-align:right;">${dispersiFmt(r.flowRec.resultNumeric,1)} m&sup3;/s</td>
       <td style="text-align:right;">${dispersiFmt(r.runningHour,0)} j <span style="color:#777;">(${dispersiFmt(r.runningHour!=null?r.runningHour/12:null,0)} j/bln)</span></td>
-      <td style="text-align:right;font-weight:700;">${dispersiFmt(bebanSemesterKg,1)} kg</td></tr>`).join("");
+      <td style="text-align:right;font-weight:700;">${dispersiFmt(bebanSemesterKg,1)} kg</td></tr>`;
+    }).join("");
     bebanSections += `<div style="font-weight:700;font-size:12px;margin:12px 0 5px;color:#0d1f38;">Semester ${escHtml(periode)} <span style="font-weight:400;color:#777;">(${rows.length} data)</span></div>
-      <table class="pg-ba-table"><thead><tr><th style="width:22px;">No</th><th>Titik</th><th>Parameter</th><th>Tgl Sampling</th><th style="text-align:right;">Konsentrasi</th><th style="text-align:right;">Laju Alir</th><th style="text-align:right;">Jam Operasi (per bulan)</th><th style="text-align:right;">Beban Semester</th></tr></thead>
+      <table class="pg-ba-table"><thead><tr><th style="width:22px;">No</th><th>Titik</th><th>Parameter</th><th>Frekuensi Pantau</th><th>Tgl Sampling</th><th style="text-align:right;">Konsentrasi</th><th style="text-align:right;">Laju Alir</th><th style="text-align:right;">Jam Operasi Semester Ini (per bulan)</th><th style="text-align:right;">Beban Semester</th></tr></thead>
         <tbody>${trs}</tbody></table>`;
   });
   // Total tahunan HANYA kalau S1 & S2 tahun itu SAMA-SAMA ada datanya — bukan hasil ekstrapolasi
@@ -1228,6 +1268,7 @@ function buildDispersiReportHtml(selectedPeriods, includeMap){
       <tbody>${summaryRows||`<tr><td colspan="5" style="text-align:center;">Tidak ada data pada periode yang dipilih.</td></tr>`}</tbody></table>
 
     <div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;">Rincian Beban Emisi per Semester</div>
+    ${anyCarried ? `<div style="font-size:10px;color:#8a5c11;margin:-2px 0 8px;">&dagger; = konsentrasi memakai hasil sampling TERAKHIR dari periode lain (belum dijadwalkan sampling ulang di semester ini sesuai Frekuensi Pantau-nya) — berlaku sepanjang siklus pemantauannya. Jam Operasi tetap dihitung dari semester yang sedang dilaporkan (bukan ikut semester sampling asalnya).</div>` : ""}
     ${bebanSections || `<div style="font-size:11px;color:#777;margin:6px 0;">Tidak ada data pada periode yang dipilih.</div>`}
 
     ${annualRows ? `<div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;">Total Tahunan (hanya kalau S1 &amp; S2 tahun sama-sama lengkap)</div>
@@ -1241,7 +1282,7 @@ function buildDispersiReportHtml(selectedPeriods, includeMap){
     ${mapSection}
 
     <div class="pg-foot" style="margin-top:16px;">
-      Beban semester = konsentrasi &times; laju alir tercatat (m&sup3;/s, diperlakukan setara Nm&sup3;/s) &times; jam operasi rata-rata per bulan (running hour 1 tahun terakhir &divide; 12) &times; 6 bulan — dihitung dari data hasil pemantauan RIIL periode itu sendiri, BUKAN estimasi/ekstrapolasi tahunan. Total tahunan hanya ditampilkan kalau kedua semester (S1 &amp; S2) tahun tsb sama-sama punya data lengkap. Baku mutu &amp; status kepatuhan diambil langsung dari data hasil pemantauan (Permen LH 13/2009 &amp; Permen LHK 11/2021 sesuai kategori kapasitas/bahan bakar tiap titik). Dibuat otomatis oleh Emission Sampling Planner &amp; Tracker.
+      Beban semester = konsentrasi &times; laju alir tercatat (m&sup3;/s, diperlakukan setara Nm&sup3;/s) &times; jam operasi SEMESTER YANG DILAPORKAN (dari riwayat Running Hour bulanan, bukan estimasi). Konsentrasi &amp; laju alir memakai hasil sampling RIIL pada semester itu sendiri kalau ada, atau hasil sampling terakhir yang masih berlaku (ditandai &dagger;) kalau titik ini memang belum dijadwalkan sampling ulang sesuai Frekuensi Pantau-nya (mis. titik 1x/tahun) — bukan estimasi/ekstrapolasi. Total tahunan hanya ditampilkan kalau kedua semester (S1 &amp; S2) tahun tsb sama-sama punya beban (riil maupun &dagger;). Baku mutu &amp; status kepatuhan diambil langsung dari data hasil pemantauan (Permen LH 13/2009 &amp; Permen LHK 11/2021 sesuai kategori kapasitas/bahan bakar tiap titik). Dibuat otomatis oleh Emission Sampling Planner &amp; Tracker.
     </div>
     <img class="pg-ba-footer-band" src="${FOOTER_BAND_B64}" alt="">
   </div>`;
