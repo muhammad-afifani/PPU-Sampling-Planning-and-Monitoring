@@ -967,6 +967,9 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
    berapa saja asal bukan "auto") di container ini supaya Leaflet ngunci semua pane-nya di
    stacking context sendiri dan tidak lagi menembus ke atas header sticky. */
 #siteMap{height:70vh;min-height:480px;border-radius:10px;border:1px solid var(--gray-200);position:relative;z-index:0;}
+/* Model Dispersi Emisi punya peta Leaflet + .stickytop yang lebih tinggi (header + 4 stat card) —
+   masalah "bocor" yang sama persis seperti #siteMap di atas, jadi solusinya sama: z-index eksplisit. */
+#dispersiMap{position:relative;z-index:0;}
 .map-legend-dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:4px;vertical-align:middle;}
 .leaflet-popup-content b{color:var(--heading);}
 .map-pin{border-radius:50%;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);transition:transform .12s ease;}

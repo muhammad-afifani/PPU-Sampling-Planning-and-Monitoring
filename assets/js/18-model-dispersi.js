@@ -32,6 +32,17 @@ const DISPERSI_COMPLIANCE_EXTRA = ["Opasitas"];
 const DISPERSI_FLOW_MODE_KEY = "FLOW";
 const DISPERSI_FLOW_MODE_META = {label:"Keluaran Cerobong (Semua Arah)", desc:"Pola sebaran KESELURUHAN gas buang berdasarkan laju alir tercatat (bukan konsentrasi pencemar tertentu) — menunjukkan ke arah mana asap/gas buang bergerak, bukan beban pencemar. Pilih salah satu parameter pencemar untuk melihat beban & kepatuhan baku mutu."};
 function dispersiIsFlowMode(){ return dispersiState.param===DISPERSI_FLOW_MODE_KEY; }
+// Baku Mutu Udara Ambien Nasional (PP 22/2021 Lampiran VII) & US EPA NAAQS — acuan umum
+// pembanding (µg/m³) utk konsentrasi PUNCAK hasil model, BUKAN pengganti kajian dispersi
+// regulatory penuh (perlu simulasi meteorologi per jam sepanjang minimal 1 tahun, bukan
+// screening satu kombinasi angin+stabilitas seperti di halaman ini). Cross-check ke teks resmi
+// PP 22/2021 sebelum dipakai pelaporan kepatuhan — angka di sini murni konteks/indikasi awal.
+const DISPERSI_AMBIENT_STD = {
+  "NOx": {ambientLabel:"NO₂ (ambien)", pp22:{"24 jam":65,"1 tahun":50}, epa:{"1 jam":188,"1 tahun":100}},
+  "SO₂": {ambientLabel:"SO₂ (ambien)", pp22:{"24 jam":75,"1 tahun":45}, epa:{"1 jam":196}},
+  "CO": {ambientLabel:"CO (ambien)", pp22:{"8 jam":10000}, epa:{"8 jam":10000}},
+  "Total Partikulat": {ambientLabel:"PM10/TSP (ambien)", pp22:{"24 jam":75,"1 tahun":40}, epa:{"24 jam":150}}
+};
 
 /* ---------- Pengelompokan jenis sumber (utk warna & default geometri cerobong) dari 17 nilai
    kategoriSumber riil yang jauh lebih rinci dari sekadar 6-7 tipe generik ---------- */
@@ -264,7 +275,7 @@ function dispersiPeriodDateRange(sel){
 /* ---------- State halaman ---------- */
 let dispersiState = {
   site: null, param: "NOx", sel: null, stability: "D", windMode: "live", mapLayer: "satellite",
-  selectedStackIds: null,
+  selectedStackIds: null, lastPeakConcUgm3: null,
   wind: {speed:null, dirFrom:null, temp:null, humidity:null, updatedAt:null, error:null, loading:false, history:[], historyLabel:""},
   periodWind: {loading:false, error:null, avgSpeed:null, avgTemp:null, avgHumidity:null, dominantDeg:null, dominantLabel:null, sampleCount:0, clamped:false, history:[], historyLabel:""}
 };
@@ -492,7 +503,15 @@ let dispersiPlumeComputeTimer = null;
 function dispersiScheduleUpdatePlume(delay){
   dispersiSetPlumeStatus("loading");
   clearTimeout(dispersiPlumeComputeTimer);
-  dispersiPlumeComputeTimer = setTimeout(dispersiComputePlumeNow, delay==null?15:delay);
+  // Panel Dampak Kualitas Udara Ambien dibaca dari dispersiState.lastPeakConcUgm3, yang HANYA
+  // terisi/dikosongkan di dalam dispersiComputePlumeNow (jalan async lewat setTimeout ini) —
+  // tanpa refresh eksplisit di sini, panel itu akan tampil basi (nilai hitungan sebelumnya) sampai
+  // ada pemicu render lain yang tidak berhubungan sama sekali dengan selesainya hitungan plume ini.
+  dispersiPlumeComputeTimer = setTimeout(()=>{ dispersiComputePlumeNow(); dispersiRefreshAmbientImpactPanel(); }, delay==null?15:delay);
+}
+function dispersiRefreshAmbientImpactPanel(){
+  const el = document.getElementById("dispersiAmbientImpact");
+  if(el) el.innerHTML = dispersiAmbientImpactHtml();
 }
 // Grid konsentrasi 200x200 (CALC) dihitung lalu diperhalus (box blur 3x) supaya batas antar-band
 // jadi kurva mulus, dibagi 8 band non-linear (akar pangkat 0.55 spy band rendah tidak keliatan
@@ -504,6 +523,10 @@ function dispersiScheduleUpdatePlume(delay){
 function dispersiComputePlumeNow(){
   if(!dispersiMapInstance) return;
   if(dispersiPlumeLayerObj){ dispersiMapInstance.removeLayer(dispersiPlumeLayerObj); dispersiPlumeLayerObj=null; }
+  // Direset di awal (bukan cuma di jalur sukses) supaya SEMUA early-return "no-data" di bawah
+  // otomatis tidak menyisakan puncak konsentrasi BASI dari hitungan sebelumnya di panel Dampak
+  // Kualitas Udara Ambien — jalur sukses di akhir fungsi ini yg akan mengisinya lagi kalau relevan.
+  dispersiState.lastPeakConcUgm3 = null;
   const flowMode = dispersiIsFlowMode();
   if(!flowMode && !DISPERSI_MASS_PARAMS[dispersiState.param]){ dispersiSetPlumeStatus("no-data","Parameter tidak dikenal."); return; }
   const sel = dispersiResolveSelection(dispersiState.sel);
@@ -588,6 +611,9 @@ function dispersiComputePlumeNow(){
   // semua karena dibandingkan ke puncak mentah yg jauh lebih tinggi dari apapun yg benar2 tervisualisasi.
   let maxV = 0.0001;
   for(let i=0;i<smooth.length;i++){ if(smooth[i]>maxV) maxV = smooth[i]; }
+  // Puncak grid yg SUDAH dihaluskan ini adalah konsentrasi ground-level riil (ug/m3, bukan
+  // sekadar nilai relatif 0-1 utk pewarnaan) — disimpan utk panel Dampak Kualitas Udara Ambien.
+  dispersiState.lastPeakConcUgm3 = flowMode ? null : maxV;
 
   // 8 band warna TANPA garis tepi putih (dihapus per feedback — kelihatan blur/kotak-kotak di
   // resolusi/zoom tertentu) — transisi antar band sekarang murni dari gradasi warnanya sendiri.
@@ -707,6 +733,52 @@ function dispersiWindRoseHtml(history){
     <div style="position:absolute;inset:22px;border:1px solid var(--gray-200);border-radius:50%;"></div>
     ${bars}
   </div>`;
+}
+// Sparkline tren kecepatan angin dari histori per-jam yg SAMA dgn dipakai wind rose (bukan
+// panggilan API baru) — didownsample maks 24 batang (rata-rata per kelompok jam) supaya tetap
+// terbaca walau rentang periode berisi ribuan jam data.
+function dispersiWindTrendHtml(history){
+  if(!history || !history.length) return `<div class="hint">Belum ada data untuk ditampilkan.</div>`;
+  const BUCKETS = Math.min(24, history.length);
+  const bucketSize = Math.ceil(history.length/BUCKETS);
+  const bars = [];
+  for(let i=0;i<history.length;i+=bucketSize){
+    const chunk = history.slice(i, i+bucketSize);
+    bars.push(chunk.reduce((a,h)=>a+h.speed,0)/chunk.length);
+  }
+  const maxV = Math.max(1, ...bars);
+  const avg = bars.reduce((a,b)=>a+b,0)/bars.length;
+  return `<div style="display:flex;align-items:flex-end;gap:2px;height:52px;">
+    ${bars.map(v=>`<div style="flex:1;background:var(--teal-400);border-radius:2px 2px 0 0;height:${Math.max(3,Math.round(v/maxV*48))}px;" title="${dispersiFmt(v,1)} m/s"></div>`).join("")}
+  </div>
+  <div class="hint" style="margin-top:4px;display:flex;justify-content:space-between;"><span>${dispersiFmt(Math.min(...bars),1)} min</span><span>${dispersiFmt(avg,1)} rata-rata</span><span>${dispersiFmt(Math.max(...bars),1)} maks (m/s)</span></div>`;
+}
+// Bandingkan puncak konsentrasi ground-level hasil model (sudah dihitung di dispersiComputePlumeNow,
+// nilai riil ug/m3 bukan sekadar skala warna) thd baku mutu ambien — mengisi ruang kosong panel
+// Data Angin sekaligus memberi konteks "seberapa besar dampaknya" spt diminta, dgn disclaimer jelas
+// ini estimasi screening (bukan simulasi meteorologi tahunan penuh spt AERMOD regulatory).
+function dispersiAmbientImpactHtml(){
+  if(dispersiIsFlowMode()) return `<div class="hint">Perbandingan baku mutu ambien tidak berlaku utk mode "${escHtml(DISPERSI_FLOW_MODE_META.label)}" — pilih parameter pencemar.</div>`;
+  const std = DISPERSI_AMBIENT_STD[dispersiState.param];
+  if(!std) return "";
+  const peak = dispersiState.lastPeakConcUgm3;
+  if(peak==null) return `<div class="hint">Belum ada plume terhitung pada titik/angin saat ini.</div>`;
+  const rows = [];
+  Object.entries(std.pp22||{}).forEach(([period,val])=>rows.push({source:"PP 22/2021 (Nasional)", period, val}));
+  Object.entries(std.epa||{}).forEach(([period,val])=>rows.push({source:"US EPA NAAQS", period, val}));
+  return `
+    <div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;letter-spacing:.02em;margin-bottom:3px;">Konsentrasi Puncak Terdekat Sumber &middot; ${escHtml(std.ambientLabel)}</div>
+    <div style="font-family:var(--font-mono);font-size:19px;font-weight:800;color:var(--heading);margin-bottom:6px;">${dispersiFmt(peak,1)} <span style="font-size:11px;font-weight:600;color:var(--gray-500);">µg/m³</span></div>
+    <table style="width:100%;border-collapse:collapse;font-size:10.5px;">
+      <thead><tr><th style="text-align:left;padding:2px 4px;color:var(--gray-500);font-weight:600;">Acuan</th><th style="text-align:right;padding:2px 4px;color:var(--gray-500);font-weight:600;">Ambang</th><th style="text-align:right;padding:2px 4px;color:var(--gray-500);font-weight:600;">%</th></tr></thead>
+      <tbody>${rows.map(r=>{
+        const pct = Math.round(peak/r.val*1000)/10;
+        const color = pct>100?"#a02a24":pct>50?"#8a5c11":"#1c7a4f";
+        return `<tr style="border-top:1px solid var(--gray-200);"><td style="padding:2px 4px;">${escHtml(r.source)} <span style="color:var(--gray-500);">(${escHtml(r.period)})</span></td><td style="text-align:right;padding:2px 4px;font-family:var(--font-mono);">${dispersiFmt(r.val,0)}</td><td style="text-align:right;padding:2px 4px;font-family:var(--font-mono);font-weight:700;color:${color};">${dispersiFmt(pct,0)}%</td></tr>`;
+      }).join("")}</tbody>
+    </table>
+    <div class="hint" style="margin-top:6px;">Nilai TERTINGGI di mana pun dalam tampilan peta saat ini (biasanya persis di dekat cerobong, bukan di lokasi reseptor publik) — estimasi screening 1 kombinasi angin+stabilitas dari mode ${dispersiState.windMode==="live"?"Live":"Periode"}, bukan rata-rata 24 jam/tahunan tervalidasi. Kajian AMDAL/kepatuhan resmi perlu simulasi meteorologi per jam min. 1 tahun (AERMOD penuh); silangkan angka baku mutu nasional ke teks resmi PP 22/2021 sebelum dipakai pelaporan.</div>
+  `;
 }
 function dispersiWindPanelHtml(){
   const s = dispersiState;
@@ -838,6 +910,8 @@ function dispersiRenderSidePanels(){
   const roseLabelEl = document.getElementById("dispersiWindRoseLabel");
   if(roseLabelEl) roseLabelEl.textContent = windHistLabel ? " · "+windHistLabel : "";
   document.getElementById("dispersiWindRose").innerHTML = dispersiWindRoseHtml(windHist);
+  document.getElementById("dispersiWindTrend").innerHTML = dispersiWindTrendHtml(windHist);
+  document.getElementById("dispersiAmbientImpact").innerHTML = dispersiAmbientImpactHtml();
   const naNote = `<tr><td colspan="7" style="text-align:center;color:var(--gray-500);padding:14px;">Tidak berlaku utk mode "${escHtml(DISPERSI_FLOW_MODE_META.label)}" — pilih salah satu parameter pencemar (NOx/SO₂/CO/Partikulat) untuk melihat beban.</td></tr>`;
   document.getElementById("dispersiBebanTable").innerHTML = flowMode ? naNote : dispersiBebanRowsHtml(stacks, dispersiState.param, sel);
   document.getElementById("dispersiComplianceTable").innerHTML = dispersiComplianceRowsHtml(stacks, sel);
