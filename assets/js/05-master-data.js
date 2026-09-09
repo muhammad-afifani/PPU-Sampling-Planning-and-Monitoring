@@ -330,30 +330,51 @@ function renderMasterTree(rows){
           ptGroups.forEach(group=>{
             const p0 = group[0];
             const specLine = specLineFor(p0);
-            // Grup gabungan (Turbin/Gas Engine/Emergency/Ambient) mencakup lebih dari satu jenis
-            // sumber asli — tampilkan tag kecil biar tetap kelihatan jenis aslinya apa. Kalau
-            // beberapa titik digabung jadi 1 baris (mis. Ambient+Kebisingan lokasi sama), tampilkan
-            // SEMUA kategori anggotanya di sini sekaligus (bukan cuma anggota pertama) — ini
-            // satu-satunya tempat "parameter apa saja" terlihat, krn baris per-parameter terpisah
-            // sudah tidak ada lagi.
-            const subTag = group.length>1
-              ? group.map(p=>`<span class="badge ${NONEMISI_BADGE[p.kategori]||"b-gray"}" style="margin-left:5px;font-size:9.5px;">${escHtml(NONEMISI_LABEL[p.kategori]||p.kategori)}</span>`).join("")
-              : (p0.kategori==="emisi"
+            // Grup dgn 1 anggota (titik emisi biasa, atau ambient-family yg sendirian di lokasi
+            // itu) — render 1 baris tabel biasa, identik dgn sebelumnya, tag kecil di bawah nama.
+            if(group.length<=1){
+              const subTag = (p0.kategori==="emisi"
                   ? (p0.kategoriSumber ? `<span class="badge b-gray" style="margin-left:5px;font-size:9.5px;">${escHtml(p0.kategoriSumber)}</span>` : "")
                   : `<span class="badge ${NONEMISI_BADGE[p0.kategori]||"b-gray"}" style="margin-left:5px;font-size:9.5px;">${escHtml(NONEMISI_LABEL[p0.kategori]||p0.kategori)}</span>`)
                 + (p0.groupOverride ? `<span class="badge b-amber" style="margin-left:3px;font-size:9.5px;" title="Grup dipindah manual, otomatis harusnya: ${escHtml(autoSubgroupOf(p0))}">dipindah manual</span>` : "");
-            html += `<tr>
-              <td style="padding-left:34px;">${groupStackHtml(group, p=>pointStatusBadge(p))}</td>
-              <td><b>${escHtml(p0.nama)}</b>${subTag}${specLine?`<div class="muted" style="font-size:10.5px;">${escHtml(specLine)}</div>`:""}</td>
-              <td>${groupStackHtml(group, p=>escHtml(p.parameter||"-")+(p.parameterCatatan?`<div class="muted" style="font-size:10px;">${escHtml(p.parameterCatatan)}</div>`:""))}</td>
-              <td class="muted">${(()=>{const v=rhYearValue(p0,currentPeriodStr()); return v!=null?v:"-";})()}</td>
-              <td>${groupStackHtml(group, p=>wajibBadgeHtml(p))}</td>
-              <td style="white-space:nowrap;">${groupStackHtml(group, p=>prediksiCellHtml(p))}</td>
-              <td>${groupStackHtml(group, p=>verifyCellHtml(p))}</td>
-              <td style="text-align:right;white-space:nowrap;">
-                ${groupStackHtml(group, p=>`<button class="btn small" data-action="editPoint" data-id="${p.id}">Edit</button> <button class="btn small danger" data-action="deletePoint" data-id="${p.id}">Hapus</button>`)}
-              </td>
-            </tr>`;
+              html += `<tr>
+                <td style="padding-left:34px;">${pointStatusBadge(p0)}</td>
+                <td><b>${escHtml(p0.nama)}</b>${subTag}${specLine?`<div class="muted" style="font-size:10.5px;">${escHtml(specLine)}</div>`:""}</td>
+                <td>${escHtml(p0.parameter||"-")}${p0.parameterCatatan?`<div class="muted" style="font-size:10px;">${escHtml(p0.parameterCatatan)}</div>`:""}</td>
+                <td class="muted">${(()=>{const v=rhYearValue(p0,currentPeriodStr()); return v!=null?v:"-";})()}</td>
+                <td>${wajibBadgeHtml(p0)}</td>
+                <td style="white-space:nowrap;">${prediksiCellHtml(p0)}</td>
+                <td>${verifyCellHtml(p0)}</td>
+                <td style="text-align:right;white-space:nowrap;">
+                  <button class="btn small" data-action="editPoint" data-id="${p0.id}">Edit</button> <button class="btn small danger" data-action="deletePoint" data-id="${p0.id}">Hapus</button>
+                </td>
+              </tr>`;
+              return;
+            }
+            // Grup gabungan (mis. Ambient+Kebisingan+Kebauan+Getaran di lokasi yang sama) — dulu
+            // ditumpuk (flex column) DI DALAM tiap sel, tapi karena tinggi teks beda-beda per
+            // kolom (parameter panjang vs status pendek), baris "virtual" per parameter itu tidak
+            // sejajar horizontal antar kolom — kelihatan berantakan/tumpang tindih. Sekarang tiap
+            // parameter dapat BARIS TABEL SUNGGUHAN (jadi otomatis sejajar per kolom, persis
+            // serapi tabel Turbin Engine yg 1 baris = 1 unit), dengan Nama/Spesifikasi dan RH
+            // digabung pakai rowspan (nilainya sama utk semua parameter 1 lokasi), dan tag kategori
+            // kecil di kolom Progress supaya tetap jelas parameter mana yg mana.
+            group.forEach((p,i)=>{
+              const isLast = i===group.length-1;
+              const tag = `<span class="badge ${NONEMISI_BADGE[p.kategori]||"b-gray"} ms-ptag">${escHtml(NONEMISI_LABEL[p.kategori]||p.kategori)}</span>`;
+              html += `<tr class="ms-group-row${isLast?" ms-group-last":""}">
+                <td style="padding-left:34px;">${tag}${pointStatusBadge(p)}</td>
+                ${i===0?`<td rowspan="${group.length}"><b>${escHtml(p0.nama)}</b>${p0.groupOverride?`<span class="badge b-amber" style="margin-left:5px;font-size:9.5px;" title="Grup dipindah manual, otomatis harusnya: ${escHtml(autoSubgroupOf(p0))}">dipindah manual</span>`:""}${specLine?`<div class="muted" style="font-size:10.5px;">${escHtml(specLine)}</div>`:""}</td>`:""}
+                <td>${escHtml(p.parameter||"-")}${p.parameterCatatan?`<div class="muted" style="font-size:10px;">${escHtml(p.parameterCatatan)}</div>`:""}</td>
+                ${i===0?`<td class="muted" rowspan="${group.length}">${(()=>{const v=rhYearValue(p0,currentPeriodStr()); return v!=null?v:"-";})()}</td>`:""}
+                <td>${wajibBadgeHtml(p)}</td>
+                <td style="white-space:nowrap;">${prediksiCellHtml(p)}</td>
+                <td>${verifyCellHtml(p)}</td>
+                <td style="text-align:right;white-space:nowrap;">
+                  <button class="btn small" data-action="editPoint" data-id="${p.id}">Edit</button> <button class="btn small danger" data-action="deletePoint" data-id="${p.id}">Hapus</button>
+                </td>
+              </tr>`;
+            });
           });
           html += `</tbody></table>`;
         }

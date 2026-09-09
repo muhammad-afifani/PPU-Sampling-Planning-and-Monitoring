@@ -699,6 +699,15 @@ textarea.mono{font-family:var(--font-mono);font-size:11.5px;}
    punya siapa. Dipakai di Database Titik Pantau (tree+flat), cetak Daftar Titik Pantau, Berita
    Acara — border putus2 antar baris tumpukan supaya beda dari border baris tabel biasa (solid).
    */
+/* Tag kategori kecil di kolom Progress tiap sub-baris grup ambient-family (lihat ms-group-row
+   di bawah) — badge biasa terlalu besar/renggang di sini, jadi dipadatkan sendiri. */
+.ms-ptag{font-size:8.5px;padding:1px 6px;margin-right:6px;vertical-align:1px;}
+/* Baris "sub-parameter" dari 1 lokasi ambient-family (Ambient/Kebisingan/Kebauan/Getaran di
+   titik yang sama) — sekarang baris tabel SUNGGUHAN (bukan ditumpuk dlm 1 sel spt .ms-stack di
+   bawah), jadi otomatis sejajar antar kolom. Border dashed di antara sub-baris (bukan solid spt
+   baris antar-lokasi) menandakan mereka masih 1 lokasi/kunjungan yang sama; baris terakhir
+   (.ms-group-last) balik ke border solid default tabel sbg pemisah ke lokasi berikutnya. */
+.tree-table tr.ms-group-row:not(.ms-group-last) td{border-bottom:1px dashed var(--gray-300);}
 .ms-stack{display:flex;flex-direction:column;gap:4px;}
 .ms-stack-row{display:flex;align-items:flex-start;gap:6px;padding-top:4px;border-top:1px dashed var(--gray-200);}
 .ms-stack-row:first-child{padding-top:0;border-top:none;}
