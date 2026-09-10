@@ -116,6 +116,15 @@ function dispersiRotateToPlume(dx,dy,bearingDeg){
   return { x: dx*Math.sin(th)+dy*Math.cos(th), y: dx*Math.cos(th)-dy*Math.sin(th) };
 }
 const DISPERSI_COLOR_STOPS = [[0,[13,31,56]],[0.12,[45,120,150]],[0.28,[14,165,160]],[0.48,[90,200,90]],[0.65,[232,214,60]],[0.82,[232,140,50]],[1,[224,40,30]]];
+// Palet kelas kecepatan angin baku — dipakai bareng oleh Wind Rose & grafik ringkasan angin harian
+// Mode Expert, supaya konvensi warna "kecepatan angin" konsisten di semua visualisasi halaman ini.
+const DISPERSI_SPEED_BINS = [
+  {max:2, label:"<2", color:"#bfe3ea"},
+  {max:4, label:"2–4", color:"#7cc3d6"},
+  {max:6, label:"4–6", color:"#2fa0ba"},
+  {max:8, label:"6–8", color:"#0ea5a0"},
+  {max:Infinity, label:"≥8", color:"#0a6b63"}
+];
 function dispersiColorForFrac(f){
   f = Math.max(0, Math.min(1, f));
   for(let i=0;i<DISPERSI_COLOR_STOPS.length-1;i++){
@@ -384,7 +393,11 @@ let dispersiState = {
   site: null, param: "NOx", sel: null, stability: "D", windMode: "live", mapLayer: "satellite",
   selectedStackIds: null, lastPeakConcUgm3: null, lastPlumeSnapshotDataUrl: null, lastPlumeBasemapUrl: null, lastPlumeSnapshotMeta: null,
   wind: {speed:null, dirFrom:null, temp:null, humidity:null, updatedAt:null, error:null, loading:false, history:[], historyLabel:""},
-  periodWind: {loading:false, error:null, avgSpeed:null, avgTemp:null, avgHumidity:null, dominantDeg:null, dominantLabel:null, sampleCount:0, clamped:false, history:[], historyLabel:""}
+  periodWind: {loading:false, error:null, avgSpeed:null, avgTemp:null, avgHumidity:null, dominantDeg:null, dominantLabel:null, sampleCount:0, clamped:false, history:[], historyLabel:""},
+  // Mode angin ke-3 (selain Live/Periode): rentang tanggal BEBAS pilihan user (tidak terbatas ke
+  // opsi semester/tahun yang disediakan) — start/end diisi user lewat 2 input tanggal, sisa field
+  // lain identik strukturnya dgn periodWind (sama2 hasil dispersiFetchArchiveWindAggregate).
+  customWind: {start:null, end:null, loading:false, error:null, avgSpeed:null, avgTemp:null, avgHumidity:null, dominantDeg:null, dominantLabel:null, sampleCount:0, clamped:false, history:[], historyLabel:""}
 };
 function dispersiEnsureState(){
   const sites = dispersiSiteList();
@@ -441,6 +454,35 @@ async function dispersiFetchLiveWind(){
   }
   dispersiRefreshMapAndPanels();
 }
+// Fetch + agregasi baku (rata-rata kecepatan/suhu/kelembapan, arah dominan dari 16 sektor) utk 1
+// rentang tanggal Open-Meteo Archive — dipakai BERSAMA oleh mode Periode (rentang dari periode
+// sampling terpilih, lihat dispersiPeriodDateRange) & mode Kustom (rentang tanggal bebas pilihan
+// user) di bawah, karena keduanya cuma beda SUMBER rentang tanggalnya, bukan cara mengolah hasilnya.
+async function dispersiFetchArchiveWindAggregate(lat, lng, start, end){
+  const maxEndDate = new Date(Date.now()-5*86400000).toISOString().slice(0,10);
+  const endDate = end>maxEndDate ? maxEndDate : end;
+  const clamped = endDate!==end;
+  if(endDate<start) throw new Error("range too recent");
+  const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${start}&end_date=${endDate}&hourly=wind_speed_10m,wind_direction_10m,temperature_2m,relative_humidity_2m&wind_speed_unit=ms&timezone=auto`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("bad response");
+  const data = await res.json();
+  const dirs = data.hourly.wind_direction_10m||[], speeds = data.hourly.wind_speed_10m||[];
+  const hist = dirs.map((d,i)=>({dir:d,speed:speeds[i]})).filter(h=>h.dir!=null && h.speed!=null);
+  if(!hist.length) throw new Error("no data");
+  const avgSpeed = hist.reduce((a,h)=>a+h.speed,0)/hist.length;
+  const temps = (data.hourly.temperature_2m||[]).filter(v=>v!=null);
+  const hums = (data.hourly.relative_humidity_2m||[]).filter(v=>v!=null);
+  const avgTemp = temps.length ? temps.reduce((a,b)=>a+b,0)/temps.length : null;
+  const avgHumidity = hums.length ? hums.reduce((a,b)=>a+b,0)/hums.length : null;
+  const N=16, bins=new Array(N).fill(0);
+  hist.forEach(h=>{ bins[Math.round(h.dir/(360/N))%N]++; });
+  let maxI=0; bins.forEach((v,i)=>{ if(v>bins[maxI]) maxI=i; });
+  return {
+    loading:false, error:null, avgSpeed, avgTemp, avgHumidity, dominantDeg:maxI*(360/N), dominantLabel:dispersiCompassLabel16(maxI*(360/N)),
+    sampleCount:hist.length, clamped, history:hist, historyLabel:`${start} – ${endDate}`
+  };
+}
 async function dispersiFetchPeriodWind(){
   const center = dispersiSiteCenter(dispersiState.site);
   const sel = dispersiResolveSelection(dispersiState.sel);
@@ -448,37 +490,39 @@ async function dispersiFetchPeriodWind(){
   dispersiState.periodWind.loading = true;
   try{
     const {start, end} = dispersiPeriodDateRange(sel);
-    const maxEndDate = new Date(Date.now()-5*86400000).toISOString().slice(0,10);
-    const endDate = end>maxEndDate ? maxEndDate : end;
-    const clamped = endDate!==end;
-    if(endDate<start) throw new Error("range too recent");
-    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${center.lat}&longitude=${center.lng}&start_date=${start}&end_date=${endDate}&hourly=wind_speed_10m,wind_direction_10m,temperature_2m,relative_humidity_2m&wind_speed_unit=ms&timezone=auto`;
-    const res = await fetch(url);
-    if(!res.ok) throw new Error("bad response");
-    const data = await res.json();
-    const dirs = data.hourly.wind_direction_10m||[], speeds = data.hourly.wind_speed_10m||[];
-    const hist = dirs.map((d,i)=>({dir:d,speed:speeds[i]})).filter(h=>h.dir!=null && h.speed!=null);
-    if(!hist.length) throw new Error("no data");
-    const avgSpeed = hist.reduce((a,h)=>a+h.speed,0)/hist.length;
-    const temps = (data.hourly.temperature_2m||[]).filter(v=>v!=null);
-    const hums = (data.hourly.relative_humidity_2m||[]).filter(v=>v!=null);
-    const avgTemp = temps.length ? temps.reduce((a,b)=>a+b,0)/temps.length : null;
-    const avgHumidity = hums.length ? hums.reduce((a,b)=>a+b,0)/hums.length : null;
-    const N=16, bins=new Array(N).fill(0);
-    hist.forEach(h=>{ bins[Math.round(h.dir/(360/N))%N]++; });
-    let maxI=0; bins.forEach((v,i)=>{ if(v>bins[maxI]) maxI=i; });
-    dispersiState.periodWind = {
-      loading:false, error:null, avgSpeed, avgTemp, avgHumidity, dominantDeg:maxI*(360/N), dominantLabel:dispersiCompassLabel16(maxI*(360/N)),
-      sampleCount:hist.length, clamped, history:hist, historyLabel:`${start} – ${endDate}`
-    };
+    dispersiState.periodWind = await dispersiFetchArchiveWindAggregate(center.lat, center.lng, start, end);
   }catch(err){
     dispersiState.periodWind = {loading:false, error:"Data angin historis Open-Meteo untuk rentang ini belum tersedia.", avgSpeed:null, avgTemp:null, avgHumidity:null, dominantDeg:null, dominantLabel:null, sampleCount:0, clamped:false, history:[], historyLabel:""};
   }
   dispersiRefreshMapAndPanels();
 }
-function dispersiRefreshWind(){
-  if(dispersiState.windMode==="periode") dispersiFetchPeriodWind(); else dispersiFetchLiveWind();
+// Mode Kustom: SAMA persis alurnya dgn Periode, bedanya rentang start/end datang dari 2 input
+// tanggal user (dispersiState.customWind.start/end, diisi lewat dispersiApplyCustomWindRange) —
+// bukan diturunkan dari daftar semester/tahun yang disediakan. Dipakai kalau user mau melihat pola
+// angin pada rentang tanggal spesifik yang tidak dibatasi pilihan periode sampling yang ada.
+async function dispersiFetchCustomWind(){
+  const center = dispersiSiteCenter(dispersiState.site);
+  const {start, end} = dispersiState.customWind;
+  if(!center || !start || !end) return;
+  dispersiState.customWind = {...dispersiState.customWind, loading:true};
+  try{
+    const agg = await dispersiFetchArchiveWindAggregate(center.lat, center.lng, start, end);
+    dispersiState.customWind = {...agg, start, end};
+  }catch(err){
+    dispersiState.customWind = {start, end, loading:false, error:"Data angin historis Open-Meteo untuk rentang tanggal ini belum tersedia (terlalu baru utk arsip &plusmn;5 hari, atau memang di luar cakupan Open-Meteo).", avgSpeed:null, avgTemp:null, avgHumidity:null, dominantDeg:null, dominantLabel:null, sampleCount:0, clamped:false, history:[], historyLabel:""};
+  }
+  dispersiRefreshMapAndPanels();
 }
+function dispersiRefreshWind(){
+  if(dispersiState.windMode==="periode") dispersiFetchPeriodWind();
+  else if(dispersiState.windMode==="custom") dispersiFetchCustomWind();
+  else dispersiFetchLiveWind();
+}
+function dispersiWindModeLabel(mode){ return mode==="live"?"Live":mode==="custom"?"Kustom":"Periode"; }
+// Objek hasil agregasi angin yang SEDANG AKTIF di luar mode Live (periodWind ATAU customWind) —
+// dipakai di banyak tempat (stat ringkas, panel angin, hint dampak ambien) supaya tidak perlu
+// mengulang ternary windMode==="custom"?...:... di tiap pemanggil.
+function dispersiActiveWindAgg(){ return dispersiState.windMode==="custom" ? dispersiState.customWind : dispersiState.periodWind; }
 let dispersiWindTimer = null;
 function dispersiEnsureWindTimer(){
   if(dispersiWindTimer) return;
@@ -591,6 +635,53 @@ function dispersiRenderTipeChips(){
   const el = document.getElementById("dispersiTipeChips");
   if(el) el.innerHTML = dispersiTipeChipsHtml();
 }
+
+/* ---------- Filter Titik Emisi (checklist gaya Excel, pola .xsel yang sama dgn checklist
+   Titik/Cerobong di Dashboard Hasil Pemantauan) — pelengkap klik-per-marker di peta & chip Jenis
+   Sumber: kadang mau pilih 2-3 titik SPESIFIK by name (misal buat preview/laporan 1 unit saja)
+   tanpa harus mencari-cari pin-nya di peta satu-satu. Tidak menambah state baru — tetap menulis ke
+   dispersiState.selectedStackIds yang sama dipakai peta/plume/tabel/preview, jadi semuanya otomatis
+   ikut tersinkron. ---------- */
+let dispersiTitikPanelOpen = false;
+function dispersiVisibleTitikOptions(){
+  const q = (document.getElementById("dispersiTitikSearch")?.value||"").toLowerCase().trim();
+  const all = dispersiStacks().filter(s=>s.site===dispersiState.site);
+  return q ? all.filter(s=>s.nama.toLowerCase().includes(q)) : all;
+}
+function dispersiRenderTitikChecklist(){
+  const all = dispersiStacks().filter(s=>s.site===dispersiState.site);
+  const btn = document.getElementById("dispersiTitikBtnLabel");
+  if(btn){
+    const n = dispersiState.selectedStackIds ? dispersiState.selectedStackIds.size : 0;
+    btn.textContent = n===all.length ? `Semua ${all.length} titik di site ini` : n===0 ? "Tidak ada titik dipilih" : `${n} dari ${all.length} titik dipilih`;
+  }
+  const list = document.getElementById("dispersiTitikList");
+  if(!list) return;
+  const visible = dispersiVisibleTitikOptions();
+  list.innerHTML = visible.length ? visible.map(s=>`<label class="xsel-opt"><input type="checkbox" class="dispersiTitikCheck" data-val="${escHtml(s.id)}" ${dispersiState.selectedStackIds.has(s.id)?"checked":""}> <span style="width:7px;height:7px;border-radius:50%;background:${s.tipe.color};display:inline-block;flex-shrink:0;"></span> ${escHtml(s.nama)}</label>`).join("")
+    : `<div class="xsel-empty">Tidak ada titik yang cocok pencarian.</div>`;
+}
+function dispersiToggleTitikPanel(){
+  dispersiTitikPanelOpen = !dispersiTitikPanelOpen;
+  const p = document.getElementById("dispersiTitikPanel");
+  if(p) p.style.display = dispersiTitikPanelOpen ? "block" : "none";
+  if(dispersiTitikPanelOpen){ dispersiRenderTitikChecklist(); document.getElementById("dispersiTitikSearch")?.focus(); }
+}
+function dispersiTitikCheckAllVisible(){
+  dispersiVisibleTitikOptions().forEach(s=>dispersiState.selectedStackIds.add(s.id));
+  dispersiDrawMarkers(); dispersiScheduleUpdatePlume(); dispersiRenderSidePanels(); dispersiRenderTitikChecklist();
+}
+function dispersiTitikUncheckAllVisible(){
+  dispersiVisibleTitikOptions().forEach(s=>dispersiState.selectedStackIds.delete(s.id));
+  dispersiDrawMarkers(); dispersiScheduleUpdatePlume(); dispersiRenderSidePanels(); dispersiRenderTitikChecklist();
+}
+document.addEventListener("change", e=>{
+  if(e.target.classList?.contains("dispersiTitikCheck")){
+    dispersiToggleStack(e.target.dataset.val);
+    dispersiRenderTitikChecklist();
+  }
+});
+document.addEventListener("input", e=>{ if(e.target.id==="dispersiTitikSearch") dispersiRenderTitikChecklist(); });
 // Status render plume ("loading"/"no-data"/"ready") ditampilkan di #dispersiPlumeStatus supaya
 // user bisa bedakan "lagi dihitung", "memang tidak ada data", atau "beneran macet" — sebelumnya
 // diam saja tanpa indikasi apapun kalau plume tidak muncul.
@@ -701,6 +792,97 @@ function dispersiBasemapExportUrl(mode, sw, ne, w, h){
 // SELALU mengikuti VIEWPORT peta saat ini (bukan kotak tetap di sekitar titik) — supaya tidak
 // pernah "kepotong" saat zoom out (kotaknya toh selalu sebesar yg kelihatan) atau blur saat zoom in
 // (dihitung ulang dgn kotak yg lebih kecil = piksel dunia-nyata lebih rapat).
+// Superposisi 16 sektor arah angin dari histori per-jam (dipakai bareng oleh mode Periode & mode
+// Kustom — keduanya rentang tanggal angin yg dibobot frekuensi kejadian, cuma beda sumber
+// rentangnya) — dipisah dari dispersiComputePlumeNow supaya bisa dipakai ulang tanpa duplikasi.
+function dispersiWindCasesFromHistory(hist){
+  const N=16, bins=new Array(N).fill(0), speedSum=new Array(N).fill(0);
+  hist.forEach(h=>{ const idx=Math.round(h.dir/(360/N))%N; bins[idx]++; speedSum[idx]+=h.speed; });
+  const total = hist.length;
+  const cases = [];
+  for(let i=0;i<N;i++){ if(bins[i]) cases.push({dirFrom:i*(360/N), u:Math.max(speedSum[i]/bins[i],0.5), weight:bins[i]/total}); }
+  return cases;
+}
+// Grid konsentrasi 200x200 dihitung lalu diperhalus (box blur 3x) supaya batas antar-band jadi
+// kurva mulus — inti fisika Gaussian plume, dipisah dari dispersiComputePlumeNow supaya bisa
+// dipakai ulang PERSIS SAMA oleh render peta interaktif MAUPUN kanvas Mode Expert (timelapse per
+// jam), tanpa duplikasi rumus. Murni angka in-out (parameter eksplisit semua, tidak menyentuh
+// DOM/Leaflet/dispersiState) — supaya aman dipanggil berulang-ulang cepat (tiap jam) tanpa efek
+// samping/state bersama.
+function dispersiComputeConcGrid(sources, windCases, stability, centerLat, centerLng, halfWidthM, halfHeightM, GW, GH){
+  const grid = new Float32Array(GW*GH);
+  const originXY = sources.map(src=>dispersiToLocalXY(src.stack.lat, src.stack.lng, centerLat, centerLng));
+  for(let py=0; py<GH; py++){
+    const worldY = (0.5-py/GH)*halfHeightM*2;
+    for(let px=0; px<GW; px++){
+      const worldX = (px/GW-0.5)*halfWidthM*2;
+      let total = 0;
+      for(let wc=0; wc<windCases.length; wc++){
+        const bearing = dispersiPlumeBearing(windCases[wc].dirFrom);
+        const u = windCases[wc].u, weight = windCases[wc].weight;
+        for(let i=0;i<sources.length;i++){
+          const {dx,dy} = originXY[i];
+          const {x,y} = dispersiRotateToPlume(worldX-dx, worldY-dy, bearing);
+          if(x<=5) continue;
+          const {sy,sz} = dispersiSigmaYZ(stability, x);
+          total += weight*dispersiGroundConc(sources[i].Qgs, u, sy, sz, sources[i].stack.stackHeight, y);
+        }
+      }
+      grid[py*GW+px] = total;
+    }
+  }
+  const boxBlur = (src)=>{
+    const out = new Float32Array(src.length);
+    for(let py=0; py<GH; py++){
+      for(let px=0; px<GW; px++){
+        let sum=0,n=0;
+        for(let oy=-1;oy<=1;oy++) for(let ox=-1;ox<=1;ox++){
+          const nx=px+ox, ny=py+oy;
+          if(nx<0||nx>=GW||ny<0||ny>=GH) continue;
+          sum += src[ny*GW+nx]; n++;
+        }
+        out[py*GW+px] = sum/n;
+      }
+    }
+    return out;
+  };
+  let smooth = boxBlur(grid); smooth = boxBlur(smooth); smooth = boxBlur(smooth);
+  // maxV diambil dari grid yg SUDAH dihaluskan, bukan grid mentah — titik tepat di dekat sumber
+  // (x kecil, sigma y/z minimal) punya lonjakan tajam yg nyaris hilang kena 3x box blur; kalau
+  // dipakai sbg pembagi, seluruh badan plume yg jadi perhatian utama malah keliatan pucat/gelap
+  // semua karena dibandingkan ke puncak mentah yg jauh lebih tinggi dari apapun yg benar2 tervisualisasi.
+  let maxV = 0.0001;
+  for(let i=0;i<smooth.length;i++){ if(smooth[i]>maxV) maxV = smooth[i]; }
+  return {smooth, maxV};
+}
+// Grid hasil dispersiComputeConcGrid -> kanvas berwarna (8 band non-linear, transparan di luar
+// badan plume) — sama spt di atas, dipisah utk dipakai ulang oleh peta interaktif & Mode Expert.
+function dispersiGridToColorCanvas(smooth, maxV, GW, GH, OW, OH){
+  const canvas = document.createElement("canvas"); canvas.width=GW; canvas.height=GH;
+  const ctx = canvas.getContext("2d");
+  const BANDS=8;
+  const bandOf = (frac)=>Math.min(BANDS-1, Math.floor(Math.pow(frac,0.55)*BANDS));
+  const imgData = ctx.createImageData(GW,GH);
+  for(let py=0; py<GH; py++){
+    for(let px=0; px<GW; px++){
+      const i = py*GW+px;
+      const frac = smooth[i]/maxV;
+      const di = i*4;
+      if(frac<0.02){ imgData.data[di+3]=0; continue; }
+      const b = bandOf(frac);
+      const bandFrac = (b+0.5)/BANDS;
+      const [r,g,bl] = dispersiColorForFrac(bandFrac);
+      imgData.data[di]=r; imgData.data[di+1]=g; imgData.data[di+2]=bl;
+      imgData.data[di+3]=Math.round(Math.min(0.85,0.28+bandFrac*0.6)*255);
+    }
+  }
+  ctx.putImageData(imgData,0,0);
+  const outCanvas = document.createElement("canvas"); outCanvas.width=OW; outCanvas.height=OH;
+  const octx = outCanvas.getContext("2d");
+  octx.imageSmoothingEnabled = true; octx.imageSmoothingQuality = "high";
+  octx.drawImage(canvas,0,0,GW,GH,0,0,OW,OH);
+  return outCanvas;
+}
 function dispersiComputePlumeNow(){
   if(!dispersiMapInstance) return;
   if(dispersiPlumeLayerObj){ dispersiMapInstance.removeLayer(dispersiPlumeLayerObj); dispersiPlumeLayerObj=null; }
@@ -723,14 +905,10 @@ function dispersiComputePlumeNow(){
   if(!sources.length){ dispersiSetPlumeStatus("no-data","Tidak ada data konsentrasi/laju alir pada titik & periode yang dipilih untuk parameter ini."); return; }
 
   let windCases;
-  if(dispersiState.windMode==="periode"){
-    const hist = dispersiState.periodWind.history;
-    if(!hist.length){ dispersiSetPlumeStatus("no-data",'Data angin periode belum tersedia — coba "Refresh Angin".'); return; }
-    const N=16, bins=new Array(N).fill(0), speedSum=new Array(N).fill(0);
-    hist.forEach(h=>{ const idx=Math.round(h.dir/(360/N))%N; bins[idx]++; speedSum[idx]+=h.speed; });
-    const total = hist.length;
-    windCases = [];
-    for(let i=0;i<N;i++){ if(bins[i]) windCases.push({dirFrom:i*(360/N), u:Math.max(speedSum[i]/bins[i],0.5), weight:bins[i]/total}); }
+  if(dispersiState.windMode==="periode" || dispersiState.windMode==="custom"){
+    const hist = (dispersiState.windMode==="custom" ? dispersiState.customWind : dispersiState.periodWind).history;
+    if(!hist.length){ dispersiSetPlumeStatus("no-data",'Data angin periode/rentang kustom belum tersedia — coba "Refresh Angin" (mode Kustom: pastikan rentang tanggal sudah diterapkan).'); return; }
+    windCases = dispersiWindCasesFromHistory(hist);
   } else {
     if(dispersiState.wind.dirFrom==null){ dispersiSetPlumeStatus("no-data",'Data angin live belum tersedia — coba "Refresh Angin".'); return; }
     windCases = [{dirFrom:dispersiState.wind.dirFrom, u:Math.max(dispersiState.wind.speed||2,0.5), weight:1}];
@@ -763,78 +941,11 @@ function dispersiComputePlumeNow(){
   const GH = aspect>=1 ? Math.max(70,Math.round(200/aspect)) : 200;
   const OW = aspect>=1 ? 900 : Math.max(320,Math.round(900*aspect));
   const OH = aspect>=1 ? Math.max(320,Math.round(900/aspect)) : 900;
-  const canvas = document.createElement("canvas"); canvas.width=GW; canvas.height=GH;
-  const ctx = canvas.getContext("2d");
-  const grid = new Float32Array(GW*GH);
-  const originXY = sources.map(src=>dispersiToLocalXY(src.stack.lat, src.stack.lng, centerLat, centerLng));
-  for(let py=0; py<GH; py++){
-    const worldY = (0.5-py/GH)*halfHeightM*2;
-    for(let px=0; px<GW; px++){
-      const worldX = (px/GW-0.5)*halfWidthM*2;
-      let total = 0;
-      for(let wc=0; wc<windCases.length; wc++){
-        const bearing = dispersiPlumeBearing(windCases[wc].dirFrom);
-        const u = windCases[wc].u, weight = windCases[wc].weight;
-        for(let i=0;i<sources.length;i++){
-          const {dx,dy} = originXY[i];
-          const {x,y} = dispersiRotateToPlume(worldX-dx, worldY-dy, bearing);
-          if(x<=5) continue;
-          const {sy,sz} = dispersiSigmaYZ(dispersiState.stability, x);
-          total += weight*dispersiGroundConc(sources[i].Qgs, u, sy, sz, sources[i].stack.stackHeight, y);
-        }
-      }
-      grid[py*GW+px] = total;
-    }
-  }
-  const boxBlur = (src)=>{
-    const out = new Float32Array(src.length);
-    for(let py=0; py<GH; py++){
-      for(let px=0; px<GW; px++){
-        let sum=0,n=0;
-        for(let oy=-1;oy<=1;oy++) for(let ox=-1;ox<=1;ox++){
-          const nx=px+ox, ny=py+oy;
-          if(nx<0||nx>=GW||ny<0||ny>=GH) continue;
-          sum += src[ny*GW+nx]; n++;
-        }
-        out[py*GW+px] = sum/n;
-      }
-    }
-    return out;
-  };
-  let smooth = boxBlur(grid); smooth = boxBlur(smooth); smooth = boxBlur(smooth);
-  // maxV diambil dari grid yg SUDAH dihaluskan, bukan grid mentah — titik tepat di dekat sumber
-  // (x kecil, sigma y/z minimal) punya lonjakan tajam yg nyaris hilang kena 3x box blur; kalau
-  // dipakai sbg pembagi, seluruh badan plume yg jadi perhatian utama malah keliatan pucat/gelap
-  // semua karena dibandingkan ke puncak mentah yg jauh lebih tinggi dari apapun yg benar2 tervisualisasi.
-  let maxV = 0.0001;
-  for(let i=0;i<smooth.length;i++){ if(smooth[i]>maxV) maxV = smooth[i]; }
+  const {smooth, maxV} = dispersiComputeConcGrid(sources, windCases, dispersiState.stability, centerLat, centerLng, halfWidthM, halfHeightM, GW, GH);
   // Puncak grid yg SUDAH dihaluskan ini adalah konsentrasi ground-level riil (ug/m3, bukan
   // sekadar nilai relatif 0-1 utk pewarnaan) — disimpan utk panel Dampak Kualitas Udara Ambien.
   dispersiState.lastPeakConcUgm3 = flowMode ? null : maxV;
-
-  // 8 band warna TANPA garis tepi putih (dihapus per feedback — kelihatan blur/kotak-kotak di
-  // resolusi/zoom tertentu) — transisi antar band sekarang murni dari gradasi warnanya sendiri.
-  const BANDS=8;
-  const bandOf = (frac)=>Math.min(BANDS-1, Math.floor(Math.pow(frac,0.55)*BANDS));
-  const imgData = ctx.createImageData(GW,GH);
-  for(let py=0; py<GH; py++){
-    for(let px=0; px<GW; px++){
-      const i = py*GW+px;
-      const frac = smooth[i]/maxV;
-      const di = i*4;
-      if(frac<0.02){ imgData.data[di+3]=0; continue; }
-      const b = bandOf(frac);
-      const bandFrac = (b+0.5)/BANDS;
-      const [r,g,bl] = dispersiColorForFrac(bandFrac);
-      imgData.data[di]=r; imgData.data[di+1]=g; imgData.data[di+2]=bl;
-      imgData.data[di+3]=Math.round(Math.min(0.85,0.28+bandFrac*0.6)*255);
-    }
-  }
-  ctx.putImageData(imgData,0,0);
-  const outCanvas = document.createElement("canvas"); outCanvas.width=OW; outCanvas.height=OH;
-  const octx = outCanvas.getContext("2d");
-  octx.imageSmoothingEnabled = true; octx.imageSmoothingQuality = "high";
-  octx.drawImage(canvas,0,0,GW,GH,0,0,OW,OH);
+  const outCanvas = dispersiGridToColorCanvas(smooth, maxV, GW, GH, OW, OH);
   dispersiPlumeLayerObj = L.imageOverlay(outCanvas.toDataURL(), bounds, {opacity:1}).addTo(dispersiMapInstance);
   // Simpan snapshot statis LATAR TRANSPARAN (plume + anotasi kartografis + titik-titik sumber
   // BERNOMOR, TANPA warna latar) utk opsi "sertakan gambar" di export PDF — ditempel sbg lapisan
@@ -995,13 +1106,7 @@ function dispersiTrendHtml(){
 function dispersiWindRoseHtml(history){
   const hist = (history||[]).filter(h=>h && h.dir!=null && h.speed!=null);
   if(!hist.length) return `<div class="hint" style="width:128px;">Belum ada data histori angin.</div>`;
-  const SPEED_BINS = [
-    {max:2, label:"<2", color:"#bfe3ea"},
-    {max:4, label:"2–4", color:"#7cc3d6"},
-    {max:6, label:"4–6", color:"#2fa0ba"},
-    {max:8, label:"6–8", color:"#0ea5a0"},
-    {max:Infinity, label:"≥8", color:"#0a6b63"}
-  ];
+  const SPEED_BINS = DISPERSI_SPEED_BINS;
   const total = hist.length;
   let calmCount = 0;
   const bins = DISPERSI_COMPASS8.map(()=>SPEED_BINS.map(()=>0));
@@ -1090,7 +1195,7 @@ function dispersiAmbientImpactHtml(){
         return `<tr style="border-top:1px solid var(--gray-200);"><td style="padding:2px 4px;">${escHtml(r.source)} <span style="color:var(--gray-500);">(${escHtml(r.period)})</span></td><td style="text-align:right;padding:2px 4px;font-family:var(--font-mono);">${dispersiFmt(r.val,0)}</td><td style="text-align:right;padding:2px 4px;font-family:var(--font-mono);font-weight:700;color:${color};">${dispersiFmt(pct,0)}%</td></tr>`;
       }).join("")}</tbody>
     </table>
-    <div class="hint" style="margin-top:6px;">Nilai TERTINGGI di mana pun dalam tampilan peta saat ini (biasanya persis di dekat cerobong, bukan di lokasi reseptor publik) — estimasi screening 1 kombinasi angin+stabilitas dari mode ${dispersiState.windMode==="live"?"Live":"Periode"}, bukan rata-rata 24 jam/tahunan tervalidasi. Kajian AMDAL/kepatuhan resmi perlu simulasi meteorologi per jam min. 1 tahun (AERMOD penuh); silangkan angka baku mutu nasional ke teks resmi PP 22/2021 sebelum dipakai pelaporan.</div>
+    <div class="hint" style="margin-top:6px;">Nilai TERTINGGI di mana pun dalam tampilan peta saat ini (biasanya persis di dekat cerobong, bukan di lokasi reseptor publik) — estimasi screening 1 kombinasi angin+stabilitas dari mode ${dispersiWindModeLabel(dispersiState.windMode)}, bukan rata-rata 24 jam/tahunan tervalidasi. Kajian AMDAL/kepatuhan resmi perlu simulasi meteorologi per jam min. 1 tahun (AERMOD penuh); silangkan angka baku mutu nasional ke teks resmi PP 22/2021 sebelum dipakai pelaporan.</div>
   `;
 }
 function dispersiWindPanelHtml(){
@@ -1117,19 +1222,28 @@ function dispersiWindPanelHtml(){
     </div>
     ${s.wind.error?`<div style="font-size:11px;color:#a02a24;margin-top:8px;">${escHtml(s.wind.error)}</div>`:""}`;
   }
-  const pw = s.periodWind;
+  if(s.windMode==="custom"){
+    if(!s.customWind.start || !s.customWind.end) return `<div class="hint">Pilih rentang tanggal bebas di atas, lalu klik "Terapkan" untuk memuat pola angin pada rentang tersebut.</div>`;
+    return dispersiWindStatsGridHtml(s.customWind);
+  }
+  return dispersiWindStatsGridHtml(s.periodWind);
+}
+// Grid statistik angin (rata-rata kecepatan, arah dominan, jumlah sampel, rentang tanggal dipakai)
+// — dipakai bareng oleh mode Periode & mode Kustom, keduanya sama-sama hasil
+// dispersiFetchArchiveWindAggregate jadi bentuk datanya identik, cuma beda sumber rentang tanggal.
+function dispersiWindStatsGridHtml(w){
   const extraRows = [];
-  if(pw.avgTemp!=null) extraRows.push(`<div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Suhu Rata-rata</div><div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--gray-700);">${dispersiFmt(pw.avgTemp,1)}°C</div></div>`);
-  if(pw.avgHumidity!=null) extraRows.push(`<div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Kelembapan Rata-rata</div><div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--gray-700);">${dispersiFmt(pw.avgHumidity,0)}%</div></div>`);
+  if(w.avgTemp!=null) extraRows.push(`<div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Suhu Rata-rata</div><div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--gray-700);">${dispersiFmt(w.avgTemp,1)}°C</div></div>`);
+  if(w.avgHumidity!=null) extraRows.push(`<div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Kelembapan Rata-rata</div><div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--gray-700);">${dispersiFmt(w.avgHumidity,0)}%</div></div>`);
   return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-    <div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Rata-rata Kecepatan</div><div style="font-family:var(--font-mono);font-size:18px;font-weight:800;color:var(--heading);">${pw.avgSpeed!=null?dispersiFmt(pw.avgSpeed,1):"—"} <span style="font-size:11px;font-weight:600;color:var(--gray-500);">m/s</span></div></div>
-    <div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Arah Dominan</div><div style="font-family:var(--font-mono);font-size:18px;font-weight:800;color:var(--heading);">${pw.dominantLabel||"—"}</div></div>
-    <div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Sampel Per Jam</div><div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--gray-700);">${pw.sampleCount}</div></div>
-    <div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Rentang Dipakai</div><div style="font-size:11px;font-weight:600;color:var(--gray-700);">${escHtml(pw.historyLabel||"—")}</div></div>
+    <div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Rata-rata Kecepatan</div><div style="font-family:var(--font-mono);font-size:18px;font-weight:800;color:var(--heading);">${w.avgSpeed!=null?dispersiFmt(w.avgSpeed,1):"—"} <span style="font-size:11px;font-weight:600;color:var(--gray-500);">m/s</span></div></div>
+    <div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Arah Dominan</div><div style="font-family:var(--font-mono);font-size:18px;font-weight:800;color:var(--heading);">${w.dominantLabel||"—"}</div></div>
+    <div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Sampel Per Jam</div><div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--gray-700);">${w.sampleCount}</div></div>
+    <div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Rentang Dipakai</div><div style="font-size:11px;font-weight:600;color:var(--gray-700);">${escHtml(w.historyLabel||"—")}</div></div>
     ${extraRows.join("")}
   </div>
-  ${pw.error?`<div style="font-size:11px;color:#a02a24;margin-top:8px;">${escHtml(pw.error)}</div>`:""}
-  ${pw.clamped?`<div style="font-size:10.5px;color:#8a5c11;margin-top:6px;">Delay arsip Open-Meteo ~5 hari — tanggal akhir dipotong ke data terbaru yang tersedia.</div>`:""}`;
+  ${w.error?`<div style="font-size:11px;color:#a02a24;margin-top:8px;">${escHtml(w.error)}</div>`:""}
+  ${w.clamped?`<div style="font-size:10.5px;color:#8a5c11;margin-top:6px;">Delay arsip Open-Meteo ~5 hari — tanggal akhir dipotong ke data terbaru yang tersedia.</div>`:""}`;
 }
 function dispersiDashboardStatsHtml(){
   const stacks = dispersiSelectedStacks();
@@ -1137,7 +1251,7 @@ function dispersiDashboardStatsHtml(){
   const sel = dispersiResolveSelection(dispersiState.sel);
   const windNow = dispersiState.windMode==="live"
     ? (dispersiState.wind.speed!=null ? `${dispersiFmt(dispersiState.wind.speed,1)} m/s, dari ${dispersiCompassLabel(dispersiState.wind.dirFrom)}` : "—")
-    : (dispersiState.periodWind.avgSpeed!=null ? `${dispersiFmt(dispersiState.periodWind.avgSpeed,1)} m/s, dominan ${dispersiState.periodWind.dominantLabel}` : "—");
+    : (dispersiActiveWindAgg().avgSpeed!=null ? `${dispersiFmt(dispersiActiveWindAgg().avgSpeed,1)} m/s, dominan ${dispersiActiveWindAgg().dominantLabel}` : "—");
   if(dispersiIsQualitativeMode()){
     const withData = stacks.filter(s=>dispersiQgsForStack(s, dispersiState.param, sel)!=null).length;
     const modeLabel = dispersiCurrentParamMeta().label;
@@ -1145,9 +1259,9 @@ function dispersiDashboardStatsHtml(){
       <div class="stat"><div class="num">${withData}/${totalEmisi}</div><div class="lbl">Titik dgn Data &middot; ${escHtml(dispersiState.site||"")}</div></div>
       <div class="stat"><div class="num">${stacks.length}</div><div class="lbl">Titik Ditampilkan di Peta</div></div>
       <div class="stat"><div class="num">${escHtml(dispersiState.stability)}</div><div class="lbl">Kelas Stabilitas Atmosfer</div></div>
-      <div class="stat"><div class="num">${dispersiState.windMode==="live"?"Live":"Periode"}</div><div class="lbl">Sumber Angin Plume</div></div>
+      <div class="stat"><div class="num">${dispersiWindModeLabel(dispersiState.windMode)}</div><div class="lbl">Sumber Angin Plume</div></div>
     </div>
-    <div class="hint" style="margin-top:8px;">Mode ${escHtml(modeLabel)}: pola sebaran relatif, bukan beban pencemar teregulasi. Angin saat ini (${dispersiState.windMode==="live"?"Live":"rata-rata Periode"}): <b>${windNow}</b> &middot; Periode data: <b>${escHtml(dispersiSelectionLabel(dispersiState.sel))}</b></div>`;
+    <div class="hint" style="margin-top:8px;">Mode ${escHtml(modeLabel)}: pola sebaran relatif, bukan beban pencemar teregulasi. Angin saat ini (${dispersiState.windMode==="live"?"Live":"rata-rata "+dispersiWindModeLabel(dispersiState.windMode)}): <b>${windNow}</b> &middot; Periode data: <b>${escHtml(dispersiSelectionLabel(dispersiState.sel))}</b></div>`;
   }
   let withData=0, bebanBulanTotal=0, bebanTahunTotal=0, exceedCount=0;
   stacks.forEach(s=>{
@@ -1164,7 +1278,7 @@ function dispersiDashboardStatsHtml(){
     <div class="stat"><div class="num">${dispersiFmt(bebanTahunTotal,2)}</div><div class="lbl">Total ton ${escHtml(dispersiState.param)}/tahun (terpilih)</div></div>
     <div class="stat ${exceedCount?"bad":"good"}"><div class="num">${exceedCount}</div><div class="lbl">Parameter Melebihi Baku Mutu</div></div>
   </div>
-  <div class="hint" style="margin-top:8px;">Angin saat ini (${dispersiState.windMode==="live"?"Live":"rata-rata Periode"}): <b>${windNow}</b> &middot; Periode data: <b>${escHtml(dispersiSelectionLabel(dispersiState.sel))}</b></div>`;
+  <div class="hint" style="margin-top:8px;">Angin saat ini (${dispersiState.windMode==="live"?"Live":"rata-rata "+dispersiWindModeLabel(dispersiState.windMode)}): <b>${windNow}</b> &middot; Periode data: <b>${escHtml(dispersiSelectionLabel(dispersiState.sel))}</b></div>`;
 }
 
 /* ---------- Render halaman ---------- */
@@ -1186,6 +1300,9 @@ function renderDispersi(){
   }
   if(!dispersiWindFetchedOnce){ dispersiWindFetchedOnce = true; dispersiRefreshWind(); }
   document.getElementById("dispersiSiteChips").innerHTML = sites.map(s=>dispersiChip(s===dispersiState.site,"dispersiSetSite",s,s)).join("");
+  const titikPanelEl = document.getElementById("dispersiTitikPanel");
+  if(titikPanelEl) titikPanelEl.style.display = dispersiTitikPanelOpen ? "block" : "none";
+  dispersiRenderTitikChecklist();
   document.getElementById("dispersiParamChips").innerHTML = dispersiParamChipsHtml();
   const periodSel = document.getElementById("dispersiPeriode");
   const periodOptions = dispersiPeriodList().map(({periode})=>`<option value="${periode}">${periode}</option>`).join("")
@@ -1195,6 +1312,14 @@ function renderDispersi(){
   document.getElementById("dispersiStability").value = dispersiState.stability;
   document.getElementById("dispersiLiveBtn").classList.toggle("active", dispersiState.windMode==="live");
   document.getElementById("dispersiPeriodeBtn").classList.toggle("active", dispersiState.windMode==="periode");
+  document.getElementById("dispersiCustomBtn").classList.toggle("active", dispersiState.windMode==="custom");
+  const customRow = document.getElementById("dispersiCustomWindRow");
+  if(customRow) customRow.style.display = dispersiState.windMode==="custom" ? "flex" : "none";
+  if(dispersiState.windMode==="custom"){
+    const fromEl = document.getElementById("dispersiCustomFrom"), toEl = document.getElementById("dispersiCustomTo");
+    if(fromEl && !fromEl.value) fromEl.value = dispersiState.customWind.start || new Date(Date.now()-7*86400000).toISOString().slice(0,10);
+    if(toEl && !toEl.value) toEl.value = dispersiState.customWind.end || new Date().toISOString().slice(0,10);
+  }
   document.getElementById("dispersiSatBtn").classList.toggle("active", dispersiState.mapLayer==="satellite");
   document.getElementById("dispersiStreetBtn").classList.toggle("active", dispersiState.mapLayer==="street");
   document.getElementById("dispersiParamDesc").textContent = dispersiCurrentParamMeta().desc;
@@ -1218,8 +1343,8 @@ function dispersiRenderSidePanels(){
   const stacks = dispersiSelectedStacks();
   const sel = dispersiResolveSelection(dispersiState.sel);
   const qualitativeMode = dispersiIsQualitativeMode();
-  const windHist = dispersiState.windMode==="live" ? dispersiState.wind.history : dispersiState.periodWind.history;
-  const windHistLabel = dispersiState.windMode==="live" ? dispersiState.wind.historyLabel : dispersiState.periodWind.historyLabel;
+  const windHist = dispersiState.windMode==="live" ? dispersiState.wind.history : dispersiActiveWindAgg().history;
+  const windHistLabel = dispersiState.windMode==="live" ? dispersiState.wind.historyLabel : dispersiActiveWindAgg().historyLabel;
   document.getElementById("dispersiWindPanel").innerHTML = dispersiWindPanelHtml();
   const roseLabelEl = document.getElementById("dispersiWindRoseLabel");
   if(roseLabelEl) roseLabelEl.textContent = windHistLabel ? " · "+windHistLabel : "";
@@ -1261,6 +1386,18 @@ function dispersiOnPeriodeChange(){ dispersiState.sel = document.getElementById(
 function dispersiOnStabilityChange(){ dispersiState.stability = document.getElementById("dispersiStability").value; dispersiScheduleUpdatePlume(); }
 function dispersiSetWindModeLive(){ dispersiState.windMode="live"; dispersiRefreshWind(); renderDispersi(); }
 function dispersiSetWindModePeriode(){ dispersiState.windMode="periode"; dispersiRefreshWind(); renderDispersi(); }
+// Mode Kustom SENGAJA tidak langsung fetch spt Live/Periode di atas (belum tentu ada rentang
+// tanggal yg valid saat baru pindah mode) — nunggu user isi 2 tanggal & klik "Terapkan"
+// (dispersiApplyCustomWindRange) baru benar2 query Open-Meteo.
+function dispersiSetWindModeCustom(){ dispersiState.windMode="custom"; renderDispersi(); }
+function dispersiApplyCustomWindRange(){
+  const from = document.getElementById("dispersiCustomFrom")?.value;
+  const to = document.getElementById("dispersiCustomTo")?.value;
+  if(!from || !to){ toast("Isi tanggal awal dan akhir dulu.","err"); return; }
+  if(from>to){ toast("Tanggal awal harus sebelum atau sama dengan tanggal akhir.","err"); return; }
+  dispersiState.customWind = {...dispersiState.customWind, start:from, end:to};
+  dispersiFetchCustomWind();
+}
 function dispersiSetMapLayerSat(){ dispersiSetMapLayer("satellite"); }
 function dispersiSetMapLayerStreet(){ dispersiSetMapLayer("street"); }
 function dispersiSelectAllAtSite(){ dispersiState.selectedStackIds = new Set(dispersiStacks().filter(s=>s.site===dispersiState.site).map(s=>s.id)); dispersiDrawMarkers(); dispersiScheduleUpdatePlume(); dispersiRenderSidePanels(); }
@@ -1463,7 +1600,7 @@ function buildDispersiReportHtml(selectedPeriods, includeMap, selectedParams){
       const ratio = (snapMeta?.aspectW && snapMeta?.aspectH) ? `${snapMeta.aspectW}/${snapMeta.aspectH}` : "1/1";
       mapSection = `
     <div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;">Peta Sebaran</div>
-    <div style="font-size:10px;color:#a02a24;margin-bottom:8px;">Latar peta (citra satelit/jalan) diambil dari layanan basemap Esri saat laporan digenerate — kalau tidak ada koneksi internet saat mencetak, latar bisa jadi kosong tapi lapisan pola sebaran &amp; titik sumber di atasnya tetap tampil normal. Pola sebaran (warna) &amp; anotasi (cincin jarak, panah utara/angin, skala bar) tetap hasil MODEL SCREENING, bukan pengukuran langsung. Kondisi saat digenerate: site ${escHtml(snapMeta?.site||"")}, parameter ${escHtml(snapMeta?.paramLabel||"")}, mode angin ${snapMeta?.windMode==="live"?"Live":"Periode"} (dominan ${windLabel}), stabilitas ${escHtml(snapMeta?.stability||"")}.</div>
+    <div style="font-size:10px;color:#a02a24;margin-bottom:8px;">Latar peta (citra satelit/jalan) diambil dari layanan basemap Esri saat laporan digenerate — kalau tidak ada koneksi internet saat mencetak, latar bisa jadi kosong tapi lapisan pola sebaran &amp; titik sumber di atasnya tetap tampil normal. Pola sebaran (warna) &amp; anotasi (cincin jarak, panah utara/angin, skala bar) tetap hasil MODEL SCREENING, bukan pengukuran langsung. Kondisi saat digenerate: site ${escHtml(snapMeta?.site||"")}, parameter ${escHtml(snapMeta?.paramLabel||"")}, mode angin ${dispersiWindModeLabel(snapMeta?.windMode)} (dominan ${windLabel}), stabilitas ${escHtml(snapMeta?.stability||"")}.</div>
     <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
       <div style="flex:1 1 420px;max-width:640px;min-width:320px;">
         <div style="position:relative;width:100%;aspect-ratio:${ratio};background:#eef2f5;border:1px solid #ccc;border-radius:6px;overflow:hidden;">
@@ -1590,7 +1727,7 @@ function dispersiProfessionalPreviewBody(){
       <table class="pg-ba-meta pg-dispersi-pro-meta">
         <tr><td>Periode Data</td><td>:</td><td>${escHtml(snapMeta.sel)}</td></tr>
         <tr><td>Kelas Stabilitas</td><td>:</td><td>${escHtml(stab?stab.label:(snapMeta.stability||"—"))}</td></tr>
-        <tr><td>Sumber Angin</td><td>:</td><td>${snapMeta.windMode==="live"?"Live (Open-Meteo)":"Rata-rata Periode (Open-Meteo)"}</td></tr>
+        <tr><td>Sumber Angin</td><td>:</td><td>${dispersiWindModeLabel(snapMeta.windMode)} (Open-Meteo)</td></tr>
         <tr><td>Angin Dominan</td><td>:</td><td>${windLabel}</td></tr>
         <tr><td>Titik Sumber</td><td>:</td><td>${(snapMeta.sourceIndex||[]).length} titik</td></tr>
         <tr><td>Tanggal Dibuat</td><td>:</td><td>${genDate}</td></tr>
@@ -1644,6 +1781,273 @@ async function dispersiPrintProfessionalPreview(){
   document.title = originalTitle;
 }
 
+/* ---------- Mode Expert: Timelapse Sebaran Per Jam ----------
+   Animasi jam-per-jam (00:00 s/d jam terakhir data tersedia) dari SATU tanggal pilihan — beda dari
+   mode Live/Periode/Kustom di panel utama (yang menunjukkan kondisi SAAT INI atau RATA-RATA sebuah
+   rentang), di sini tiap frame pakai data angin SATU JAM SPESIFIK apa adanya (kerucut sempit spt
+   mode Live, bukan superposisi) supaya perubahan ARAH terlihat jelas antar jam. Kekuatan sumber
+   (Qgs) SENGAJA dibekukan dari Parameter & Periode Data yang aktif di panel utama saat modal dibuka
+   (bukan ikut berubah tiap jam — data sampling toh tidak ada per jam) — transparansi ini ditulis
+   eksplisit di caption bawah supaya tidak disalahartikan sbg rekonstruksi kejadian aktual per jam.
+   Geometri peta (pusat & lebar area) dihitung MANDIRI dari sebaran titik sumber terpilih (bukan
+   bergantung viewport peta utama) supaya Mode Expert selalu punya framing yang masuk akal
+   walaupun peta utama belum pernah di-zoom/geser ke titik yang relevan. */
+let dispersiTimelapse = {
+  loaded:false, date:null, hours:[], frameCache:{}, frameIdx:0, playing:false, timer:null,
+  geo:null, basemapUrl:null, sources:[], staticSvg:"", sourcePins:[],
+  paramLabel:"", selLabel:"", stabilityLabel:"", qualitative:false
+};
+// Pusat & setengah-lebar area (meter) dari sebaran titik sumber terpilih sendiri — bukan dari
+// viewport peta utama (lihat catatan di atas). Faktor 3.2x jarak titik terjauh dari pusat memberi
+// ruang cukup utk plume melebar ke satu sisi, dgn batas bawah 400m (titik tunggal) & batas atas
+// sama dgn MAX_HALF_M peta utama (konsisten dgn batas realistis model screening ini).
+function dispersiTimelapseComputeGeo(sources){
+  const lats = sources.map(s=>s.stack.lat), lngs = sources.map(s=>s.stack.lng);
+  const centerLat = lats.reduce((a,b)=>a+b,0)/lats.length;
+  const centerLng = lngs.reduce((a,b)=>a+b,0)/lngs.length;
+  let maxDistM = 300;
+  sources.forEach(s=>{
+    const {dx,dy} = dispersiToLocalXY(s.stack.lat, s.stack.lng, centerLat, centerLng);
+    maxDistM = Math.max(maxDistM, Math.hypot(dx,dy));
+  });
+  const halfM = Math.min(15000, Math.max(400, maxDistM*3.2));
+  const GW=200, GH=200, OW=620, OH=620;
+  return {
+    centerLat, centerLng, halfWidthM:halfM, halfHeightM:halfM, GW, GH, OW, OH,
+    sw: dispersiToLatLng(-halfM,-halfM,centerLat,centerLng), ne: dispersiToLatLng(halfM,halfM,centerLat,centerLng)
+  };
+}
+// Angin per-jam utk SATU tanggal: Archive API (kalau tanggalnya cukup lama, konsisten dgn delay
+// arsip &plusmn;5 hari yg sama dipakai mode Periode/Kustom) atau fallback Forecast API (utk tanggal
+// yg terlalu baru utk arsip — forecast API-nya sendiri sudah menyertakan riwayat 7 hari terakhir
+// lewat past_days). Menyertakan suhu/kelembapan tiap jam jg (bukan cuma arah+kecepatan) supaya
+// panel detail Mode Expert bisa menampilkan info selengkap mode Live/Periode.
+async function dispersiFetchTimelapseWindHours(lat, lng, dateStr){
+  const maxArchiveDate = new Date(Date.now()-5*86400000).toISOString().slice(0,10);
+  let times=[], dirs=[], speeds=[], temps=[], hums=[];
+  if(dateStr<=maxArchiveDate){
+    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${dateStr}&end_date=${dateStr}&hourly=wind_speed_10m,wind_direction_10m,temperature_2m,relative_humidity_2m&wind_speed_unit=ms&timezone=auto`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("bad response");
+    const data = await res.json();
+    times = data.hourly.time||[]; dirs = data.hourly.wind_direction_10m||[]; speeds = data.hourly.wind_speed_10m||[];
+    temps = data.hourly.temperature_2m||[]; hums = data.hourly.relative_humidity_2m||[];
+  } else {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=wind_speed_10m,wind_direction_10m,temperature_2m,relative_humidity_2m&past_days=7&forecast_days=2&wind_speed_unit=ms&timezone=auto`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("bad response");
+    const data = await res.json();
+    const allT=data.hourly.time||[], allD=data.hourly.wind_direction_10m||[], allS=data.hourly.wind_speed_10m||[], allTemp=data.hourly.temperature_2m||[], allHum=data.hourly.relative_humidity_2m||[];
+    allT.forEach((t,i)=>{ if(t.slice(0,10)===dateStr){ times.push(t); dirs.push(allD[i]); speeds.push(allS[i]); temps.push(allTemp[i]); hums.push(allHum[i]); } });
+  }
+  const hours = times.map((t,i)=>({hour:Number(t.slice(11,13)), time:t, dir:dirs[i], speed:speeds[i], temp:temps[i], humidity:hums[i]}))
+    .filter(h=>h.dir!=null && h.speed!=null).sort((a,b)=>a.hour-b.hour);
+  if(!hours.length) throw new Error("no data");
+  return hours;
+}
+// Lapisan anotasi kartografis (cincin jarak, titik sumber bernomor, panah utara, skala bar) —
+// GEOMETRINYA TIDAK BERUBAH antar jam (site/titik/area yang sama), jadi dihitung SEKALI saja
+// sbg SVG (bukan digambar ulang ke canvas tiap frame spt panah angin yg memang berubah arah) —
+// beda dari snapshot canvas peta utama yang menggambar semuanya jadi satu bitmap sekali jalan.
+function dispersiTimelapseBuildStaticLayer(geo, sources){
+  const {centerLat, centerLng, halfWidthM, halfHeightM, OW, OH} = geo;
+  const pxPerM = OW/(halfWidthM*2);
+  const scx = OW/2, scy = OH/2;
+  const ringStep = dispersiNiceNumber(Math.min(halfWidthM,halfHeightM)/2.6);
+  let rings = "";
+  for(let r=ringStep, n=0; r<Math.max(halfWidthM,halfHeightM)*1.45 && n<6; r+=ringStep, n++){
+    rings += `<circle cx="${scx}" cy="${scy}" r="${(r*pxPerM).toFixed(1)}" fill="none" stroke="rgba(13,31,56,.18)" stroke-width="1.5"/>`;
+    const lx = scx + r*pxPerM*Math.SQRT1_2, ly = scy - r*pxPerM*Math.SQRT1_2;
+    if(lx<OW-32 && lx>0 && ly>16) rings += `<text x="${(lx+3).toFixed(1)}" y="${(ly-2).toFixed(1)}" font-size="11" fill="rgba(13,31,56,.65)">${dispersiFmtDistance(r)}</text>`;
+  }
+  const sourcePins = sources.map((src,i)=>{
+    const {dx,dy} = dispersiToLocalXY(src.stack.lat, src.stack.lng, centerLat, centerLng);
+    return {no:i+1, stack:src.stack, px:scx+dx*pxPerM, py:scy-dy*pxPerM};
+  });
+  let pins = "";
+  sourcePins.forEach(p=>{
+    pins += `<circle cx="${p.px.toFixed(1)}" cy="${p.py.toFixed(1)}" r="9" fill="${p.stack.tipe.color}" stroke="#fff" stroke-width="2"/><circle cx="${p.px.toFixed(1)}" cy="${p.py.toFixed(1)}" r="9" fill="none" stroke="#0d1f38" stroke-width="1"/><text x="${p.px.toFixed(1)}" y="${(p.py+3.5).toFixed(1)}" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">${p.no}</text>`;
+  });
+  const nx = OW-42, ny=42;
+  const northArrow = `<line x1="${nx}" y1="${ny+10}" x2="${nx}" y2="${ny-18}" stroke="#0d1f38" stroke-width="2.5" stroke-linecap="round" marker-end="url(#tlNorthHead)"/><text x="${nx}" y="${ny+24}" font-size="12" font-weight="700" fill="#0d1f38" text-anchor="middle">U</text>`;
+  const niceM = dispersiNiceNumber((Math.min(OW,OH)*0.22)/pxPerM);
+  const barPx = niceM*pxPerM, barX=20, barY=OH-22;
+  const scaleBar = `<line x1="${barX}" y1="${barY}" x2="${barX+barPx}" y2="${barY}" stroke="#0d1f38" stroke-width="2"/><line x1="${barX}" y1="${barY-5}" x2="${barX}" y2="${barY+5}" stroke="#0d1f38" stroke-width="2"/><line x1="${barX+barPx}" y1="${barY-5}" x2="${barX+barPx}" y2="${barY+5}" stroke="#0d1f38" stroke-width="2"/><text x="${barX}" y="${barY-8}" font-size="12" fill="#0d1f38">${dispersiFmtDistance(niceM)}</text>`;
+  const svg = `<svg viewBox="0 0 ${OW} ${OH}" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;">
+    <defs><marker id="tlNorthHead" viewBox="0 0 10 10" refX="5" refY="8" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,10 L5,0 L10,10 Z" fill="#0d1f38"/></marker></defs>
+    ${rings}${pins}${northArrow}${scaleBar}
+  </svg>`;
+  return {svg, sourcePins};
+}
+function dispersiOpenExpertMode(){
+  const defaultDate = new Date(Date.now()-7*86400000).toISOString().slice(0,10);
+  dispersiTimelapse = {loaded:false, date:null, hours:[], frameCache:{}, frameIdx:0, playing:false, timer:null, geo:null, basemapUrl:null, sources:[], staticSvg:"", sourcePins:[], paramLabel:"", selLabel:"", stabilityLabel:"", qualitative:false};
+  openModal(`
+    <h3>&#127916; Mode Expert &mdash; Timelapse Sebaran Per Jam</h3>
+    <div class="hint" style="margin-bottom:10px;">Simulasikan bagaimana pola sebaran berubah sepanjang hari mengikuti data angin per jam pada satu tanggal pilihan. Kekuatan sumber emisi dibekukan dari Parameter &amp; Periode Data yang sedang aktif di halaman (<b>${escHtml(dispersiCurrentParamMeta().label)}</b>, periode <b>${escHtml(dispersiSelectionLabel(dispersiState.sel))}</b>); titik yang dipakai mengikuti seleksi peta/filter Titik Emisi saat ini (<b>${dispersiSelectedStacks().length} titik</b>).</div>
+    <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+      <div class="field" style="margin:0;"><label>Tanggal</label><input type="date" id="tlDateInput" value="${defaultDate}"></div>
+      <button class="btn primary" data-action="dispersiTimelapseLoad">Muat Data Hari Ini</button>
+    </div>
+    <div id="tlBody"><div class="hint">Pilih tanggal (disarankan &ge;5 hari yang lalu supaya data arsip penuh 24 jam), lalu klik "Muat Data Hari Ini".</div></div>
+    <div class="actions"><button class="btn ghost" data-action="dispersiTimelapseCloseModal">Tutup</button></div>
+  `, {wide:true});
+}
+function dispersiTimelapseCloseModal(){ dispersiTimelapseStopTimer(); closeModal(); }
+function dispersiTimelapseStopTimer(){
+  if(dispersiTimelapse.timer){ clearInterval(dispersiTimelapse.timer); dispersiTimelapse.timer=null; }
+  dispersiTimelapse.playing = false;
+}
+async function dispersiTimelapseLoad(){
+  dispersiTimelapseStopTimer();
+  const dateStr = document.getElementById("tlDateInput")?.value;
+  if(!dateStr){ toast("Pilih tanggal dulu.","err"); return; }
+  const stacks = dispersiSelectedStacks();
+  if(!stacks.length){ toast('Tidak ada titik terpilih — pilih titik di peta atau Filter Titik Emisi dulu.',"err"); return; }
+  const sel = dispersiResolveSelection(dispersiState.sel);
+  if(!sel){ toast("Periode data belum dipilih.","err"); return; }
+  const flowMode = dispersiIsFlowMode();
+  if(!flowMode && !DISPERSI_MASS_PARAMS[dispersiState.param]){ toast("Parameter tidak dikenal.","err"); return; }
+  const sources = stacks.map(s=>{ const q=dispersiQgsForStack(s,dispersiState.param,sel); return q==null?null:{stack:s,Qgs:q}; }).filter(Boolean);
+  if(!sources.length){ toast("Tidak ada data konsentrasi/laju alir pada titik & periode terpilih untuk parameter ini.","err"); return; }
+  document.getElementById("tlBody").innerHTML = `<div class="hint">Memuat data angin per jam Open-Meteo untuk ${escHtml(dateStr)}…</div>`;
+  const geo = dispersiTimelapseComputeGeo(sources);
+  try{
+    const hours = await dispersiFetchTimelapseWindHours(geo.centerLat, geo.centerLng, dateStr);
+    const {svg, sourcePins} = dispersiTimelapseBuildStaticLayer(geo, sources);
+    const stab = DISPERSI_STABILITY_CLASSES.find(x=>x.key===dispersiState.stability);
+    dispersiTimelapse = {
+      loaded:true, date:dateStr, hours, frameCache:{}, frameIdx:0, playing:false, timer:null,
+      geo, basemapUrl: dispersiBasemapExportUrl(dispersiState.mapLayer, geo.sw, geo.ne, geo.OW, geo.OH),
+      sources, staticSvg:svg, sourcePins,
+      paramLabel: dispersiCurrentParamMeta().label, selLabel: dispersiSelectionLabel(dispersiState.sel),
+      stabilityLabel: stab?stab.label:dispersiState.stability, qualitative: flowMode || dispersiIsQualitativeMode()
+    };
+    document.getElementById("tlBody").innerHTML = dispersiTimelapseBodyHtml();
+    dispersiTimelapseRenderFrame(0);
+  }catch(err){
+    document.getElementById("tlBody").innerHTML = `<div class="hint" style="color:#a02a24;">Data angin per jam Open-Meteo untuk tanggal ini belum/tidak tersedia — coba tanggal lain (idealnya &ge;5 hari yang lalu supaya data arsip sudah lengkap 24 jam).</div>`;
+  }
+}
+function dispersiTimelapseBodyHtml(){
+  const tl = dispersiTimelapse;
+  return `
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:16px;align-items:start;">
+    <div>
+      <div style="position:relative;width:100%;max-width:560px;aspect-ratio:1/1;margin:0 auto;background:#eef2f5;border:1px solid #ccc;border-radius:8px;overflow:hidden;">
+        <img id="tlBasemapImg" src="${tl.basemapUrl||""}" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+        <img id="tlPlumeImg" style="position:absolute;inset:0;width:100%;height:100%;">
+        <div id="tlStaticLayer" style="position:absolute;inset:0;">${tl.staticSvg}</div>
+        <div id="tlWindArrow" style="position:absolute;top:14px;left:14px;width:0;height:0;transform-origin:14px 14px;">
+          <div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:22px solid #1a6fb0;margin-left:-7px;"></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin:12px auto 0;max-width:560px;">
+        <button type="button" class="btn small" id="tlPlayBtn" data-action="dispersiTimelapseTogglePlay">&#9654; Putar</button>
+        <input type="range" id="tlSlider" min="0" max="${tl.hours.length-1}" value="0" style="flex:1;">
+        <span id="tlTimeLabel" style="font-family:var(--font-mono);font-weight:700;min-width:42px;text-align:right;">--:--</span>
+      </div>
+      <div style="max-width:560px;margin:10px auto 0;">${dispersiTimelapseDayChartHtml()}</div>
+    </div>
+    <div>
+      <div id="tlReadout"></div>
+      <div class="hint" style="margin-top:12px;">Animasi ini mensimulasikan bagaimana pola sebaran akan terlihat seandainya angin pada tanggal terpilih bertiup sesuai data historis per jam Open-Meteo, dengan kekuatan sumber emisi (Qgs) tetap konstan dari data parameter &amp; periode pemantauan yang sedang aktif — <b>bukan rekonstruksi kejadian aktual</b> (sampling tidak dilakukan tiap jam), melainkan alat bantu visual untuk memahami sensitivitas arah &amp; luas sebaran terhadap perubahan angin sepanjang hari.</div>
+    </div>
+  </div>`;
+}
+// Grafik ringkasan angin 24 jam (batang kecepatan diwarnai per DISPERSI_SPEED_BINS, konsisten dgn
+// Wind Rose) — bisa diklik (dispersiTimelapseScrubTo) utk lompat langsung ke jam itu, dan diberi
+// garis "playhead" merah yang mengikuti posisi animasi (lihat dispersiTimelapseRenderFrame).
+function dispersiTimelapseDayChartHtml(){
+  const hours = dispersiTimelapse.hours;
+  const maxSpeed = Math.max(1, ...hours.map(h=>h.speed));
+  const bars = hours.map((h,i)=>{
+    const bin = DISPERSI_SPEED_BINS.find(b=>h.speed<b.max) || DISPERSI_SPEED_BINS[DISPERSI_SPEED_BINS.length-1];
+    const hpx = Math.max(4, Math.round((h.speed/maxSpeed)*54));
+    return `<div class="tlBar" data-idx="${i}" title="${String(h.hour).padStart(2,"0")}:00 · ${dispersiCompassLabel16(h.dir)} · ${dispersiFmt(h.speed,1)} m/s" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:64px;cursor:pointer;">
+      <div style="width:100%;max-width:10px;height:${hpx}px;background:${bin.color};border-radius:2px 2px 0 0;"></div>
+    </div>`;
+  }).join("");
+  const legend = DISPERSI_SPEED_BINS.map(b=>`<span style="display:inline-flex;align-items:center;gap:3px;"><span style="width:7px;height:7px;border-radius:1.5px;background:${b.color};display:inline-block;"></span>${b.label}</span>`).join("");
+  return `<div style="position:relative;">
+    <div id="tlDayChartBars" style="display:flex;gap:2px;align-items:flex-end;height:64px;border-bottom:1px solid var(--gray-200);padding-bottom:2px;">${bars}</div>
+    <div id="tlPlayhead" style="position:absolute;top:0;bottom:2px;width:2px;background:#a02a24;pointer-events:none;left:0;"></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--gray-500);margin-top:2px;"><span>${String(hours[0]?.hour??0).padStart(2,"0")}:00</span><span>m/s per jam (${escHtml(dispersiTimelapse.date||"")})</span><span>${String(hours[hours.length-1]?.hour??23).padStart(2,"0")}:00</span></div>
+  <div style="display:flex;flex-wrap:wrap;gap:4px 8px;font-size:8.5px;color:var(--gray-500);margin-top:4px;">${legend}</div>`;
+}
+// Dihitung malas (baru dikerjakan saat jam itu pertama kali ditampilkan) & di-cache per jam —
+// grid 200x200 + 3x box blur cukup cepat utk dihitung ulang tiap jam tanpa jeda terasa, tapi
+// cache tetap mencegah kerja ulang percuma saat user maju-mundur/scrub ke jam yang sama.
+function dispersiTimelapseFrameData(idx){
+  const tl = dispersiTimelapse;
+  if(tl.frameCache[idx]) return tl.frameCache[idx];
+  const h = tl.hours[idx];
+  const windCases = [{dirFrom:h.dir, u:Math.max(h.speed,0.5), weight:1}];
+  const {smooth, maxV} = dispersiComputeConcGrid(tl.sources, windCases, dispersiState.stability, tl.geo.centerLat, tl.geo.centerLng, tl.geo.halfWidthM, tl.geo.halfHeightM, tl.geo.GW, tl.geo.GH);
+  const canvas = dispersiGridToColorCanvas(smooth, maxV, tl.geo.GW, tl.geo.GH, tl.geo.OW, tl.geo.OH);
+  const frame = {dataUrl:canvas.toDataURL(), peakConc: tl.qualitative?null:maxV};
+  tl.frameCache[idx] = frame;
+  return frame;
+}
+function dispersiTimelapseRenderFrame(idx){
+  const tl = dispersiTimelapse;
+  if(!tl.loaded || !tl.hours.length) return;
+  idx = Math.max(0, Math.min(tl.hours.length-1, Math.round(Number(idx))));
+  tl.frameIdx = idx;
+  const h = tl.hours[idx];
+  const frame = dispersiTimelapseFrameData(idx);
+  const img = document.getElementById("tlPlumeImg"); if(img) img.src = frame.dataUrl;
+  const slider = document.getElementById("tlSlider"); if(slider) slider.value = idx;
+  const timeLabel = document.getElementById("tlTimeLabel"); if(timeLabel) timeLabel.textContent = String(h.hour).padStart(2,"0")+":00";
+  const blowTo = (h.dir+180)%360;
+  const arrow = document.getElementById("tlWindArrow"); if(arrow) arrow.style.transform = `rotate(${blowTo}deg)`;
+  const playhead = document.getElementById("tlPlayhead"); if(playhead) playhead.style.left = ((idx+0.5)/tl.hours.length*100)+"%";
+  document.querySelectorAll("#tlDayChartBars .tlBar").forEach(el=>{ el.style.opacity = Number(el.dataset.idx)===idx ? "1" : "0.5"; });
+  const readout = document.getElementById("tlReadout");
+  if(readout){
+    const peakRow = tl.qualitative
+      ? `<div class="hint">Mode "${escHtml(tl.paramLabel)}": pola relatif, bukan konsentrasi massa.</div>`
+      : `<div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Puncak Konsentrasi Jam Ini</div><div style="font-family:var(--font-mono);font-size:20px;font-weight:800;color:var(--heading);">${dispersiFmt(frame.peakConc,frame.peakConc<1?3:1)} <span style="font-size:11px;font-weight:600;color:var(--gray-500);">&micro;g/m&sup3;</span></div></div>`;
+    readout.innerHTML = `
+      <div style="font-family:var(--font-mono);font-size:34px;font-weight:800;color:var(--heading);line-height:1;">${String(h.hour).padStart(2,"0")}:00</div>
+      <div style="font-size:11px;color:var(--gray-500);margin:2px 0 12px;">${escHtml(tl.date)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+        <div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Arah Angin</div><div style="font-family:var(--font-mono);font-size:16px;font-weight:800;color:var(--heading);">${dispersiCompassLabel16(h.dir)} <span style="font-size:11px;color:var(--gray-500);">(${Math.round(h.dir)}&deg;)</span></div></div>
+        <div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Kecepatan</div><div style="font-family:var(--font-mono);font-size:16px;font-weight:800;color:var(--heading);">${dispersiFmt(h.speed,1)} <span style="font-size:11px;color:var(--gray-500);">m/s</span></div></div>
+        ${h.temp!=null?`<div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Suhu</div><div style="font-family:var(--font-mono);font-size:14px;font-weight:700;">${dispersiFmt(h.temp,1)}&deg;C</div></div>`:""}
+        ${h.humidity!=null?`<div><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;">Kelembapan</div><div style="font-family:var(--font-mono);font-size:14px;font-weight:700;">${dispersiFmt(h.humidity,0)}%</div></div>`:""}
+      </div>
+      ${peakRow}
+      <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--gray-200);font-size:10.5px;color:var(--gray-500);line-height:1.6;">
+        <div><b>Parameter:</b> ${escHtml(tl.paramLabel)}</div>
+        <div><b>Periode Data (kekuatan sumber):</b> ${escHtml(tl.selLabel)}</div>
+        <div><b>Kelas Stabilitas:</b> ${escHtml(tl.stabilityLabel)}</div>
+        <div><b>Titik Sumber:</b> ${tl.sources.length} titik</div>
+      </div>`;
+  }
+}
+function dispersiTimelapseScrubTo(idx){ dispersiTimelapseStopTimer(); dispersiTimelapseRenderFrame(idx); const btn=document.getElementById("tlPlayBtn"); if(btn) btn.innerHTML="&#9654; Putar"; }
+function dispersiTimelapseTogglePlay(){
+  const tl = dispersiTimelapse;
+  if(!tl.loaded || !tl.hours.length) return;
+  if(tl.playing){ dispersiTimelapseStopTimer(); const btn=document.getElementById("tlPlayBtn"); if(btn) btn.innerHTML="&#9654; Putar"; return; }
+  tl.playing = true;
+  const btn=document.getElementById("tlPlayBtn"); if(btn) btn.innerHTML="&#10074;&#10074; Jeda";
+  tl.timer = setInterval(()=>{
+    // Modal bisa ditutup lewat klik overlay/tombol X yang tidak lewat dispersiTimelapseCloseModal
+    // (mis. backdrop click bawaan) — jaga-jaga timer tetap dimatikan sendiri kalau elemennya sudah
+    // tidak ada di DOM, bukan terus jalan diam-diam di belakang layar.
+    if(!document.getElementById("tlSlider")){ dispersiTimelapseStopTimer(); return; }
+    dispersiTimelapseRenderFrame((dispersiTimelapse.frameIdx+1) % dispersiTimelapse.hours.length);
+  }, 750);
+}
+document.addEventListener("input", e=>{ if(e.target.id==="tlSlider") dispersiTimelapseScrubTo(e.target.value); });
+document.addEventListener("click", e=>{
+  const bar = e.target.closest ? e.target.closest(".tlBar") : null;
+  if(bar) dispersiTimelapseScrubTo(bar.dataset.idx);
+});
+
 // Penjelasan sumber data angin & cara kerja model, dipisah dari sekian banyak hint kecil yang
 // tersebar di halaman ini (tooltip, footer laporan, dst) jadi SATU tempat lengkap yang gampang
 // ditemukan — sesuai pola openAboutModal/renderOnboardingModal (12-data-page.js) yang sudah ada.
@@ -1686,7 +2090,10 @@ Object.assign(ACTIONS, {
   dispersiSetWindModeLive, dispersiSetWindModePeriode, dispersiSetMapLayerSat, dispersiSetMapLayerStreet,
   dispersiRefreshWind, dispersiSelectAllAtSite, dispersiDeselectAll, printDispersiReport, doPrintDispersiReport,
   dispersiToggleTipe, dispersiManualRefreshPlume, dispersiInfoModal,
-  dispersiOpenProfessionalPreview, dispersiPrintProfessionalPreview
+  dispersiOpenProfessionalPreview, dispersiPrintProfessionalPreview,
+  dispersiToggleTitikPanel, dispersiTitikCheckAllVisible, dispersiTitikUncheckAllVisible,
+  dispersiSetWindModeCustom, dispersiApplyCustomWindRange,
+  dispersiOpenExpertMode, dispersiTimelapseLoad, dispersiTimelapseTogglePlay, dispersiTimelapseCloseModal
 });
 document.addEventListener("change", e=>{
   if(e.target.id==="dispersiPeriode") dispersiOnPeriodeChange();

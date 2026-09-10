@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202609101500">
+<link rel="stylesheet" href="assets/css/style.css?v=202609101900">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -778,6 +778,7 @@
         <div class="toolbar">
           <button class="btn ghost" data-action="dispersiInfoModal" title="Sumber data angin &amp; cara kerja model">&#8505;&#65039; Info Model &amp; Data Angin</button>
           <button class="btn ghost" data-action="dispersiOpenProfessionalPreview" title="Preview peta format AMDAL dgn logo PHM, siap cetak">&#128506;&#65039; Preview Peta Profesional</button>
+          <button class="btn ghost" data-action="dispersiOpenExpertMode" title="Animasi timelapse sebaran per jam pada 1 tanggal pilihan">&#127916; Mode Expert (Timelapse)</button>
           <button class="btn primary" data-action="printDispersiReport">Cetak Laporan Beban Emisi (PDF)</button>
         </div>
       </div>
@@ -788,6 +789,20 @@
           <div>
             <div class="hint" style="margin:0 0 6px;text-transform:uppercase;letter-spacing:.02em;">Site</div>
             <div id="dispersiSiteChips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+          </div>
+          <div class="field" style="margin:0;min-width:230px;">
+            <label>Titik Emisi (filter per titik, tidak harus 1 site utuh)</label>
+            <div class="xsel" id="dispersiTitikXsel">
+              <button type="button" class="xsel-btn" data-action="dispersiToggleTitikPanel"><span id="dispersiTitikBtnLabel">Semua titik</span> <span>&#9662;</span></button>
+              <div class="xsel-panel" id="dispersiTitikPanel" style="display:none;">
+                <input type="text" id="dispersiTitikSearch" placeholder="cari nama titik…">
+                <div class="xsel-toolbar">
+                  <button type="button" class="btn small ghost" data-action="dispersiTitikCheckAllVisible">Centang Semua yang Tampil</button>
+                  <button type="button" class="btn small ghost" data-action="dispersiTitikUncheckAllVisible">Kosongkan yang Tampil</button>
+                </div>
+                <div class="xsel-list" id="dispersiTitikList"></div>
+              </div>
+            </div>
           </div>
           <div>
             <div class="hint" style="margin:0 0 6px;text-transform:uppercase;letter-spacing:.02em;">Parameter Pencemar</div>
@@ -809,7 +824,13 @@
             <div style="display:flex;gap:0;border:1.5px solid var(--gray-300);border-radius:16px;overflow:hidden;">
               <button type="button" class="chip-toggle" id="dispersiLiveBtn" data-action="dispersiSetWindModeLive" style="border-radius:0;border:none;">Live</button>
               <button type="button" class="chip-toggle" id="dispersiPeriodeBtn" data-action="dispersiSetWindModePeriode" style="border-radius:0;border:none;">Periode (Historis)</button>
+              <button type="button" class="chip-toggle" id="dispersiCustomBtn" data-action="dispersiSetWindModeCustom" style="border-radius:0;border:none;">Kustom (Tanggal Bebas)</button>
             </div>
+          </div>
+          <div id="dispersiCustomWindRow" style="display:none;align-items:flex-end;gap:8px;">
+            <div class="field" style="margin:0;"><label>Dari Tanggal</label><input type="date" id="dispersiCustomFrom"></div>
+            <div class="field" style="margin:0;"><label>Sampai Tanggal</label><input type="date" id="dispersiCustomTo"></div>
+            <button class="btn small" data-action="dispersiApplyCustomWindRange">Terapkan</button>
           </div>
           <div style="margin-left:auto;">
             <button class="btn" data-action="dispersiRefreshWind">&#8635; Refresh Angin</button>
@@ -820,7 +841,7 @@
           <div id="dispersiTipeChips" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
         </div>
         <div class="hint" style="margin:-8px 0 14px;">
-          <b>Live</b>: potret sesaat satu arah angin (kerucut plume sempit). <b>Periode</b>: gabungan SEMUA arah angin sepanjang periode terpilih (data historis Open-Meteo), dibobot frekuensinya — menghasilkan bentuk kipas melebar seperti sebaran jangka panjang.
+          <b>Live</b>: potret sesaat satu arah angin (kerucut plume sempit). <b>Periode</b>: gabungan SEMUA arah angin sepanjang periode sampling terpilih (data historis Open-Meteo), dibobot frekuensinya — menghasilkan bentuk kipas melebar seperti sebaran jangka panjang. <b>Kustom</b>: sama seperti Periode, tapi rentang tanggalnya bebas dipilih sendiri (tidak terbatas ke opsi semester/tahun yang tersedia) — beban pencemar &amp; tabel kepatuhan tetap memakai Periode Data di atas (data sampling memang hanya ada per periode itu), hanya pola sebaran &amp; data anginnya yang mengikuti rentang kustom.
         </div>
 
         <div class="grid" style="grid-template-columns:minmax(0,1.7fr) minmax(320px,1fr);align-items:start;">
@@ -1377,32 +1398,32 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202609101500"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202609101500"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202609101900"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202609101900"></script>
 
-<script src="assets/data/default-data.js?v=202609101500"></script>
-<script src="assets/data/brand-assets.js?v=202609101500"></script>
-<script src="assets/data/travel-routes.js?v=202609101500"></script>
-<script src="assets/js/00-icons.js?v=202609101500"></script>
-<script src="assets/js/01-state.js?v=202609101500"></script>
-<script src="assets/js/02-nav-util.js?v=202609101500"></script>
-<script src="assets/js/03-period-logic.js?v=202609101500"></script>
-<script src="assets/js/04-dashboard.js?v=202609101500"></script>
-<script src="assets/js/05-master-data.js?v=202609101500"></script>
-<script src="assets/js/06-plan-personil.js?v=202609101500"></script>
-<script src="assets/js/07-rules-planner.js?v=202609101500"></script>
-<script src="assets/js/08-gantt-print.js?v=202609101500"></script>
-<script src="assets/js/09-tracking-map.js?v=202609101500"></script>
-<script src="assets/js/10-running-hour.js?v=202609101500"></script>
-<script src="assets/js/11-berita-acara.js?v=202609101500"></script>
-<script src="assets/js/12-data-page.js?v=202609101500"></script>
-<script src="assets/js/13-hasil-db.js?v=202609101500"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202609101500"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202609101500"></script>
-<script src="assets/js/16-actions-init.js?v=202609101500"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202609101500"></script>
-<script src="assets/js/18-model-dispersi.js?v=202609101500"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202609101500"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202609101500"></script>
+<script src="assets/data/default-data.js?v=202609101900"></script>
+<script src="assets/data/brand-assets.js?v=202609101900"></script>
+<script src="assets/data/travel-routes.js?v=202609101900"></script>
+<script src="assets/js/00-icons.js?v=202609101900"></script>
+<script src="assets/js/01-state.js?v=202609101900"></script>
+<script src="assets/js/02-nav-util.js?v=202609101900"></script>
+<script src="assets/js/03-period-logic.js?v=202609101900"></script>
+<script src="assets/js/04-dashboard.js?v=202609101900"></script>
+<script src="assets/js/05-master-data.js?v=202609101900"></script>
+<script src="assets/js/06-plan-personil.js?v=202609101900"></script>
+<script src="assets/js/07-rules-planner.js?v=202609101900"></script>
+<script src="assets/js/08-gantt-print.js?v=202609101900"></script>
+<script src="assets/js/09-tracking-map.js?v=202609101900"></script>
+<script src="assets/js/10-running-hour.js?v=202609101900"></script>
+<script src="assets/js/11-berita-acara.js?v=202609101900"></script>
+<script src="assets/js/12-data-page.js?v=202609101900"></script>
+<script src="assets/js/13-hasil-db.js?v=202609101900"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202609101900"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202609101900"></script>
+<script src="assets/js/16-actions-init.js?v=202609101900"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202609101900"></script>
+<script src="assets/js/18-model-dispersi.js?v=202609101900"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202609101900"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202609101900"></script>
 </body>
 </html>
