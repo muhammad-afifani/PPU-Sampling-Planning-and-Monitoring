@@ -985,23 +985,67 @@ function dispersiTrendHtml(){
   </div>
   <div class="hint" style="margin-top:6px;">kg/bulan (rata-rata dari beban tahunan) &middot; batang teal = termasuk seleksi periode saat ini. Data sampel per semester (~6 bulan), sesuai kadens sampling aktual — bukan data harian/bulanan kalender asli.</div>`;
 }
+// Wind rose SEBENARNYA (polar diagram baku ilmu meteorologi): 8 arah mata angin, tiap "petal"
+// ditumpuk (stacked) per kelas kecepatan angin — bukan cuma 1 batang polos spt sebelumnya. Dibangun
+// sbg SVG dgn viewBox tetap (BUKAN posisi persentase absolut spt versi lama yg lx/ly-nya bisa
+// tembus s/d 120% dari kotak 112px & numpuk ke panel Tren di sebelahnya) — viewBox SVG otomatis
+// membungkus semua elemen yg digambar di dalam koordinatnya sendiri, jadi tidak mungkin meluber
+// keluar kotak berapa pun ukuran tampil kotaknya. Panjang tiap petal = persentase kejadian dari
+// TOTAL jam data (bukan relatif ke arah terbanyak saja) supaya skalanya bisa dibaca lintas render.
 function dispersiWindRoseHtml(history){
-  const sectorLabels = ["N","NE","E","SE","S","SW","W","NW"];
-  const bins = new Array(8).fill(0);
-  (history||[]).forEach(h=>{ bins[Math.round(h.dir/45)%8]++; });
-  const maxBin = Math.max(1, ...bins);
-  const bars = sectorLabels.map((label,i)=>{
-    const angle = i*45;
-    const len = Math.round((bins[i]/maxBin)*38)+3;
-    const lx = 50+Math.sin(angle*Math.PI/180)*70, ly = 50-Math.cos(angle*Math.PI/180)*70;
-    return `<div style="position:absolute;left:50%;bottom:50%;width:6px;height:${len}px;background:var(--teal-500);border-radius:2px 2px 0 0;transform:translateX(-50%) rotate(${angle}deg);transform-origin:bottom center;"></div>
-      <div style="position:absolute;left:${lx}%;top:${ly}%;transform:translate(-50%,-50%);font-size:8.5px;color:var(--gray-500);">${label}</div>`;
+  const hist = (history||[]).filter(h=>h && h.dir!=null && h.speed!=null);
+  if(!hist.length) return `<div class="hint" style="width:128px;">Belum ada data histori angin.</div>`;
+  const SPEED_BINS = [
+    {max:2, label:"<2", color:"#bfe3ea"},
+    {max:4, label:"2–4", color:"#7cc3d6"},
+    {max:6, label:"4–6", color:"#2fa0ba"},
+    {max:8, label:"6–8", color:"#0ea5a0"},
+    {max:Infinity, label:"≥8", color:"#0a6b63"}
+  ];
+  const total = hist.length;
+  let calmCount = 0;
+  const bins = DISPERSI_COMPASS8.map(()=>SPEED_BINS.map(()=>0));
+  hist.forEach(h=>{
+    if(h.speed<0.5){ calmCount++; return; }
+    const d = Math.round(h.dir/45)%8;
+    let bi = SPEED_BINS.findIndex(sb=>h.speed<sb.max);
+    if(bi<0) bi = SPEED_BINS.length-1;
+    bins[d][bi]++;
+  });
+  const dirTotalsPct = bins.map(row=>row.reduce((a,b)=>a+b,0)/total*100);
+  const rawMax = Math.max(...dirTotalsPct, 0.001);
+  const niceMax = rawMax<=10 ? Math.ceil(rawMax/2.5)*2.5 : Math.ceil(rawMax/5)*5;
+  const cx=64, cy=64, rInner=8, rMax=44;
+  const scale = (rMax-rInner)/niceMax;
+  const labelA = 22.5*Math.PI/180; // sisipkan label cincin di antara N & NE spy tak numpuk petal
+  const gridRings = [0.25,0.5,0.75,1].map(f=>{
+    const r = rInner+(rMax-rInner)*f;
+    const lx = cx+Math.sin(labelA)*r, ly = cy-Math.cos(labelA)*r;
+    return `<circle cx="${cx}" cy="${cy}" r="${r.toFixed(1)}" fill="none" stroke="var(--gray-200)" stroke-width="1"/><text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-size="6" fill="var(--gray-400)" text-anchor="middle">${dispersiFmt(niceMax*f, niceMax*f<10?1:0)}%</text>`;
   }).join("");
-  return `<div style="position:relative;width:112px;height:112px;margin:0 auto;">
-    <div style="position:absolute;inset:0;border:1px solid var(--gray-200);border-radius:50%;"></div>
-    <div style="position:absolute;inset:16px;border:1px solid var(--gray-200);border-radius:50%;"></div>
-    ${bars}
-  </div>`;
+  const spokes = DISPERSI_COMPASS8.map((_,i)=>{
+    const a = i*45*Math.PI/180;
+    const x2 = cx+Math.sin(a)*rMax, y2 = cy-Math.cos(a)*rMax;
+    return `<line x1="${cx}" y1="${cy}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="var(--gray-200)" stroke-width="1"/>`;
+  }).join("");
+  const petals = DISPERSI_COMPASS8.map((label,i)=>{
+    const a = i*45*Math.PI/180, dx = Math.sin(a), dy = -Math.cos(a);
+    let rCursor = rInner;
+    const segs = SPEED_BINS.map((sb,bi)=>{
+      const pct = bins[i][bi]/total*100;
+      if(!pct) return "";
+      const r0=rCursor, r1=rCursor+pct*scale; rCursor=r1;
+      const x1=(cx+dx*r0).toFixed(1), y1=(cy+dy*r0).toFixed(1), x2=(cx+dx*r1).toFixed(1), y2=(cy+dy*r1).toFixed(1);
+      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${sb.color}" stroke-width="9" stroke-linecap="butt"><title>${label} &middot; ${sb.label} m/s: ${dispersiFmt(pct,1)}%</title></line>`;
+    }).join("");
+    const lx = cx+Math.sin(a)*(rMax+11), ly = cy-Math.cos(a)*(rMax+11);
+    return segs+`<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-size="9" font-weight="700" fill="var(--gray-600)" text-anchor="middle" dominant-baseline="middle">${label}</text>`;
+  }).join("");
+  const legend = SPEED_BINS.map(sb=>`<span style="display:inline-flex;align-items:center;gap:3px;"><span style="width:7px;height:7px;border-radius:1.5px;background:${sb.color};display:inline-block;flex-shrink:0;"></span>${sb.label}</span>`).join("");
+  const calmPct = calmCount/total*100;
+  return `<svg viewBox="0 0 128 128" width="128" height="128" style="display:block;margin:0 auto;max-width:100%;overflow:visible;">${gridRings}${spokes}${petals}</svg>
+    <div style="display:flex;flex-wrap:wrap;gap:4px 7px;justify-content:center;font-size:8px;color:var(--gray-500);margin-top:5px;max-width:128px;margin-left:auto;margin-right:auto;">${legend}</div>
+    <div class="hint" style="text-align:center;margin-top:3px;font-size:9.5px;">m/s &middot; n=${total} jam${calmPct>=0.5?` &middot; tenang (&lt;0,5 m/s) ${dispersiFmt(calmPct,1)}%`:""}</div>`;
 }
 // Sparkline tren kecepatan angin dari histori per-jam yg SAMA dgn dipakai wind rose (bukan
 // panggilan API baru) — didownsample maks 24 batang (rata-rata per kelompok jam) supaya tetap
@@ -1281,6 +1325,29 @@ async function doPrintDispersiReport(){
   window.print();
   document.title = originalTitle;
 }
+// Tiga helper di bawah ini DIPAKAI BERSAMA oleh laporan tabular (mapSection di
+// buildDispersiReportHtml) & preview kartografis profesional (dispersiProfessionalPreviewBody) —
+// dipisah supaya kedua tampilan itu SELALU konsisten (satu sumber logika legenda/indeks titik),
+// bukan 2 salinan kode yang bisa diam-diam melenceng satu sama lain seiring waktu.
+function dispersiLegendBlockHtml(snapMeta){
+  const gradientCss = DISPERSI_COLOR_STOPS.map(([f,c])=>`rgb(${c[0]},${c[1]},${c[2]}) ${(f*100).toFixed(0)}%`).join(", ");
+  const bar = `<div style="height:9px;border-radius:4px;background:linear-gradient(to right, ${gradientCss});border:1px solid #ccc;max-width:320px;"></div>`;
+  if(snapMeta?.qualitative) return `${bar}
+    <div style="display:flex;justify-content:space-between;font-size:9px;color:#777;max-width:320px;margin-top:2px;"><span>Rendah</span><span>Tinggi (relatif)</span></div>
+    <div style="font-size:9.5px;color:#777;margin-top:3px;">Skala relatif — bukan konsentrasi terukur, tanpa satuan.</div>`;
+  const peak = snapMeta?.peakConcUgm3;
+  const decimals = peak==null?1:(peak<1?3:peak<10?2:1);
+  const ticks = [0,0.5,1].map(f=>dispersiFmt((peak||0)*f, decimals));
+  return `${bar}
+    <div style="display:flex;justify-content:space-between;font-size:9px;font-family:monospace;color:#777;max-width:320px;margin-top:2px;">${ticks.map(t=>`<span>${t}</span>`).join("")}</div>
+    <div style="font-size:9.5px;color:#777;margin-top:3px;">Puncak konsentrasi lokal saat digenerate: <b>${dispersiFmt(peak,decimals)} &micro;g/m&sup3;</b> (merah) &middot; biru tua &asymp; nol.</div>`;
+}
+function dispersiWindLabelFromMeta(snapMeta){
+  return snapMeta?.windDirFrom!=null ? `${dispersiFmt(snapMeta.windSpeed,1)} m/s dari ${dispersiCompassLabel(snapMeta.windDirFrom)} (${Math.round(snapMeta.windDirFrom)}&deg;)` : "—";
+}
+function dispersiSourceIndexRowsHtml(snapMeta){
+  return (snapMeta?.sourceIndex||[]).map(s=>`<tr><td style="text-align:center;font-weight:700;">${s.no}</td><td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${s.color};margin-right:5px;vertical-align:1px;"></span>${escHtml(s.nama)}</td><td style="color:#777;font-size:9.5px;">${escHtml(s.tipe)}</td></tr>`).join("");
+}
 function buildDispersiReportHtml(selectedPeriods, includeMap, selectedParams){
   const stacks = dispersiSelectedStacks();
   if(!stacks.length) return null;
@@ -1387,21 +1454,9 @@ function buildDispersiReportHtml(selectedPeriods, includeMap, selectedParams){
       // Legenda warna dibekukan dari kondisi SAAT snapshot diambil (bukan state layar saat ini,
       // krn bisa saja user sudah ganti filter lagi sebelum benar2 klik cetak) — sama spt seluruh
       // konten laporan lain di sini, yg selalu berdasar data riil bukan tampilan layar sesaat.
-      const gradientCss = DISPERSI_COLOR_STOPS.map(([f,c])=>`rgb(${c[0]},${c[1]},${c[2]}) ${(f*100).toFixed(0)}%`).join(", ");
-      const bar = `<div style="height:9px;border-radius:4px;background:linear-gradient(to right, ${gradientCss});border:1px solid #ccc;max-width:320px;"></div>`;
-      const legendHtml = snapMeta?.qualitative ? `${bar}
-          <div style="display:flex;justify-content:space-between;font-size:9px;color:#777;max-width:320px;margin-top:2px;"><span>Rendah</span><span>Tinggi (relatif)</span></div>
-          <div style="font-size:9.5px;color:#777;margin-top:3px;">Skala relatif — bukan konsentrasi terukur, tanpa satuan.</div>`
-        : (()=>{
-            const peak = snapMeta?.peakConcUgm3;
-            const decimals = peak==null?1:(peak<1?3:peak<10?2:1);
-            const ticks = [0,0.5,1].map(f=>dispersiFmt((peak||0)*f, decimals));
-            return `${bar}
-          <div style="display:flex;justify-content:space-between;font-size:9px;font-family:monospace;color:#777;max-width:320px;margin-top:2px;">${ticks.map(t=>`<span>${t}</span>`).join("")}</div>
-          <div style="font-size:9.5px;color:#777;margin-top:3px;">Puncak konsentrasi lokal saat digenerate: <b>${dispersiFmt(peak,decimals)} &micro;g/m&sup3;</b> (merah) &middot; biru tua &asymp; nol.</div>`;
-          })();
-      const windLabel = snapMeta?.windDirFrom!=null ? `${dispersiFmt(snapMeta.windSpeed,1)} m/s dari ${dispersiCompassLabel(snapMeta.windDirFrom)} (${Math.round(snapMeta.windDirFrom)}&deg;)` : "—";
-      const idxRows = (snapMeta?.sourceIndex||[]).map(s=>`<tr><td style="text-align:center;font-weight:700;">${s.no}</td><td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${s.color};margin-right:5px;vertical-align:1px;"></span>${escHtml(s.nama)}</td><td style="color:#777;font-size:9.5px;">${escHtml(s.tipe)}</td></tr>`).join("");
+      const legendHtml = dispersiLegendBlockHtml(snapMeta);
+      const windLabel = dispersiWindLabelFromMeta(snapMeta);
+      const idxRows = dispersiSourceIndexRowsHtml(snapMeta);
       // Rasio gambar dari aspectW:aspectH sungguhan (ikut viewport peta saat digenerate, TIDAK
       // dipaksa persegi lagi) — dipakai sbg aspect-ratio wrapper spy kedua layer (basemap + plume)
       // pas bertumpuk tanpa perlu tahu ukuran aslinya di CSS statis.
@@ -1465,6 +1520,130 @@ function buildDispersiReportHtml(selectedPeriods, includeMap, selectedParams){
   </div>`;
 }
 
+/* ---------- Preview Kartografis Profesional (gaya peta AMDAL/ANDAL: peta besar + sidebar formal
+   berlogo, judul, legenda, arah utara, skala, indeks titik sumber) ---------- */
+// Field panah angin: array panah SERAGAM (arah & kecepatan SAMA semua) di atas peta, mirip gaya
+// output CALPUFF/AERMOD (medan vektor angin). SENGAJA seragam (bukan pura-pura spt medan spasial
+// riil) — model di halaman ini cuma mengambil 1 titik data angin (pusat site) per perhitungan,
+// BUKAN medan meteorologi spasial sungguhan spt WRF/CALMET, jadi menggambar arah/kecepatan yang
+// beda-beda tiap panah justru akan menyesatkan (mengklaim presisi spasial yang tidak ada datanya).
+// Keseragaman inilah yang justru transparan menunjukkan asumsi model: 1 angin dominan berlaku rata
+// di seluruh area yang dimodelkan.
+function dispersiWindVectorFieldSvg(dirFromDeg, speedMs, boxW, boxH){
+  if(dirFromDeg==null || speedMs==null || !boxW || !boxH) return "";
+  const blowTo = (dirFromDeg+180)%360;
+  const th = blowTo*Math.PI/180, dx = Math.sin(th), dy = -Math.cos(th);
+  const speedFrac = Math.max(0, Math.min(1, speedMs/12));
+  const unit = Math.min(boxW,boxH);
+  const len = unit*(0.08+speedFrac*0.06);
+  const [r,g,b] = dispersiColorForFrac(0.18+speedFrac*0.55);
+  const colorCss = `rgba(${r},${g},${b},.92)`;
+  const cols=5, rows=4;
+  let arrows = "";
+  for(let ri=0; ri<rows; ri++){
+    for(let ci=0; ci<cols; ci++){
+      const cx = (ci+0.5)/cols*boxW, cy = (ri+0.5)/rows*boxH;
+      const x1 = cx-dx*len*0.5, y1 = cy-dy*len*0.5, x2 = cx+dx*len*0.5, y2 = cy+dy*len*0.5;
+      arrows += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${colorCss}" stroke-width="${Math.max(1,unit*0.006).toFixed(1)}" stroke-linecap="round" marker-end="url(#dispArrowHead)"/>`;
+    }
+  }
+  return `<svg viewBox="0 0 ${boxW} ${boxH}" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;">
+    <defs><marker id="dispArrowHead" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.4" markerHeight="3.4" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="${colorCss}"/></marker></defs>
+    ${arrows}
+  </svg>`;
+}
+// SATU builder dipakai baik utk preview di layar (modal) MAUPUN saat ditekan cetak — jadi preview &
+// hasil cetak/PDF-nya dijamin identik, bukan 2 jalur render terpisah yang bisa beda. SELALU baca
+// dispersiState & lastPlumeSnapshotMeta TERKINI saat dipanggil (tidak disimpan/di-cache di closure
+// manapun) — jadi otomatis ikut "dinamis": ganti site/parameter/periode/mode-angin di halaman peta,
+// lalu buka preview ini (lagi), tampilannya otomatis mengikuti kondisi yang baru dipilih, termasuk
+// arah & kecepatan angin dominan hasil periode/tanggal yang sedang aktif.
+function dispersiProfessionalPreviewBody(){
+  const snapMeta = dispersiState.lastPlumeSnapshotMeta;
+  if(!dispersiState.lastPlumeSnapshotDataUrl || !snapMeta){
+    return `<div style="padding:34px 20px;text-align:center;color:#a02a24;font-size:13px;">Gambar peta sebaran belum tersedia untuk kondisi filter saat ini — pastikan minimal 1 titik terpilih &amp; plume berhasil tampil di peta pada halaman Model Dispersi Emisi, baru buka preview ini lagi.</div>`;
+  }
+  const ratio = (snapMeta.aspectW && snapMeta.aspectH) ? `${snapMeta.aspectW}/${snapMeta.aspectH}` : "1/1";
+  const windLabel = dispersiWindLabelFromMeta(snapMeta);
+  const stab = DISPERSI_STABILITY_CLASSES.find(s=>s.key===snapMeta.stability);
+  const vectorField = dispersiWindVectorFieldSvg(snapMeta.windDirFrom, snapMeta.windSpeed, snapMeta.aspectW, snapMeta.aspectH);
+  const genDate = new Date().toLocaleDateString("id-ID", {day:"numeric",month:"long",year:"numeric"});
+  return `
+  <div class="pg-dispersi-pro">
+    <div class="pg-dispersi-pro-map">
+      <div style="position:relative;width:100%;aspect-ratio:${ratio};background:#eef2f5;overflow:hidden;">
+        <img src="${dispersiState.lastPlumeBasemapUrl||""}" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+        <img src="${dispersiState.lastPlumeSnapshotDataUrl}" style="position:absolute;inset:0;width:100%;height:100%;">
+        ${vectorField}
+      </div>
+    </div>
+    <div class="pg-dispersi-pro-sidebar">
+      <div class="pg-ba-logos" style="margin:0 0 12px;min-height:44px;">
+        <div class="pg-ba-logo-left"><img src="${LOGO_SKKMIGAS_B64}" alt="SKK Migas"></div>
+        <div class="pg-ba-logo-right"><img src="${LOGO_PHM_B64}" alt="Pertamina Hulu Mahakam"></div>
+      </div>
+      <div class="pg-dispersi-pro-title">
+        <div class="eyebrow">DOKUMEN TEKNIS PEMANTAUAN KUALITAS UDARA</div>
+        <h1>PETA MODEL SEBARAN DISPERSI EMISI</h1>
+        <div class="sub">${escHtml(snapMeta.paramLabel)} &middot; ${escHtml(snapMeta.site)}</div>
+      </div>
+      <table class="pg-ba-meta pg-dispersi-pro-meta">
+        <tr><td>Periode Data</td><td>:</td><td>${escHtml(snapMeta.sel)}</td></tr>
+        <tr><td>Kelas Stabilitas</td><td>:</td><td>${escHtml(stab?stab.label:(snapMeta.stability||"—"))}</td></tr>
+        <tr><td>Sumber Angin</td><td>:</td><td>${snapMeta.windMode==="live"?"Live (Open-Meteo)":"Rata-rata Periode (Open-Meteo)"}</td></tr>
+        <tr><td>Angin Dominan</td><td>:</td><td>${windLabel}</td></tr>
+        <tr><td>Titik Sumber</td><td>:</td><td>${(snapMeta.sourceIndex||[]).length} titik</td></tr>
+        <tr><td>Tanggal Dibuat</td><td>:</td><td>${genDate}</td></tr>
+      </table>
+      <div class="pg-dispersi-pro-block">
+        <div class="pg-dispersi-pro-label">Legenda ${snapMeta.qualitative?"Pola Relatif":"Konsentrasi (&micro;g/m&sup3;)"}</div>
+        ${dispersiLegendBlockHtml(snapMeta)}
+      </div>
+      <div class="pg-dispersi-pro-block" style="display:flex;gap:12px;align-items:flex-start;">
+        <div style="flex-shrink:0;text-align:center;">
+          <svg width="32" height="32" viewBox="0 0 34 34"><circle cx="17" cy="17" r="15" fill="none" stroke="#999" stroke-width="1"/><path d="M17,4 L21,18 L17,15 L13,18 Z" fill="#0d1f38"/><text x="17" y="30" font-size="7" text-anchor="middle" fill="#555">U</text></svg>
+          <div style="font-size:8px;color:#777;margin-top:1px;">Arah Utara</div>
+        </div>
+        <div style="font-size:9.5px;color:#555;line-height:1.5;">Peta tidak dirotasi (atas peta = Utara). Skala grafis (garis berskala jarak) tertera pada citra peta di sisi kiri — representasi ini tetap akurat pada ukuran cetak berapa pun, berbeda dari rasio skala numerik yang bergantung pada ukuran kertas aktual saat dicetak.</div>
+      </div>
+      <div class="pg-dispersi-pro-block">
+        <div class="pg-dispersi-pro-label">Indeks Titik Sumber</div>
+        <table class="pg-ba-table" style="font-size:9.5px;"><thead><tr><th style="width:20px;">No</th><th>Titik</th><th>Jenis</th></tr></thead>
+          <tbody>${dispersiSourceIndexRowsHtml(snapMeta)||`<tr><td colspan="3" style="text-align:center;">&mdash;</td></tr>`}</tbody></table>
+      </div>
+      <div class="pg-dispersi-pro-block pg-foot" style="border-top:1.5px solid #a02a24;padding-top:6px;margin-bottom:0;">
+        Panah pada peta menunjukkan arah &amp; kecepatan angin DOMINAN yang dipakai model (nilai seragam di seluruh area yang ditampilkan, bukan medan angin spasial terukur per titik). Hasil merupakan model screening Gaussian plume berbasis data pemantauan yang tersimpan di aplikasi ini — BUKAN keluaran AERMOD/CALPUFF &amp; bukan pengganti kajian dispersi regulatory. Lihat "Info Model Dispersi &amp; Data Angin" untuk penjelasan metodologi &amp; keterbatasan selengkapnya.
+      </div>
+    </div>
+  </div>`;
+}
+function dispersiOpenProfessionalPreview(){
+  openModal(`
+    <h3>Preview Peta Profesional (Format AMDAL)</h3>
+    <div class="hint" style="margin-bottom:10px;">Mengikuti kondisi filter yang sedang aktif di halaman peta saat ini (site, parameter, periode/tanggal, mode &amp; kelas stabilitas angin). Untuk melihat kondisi lain (mis. semester atau tanggal berbeda) — tutup preview ini, ganti filter di halaman, lalu buka preview lagi.</div>
+    <div style="max-height:68vh;overflow:auto;border:1px solid var(--gray-200);border-radius:8px;">${dispersiProfessionalPreviewBody()}</div>
+    <div class="actions"><button class="btn ghost" data-action="closeModal">Tutup</button><button class="btn primary" data-action="dispersiPrintProfessionalPreview">Cetak / Simpan PDF</button></div>
+  `, {wide:true});
+}
+async function dispersiPrintProfessionalPreview(){
+  const snapMeta = dispersiState.lastPlumeSnapshotMeta;
+  if(!dispersiState.lastPlumeSnapshotDataUrl || !snapMeta){ toast("Peta belum tersedia untuk dicetak — lihat catatan di preview.","err"); return; }
+  const html = `<div class="pg-batch pg-dispersi-pro-page">${dispersiProfessionalPreviewBody()}</div>`;
+  closeModal();
+  setPrintOrientation("landscape", 10);
+  document.getElementById("printGuideArea").innerHTML = html;
+  const imgs = Array.from(document.querySelectorAll("#printGuideArea img"));
+  await Promise.all(imgs.map(img=>{
+    if(img.decode) return img.decode().catch(()=>{});
+    if(img.complete) return Promise.resolve();
+    return new Promise(res=>{ img.onload=res; img.onerror=res; });
+  }));
+  const originalTitle = document.title;
+  document.title = `Peta Model Dispersi_${dispersiState.site}_${snapMeta.paramLabel}`.replace(/[^\w\-]/g,"_");
+  window.print();
+  document.title = originalTitle;
+}
+
 // Penjelasan sumber data angin & cara kerja model, dipisah dari sekian banyak hint kecil yang
 // tersebar di halaman ini (tooltip, footer laporan, dst) jadi SATU tempat lengkap yang gampang
 // ditemukan — sesuai pola openAboutModal/renderOnboardingModal (12-data-page.js) yang sudah ada.
@@ -1472,6 +1651,14 @@ function dispersiInfoModal(){
   openModal(`
     <h3>&#8505;&#65039; Info Model Dispersi &amp; Data Angin</h3>
     <div style="max-height:65vh;overflow:auto;font-size:13px;line-height:1.65;">
+      <h4 style="margin:2px 0 4px;color:var(--navy-800);">Apa Itu Pemodelan Dispersi Udara &amp; Kedudukan Modul Ini</h4>
+      <p>Pemodelan dispersi udara (air dispersion modeling) adalah metode perhitungan untuk memperkirakan bagaimana pencemar yang dilepaskan dari suatu sumber emisi (cerobong, flare, dan sejenisnya) menyebar di atmosfer akibat pengaruh angin, turbulensi, dan kondisi termal udara, sehingga konsentrasinya pada suatu titik di permukaan tanah dapat diestimasi. Metode ini merupakan bagian baku dari kajian Analisis Mengenai Dampak Lingkungan (AMDAL) serta pelaporan kepatuhan emisi udara pada industri hulu migas.</p>
+      <p>Dua perangkat lunak yang umum menjadi acuan regulatory untuk keperluan tersebut:</p>
+      <ul style="margin:4px 0 10px;padding-left:20px;">
+        <li><b>AERMOD</b> — model dispersi untuk jarak dekat hingga menengah (umumnya di bawah 50 km dari sumber), dikembangkan oleh AERMIC (AMS/EPA Regulatory Model Improvement Committee), yaitu kelompok kerja gabungan American Meteorological Society (AMS) dan United States Environmental Protection Agency (US EPA). AERMOD ditetapkan sebagai model preferred oleh US EPA dalam Guideline on Air Quality Models (40 CFR Part 51, Appendix W) untuk sebagian besar kajian dispersi jarak dekat, dan menjadi acuan yang lazim diadaptasi pula pada kajian AMDAL di Indonesia.</li>
+        <li><b>CALPUFF</b> — model dispersi non-steady-state berbasis puff, dikembangkan oleh Sigma Research Corporation (kemudian Earth Tech), dipakai untuk kondisi yang tidak dapat diasumsikan seragam oleh AERMOD: transport jarak jauh (di atas 50 km), medan/terrain kompleks, atau angin yang berubah arah secara signifikan sepanjang lintasan sebaran. CALPUFF sempat berstatus preferred model US EPA untuk transport jarak jauh, meski status tersebut telah direvisi pada pembaruan Appendix W tahun 2017 yang kini menempatkannya sebagai model alternatif berbasis persetujuan kasus per kasus (case-by-case), bukan lagi preferred baku.</li>
+      </ul>
+      <p>Kedua model tersebut mensyaratkan data meteorologi per jam yang telah diproses (umumnya melalui AERMET/CALMET) sepanjang minimal satu tahun, data terrain, serta parameter emisi yang lengkap dan tervalidasi — sebuah simulasi penuh yang berada di luar cakupan aplikasi ini. <b>Modul Model Dispersi Emisi pada aplikasi ini bukan AERMOD maupun CALPUFF</b>, dan tidak dimaksudkan untuk menggantikan keduanya. Modul ini adalah alat bantu screening internal yang dibangun langsung dari data yang sudah tersimpan di aplikasi (hasil stack sampling, running hour, koordinat titik), menggunakan persamaan Gaussian plume ground-level klasik dengan koefisien dispersi pendekatan Briggs — landasan matematis yang sama dengan model-model screening generasi sebelumnya (seperti SCREEN3/ISCST3) dan juga menjadi inti perhitungan di balik AERMOD sendiri, hanya tanpa lapisan pemrosesan meteorologi &amp; terrain yang membuat AERMOD/CALPUFF absah dipakai untuk pelaporan regulatory penuh. Fungsi modul ini adalah memberikan indikasi arah &amp; pola sebaran secara cepat dari data pemantauan yang sudah tercatat, sebagai pelengkap pemantauan harian — bukan pengganti kajian AMDAL atau studi dispersi bersertifikat yang mensyaratkan AERMOD/CALPUFF.</p>
       <h4 style="margin:14px 0 4px;color:var(--navy-800);">Sumber Data Angin</h4>
       <p>Data angin diambil otomatis dari <b>Open-Meteo</b> (layanan cuaca gratis, tanpa API key) berdasarkan koordinat pusat site yang sedang dipilih:</p>
       <ul style="margin:4px 0 10px;padding-left:20px;">
@@ -1498,7 +1685,8 @@ Object.assign(ACTIONS, {
   dispersiSetSite, dispersiSetParam, dispersiOnPeriodeChange, dispersiOnStabilityChange,
   dispersiSetWindModeLive, dispersiSetWindModePeriode, dispersiSetMapLayerSat, dispersiSetMapLayerStreet,
   dispersiRefreshWind, dispersiSelectAllAtSite, dispersiDeselectAll, printDispersiReport, doPrintDispersiReport,
-  dispersiToggleTipe, dispersiManualRefreshPlume, dispersiInfoModal
+  dispersiToggleTipe, dispersiManualRefreshPlume, dispersiInfoModal,
+  dispersiOpenProfessionalPreview, dispersiPrintProfessionalPreview
 });
 document.addEventListener("change", e=>{
   if(e.target.id==="dispersiPeriode") dispersiOnPeriodeChange();
