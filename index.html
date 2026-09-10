@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202609100245">
+<link rel="stylesheet" href="assets/css/style.css?v=202609100500">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -81,6 +81,8 @@
           <button class="navbtn" data-page="hasildashboard" data-group="hasil" data-label="Dashboard Hasil Pemantauan" title="Dashboard Hasil Pemantauan"><span class="navbtn-icon ms-icon" data-icon="trending-up"></span><span class="label">Dashboard Hasil Pemantauan</span></button>
           <button class="navbtn" data-page="hasildb" data-group="hasil" data-label="Database Hasil Pemantauan" title="Database Hasil Pemantauan"><span class="navbtn-icon ms-icon" data-icon="database"></span><span class="label">Database Hasil Pemantauan</span></button>
           <button class="navbtn" data-page="dispersi" data-group="hasil" data-label="Model Dispersi Emisi" title="Model Dispersi Emisi"><span class="navbtn-icon ms-icon" data-icon="wind"></span><span class="label">Model Dispersi Emisi</span></button>
+          <button class="navbtn" data-page="ambiendashboard" data-group="hasil" data-label="Dashboard Hasil Ambient" title="Dashboard Hasil Ambient"><span class="navbtn-icon ms-icon" data-icon="trending-up"></span><span class="label">Dashboard Hasil Ambient</span></button>
+          <button class="navbtn" data-page="ambiendb" data-group="hasil" data-label="Database Hasil Ambient" title="Database Hasil Ambient"><span class="navbtn-icon ms-icon" data-icon="database"></span><span class="label">Database Hasil Ambient</span></button>
         </div>
       </div>
       <div class="navgroup" data-navgroup="ref">
@@ -149,8 +151,8 @@
       <div class="pagehead"><div><h2>Database Titik Pantau</h2><div class="desc">Daftar sumber emisi, ambient, kebisingan, kebauan &amp; getaran</div></div>
         <div class="toolbar">
           <button class="btn primary" data-action="addPoint">+ Tambah Titik</button>
-          <button class="btn" data-action="importPointsCsv">Import CSV</button>
-          <button class="btn" data-action="exportPointsCsv">Export CSV</button>
+          <button class="btn" data-action="importPointsXlsx">Import Excel</button>
+          <button class="btn" data-action="exportPointsXlsx">Export Excel</button>
           <button class="btn ghost" data-action="verifyAllVisible" title="Tandai semua titik yang tampil (sesuai filter) sebagai sudah dicek">&#10003; Tandai Tampil Sudah Dicek</button>
           <button class="btn ghost" data-action="clearStaleVisible" title="Hapus tanda kuning 'berubah sejak dicek' pada titik yang tampil (sesuai filter) — tanggal verifikasi terakhir tidak diubah, cuma tandanya yang dihilangkan">&#10005; Hapus Tanda Berubah</button>
         </div>
@@ -916,6 +918,33 @@
       </div>
     </div>
 
+    <!-- DASHBOARD HASIL AMBIENT -->
+    <div class="page" id="page-ambiendashboard">
+      <div class="stickytop">
+      <div class="pagehead"><div><h2>Dashboard Hasil Ambient</h2><div class="desc">Analitik hasil pemantauan udara ambien, kebisingan, kebauan &amp; getaran terhadap baku mutu dan kriteria yang berlaku</div></div></div>
+      <div class="chipbar" id="ambDashCategoryTabs" style="margin:10px 0;"></div>
+      </div>
+      <div id="ambDashBody"></div>
+    </div>
+
+    <!-- DATABASE HASIL AMBIENT -->
+    <div class="page" id="page-ambiendb">
+      <div class="stickytop">
+      <div class="pagehead"><div><h2>Database Hasil Ambient</h2><div class="desc">Riwayat hasil uji udara ambien, kebisingan, kebauan &amp; getaran — data dasar Dashboard Hasil Ambient</div></div>
+        <div class="toolbar">
+          <button class="btn primary" data-action="importAmbienXlsx">Import Excel</button>
+          <button class="btn" data-action="exportAmbienXlsx">Export Excel</button>
+          <button class="btn ghost" data-action="downloadTemplateAmbien">Download Template</button>
+          <button class="btn danger" data-action="resetAmbienData">Reset ke Data Default</button>
+        </div>
+      </div>
+      <div class="chipbar" id="ambDbCategoryTabs" style="margin:10px 0;"></div>
+      <div class="toolbar card" id="ambDbFilterBar" style="padding:12px 14px;"></div>
+      </div>
+      <div class="tablewrap"><table id="ambDbTable"></table></div>
+      <div class="hint" id="ambDbCount"></div>
+    </div>
+
     <!-- LOKASI PETA -->
     <div class="page" id="page-lokasi">
       <div class="stickytop">
@@ -1288,15 +1317,21 @@
       </div>
       <div class="grid cols-2">
         <div class="card">
-          <h3>Template CSV — Titik Pantau</h3>
-          <p class="hint accent-amber-text">Pemisah kolom pakai titik-koma (;), bukan koma — supaya field yang isinya daftar (mis. parameter "NOx, CO") tidak ikut kepisah saat dibuka di Excel.</p>
-          <p class="hint">Kolom: id;site;kategori;nama;kategoriSumber;regulasi;parameter;parameterCatatan;wajib;frekuensiBulan;tidakBeroperasi;alasanTidakWajib;kapasitas;kapasitasKW;jenisBahanBakar;runningHour;pemantauanTerakhir;prediksiBerikutnya;lastSampling</p>
-          <button class="btn small" data-action="downloadTemplatePoints">Download Template Kosong</button>
+          <h3>Template Excel — Titik Pantau</h3>
+          <p class="hint">Berisi 2 sheet: "Emisi" (seluruh kolom termasuk kapasitas, bahan bakar, dimensi cerobong, dsb.) dan "Ambient &amp; Lingkungan" (kolom yang relevan saja untuk titik ambient/kebisingan/kebauan/getaran — kolom khusus emisi yang pasti kosong untuk kategori ini tidak disertakan).</p>
+          <button class="btn small" data-action="downloadTemplatePointsXlsx">Download Template Kosong</button>
         </div>
         <div class="card">
           <h3>Template CSV — Personil</h3>
           <p class="hint">Kolom: nama,role,ktpExp,mcuExp,spkExp,medpassExp,clsrExp,ppcExp,fotoBiruAda,bosietExp,vaksinAda,ptsidExp</p>
           <button class="btn small" data-action="downloadTemplatePersonil">Download Template Kosong</button>
+        </div>
+      </div>
+      <div class="grid cols-2">
+        <div class="card">
+          <h3>Template Excel — Hasil Pemantauan Ambient</h3>
+          <p class="hint">Berisi 4 sheet, satu per kategori (Ambien Udara, Kebisingan, Kebauan, Getaran), mengikuti format lembar data hasil laboratorium yang umum dipakai (SAMPLE IDENTIFICATION, SITE, tanggal, parameter, hasil uji, baku mutu, metode, dst).</p>
+          <button class="btn small" data-action="downloadTemplateAmbien">Download Template Kosong</button>
         </div>
       </div>
     </div>
@@ -1305,6 +1340,7 @@
 
 <div class="overlay" id="overlay"><div class="modal" id="modalBox"></div></div>
 <input type="file" id="hiddenCsvFile" accept=".csv" style="display:none;">
+<input type="file" id="hiddenXlsxFile" accept=".xlsx" style="display:none;">
 <input type="file" id="hiddenPhotoFile" accept="image/*" multiple style="display:none;">
 <div id="printGuideArea"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -1313,29 +1349,32 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202609100245"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202609100500"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202609100500"></script>
 
-<script src="assets/data/default-data.js?v=202609100245"></script>
-<script src="assets/data/brand-assets.js?v=202609100245"></script>
-<script src="assets/data/travel-routes.js?v=202609100245"></script>
-<script src="assets/js/00-icons.js?v=202609100245"></script>
-<script src="assets/js/01-state.js?v=202609100245"></script>
-<script src="assets/js/02-nav-util.js?v=202609100245"></script>
-<script src="assets/js/03-period-logic.js?v=202609100245"></script>
-<script src="assets/js/04-dashboard.js?v=202609100245"></script>
-<script src="assets/js/05-master-data.js?v=202609100245"></script>
-<script src="assets/js/06-plan-personil.js?v=202609100245"></script>
-<script src="assets/js/07-rules-planner.js?v=202609100245"></script>
-<script src="assets/js/08-gantt-print.js?v=202609100245"></script>
-<script src="assets/js/09-tracking-map.js?v=202609100245"></script>
-<script src="assets/js/10-running-hour.js?v=202609100245"></script>
-<script src="assets/js/11-berita-acara.js?v=202609100245"></script>
-<script src="assets/js/12-data-page.js?v=202609100245"></script>
-<script src="assets/js/13-hasil-db.js?v=202609100245"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202609100245"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202609100245"></script>
-<script src="assets/js/16-actions-init.js?v=202609100245"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202609100245"></script>
-<script src="assets/js/18-model-dispersi.js?v=202609100245"></script>
+<script src="assets/data/default-data.js?v=202609100500"></script>
+<script src="assets/data/brand-assets.js?v=202609100500"></script>
+<script src="assets/data/travel-routes.js?v=202609100500"></script>
+<script src="assets/js/00-icons.js?v=202609100500"></script>
+<script src="assets/js/01-state.js?v=202609100500"></script>
+<script src="assets/js/02-nav-util.js?v=202609100500"></script>
+<script src="assets/js/03-period-logic.js?v=202609100500"></script>
+<script src="assets/js/04-dashboard.js?v=202609100500"></script>
+<script src="assets/js/05-master-data.js?v=202609100500"></script>
+<script src="assets/js/06-plan-personil.js?v=202609100500"></script>
+<script src="assets/js/07-rules-planner.js?v=202609100500"></script>
+<script src="assets/js/08-gantt-print.js?v=202609100500"></script>
+<script src="assets/js/09-tracking-map.js?v=202609100500"></script>
+<script src="assets/js/10-running-hour.js?v=202609100500"></script>
+<script src="assets/js/11-berita-acara.js?v=202609100500"></script>
+<script src="assets/js/12-data-page.js?v=202609100500"></script>
+<script src="assets/js/13-hasil-db.js?v=202609100500"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202609100500"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202609100500"></script>
+<script src="assets/js/16-actions-init.js?v=202609100500"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202609100500"></script>
+<script src="assets/js/18-model-dispersi.js?v=202609100500"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202609100500"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202609100500"></script>
 </body>
 </html>

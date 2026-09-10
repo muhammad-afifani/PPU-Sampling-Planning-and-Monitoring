@@ -634,27 +634,33 @@ function deletePoint(id){
     touchDataset("points"); save(); renderMaster(); toast("Titik pantau dihapus.");
   });
 }
-function importPointsCsv(){
-  const inp = document.getElementById("hiddenCsvFile");
-  inp.onchange = ()=>{
-    const file = inp.files[0]; if(!file) return;
-    const reader = new FileReader();
-    reader.onload = ()=>{
-      const rows = csvParse(reader.result);
-      let added=0, updated=0;
-      rows.forEach(r=>{
-        const rec = {
-          site:(r.site||"").toUpperCase(), kategori:r.kategori||"emisi", nama:r.nama||"",
-          kategoriSumber:r.kategoriSumber||"", regulasi:r.regulasi||"", parameter:r.parameter||"",
-          parameterCatatan:r.parameterCatatan||"",
-          wajib: /^(1|true|ya|wajib)$/i.test(r.wajib||""), frekuensiBulan: r.frekuensiBulan?Number(r.frekuensiBulan):"",
-          tidakBeroperasi: /^(1|true|ya)$/i.test(r.tidakBeroperasi||""), kapasitas:r.kapasitas||"",
-          kapasitasKW: r.kapasitasKW?Number(r.kapasitasKW):null, jenisBahanBakar:r.jenisBahanBakar||"",
-          stackHeight: r.stackHeight?Number(r.stackHeight):null, stackDiameter: r.stackDiameter?Number(r.stackDiameter):null,
-          runningHour: r.runningHour?Number(r.runningHour):null, pemantauanTerakhir:r.pemantauanTerakhir||"",
-          prediksiBerikutnya:r.prediksiBerikutnya||"", alasanTidakWajib:r.alasanTidakWajib||"",
-          lastSampling:r.lastSampling||""
-        };
+// 2 sheet: "Emisi" (seluruh kolom) & "Ambient & Lingkungan" (tanpa 7 kolom yang SELALU kosong utk
+// kategori ambient/kebisingan/kebauan/getaran — kategoriSumber, kapasitas, kapasitasKW,
+// jenisBahanBakar, stackHeight, stackDiameter, runningHour — supaya file lebih ringkas & tidak
+// membingungkan saat diedit manual, sesuai keluhan "banyak field/kolom kosong" di CSV lama.
+const POINTS_XLSX_HEADERS_EMISI = ["id","site","kategori","nama","kategoriSumber","regulasi","parameter","parameterCatatan","wajib","frekuensiBulan","tidakBeroperasi","alasanTidakWajib","kapasitas","kapasitasKW","jenisBahanBakar","stackHeight","stackDiameter","runningHour","pemantauanTerakhir","prediksiBerikutnya","lastSampling","status","batchId"];
+const POINTS_XLSX_HEADERS_AMBIENT = ["id","site","kategori","nama","regulasi","parameter","parameterCatatan","wajib","frekuensiBulan","tidakBeroperasi","alasanTidakWajib","pemantauanTerakhir","prediksiBerikutnya","lastSampling","status","batchId"];
+function pointsRecFromRow(r){
+  return {
+    site:(r.site||"").toUpperCase(), kategori:r.kategori||"emisi", nama:r.nama||"",
+    kategoriSumber:r.kategoriSumber||"", regulasi:r.regulasi||"", parameter:r.parameter||"",
+    parameterCatatan:r.parameterCatatan||"",
+    wajib: /^(1|true|ya|wajib)$/i.test(String(r.wajib==null?"":r.wajib)), frekuensiBulan: r.frekuensiBulan?Number(r.frekuensiBulan):"",
+    tidakBeroperasi: /^(1|true|ya)$/i.test(String(r.tidakBeroperasi==null?"":r.tidakBeroperasi)), kapasitas:r.kapasitas||"",
+    kapasitasKW: r.kapasitasKW?Number(r.kapasitasKW):null, jenisBahanBakar:r.jenisBahanBakar||"",
+    stackHeight: r.stackHeight?Number(r.stackHeight):null, stackDiameter: r.stackDiameter?Number(r.stackDiameter):null,
+    runningHour: r.runningHour?Number(r.runningHour):null, pemantauanTerakhir:r.pemantauanTerakhir||"",
+    prediksiBerikutnya:r.prediksiBerikutnya||"", alasanTidakWajib:r.alasanTidakWajib||"",
+    lastSampling:r.lastSampling||""
+  };
+}
+function importPointsXlsx(){
+  xlsxImport(wb=>{
+    let added=0, updated=0;
+    ["Emisi","Ambient & Lingkungan"].forEach(sheetName=>{
+      const ws = wb.Sheets[sheetName]; if(!ws) return;
+      xlsxSheetToRows(ws).forEach(r=>{
+        const rec = pointsRecFromRow(r);
         if(!rec.site||!rec.nama) return;
         if(r.id){
           const existing = DB.points.find(p=>p.id===r.id);
@@ -663,16 +669,22 @@ function importPointsCsv(){
         DB.points.push({id: uid("PT"), status:"pending", batchId:"", planStart:"", planEnd:"", actualStart:"", actualEnd:"", team: rec.kategori==="emisi"?"emisi":"ambient", keterangan:"", ...rec});
         added++;
       });
-      touchDataset("points"); save(); renderMaster();
-      toast(`Import selesai: ${added} titik baru, ${updated} diperbarui.`,"ok");
-    };
-    reader.readAsText(file);
-    inp.value="";
-  };
-  inp.click();
+    });
+    if(!added && !updated){ toast("Tidak ada baris data yang berhasil dibaca — pastikan nama sheet 'Emisi' dan/atau 'Ambient & Lingkungan' sesuai Template.","err"); return; }
+    touchDataset("points"); save(); renderMaster();
+    toast(`Import selesai: ${added} titik baru, ${updated} diperbarui.`,"ok");
+  });
 }
-function exportPointsCsv(){
-  const headers=["id","site","kategori","nama","kategoriSumber","regulasi","parameter","parameterCatatan","wajib","frekuensiBulan","tidakBeroperasi","alasanTidakWajib","kapasitas","kapasitasKW","jenisBahanBakar","stackHeight","stackDiameter","runningHour","pemantauanTerakhir","prediksiBerikutnya","lastSampling","status","batchId"];
-  csvExport(headers, DB.points, "titik_pantau_export.csv");
+function pointsRowForExport(p, headers){
+  const o = {}; headers.forEach(h=>{ o[h] = p[h]!=null ? p[h] : ""; }); return o;
+}
+function exportPointsXlsx(){
+  const emisiRows = DB.points.filter(p=>p.kategori==="emisi").map(p=>pointsRowForExport(p, POINTS_XLSX_HEADERS_EMISI));
+  const ambientRows = DB.points.filter(p=>AMBIENT_FAMILY.includes(p.kategori)).map(p=>pointsRowForExport(p, POINTS_XLSX_HEADERS_AMBIENT));
+  const wb = xlsxWorkbookFromSheets([
+    ["Emisi", xlsxSheetFromRows(POINTS_XLSX_HEADERS_EMISI, emisiRows)],
+    ["Ambient & Lingkungan", xlsxSheetFromRows(POINTS_XLSX_HEADERS_AMBIENT, ambientRows)]
+  ]);
+  xlsxDownload(wb, "titik_pantau_export.xlsx");
 }
 

@@ -109,6 +109,8 @@ function renderPage(p){
   if(p==="runninghour") renderRunningHour();
   if(p==="hasildashboard") renderHasilDashboard();
   if(p==="hasildb") renderHasilDb();
+  if(p==="ambiendashboard") renderAmbienDashboard();
+  if(p==="ambiendb") renderAmbienDb();
   if(p==="riwayat") renderRiwayat();
   if(p==="lokasi") renderMap();
   if(p==="data") renderDataStatus();
@@ -317,5 +319,54 @@ function downloadBlob(content, filename, mime){
   const a = document.createElement("a");
   a.href=url; a.download=filename; document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+/* =========================================================
+   EXCEL (XLSX) HELPERS — dipakai untuk import/export yang lebih mudah diedit user dibanding CSV
+   (bisa multi-sheet dalam satu file, tanpa masalah delimiter/encoding CSV). Library: SheetJS
+   (assets/vendor/xlsx.mini.min.js), dimuat sbg global XLSX.
+========================================================= */
+// Bikin satu sheet dari array-of-object, kolom mengikuti urutan `headers` persis (bukan urutan
+// key object) supaya kolom yang selalu kosong utk kategori tertentu bisa dihilangkan dgn simpel
+// (tinggal tidak dimasukkan ke `headers`) tanpa perlu strip key dari tiap objeknya dulu.
+function xlsxSheetFromRows(headers, rows){
+  return XLSX.utils.json_to_sheet(rows, {header:headers});
+}
+function xlsxWorkbookFromSheets(sheets){
+  const wb = XLSX.utils.book_new();
+  sheets.forEach(([name, ws])=> XLSX.utils.book_append_sheet(wb, ws, name));
+  return wb;
+}
+function xlsxDownload(wb, filename){
+  const buf = XLSX.write(wb, {type:"array", bookType:"xlsx"});
+  downloadBlob(buf, filename, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+}
+// `onWorkbook(wb)` dipanggil setelah file dipilih & berhasil dibaca — pemanggil yang urus
+// per-sheet parsing-nya sendiri (bentuk sheet tiap fitur beda-beda).
+function xlsxImport(onWorkbook){
+  const inp = document.getElementById("hiddenXlsxFile");
+  inp.onchange = ()=>{
+    const file = inp.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      try{
+        const wb = XLSX.read(reader.result, {type:"array", cellDates:true});
+        onWorkbook(wb);
+      }catch(err){ toast("Gagal membaca file Excel: "+err.message, "err"); console.error(err); }
+    };
+    reader.readAsArrayBuffer(file);
+    inp.value = "";
+  };
+  inp.click();
+}
+function xlsxSheetToRows(ws){
+  return ws ? XLSX.utils.sheet_to_json(ws, {defval:"", raw:true}) : [];
+}
+// Tanggal sel Excel (dibaca dgn cellDates:true) jadi objek Date lokal jam 00:00 UTC — dikonversi
+// pakai komponen UTC (bukan lokal) supaya tanggalnya tidak bisa bergeser sehari tergantung timezone
+// browser pengguna (lihat catatan yg sama di hasilParseDate utk alasan format YYYY-MM-DD).
+function xlsxDateToIso(v){
+  if(v instanceof Date && !isNaN(v)) return v.getUTCFullYear()+"-"+String(v.getUTCMonth()+1).padStart(2,"0")+"-"+String(v.getUTCDate()).padStart(2,"0");
+  return "";
 }
 

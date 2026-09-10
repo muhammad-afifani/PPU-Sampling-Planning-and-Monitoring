@@ -5,7 +5,7 @@ const ACTIONS = {
   addPoint, editPoint:(t)=>editPoint(t.dataset.id), deletePoint:(t)=>deletePoint(t.dataset.id), savePoint:(t)=>savePoint(t.dataset.id),
   verifyAllVisible, clearStaleVisible, openMasterColumnPicker,
   goToPage:(t)=>showPage(t.dataset.page),
-  importPointsCsv, exportPointsCsv,
+  importPointsXlsx, exportPointsXlsx,
   addPersonil, editPersonil:(t)=>editPersonil(t.dataset.id), deletePersonil:(t)=>deletePersonil(t.dataset.id), savePersonil:(t)=>savePersonil(t.dataset.id),
   importPersonilCsv, exportPersonilCsv, printPersonilRoster,
   importRhCsv, exportRhCsv, doImportRhCsv,
@@ -68,7 +68,7 @@ const ACTIONS = {
     logChange(`Urutan rute ${list==="routeEmisi"?"Emisi":"Ambient"} diubah — "${arr[j]}" & "${arr[idx]}" ditukar`);
     save(); refreshRouteViews();
   },
-  exportAll, resetDefault, resetEmpty, downloadTemplatePoints, downloadTemplatePersonil,
+  exportAll, resetDefault, resetEmpty, downloadTemplatePointsXlsx, downloadTemplatePersonil,
   checkFullBackupUpdate, checkRepoBackupUpdate, applyFullBackupImport,
   dismissOnboarding, startOnboardingUpdate, replayOnboarding, openAboutModal,
   importHasilCsv, exportHasilCsv, downloadTemplateHasil, resetHasilData,

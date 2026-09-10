@@ -23,6 +23,7 @@ function freshDB(){
     rhMonths: [...RH_MONTHS_DEFAULT],
     rhMonthly: JSON.parse(JSON.stringify(RH_MONTHLY_DEFAULT)),
     hasilPemantauan: [...DEFAULT_HASIL_PEMANTAUAN],
+    hasilAmbien: {ambien:[...DEFAULT_HASIL_AMBIEN.ambien], kebisingan:[...DEFAULT_HASIL_AMBIEN.kebisingan], kebauan:[...DEFAULT_HASIL_AMBIEN.kebauan], getaran:[...DEFAULT_HASIL_AMBIEN.getaran]},
     dokumentasiFoto: {}
   };
 }
@@ -33,6 +34,8 @@ function uid(pfx){ return pfx+"_"+Math.random().toString(36).slice(2,9); }
 function migrateDB(){
   if(!DB.tracking) DB.tracking = {};
   if(!DB.hasilPemantauan) DB.hasilPemantauan = [...DEFAULT_HASIL_PEMANTAUAN];
+  if(!DB.hasilAmbien) DB.hasilAmbien = {ambien:[...DEFAULT_HASIL_AMBIEN.ambien], kebisingan:[...DEFAULT_HASIL_AMBIEN.kebisingan], kebauan:[...DEFAULT_HASIL_AMBIEN.kebauan], getaran:[...DEFAULT_HASIL_AMBIEN.getaran]};
+  ["ambien","kebisingan","kebauan","getaran"].forEach(k=>{ if(!Array.isArray(DB.hasilAmbien[k])) DB.hasilAmbien[k] = []; });
   if(!DB.batches) DB.batches = [];
   if(!DB.routeAmbient) DB.routeAmbient = [...DEFAULT_ROUTE_AMBIENT];
   if(!DB.routeEmisi) DB.routeEmisi = [...DEFAULT_ROUTE_EMISI];
@@ -251,6 +254,7 @@ const DATASET_LABELS = {
   personil: "Personil PPC & Observer",
   coords: "Koordinat Titik Pantau",
   hasilPemantauan: "Hasil Pemantauan (Database Hasil Pemantauan)",
+  hasilAmbien: "Hasil Pemantauan Ambient (Udara Ambien, Kebisingan, Kebauan, Getaran)",
   rh: "Running Hour Harian",
   rhMonthly: "Running Hour Bulanan",
   tracking: "Tracking BA / CoA"
@@ -270,13 +274,14 @@ function formatRelativeTime(iso){
   if(days<365) return `${Math.floor(days/30)} bulan yang lalu`;
   return `${Math.floor(days/365)} tahun yang lalu`;
 }
-const DATASET_PAGE = {points:"master", personil:"personil", coords:"lokasi", hasilPemantauan:"hasildb", rh:"runninghour", rhMonthly:"runninghour", tracking:"tracking"};
-const DATASET_PAGE_LABEL = {master:"Database Titik Pantau", personil:"Personil PPC & Observer", lokasi:"Lokasi Titik Pantau", hasildb:"Database Hasil Pemantauan", runninghour:"Running Hour Detail", tracking:"Tracking BA / CoA"};
+const DATASET_PAGE = {points:"master", personil:"personil", coords:"lokasi", hasilPemantauan:"hasildb", hasilAmbien:"ambiendb", rh:"runninghour", rhMonthly:"runninghour", tracking:"tracking"};
+const DATASET_PAGE_LABEL = {master:"Database Titik Pantau", personil:"Personil PPC & Observer", lokasi:"Lokasi Titik Pantau", hasildb:"Database Hasil Pemantauan", ambiendb:"Database Hasil Ambient", runninghour:"Running Hour Detail", tracking:"Tracking BA / CoA"};
 function datasetCount(key){
   if(key==="points") return DB.points.length;
   if(key==="personil") return DB.personil.length;
   if(key==="coords") return Object.keys(DB.pointCoords||{}).length;
   if(key==="hasilPemantauan") return DB.hasilPemantauan.length;
+  if(key==="hasilAmbien") return Object.values(DB.hasilAmbien||{}).reduce((s,a)=>s+a.length,0);
   if(key==="rh") return DB.points.filter(p=>p.kategori==="emisi" && p.runningHour!=null).length;
   if(key==="rhMonthly") return Object.keys(DB.rhMonthly||{}).length;
   if(key==="tracking") return Object.keys(DB.tracking||{}).length;
