@@ -96,7 +96,7 @@ function ambBuildRankChart(rows, valueField, labelField, refLine, unitSuffix){
   return svg;
 }
 function ambBuildHourlyProfile(record){
-  if(!record) return "<div class='hint' style='padding:14px;'>Tidak ada data profil 24 jam untuk dipilih.</div>";
+  if(!record || !record.hourly || !record.hourly.length) return "<div class='hint' style='padding:14px;'>Titik/tanggal ini belum ada data pembacaan per jam (data L Siang-Malam saja tanpa rincian per jam, atau belum dipilih).</div>";
   const W=760,H=260,padL=44,padR=16,padT=16,padB=34;
   const plotW=W-padL-padR, plotH=H-padT-padB;
   const vals = record.hourly.map(h=>h.nilai);
@@ -400,5 +400,11 @@ document.addEventListener("change", e=>{
 Object.assign(ACTIONS, {
   importAmbienXlsx, exportAmbienXlsx, downloadTemplateAmbien, resetAmbienData,
   ambDbSetCat:(t)=>{ ambDbCat = t.dataset.cat; renderAmbienDb(); },
-  ambDashSetCat:(t)=>{ ambDashCat = t.dataset.cat; ambDashFlt = {site:"",from:"",to:"",param:""}; ambDashProfileKey=""; renderAmbienDashboard(); }
+  ambDashSetCat:(t)=>{ ambDashCat = t.dataset.cat; ambDashFlt = {site:"",from:"",to:"",param:""}; ambDashProfileKey=""; renderAmbienDashboard(); },
+  addAmbRecordBtn:(t)=>addAmbRecord(t.dataset.cat),
+  editAmbRecord:(t)=>editAmbRecord(t.dataset.cat, t.dataset.id),
+  deleteAmbRecord:(t)=>deleteAmbRecord(t.dataset.cat, t.dataset.id),
+  saveAmbParam:(t)=>saveAmbParam(t.dataset.cat, t.dataset.id),
+  saveKebisingan:(t)=>saveKebisingan(t.dataset.id),
+  saveGetaran:(t)=>saveGetaran(t.dataset.id)
 });

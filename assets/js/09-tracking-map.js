@@ -607,7 +607,7 @@ function renderCoordTable(){
       if(!arr.length) return;
       html += `<div class="tree-sub"><div class="tree-subhead">${label} (${arr.length})</div>
         <table class="tree-table coord-tbl">
-        <colgroup><col style="width:26%;"><col style="width:15%;"><col style="width:24%;"><col style="width:24%;"><col style="width:11%;"></colgroup>
+        <colgroup><col style="width:24%;"><col style="width:14%;"><col style="width:22%;"><col style="width:22%;"><col style="width:9%;"><col style="width:9%;"></colgroup>
         <tbody>${arr.map(p=>{
           const c = DB.pointCoords[p.site+"::"+p.nama];
           const key = p.site+"::"+p.nama;
@@ -618,6 +618,7 @@ function renderCoordTable(){
             <td class="muted" style="font-size:10.5px;">${coordsDMS(c[0],c[1])}</td>
             <td>${vb.badge} ${vb.btns}</td>
             <td><a href="${gmapsLink(c[0],c[1])}" target="_blank" rel="noopener" onclick="event.stopPropagation()">GMaps &#8599;</a></td>
+            <td><button class="btn small ghost" data-action="editCoord" data-key="${escHtml(key)}" onclick="event.stopPropagation()">Edit</button></td>
           </tr>`;
         }).join("")}</tbody></table>
       </div>`;
@@ -626,40 +627,88 @@ function renderCoordTable(){
     return html;
   }).join("") : "<div class='hint' style='padding:10px;'>Belum ada titik dengan koordinat.</div>";
 }
-function exportCoordsCsv(){
+const COORDS_XLSX_HEADERS = ["site","nama","lat","lng"];
+function exportCoordsXlsx(){
   const rows = Object.entries(DB.pointCoords).map(([key,c])=>{
     const [site,...rest] = key.split("::");
     return {site, nama: rest.join("::"), lat:c[0], lng:c[1]};
   });
-  csvExport(["site","nama","lat","lng"], rows, `koordinat_titik_${todayStr()}.csv`);
+  const wb = xlsxWorkbookFromSheets([["Koordinat", xlsxSheetFromRows(COORDS_XLSX_HEADERS, rows)]]);
+  xlsxDownload(wb, `koordinat_titik_${todayStr()}.xlsx`);
 }
-function importCoordsCsv(){
-  openModal(`<h3>Import Koordinat CSV</h3>
-    <p class="hint">Kolom wajib: <b>site;nama;lat;lng</b> (pakai Export dulu buat format contohnya). Site+nama harus persis sama dengan yang ada di Database Titik Pantau supaya nyambung ke peta.</p>
-    <input type="file" id="coordsImportFile" accept=".csv">
-    <div class="actions"><button class="btn ghost" data-action="closeModal">Batal</button><button class="btn primary" data-action="doImportCoordsCsv">Import</button></div>`);
+function downloadTemplateCoordsXlsx(){
+  const wb = xlsxWorkbookFromSheets([["Koordinat", xlsxSheetFromRows(COORDS_XLSX_HEADERS, [])]]);
+  xlsxDownload(wb, "template_koordinat.xlsx");
 }
-function doImportCoordsCsv(){
-  const file = document.getElementById("coordsImportFile").files[0];
-  if(!file){ toast("Pilih file CSV dulu.","err"); return; }
-  const reader = new FileReader();
-  reader.onload = ()=>{
-    try{
-      const rows = csvParse(reader.result);
-      snapshotBefore(`Sebelum import koordinat CSV "${file.name}"`);
-      let updated=0;
-      rows.forEach(r=>{
-        if(!r.site || !r.nama || r.lat==="" || r.lng==="") return;
-        DB.pointCoords[r.site+"::"+r.nama] = [Number(r.lat), Number(r.lng)];
-        updated++;
-      });
-      logChange(`Import koordinat dari "${file.name}" — ${updated} titik diperbarui`);
-      touchDataset("coords"); save(); closeModal();
-      if(mapInstance){ mapInstance.remove(); mapInstance=null; }
-      renderMap();
-      toast(`${updated} koordinat diperbarui.`,"ok");
-    }catch(err){ toast("Gagal import: "+err.message,"err"); }
-  };
-  reader.readAsText(file);
+function importCoordsXlsx(){
+  xlsxImport(wb=>{
+    const ws = wb.Sheets["Koordinat"] || wb.Sheets[wb.SheetNames[0]];
+    const rows = xlsxSheetToRows(ws);
+    snapshotBefore(`Sebelum import koordinat Excel`);
+    let updated=0;
+    rows.forEach(r=>{
+      if(!r.site || !r.nama || r.lat==="" || r.lat==null || r.lng==="" || r.lng==null) return;
+      DB.pointCoords[r.site+"::"+r.nama] = [Number(r.lat), Number(r.lng)];
+      updated++;
+    });
+    logChange(`Import koordinat Excel — ${updated} titik diperbarui`);
+    touchDataset("coords"); save();
+    if(mapInstance){ mapInstance.remove(); mapInstance=null; }
+    renderMap();
+    toast(`${updated} koordinat diperbarui.`,"ok");
+  });
+}
+// Edit/tambah SATU koordinat secara manual, tanpa perlu import file — key=null berarti tambah baru
+// (user pilih titiknya dulu dari dropdown), key="site::nama" berarti edit koordinat titik itu.
+function coordFormHtml(key){
+  const c = key ? DB.pointCoords[key] : null;
+  const pointPicker = key ? "" : (()=>{
+    const withCoord = new Set(Object.keys(DB.pointCoords));
+    const bySite = {};
+    DB.points.forEach(p=>{ const k=p.site+"::"+p.nama; if(withCoord.has(k)) return; (bySite[p.site]=bySite[p.site]||[]).push(p); });
+    const sites = Object.keys(bySite).sort();
+    if(!sites.length) return `<div class="hint">Semua titik sudah punya koordinat. Untuk mengubah koordinat yang sudah ada, klik "Edit" pada baris tabelnya.</div>`;
+    return `<div class="field"><label>Titik (hanya titik yang belum ada koordinatnya)</label>
+      <select id="crd_key">${sites.map(s=>`<optgroup label="${escHtml(s)}">${bySite[s].sort((a,b)=>a.nama.localeCompare(b.nama)).map(p=>`<option value="${escHtml(s+"::"+p.nama)}">${escHtml(p.nama)}</option>`).join("")}</optgroup>`).join("")}</select>
+    </div>`;
+  })();
+  return `
+  <h3>${key?"Edit":"Tambah"} Koordinat</h3>
+  ${key?`<div class="hint" style="margin-bottom:8px;"><b>${escHtml(key.split("::").slice(1).join("::"))}</b> &middot; ${escHtml(key.split("::")[0])}</div>`:""}
+  ${pointPicker}
+  <div class="grid cols-2" style="margin-top:10px;">
+    <div class="field"><label>Latitude</label><input type="number" step="any" id="crd_lat" value="${c?c[0]:""}" placeholder="mis. -0.5827"></div>
+    <div class="field"><label>Longitude</label><input type="number" step="any" id="crd_lng" value="${c?c[1]:""}" placeholder="mis. 117.3775"></div>
+  </div>
+  <div class="hint" style="margin-top:6px;">Format desimal (bukan derajat-menit-detik) — kalau sumbernya format DMS, konversi dulu ke desimal.</div>
+  <div class="actions">
+    <button class="btn ghost" data-action="closeModal">Batal</button>
+    ${key?`<button class="btn danger" data-action="deleteCoord" data-key="${escHtml(key)}">Hapus</button>`:""}
+    <button class="btn primary" data-action="saveCoord" data-key="${key?escHtml(key):""}">Simpan</button>
+  </div>`;
+}
+function addCoord(){ openModal(coordFormHtml(null)); }
+function editCoord(key){ openModal(coordFormHtml(key)); }
+function saveCoord(key){
+  const targetKey = key || (document.getElementById("crd_key")||{}).value;
+  if(!targetKey){ toast("Pilih titik dulu.","err"); return; }
+  const lat = Number(document.getElementById("crd_lat").value), lng = Number(document.getElementById("crd_lng").value);
+  if(!isFinite(lat) || !isFinite(lng)){ toast("Latitude/Longitude wajib diisi angka.","err"); return; }
+  DB.pointCoords[targetKey] = [lat, lng];
+  logChange(`Koordinat "${targetKey.split("::").slice(1).join("::")}" diubah manual`);
+  touchDataset("coords"); save(); closeModal();
+  if(mapInstance){ mapInstance.remove(); mapInstance=null; }
+  renderMap();
+  toast("Koordinat disimpan.","ok");
+}
+function deleteCoord(key){
+  askConfirm(`Hapus koordinat "${key.split("::").slice(1).join("::")}"? Titik ini tidak akan tampil di peta sampai koordinatnya ditambahkan lagi.`, ()=>{
+    delete DB.pointCoords[key];
+    logChange(`Koordinat "${key.split("::").slice(1).join("::")}" dihapus`);
+    touchDataset("coords"); save(); closeModal();
+    if(mapInstance){ mapInstance.remove(); mapInstance=null; }
+    renderMap();
+    toast("Koordinat dihapus.","ok");
+  });
 }
 

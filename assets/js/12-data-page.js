@@ -220,7 +220,8 @@ function downloadTemplatePointsXlsx(){
   ]);
   xlsxDownload(wb, "template_titik_pantau.xlsx");
 }
-function downloadTemplatePersonil(){
-  csvExport(["nama","role","ktpExp","mcuExp","spkExp","medpassExp","clsrExp","ppcExp","fotoBiruAda","bosietExp","vaksinAda","ptsidExp"], [], "template_personil.csv");
+function downloadTemplatePersonilXlsx(){
+  const wb = xlsxWorkbookFromSheets([["Personil", xlsxSheetFromRows(PERSONIL_XLSX_HEADERS, [])]]);
+  xlsxDownload(wb, "template_personil.xlsx");
 }
 

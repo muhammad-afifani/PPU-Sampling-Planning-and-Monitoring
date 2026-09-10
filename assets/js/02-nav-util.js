@@ -271,48 +271,8 @@ function askConfirm(msg, onYes){
 }
 
 /* =========================================================
-   CSV HELPERS
+   FILE DOWNLOAD HELPER
 ========================================================= */
-// Delimiter ";" (bukan ",") karena Windows locale Indonesia biasanya pakai koma sebagai
-// pemisah desimal, sehingga Excel menjadikan ";" sebagai pemisah kolom CSV default — file akan
-// otomatis kebuka rapi per kolom tanpa perlu "Text to Columns" manual, dan koma di dalam field
-// (mis. daftar parameter "NOx, CO") tidak lagi ambigu karena bukan karakter pemisah.
-const CSV_DELIM = ";";
-function csvParse(text){
-  const rows=[]; let row=[]; let cur=""; let inQ=false;
-  for(let i=0;i<text.length;i++){
-    const c=text[i];
-    if(inQ){
-      if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else inQ=false; }
-      else cur+=c;
-    } else {
-      if(c==='"') inQ=true;
-      else if(c===CSV_DELIM){ row.push(cur); cur=""; }
-      else if(c==='\n'){ row.push(cur); rows.push(row); row=[]; cur=""; }
-      else if(c==='\r'){}
-      else cur+=c;
-    }
-  }
-  if(cur.length||row.length){ row.push(cur); rows.push(row); }
-  if(!rows.length) return [];
-  const headers = rows[0].map(h=>h.trim());
-  return rows.slice(1).filter(r=>r.some(v=>v!=="")).map(r=>{
-    const o={}; headers.forEach((h,i)=>o[h]=r[i]!==undefined?r[i].trim():""); return o;
-  });
-}
-function csvCell(v){
-  v = v==null?"":String(v);
-  if(v.indexOf('"')>=0 || v.indexOf(CSV_DELIM)>=0 || v.indexOf("\n")>=0) return '"'+v.replace(/"/g,'""')+'"';
-  return v;
-}
-function csvExport(headers, rows, filename){
-  let out = headers.join(CSV_DELIM)+"\n";
-  rows.forEach(r=>{ out += headers.map(h=>csvCell(r[h])).join(CSV_DELIM)+"\n"; });
-  // BOM UTF-8 di depan WAJIB ada — tanpanya Excel (terutama locale Windows non-UTF8) salah
-  // menebak encoding file sbg Windows-1252/ANSI, sehingga karakter khusus (en dash "–", simbol
-  // derajat "°", superscript, dst) tampil sbg mojibake "â€“" dst padahal isi file aslinya benar.
-  downloadBlob("﻿"+out, filename, "text/csv;charset=utf-8");
-}
 function downloadBlob(content, filename, mime){
   const blob = new Blob([content], {type:mime});
   const url = URL.createObjectURL(blob);
