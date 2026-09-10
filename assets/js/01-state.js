@@ -54,6 +54,7 @@ function migrateDB(){
   if(!DB.rhMonthly) DB.rhMonthly = JSON.parse(JSON.stringify(RH_MONTHLY_DEFAULT));
   if(!DB.meta) DB.meta = {semester:"S1", tahun:new Date().getFullYear(), lastBatchIdEmisi:0, lastBatchIdAmbient:0};
   if(DB.meta.currentPeriod!==undefined) delete DB.meta.currentPeriod; // field lama, tidak dipakai lagi — diganti meta.semester+meta.tahun
+  if(!DB.meta.rhMonthsNormalized){ rhNormalizeMonthLabels(); DB.meta.rhMonthsNormalized = true; }
   // Tur onboarding "pertama kali buka tools ini" cuma utk sesi yg BENAR2 baru (freshDB, belum
   // pernah ada data sama sekali) — sesi yg sudah pernah jalan sebelumnya (lewat baris migrateDB
   // manapun, termasuk yg baru pertama kali dapat field ini) dianggap "sudah pernah lihat", supaya

@@ -494,39 +494,43 @@ function deletePersonil(id){
     touchDataset("personil"); save(); renderPersonil(); toast("Personil dihapus.");
   });
 }
-function exportPersonilCsv(){
-  const headers=["nama","role","ktpExp","mcuExp","spkExp","medpassExp","clsrExp","ppcExp","fotoBiruAda","bosietExp","vaksinAda","ptsidExp"];
-  const rows = DB.personil.map(p=>({
-    nama:p.nama, role:p.role,
+const PERSONIL_XLSX_HEADERS = ["id","nama","role","telepon","ktpExp","mcuExp","spkExp","medpassExp","clsrExp","ppcExp","fotoBiruAda","bosietExp","vaksinAda","ptsidExp","dokumentasiLink"];
+function personilRowForExport(p){
+  return {
+    id:p.id, nama:p.nama, role:p.role, telepon:p.telepon||"",
     ktpExp:(p.items.ktp||{}).exp||"", mcuExp:(p.items.mcu||{}).exp||"", spkExp:(p.items.spk||{}).exp||"",
     medpassExp:(p.items.medpass||{}).exp||"", clsrExp:(p.items.clsr||{}).exp||"", ppcExp:(p.items.ppc||{}).exp||"",
     fotoBiruAda:(p.items.fotoBiru||{}).ada?1:0, bosietExp:(p.items.bosiet||{}).exp||"",
-    vaksinAda:(p.items.vaksin||{}).ada?1:0, ptsidExp:(p.items.ptsid||{}).exp||""
-  }));
-  csvExport(headers, rows, "personil_export.csv");
-}
-function importPersonilCsv(){
-  const inp = document.getElementById("hiddenCsvFile");
-  inp.onchange = ()=>{
-    const file = inp.files[0]; if(!file) return;
-    const reader = new FileReader();
-    reader.onload = ()=>{
-      const rows = csvParse(reader.result);
-      rows.forEach(r=>{
-        if(!r.nama) return;
-        DB.personil.push({id: uid("PS"), nama:r.nama, role:r.role||"PPC Emisi", items:{
-          ktp:{exp:r.ktpExp||""}, mcu:{exp:r.mcuExp||""}, spk:{exp:r.spkExp||""}, medpass:{exp:r.medpassExp||""},
-          clsr:{exp:r.clsrExp||""}, ppc:{exp:r.ppcExp||""}, fotoBiru:{ada:/^1|true|ya$/i.test(r.fotoBiruAda||"")},
-          bosiet:{exp:r.bosietExp||""}, vaksin:{ada:/^1|true|ya$/i.test(r.vaksinAda||"")}, ptsid:{exp:r.ptsidExp||""}
-        }});
-      });
-      touchDataset("personil"); save(); renderPersonil();
-      toast("Import personil selesai: "+rows.length+" baris diproses.","ok");
-    };
-    reader.readAsText(file);
-    inp.value="";
+    vaksinAda:(p.items.vaksin||{}).ada?1:0, ptsidExp:(p.items.ptsid||{}).exp||"",
+    dokumentasiLink:p.dokumentasiLink||""
   };
-  inp.click();
+}
+function exportPersonilXlsx(){
+  const wb = xlsxWorkbookFromSheets([["Personil", xlsxSheetFromRows(PERSONIL_XLSX_HEADERS, DB.personil.map(personilRowForExport))]]);
+  xlsxDownload(wb, "personil_export.xlsx");
+}
+function importPersonilXlsx(){
+  xlsxImport(wb=>{
+    const ws = wb.Sheets["Personil"] || wb.Sheets[wb.SheetNames[0]];
+    const rows = xlsxSheetToRows(ws);
+    let added=0, updated=0;
+    rows.forEach(r=>{
+      if(!r.nama) return;
+      const val = {nama:r.nama, role:r.role||"PPC Emisi", telepon:r.telepon||"", dokumentasiLink:r.dokumentasiLink||"", items:{
+        ktp:{exp:r.ktpExp||""}, mcu:{exp:r.mcuExp||""}, spk:{exp:r.spkExp||""}, medpass:{exp:r.medpassExp||""},
+        clsr:{exp:r.clsrExp||""}, ppc:{exp:r.ppcExp||""}, fotoBiru:{ada:/^1|true|ya$/i.test(String(r.fotoBiruAda==null?"":r.fotoBiruAda))},
+        bosiet:{exp:r.bosietExp||""}, vaksin:{ada:/^1|true|ya$/i.test(String(r.vaksinAda==null?"":r.vaksinAda))}, ptsid:{exp:r.ptsidExp||""}
+      }};
+      if(r.id){
+        const existing = DB.personil.find(p=>p.id===r.id);
+        if(existing){ Object.assign(existing, val); updated++; return; }
+      }
+      DB.personil.push({id: uid("PS"), ...val});
+      added++;
+    });
+    touchDataset("personil"); save(); renderPersonil();
+    toast(`Import personil selesai: ${added} baru, ${updated} diperbarui.`,"ok");
+  });
 }
 
 /* =========================================================

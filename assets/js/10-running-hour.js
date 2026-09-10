@@ -67,7 +67,7 @@ function renderRunningHour(){
         <td><button class="btn small" data-action="openRhDetail" data-id="${p.id}">Detail Bulanan</button></td>
       </tr>`;
     }).join("")}</tbody>`;
-  document.getElementById("rhCount").textContent = pts.length+" dari "+allEmisi.length+" sumber emisi ditampilkan. \"RH Manual\" = angka ringkas yang dipakai di Database Titik Pantau & Perencanaan Batch; terisi otomatis dari bulan terakhir riwayat saat import CSV bulanan, tapi tetap bisa dikoreksi manual.";
+  document.getElementById("rhCount").textContent = pts.length+" dari "+allEmisi.length+" sumber emisi ditampilkan. \"RH Manual\" = angka ringkas yang dipakai di Database Titik Pantau & Perencanaan Batch; terisi otomatis dari bulan terakhir riwayat saat import Excel bulanan atau edit langsung di \"Detail Bulanan\", tapi tetap bisa dikoreksi manual di kolom ini juga.";
 }
 document.getElementById("rhFltSite").addEventListener("change", renderRunningHour);
 document.getElementById("rhFltSearch").addEventListener("input", renderRunningHour);
@@ -82,13 +82,17 @@ document.addEventListener("change", e=>{
     if(field==="runningHour") renderRunningHour();
   }
 });
-// Modal detail bulanan: grid tahun x bulan untuk satu titik, dengan jendela trailing 12 bulan di-highlight.
+// Modal detail bulanan: grid tahun x bulan utk satu titik, BISA diedit langsung per sel (tidak
+// harus import file) — jendela trailing 12 bulan (dipakai cek ambang Emergency Engine) di-highlight.
+let rhDetailOpenId = null;
 function openRhDetail(id){
+  rhDetailOpenId = id;
   const p = DB.points.find(x=>x.id===id); if(!p) return;
   const arr = DB.rhMonthly[p.nama];
   const period = (document.getElementById("rhPeriode")||{}).value || currentPeriodStr();
   const trailingLabels = new Set(trailingWindowLabels(period));
-  const years = [...new Set((DB.rhMonths||[]).map(lab=>2000+Number(lab.split("-")[1])))].sort((a,b)=>a-b);
+  const now = new Date();
+  const years = [...new Set([...(DB.rhMonths||[]).map(lab=>2000+Number(lab.split("-")[1])), now.getFullYear(), now.getFullYear()+1])].sort((a,b)=>a-b);
   let note = "";
   if(isEmergencyEngine(p)){
     const r = wajibReason(p, period);
@@ -103,7 +107,9 @@ function openRhDetail(id){
       const idx = (DB.rhMonths||[]).indexOf(lab);
       const v = (idx>=0 && arr) ? arr[idx] : null;
       const hl = trailingLabels.has(lab);
-      return `<td style="text-align:right;padding:5px 7px;${hl?"background:#d9f7f3;font-weight:700;":""}">${v==null?"<span class='muted'>-</span>":v}</td>`;
+      return `<td style="padding:2px;${hl?"background:#d9f7f3;":""}"><input type="number" step="0.1" min="0" value="${v==null?"":v}" placeholder="-"
+        style="width:64px;text-align:right;border:1px solid transparent;background:transparent;font-weight:${hl?"700":"400"};"
+        data-action="editRhMonthly" data-nama="${escHtml(p.nama)}" data-year="${y}" data-month="${i}"></td>`;
     }).join("");
     const s1 = semesterRhSum(p.nama,1,y), s2 = semesterRhSum(p.nama,2,y);
     return `<tr><td style="padding:5px 7px;"><b>${y}</b></td>${cells}<td style="text-align:right;padding:5px 7px;font-weight:700;">${s1==null?"-":s1}</td><td style="text-align:right;padding:5px 7px;font-weight:700;">${s2==null?"-":s2}</td></tr>`;
@@ -115,106 +121,116 @@ function openRhDetail(id){
       <table><thead><tr><th>Tahun</th>${MONTH_SHORT_EN.map(m=>`<th style="text-align:right;">${m}</th>`).join("")}<th style="text-align:right;">Tot. S1</th><th style="text-align:right;">Tot. S2</th></tr></thead>
       <tbody>${rows}</tbody></table>
     </div>
-    <div class="hint" style="margin-top:8px;">Sel teal = 12 bulan yang dihitung untuk jendela wajib-pantau periode ${escHtml(period)}. Ganti periode di filter halaman lalu buka lagi detail ini untuk lihat jendela lain.</div>
+    <div class="hint" style="margin-top:8px;">Sel teal = 12 bulan yang dihitung untuk jendela wajib-pantau periode ${escHtml(period)}. Ganti periode di filter halaman lalu buka lagi detail ini untuk lihat jendela lain. Klik langsung ke tiap sel untuk mengisi/mengubah angkanya — tersimpan otomatis saat pindah sel (tidak perlu tombol Simpan terpisah), kosongkan sel untuk menghapus nilai bulan itu.</div>
     <div class="actions"><button class="btn ghost" data-action="closeModal">Tutup</button></div>`, {wide:true});
 }
-function exportRhCsv(){
+document.addEventListener("change", e=>{
+  if(e.target.dataset.action!=="editRhMonthly") return;
+  const nama = e.target.dataset.nama, year = Number(e.target.dataset.year), month = Number(e.target.dataset.month);
+  const lab = monthLabel(year, month);
+  if(DB.rhMonths.indexOf(lab)<0){
+    DB.rhMonths.push(lab);
+    Object.keys(DB.rhMonthly).forEach(nm=>{ DB.rhMonthly[nm].push(null); });
+  }
+  const idx = DB.rhMonths.indexOf(lab);
+  if(!DB.rhMonthly[nama]) DB.rhMonthly[nama] = new Array(DB.rhMonths.length).fill(null);
+  while(DB.rhMonthly[nama].length < DB.rhMonths.length) DB.rhMonthly[nama].push(null);
+  const raw = e.target.value.trim();
+  DB.rhMonthly[nama][idx] = raw==="" ? null : Math.round(Number(raw)*1000)/1000;
+  const point = DB.points.find(x=>x.kategori==="emisi" && x.nama===nama);
+  if(point){ const latest = rhLatestKnown(nama); point.runningHour = latest ? latest.value : null; }
+  touchDataset("rhMonthly"); save();
+  if(rhDetailOpenId) openRhDetail(rhDetailOpenId);
+  renderRunningHour(); renderMaster();
+});
+function exportRhXlsx(){
+  const headers = ["id","site","nama","runningHour","pemantauanTerakhir","prediksiBerikutnya"];
   const rows = DB.points.filter(p=>p.kategori==="emisi" && p.kategoriSumber!==KATEGORI_SUMBER_FUEL_QUALITY).map(p=>({id:p.id, site:p.site, nama:p.nama, runningHour:p.runningHour??"", pemantauanTerakhir:p.pemantauanTerakhir||"", prediksiBerikutnya:p.prediksiBerikutnya||""}));
-  csvExport(["id","site","nama","runningHour","pemantauanTerakhir","prediksiBerikutnya"], rows, `running_hour_${todayStr()}.csv`);
+  const wb = xlsxWorkbookFromSheets([["RH Terkini", xlsxSheetFromRows(headers, rows)]]);
+  xlsxDownload(wb, `running_hour_${todayStr()}.xlsx`);
 }
-function importRhCsv(){
-  openModal(`<h3>Import RH Terkini (ringkas)</h3>
-    <p class="hint">Kolom wajib: <b>id</b> (harus cocok dengan titik yang sudah ada — pakai Export dulu buat dapetin id-nya), lalu <b>runningHour</b>, <b>pemantauanTerakhir</b>, <b>prediksiBerikutnya</b> (opsional). Pemisah kolom pakai titik-koma (;), sama seperti hasil Export. Untuk update riwayat bulanan lengkap (dipakai cek ambang Emergency Engine), pakai tombol <b>Import Riwayat Bulanan (CSV)</b> di toolbar.</p>
-    <input type="file" id="rhImportFile" accept=".csv">
-    <div class="actions"><button class="btn ghost" data-action="closeModal">Batal</button><button class="btn primary" data-action="doImportRhCsv">Import</button></div>`);
+function importRhXlsx(){
+  xlsxImport(wb=>{
+    const ws = wb.Sheets["RH Terkini"] || wb.Sheets[wb.SheetNames[0]];
+    const rows = xlsxSheetToRows(ws);
+    snapshotBefore(`Sebelum import RH Terkini Excel`);
+    let updated=0, skipped=0;
+    rows.forEach(r=>{
+      const p = DB.points.find(x=>x.id===r.id);
+      if(!p){ skipped++; return; }
+      if(r.runningHour!==undefined && r.runningHour!=="") p.runningHour = Number(r.runningHour);
+      if(r.pemantauanTerakhir!==undefined) p.pemantauanTerakhir = r.pemantauanTerakhir;
+      if(r.prediksiBerikutnya!==undefined) p.prediksiBerikutnya = r.prediksiBerikutnya;
+      updated++;
+    });
+    logChange(`Import RH Terkini Excel — ${updated} titik diperbarui${skipped?`, ${skipped} id tidak ditemukan`:""}`);
+    touchDataset("rh"); save(); renderRunningHour(); renderMaster();
+    toast(`${updated} titik diperbarui.`+(skipped?` ${skipped} baris dilewati (id tidak ditemukan).`:""), skipped?"err":"ok");
+  });
 }
-function doImportRhCsv(){
-  const file = document.getElementById("rhImportFile").files[0];
-  if(!file){ toast("Pilih file CSV dulu.","err"); return; }
-  const reader = new FileReader();
-  reader.onload = ()=>{
-    try{
-      const rows = csvParse(reader.result);
-      snapshotBefore(`Sebelum import Running Hour CSV "${file.name}"`);
-      let updated=0, skipped=0;
-      rows.forEach(r=>{
-        const p = DB.points.find(x=>x.id===r.id);
-        if(!p){ skipped++; return; }
-        if(r.runningHour!==undefined && r.runningHour!=="") p.runningHour = Number(r.runningHour);
-        if(r.pemantauanTerakhir!==undefined) p.pemantauanTerakhir = r.pemantauanTerakhir;
-        if(r.prediksiBerikutnya!==undefined) p.prediksiBerikutnya = r.prediksiBerikutnya;
-        updated++;
-      });
-      logChange(`Import Running Hour dari "${file.name}" — ${updated} titik diperbarui${skipped?`, ${skipped} id tidak ditemukan`:""}`);
-      touchDataset("rh"); save(); closeModal(); renderRunningHour(); renderMaster();
-      toast(`${updated} titik diperbarui.`+(skipped?` ${skipped} baris dilewati (id tidak ditemukan).`:""), skipped?"err":"ok");
-    }catch(err){ toast("Gagal import: "+err.message,"err"); }
-  };
-  reader.readAsText(file);
+function downloadTemplateRhXlsx(){
+  const wb = xlsxWorkbookFromSheets([["RH Terkini", xlsxSheetFromRows(["id","site","nama","runningHour","pemantauanTerakhir","prediksiBerikutnya"], [])]]);
+  xlsxDownload(wb, "template_running_hour.xlsx");
 }
-// Export riwayat bulanan lengkap — format sama seperti CSV RH bulanan aslinya (baris=nama titik, kolom=bulan).
-function exportRhMonthlyCsv(){
+// Export riwayat bulanan lengkap — format lebar sama seperti sebelumnya (baris=nama titik, kolom=bulan).
+function exportRhMonthlyXlsx(){
   const headers = ["NAMA ENGINE", ...DB.rhMonths];
   const rows = Object.keys(DB.rhMonthly).sort().map(nama=>{
     const row = {"NAMA ENGINE": nama};
     DB.rhMonths.forEach((lab,i)=>{ row[lab] = DB.rhMonthly[nama][i]==null ? "" : DB.rhMonthly[nama][i]; });
     return row;
   });
-  csvExport(headers, rows, `running_hour_bulanan_${todayStr()}.csv`);
+  const wb = xlsxWorkbookFromSheets([["Riwayat Bulanan", xlsxSheetFromRows(headers, rows)]]);
+  xlsxDownload(wb, `running_hour_bulanan_${todayStr()}.xlsx`);
 }
-function importRhMonthlyCsv(){
-  openModal(`<h3>Import Riwayat Bulanan Running Hour</h3>
-    <p class="hint">Format lebar: kolom pertama <b>nama titik/engine</b> (harus persis sama dengan Nama Titik di Database Titik Pantau — dipakai untuk mencocokkan), kolom-kolom berikutnya adalah bulan (mis. <b>Jan-21</b>, <b>Feb-21</b>, dst). Pemisah kolom pakai titik-koma (;). Bulan yang belum ada akan otomatis ditambahkan ke riwayat; bulan yang sudah ada akan ditimpa dengan nilai baru. "RH Manual" tiap titik ikut ter-update otomatis ke nilai bulan terakhir yang terisi.</p>
-    <input type="file" id="rhMonthlyImportFile" accept=".csv">
-    <div class="actions"><button class="btn ghost" data-action="closeModal">Batal</button><button class="btn primary" data-action="doImportRhMonthlyCsv">Import</button></div>`);
+function downloadTemplateRhMonthlyXlsx(){
+  const headers = ["NAMA ENGINE", ...MONTH_SHORT_EN.map((m,i)=>monthLabel(new Date().getFullYear(),i))];
+  const wb = xlsxWorkbookFromSheets([["Riwayat Bulanan", xlsxSheetFromRows(headers, [])]]);
+  xlsxDownload(wb, "template_running_hour_bulanan.xlsx");
 }
-function doImportRhMonthlyCsv(){
-  const file = document.getElementById("rhMonthlyImportFile").files[0];
-  if(!file){ toast("Pilih file CSV dulu.","err"); return; }
-  const reader = new FileReader();
-  reader.onload = ()=>{
-    try{
-      let text = reader.result;
-      if(text.charCodeAt(0)===0xFEFF) text = text.slice(1); // strip BOM
-      const lines = text.split(/\r?\n/).filter(l=>l.length);
-      if(!lines.length){ toast("File kosong.","err"); return; }
-      const header = lines[0].split(CSV_DELIM).map(h=>h.trim());
-      const monthCols = header.slice(1);
-      if(!monthCols.length){ toast("Tidak ada kolom bulan terdeteksi di header.","err"); return; }
-      snapshotBefore(`Sebelum import Riwayat Bulanan CSV "${file.name}"`);
-      // tambahkan bulan baru (yang belum ada) ke akhir DB.rhMonths, sambil pad array lama dengan null
-      monthCols.forEach(lab=>{
-        if(lab && DB.rhMonths.indexOf(lab)<0){
-          DB.rhMonths.push(lab);
-          Object.keys(DB.rhMonthly).forEach(nm=>{ DB.rhMonthly[nm].push(null); });
-        }
-      });
-      let rowsUpdated=0, monthsWritten=0;
-      for(let i=1;i<lines.length;i++){
-        const cols = lines[i].split(CSV_DELIM);
-        const nama = (cols[0]||"").trim();
-        if(!nama) continue;
-        if(!DB.rhMonthly[nama]) DB.rhMonthly[nama] = new Array(DB.rhMonths.length).fill(null);
-        monthCols.forEach((lab,ci)=>{
-          if(!lab) return;
-          const idx = DB.rhMonths.indexOf(lab); if(idx<0) return;
-          const raw = (cols[ci+1]||"").trim();
-          if(raw==="") return;
-          if(raw.toUpperCase()==="NA"){ DB.rhMonthly[nama][idx] = null; return; }
-          const num = Number(raw.replace(",","."));
-          if(!isNaN(num)){ DB.rhMonthly[nama][idx] = Math.round(num*1000)/1000; monthsWritten++; }
-        });
-        rowsUpdated++;
-        // sinkron RH Manual (p.runningHour) ke nilai bulan terakhir yang terisi
-        const point = DB.points.find(x=>x.kategori==="emisi" && x.nama===nama);
-        if(point){ const latest = rhLatestKnown(nama); if(latest) point.runningHour = latest.value; }
+// Dibaca sbg array-of-array (bukan array-of-object) supaya kolom bulan yg jumlah & namanya dinamis
+// (beda-beda tiap file, tergantung rentang tanggal yg diexport) tetap terbaca apa adanya berurutan,
+// termasuk kalau ada 2 kolom "nama bulan" yg mirip tapi beda kapitalisasi/spasi — dicocokkan via
+// rhNormalizeMonthLabels() supaya tidak numpuk jadi kolom duplikat (lihat catatan di fungsi itu).
+function importRhMonthlyXlsx(){
+  xlsxImport(wb=>{
+    const ws = wb.Sheets["Riwayat Bulanan"] || wb.Sheets[wb.SheetNames[0]];
+    const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:"", raw:true});
+    if(!aoa.length){ toast("File kosong.","err"); return; }
+    const header = aoa[0].map(h=>String(h==null?"":h).trim());
+    const monthCols = header.slice(1);
+    if(!monthCols.length){ toast("Tidak ada kolom bulan terdeteksi di header.","err"); return; }
+    snapshotBefore(`Sebelum import Riwayat Bulanan Excel`);
+    monthCols.forEach(lab=>{
+      if(lab && DB.rhMonths.indexOf(lab)<0){
+        DB.rhMonths.push(lab);
+        Object.keys(DB.rhMonthly).forEach(nm=>{ DB.rhMonthly[nm].push(null); });
       }
-      logChange(`Import Riwayat Bulanan RH dari "${file.name}" — ${rowsUpdated} titik, ${monthsWritten} sel bulan diperbarui`);
-      touchDataset("rhMonthly"); save(); closeModal(); renderRunningHour(); renderMaster();
-      toast(`${rowsUpdated} titik diperbarui (${monthsWritten} sel bulan).`,"ok");
-    }catch(err){ toast("Gagal import: "+err.message,"err"); console.error(err); }
-  };
-  reader.readAsText(file);
+    });
+    let rowsUpdated=0, monthsWritten=0;
+    for(let i=1;i<aoa.length;i++){
+      const cols = aoa[i];
+      const nama = String(cols[0]==null?"":cols[0]).trim();
+      if(!nama) continue;
+      if(!DB.rhMonthly[nama]) DB.rhMonthly[nama] = new Array(DB.rhMonths.length).fill(null);
+      monthCols.forEach((lab,ci)=>{
+        if(!lab) return;
+        const idx = DB.rhMonths.indexOf(lab); if(idx<0) return;
+        const raw = cols[ci+1];
+        if(raw===""||raw==null) return;
+        if(String(raw).toUpperCase()==="NA"){ DB.rhMonthly[nama][idx] = null; return; }
+        const num = Number(String(raw).replace(",","."));
+        if(!isNaN(num)){ DB.rhMonthly[nama][idx] = Math.round(num*1000)/1000; monthsWritten++; }
+      });
+      rowsUpdated++;
+      const point = DB.points.find(x=>x.kategori==="emisi" && x.nama===nama);
+      if(point){ const latest = rhLatestKnown(nama); if(latest) point.runningHour = latest.value; }
+    }
+    rhNormalizeMonthLabels();
+    logChange(`Import Riwayat Bulanan RH Excel — ${rowsUpdated} titik, ${monthsWritten} sel bulan diperbarui`);
+    touchDataset("rhMonthly"); save(); renderRunningHour(); renderMaster();
+    toast(`${rowsUpdated} titik diperbarui (${monthsWritten} sel bulan).`,"ok");
+  });
 }
 function renderTracking(){
   refreshTrackingBatchSelect();
@@ -320,8 +336,8 @@ document.addEventListener("change", e=>{
 // Export/Import Tracking BA/CoA (Tahap 1 sampling + Tahap 2 dokumen) sebagai CSV — dicocokkan
 // lewat kolom id (harus sama dengan id di Database Titik Pantau), mengikuti pola Export/Import
 // dataset lain di tools ini (Titik Pantau, Personil, dst).
-const TRACKING_CSV_HEADERS = ["id","nama","site","samplingStatus","samplingDate","samplingNote","ba","baDate","draftSent","draftSentDate","reviewed","reviewedDate","approved","approvedDate","finalReceived","finalReceivedDate","simpelInput","simpelInputDate"];
-function exportTrackingCsv(){
+const TRACKING_XLSX_HEADERS = ["id","nama","site","samplingStatus","samplingDate","samplingNote","ba","baDate","draftSent","draftSentDate","reviewed","reviewedDate","approved","approvedDate","finalReceived","finalReceivedDate","simpelInput","simpelInputDate"];
+function exportTrackingXlsx(){
   const rows = DB.points.filter(p=>DB.tracking[p.id]).map(p=>{
     const t = ensureTracking(p.id);
     return {
@@ -335,38 +351,34 @@ function exportTrackingCsv(){
       simpelInput: t.simpelInput?1:0, simpelInputDate: t.dates.simpelInput||""
     };
   });
-  csvExport(TRACKING_CSV_HEADERS, rows, `tracking_ba_coa_${todayStr()}.csv`);
+  const wb = xlsxWorkbookFromSheets([["Tracking", xlsxSheetFromRows(TRACKING_XLSX_HEADERS, rows)]]);
+  xlsxDownload(wb, `tracking_ba_coa_${todayStr()}.xlsx`);
 }
-function importTrackingCsv(){
-  const inp = document.getElementById("hiddenCsvFile");
-  inp.onchange = ()=>{
-    const file = inp.files[0]; if(!file) return;
-    const reader = new FileReader();
-    reader.onload = ()=>{
-      try{
-        const rows = csvParse(reader.result);
-        let updated=0, skipped=0;
-        rows.forEach(r=>{
-          const p = DB.points.find(x=>x.id===r.id);
-          if(!p){ skipped++; return; }
-          const t = ensureTracking(p.id);
-          if(r.samplingStatus!==undefined) t.samplingStatus = r.samplingStatus;
-          if(r.samplingDate!==undefined) t.dates.actual = r.samplingDate;
-          if(r.samplingNote!==undefined) t.samplingNote = r.samplingNote;
-          ["ba","draftSent","reviewed","approved","finalReceived","simpelInput"].forEach(key=>{
-            if(r[key]!==undefined) t[key] = /^1|true|ya$/i.test(r[key]);
-            if(r[key+"Date"]!==undefined) t.dates[key] = r[key+"Date"];
-          });
-          updated++;
-        });
-        touchDataset("tracking"); save();
-        toast(`Import Tracking selesai: ${updated} titik diperbarui${skipped?`, ${skipped} id tidak ditemukan`:""}.`, skipped?"err":"ok");
-        renderTracking();
-      }catch(err){ toast("Gagal import: "+err.message,"err"); console.error(err); }
-    };
-    reader.readAsText(file);
-    inp.value = "";
-  };
-  inp.click();
+function importTrackingXlsx(){
+  xlsxImport(wb=>{
+    const ws = wb.Sheets["Tracking"] || wb.Sheets[wb.SheetNames[0]];
+    const rows = xlsxSheetToRows(ws);
+    let updated=0, skipped=0;
+    rows.forEach(r=>{
+      const p = DB.points.find(x=>x.id===r.id);
+      if(!p){ skipped++; return; }
+      const t = ensureTracking(p.id);
+      if(r.samplingStatus!==undefined) t.samplingStatus = r.samplingStatus;
+      if(r.samplingDate!==undefined) t.dates.actual = r.samplingDate;
+      if(r.samplingNote!==undefined) t.samplingNote = r.samplingNote;
+      ["ba","draftSent","reviewed","approved","finalReceived","simpelInput"].forEach(key=>{
+        if(r[key]!==undefined) t[key] = /^1|true|ya$/i.test(String(r[key]));
+        if(r[key+"Date"]!==undefined) t.dates[key] = r[key+"Date"];
+      });
+      updated++;
+    });
+    touchDataset("tracking"); save();
+    toast(`Import Tracking selesai: ${updated} titik diperbarui${skipped?`, ${skipped} id tidak ditemukan`:""}.`, skipped?"err":"ok");
+    renderTracking();
+  });
+}
+function downloadTemplateTrackingXlsx(){
+  const wb = xlsxWorkbookFromSheets([["Tracking", xlsxSheetFromRows(TRACKING_XLSX_HEADERS, [])]]);
+  xlsxDownload(wb, "template_tracking_ba_coa.xlsx");
 }
 

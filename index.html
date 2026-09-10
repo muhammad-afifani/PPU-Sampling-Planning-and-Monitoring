@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202609100500">
+<link rel="stylesheet" href="assets/css/style.css?v=202609100900">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -245,8 +245,8 @@
       <div class="pagehead"><div><h2>Personil PPC &amp; Observer</h2><div class="desc">Basis data personil beserta kelengkapan dokumen. Untuk menentukan personil yang bertugas pada tiap batch (termasuk Ketua Tim), buka Perencanaan Batch.</div></div>
         <div class="toolbar">
           <button class="btn primary" data-action="addPersonil">+ Tambah Personil</button>
-          <button class="btn" data-action="importPersonilCsv">Import Excel (.csv)</button>
-          <button class="btn" data-action="exportPersonilCsv">Export Excel (.csv)</button>
+          <button class="btn" data-action="importPersonilXlsx">Import Excel</button>
+          <button class="btn" data-action="exportPersonilXlsx">Export Excel</button>
           <button class="btn" data-action="goToPage" data-page="planner">Buka Perencanaan Batch &rarr;</button>
         </div>
       </div>
@@ -267,10 +267,10 @@
       </div>
       <div class="card">
         <h3>Kelengkapan Data Personil (Cetak A4 / Excel)</h3>
-        <div class="hint" style="margin-bottom:10px;">Ringkasan nama, role, dan kelengkapan dokumen tiap personil (termasuk tanggal kedaluwarsa tiap item) — dilengkapi QR code &amp; tautan ke folder dokumentasi (isi lewat "Link Dokumentasi" di form Edit Personil) supaya ENV site bisa langsung scan/buka untuk verifikasi saat mengatur persiapan dan perizinan akses site. Personil tanpa Link Dokumentasi tetap tampil, kolom itu cuma kosong. Butuh format yang bisa langsung disalin per kolom (mis. ke Excel)? Gunakan "Export Excel (.csv)" — satu kolom per item, isinya tanggal/status polos tanpa format tambahan.</div>
+        <div class="hint" style="margin-bottom:10px;">Ringkasan nama, role, dan kelengkapan dokumen tiap personil (termasuk tanggal kedaluwarsa tiap item) — dilengkapi QR code &amp; tautan ke folder dokumentasi (isi lewat "Link Dokumentasi" di form Edit Personil) supaya ENV site bisa langsung scan/buka untuk verifikasi saat mengatur persiapan dan perizinan akses site. Personil tanpa Link Dokumentasi tetap tampil, kolom itu cuma kosong. Butuh format yang bisa langsung diedit (mis. di Excel)? Gunakan "Export Excel" — satu kolom per item, isinya tanggal/status polos tanpa format tambahan.</div>
         <div class="toolbar">
           <button class="btn primary" data-action="printPersonilRoster">Cetak Kelengkapan Data Personil (A4)</button>
-          <button class="btn" data-action="exportPersonilCsv">Export Excel (.csv)</button>
+          <button class="btn" data-action="exportPersonilXlsx">Export Excel</button>
         </div>
       </div>
     </div>
@@ -451,8 +451,8 @@
       <div class="stickytop">
       <div class="pagehead"><div><h2>Tracking BA / Draft CoA / SHU</h2><div class="desc">Dibagi menjadi 2 tahap: eksekusi sampling di lapangan, dilanjutkan dengan dokumentasi dan pelaporan hingga SIMPEL PPU</div></div>
         <div class="toolbar">
-          <button class="btn" data-action="exportTrackingCsv">Export Tracking (CSV)</button>
-          <button class="btn ghost" data-action="importTrackingCsv">Import Tracking (CSV)</button>
+          <button class="btn" data-action="exportTrackingXlsx">Export Tracking (Excel)</button>
+          <button class="btn ghost" data-action="importTrackingXlsx">Import Tracking (Excel)</button>
           <button class="btn primary" data-action="goToPage" data-page="beritaacara">Buka Berita Acara</button>
         </div>
       </div>
@@ -554,10 +554,10 @@
       <div class="stickytop">
       <div class="pagehead"><div><h2>Running Hour Detail</h2><div class="desc">Riwayat RH bulanan tiap sumber emisi, rekap per semester, dan pemeriksaan ambang wajib pantau Emergency Engine (RH &gt; 200 jam/tahun)</div></div>
         <div class="toolbar">
-          <button class="btn primary" data-action="importRhMonthlyCsv">Import Riwayat Bulanan (CSV)</button>
-          <button class="btn" data-action="exportRhMonthlyCsv">Export Riwayat Bulanan (CSV)</button>
-          <button class="btn ghost" data-action="importRhCsv">Import RH Terkini (ringkas)</button>
-          <button class="btn ghost" data-action="exportRhCsv">Export RH Terkini (ringkas)</button>
+          <button class="btn primary" data-action="importRhMonthlyXlsx">Import Riwayat Bulanan (Excel)</button>
+          <button class="btn" data-action="exportRhMonthlyXlsx">Export Riwayat Bulanan (Excel)</button>
+          <button class="btn ghost" data-action="importRhXlsx">Import RH Terkini (ringkas)</button>
+          <button class="btn ghost" data-action="exportRhXlsx">Export RH Terkini (ringkas)</button>
         </div>
       </div>
       <div class="toolbar card" style="padding:12px 14px;">
@@ -748,9 +748,10 @@
       <div class="stickytop">
       <div class="pagehead"><div><h2>Database Hasil Pemantauan</h2><div class="desc">Riwayat hasil uji laboratorium tiap sumber emisi — data dasar yang digunakan pada Dashboard Hasil Pemantauan</div></div>
         <div class="toolbar">
-          <button class="btn primary" data-action="importHasilCsv">Import CSV</button>
-          <button class="btn" data-action="exportHasilCsv">Export CSV</button>
-          <button class="btn ghost" data-action="downloadTemplateHasil">Download Template</button>
+          <button class="btn primary" data-action="addHasil">+ Tambah Data</button>
+          <button class="btn" data-action="importHasilXlsx">Import Excel</button>
+          <button class="btn" data-action="exportHasilXlsx">Export Excel</button>
+          <button class="btn ghost" data-action="downloadTemplateHasilXlsx">Download Template</button>
           <button class="btn danger" data-action="resetHasilData">Reset ke Data Default</button>
         </div>
       </div>
@@ -932,7 +933,8 @@
       <div class="stickytop">
       <div class="pagehead"><div><h2>Database Hasil Ambient</h2><div class="desc">Riwayat hasil uji udara ambien, kebisingan, kebauan &amp; getaran — data dasar Dashboard Hasil Ambient</div></div>
         <div class="toolbar">
-          <button class="btn primary" data-action="importAmbienXlsx">Import Excel</button>
+          <button class="btn primary" id="ambDbAddBtn" data-action="addAmbRecordBtn" data-cat="ambien">+ Tambah Data</button>
+          <button class="btn" data-action="importAmbienXlsx">Import Excel</button>
           <button class="btn" data-action="exportAmbienXlsx">Export Excel</button>
           <button class="btn ghost" data-action="downloadTemplateAmbien">Download Template</button>
           <button class="btn danger" data-action="resetAmbienData">Reset ke Data Default</button>
@@ -950,8 +952,9 @@
       <div class="stickytop">
       <div class="pagehead"><div><h2>Lokasi Titik Pantau</h2><div class="desc">Peta satelit koordinat titik sumber emisi</div></div>
         <div class="toolbar">
-          <button class="btn small" data-action="importCoordsCsv">Import Koordinat CSV</button>
-          <button class="btn small" data-action="exportCoordsCsv">Export Koordinat CSV</button>
+          <button class="btn small primary" data-action="addCoord">+ Tambah Koordinat</button>
+          <button class="btn small" data-action="importCoordsXlsx">Import Koordinat Excel</button>
+          <button class="btn small" data-action="exportCoordsXlsx">Export Koordinat Excel</button>
         </div>
       </div>
       <div class="toolbar card" style="padding:12px 14px;">
@@ -1322,9 +1325,14 @@
           <button class="btn small" data-action="downloadTemplatePointsXlsx">Download Template Kosong</button>
         </div>
         <div class="card">
-          <h3>Template CSV — Personil</h3>
-          <p class="hint">Kolom: nama,role,ktpExp,mcuExp,spkExp,medpassExp,clsrExp,ppcExp,fotoBiruAda,bosietExp,vaksinAda,ptsidExp</p>
-          <button class="btn small" data-action="downloadTemplatePersonil">Download Template Kosong</button>
+          <h3>Template Excel — Personil</h3>
+          <p class="hint">Kolom: id,nama,role,telepon,ktpExp,mcuExp,spkExp,medpassExp,clsrExp,ppcExp,fotoBiruAda,bosietExp,vaksinAda,ptsidExp,dokumentasiLink</p>
+          <button class="btn small" data-action="downloadTemplatePersonilXlsx">Download Template Kosong</button>
+        </div>
+        <div class="card">
+          <h3>Template Excel — Koordinat Titik</h3>
+          <p class="hint">Kolom: site,nama,lat,lng (desimal). Site+nama harus persis sama dengan Database Titik Pantau. Untuk koordinat satu titik saja, lebih cepat pakai "+ Tambah Koordinat" langsung di halaman Lokasi Titik Pantau.</p>
+          <button class="btn small" data-action="downloadTemplateCoordsXlsx">Download Template Kosong</button>
         </div>
       </div>
       <div class="grid cols-2">
@@ -1333,13 +1341,32 @@
           <p class="hint">Berisi 4 sheet, satu per kategori (Ambien Udara, Kebisingan, Kebauan, Getaran), mengikuti format lembar data hasil laboratorium yang umum dipakai (SAMPLE IDENTIFICATION, SITE, tanggal, parameter, hasil uji, baku mutu, metode, dst).</p>
           <button class="btn small" data-action="downloadTemplateAmbien">Download Template Kosong</button>
         </div>
+        <div class="card">
+          <h3>Template Excel — Hasil Pemantauan Emisi</h3>
+          <p class="hint">Kolom mengikuti format lembar hasil laboratorium emisi (nama cerobong, site, periode, parameter, hasil uji, baku mutu, dst). Untuk data satu-dua baris, lebih cepat pakai "+ Tambah Data" langsung di halaman Database Hasil Pemantauan.</p>
+          <button class="btn small" data-action="downloadTemplateHasilXlsx">Download Template Kosong</button>
+        </div>
+      </div>
+      <div class="grid cols-2">
+        <div class="card">
+          <h3>Template Excel — Running Hour</h3>
+          <p class="hint">"RH Terkini" (ringkas, kolom: id,site,nama,runningHour,pemantauanTerakhir,prediksiBerikutnya) dan "Riwayat Bulanan" (format lebar: baris=nama titik, kolom=tiap bulan mis. Jan-21). Untuk edit cepat satu-dua bulan, lebih praktis lewat tombol "Detail Bulanan" per titik di halaman Running Hour Detail.</p>
+          <div class="toolbar" style="margin-top:6px;">
+            <button class="btn small" data-action="downloadTemplateRhXlsx">Template RH Terkini</button>
+            <button class="btn small" data-action="downloadTemplateRhMonthlyXlsx">Template Riwayat Bulanan</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Template Excel — Tracking BA/CoA</h3>
+          <p class="hint">Kolom: id,nama,site,samplingStatus,samplingDate,samplingNote,ba,baDate,draftSent,draftSentDate,reviewed,reviewedDate,approved,approvedDate,finalReceived,finalReceivedDate,simpelInput,simpelInputDate. Halaman Tracking BA/CoA sendiri sudah bisa diedit langsung per baris tanpa perlu Excel.</p>
+          <button class="btn small" data-action="downloadTemplateTrackingXlsx">Download Template Kosong</button>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
 <div class="overlay" id="overlay"><div class="modal" id="modalBox"></div></div>
-<input type="file" id="hiddenCsvFile" accept=".csv" style="display:none;">
 <input type="file" id="hiddenXlsxFile" accept=".xlsx" style="display:none;">
 <input type="file" id="hiddenPhotoFile" accept="image/*" multiple style="display:none;">
 <div id="printGuideArea"></div>
@@ -1349,32 +1376,32 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202609100500"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202609100500"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202609100900"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202609100900"></script>
 
-<script src="assets/data/default-data.js?v=202609100500"></script>
-<script src="assets/data/brand-assets.js?v=202609100500"></script>
-<script src="assets/data/travel-routes.js?v=202609100500"></script>
-<script src="assets/js/00-icons.js?v=202609100500"></script>
-<script src="assets/js/01-state.js?v=202609100500"></script>
-<script src="assets/js/02-nav-util.js?v=202609100500"></script>
-<script src="assets/js/03-period-logic.js?v=202609100500"></script>
-<script src="assets/js/04-dashboard.js?v=202609100500"></script>
-<script src="assets/js/05-master-data.js?v=202609100500"></script>
-<script src="assets/js/06-plan-personil.js?v=202609100500"></script>
-<script src="assets/js/07-rules-planner.js?v=202609100500"></script>
-<script src="assets/js/08-gantt-print.js?v=202609100500"></script>
-<script src="assets/js/09-tracking-map.js?v=202609100500"></script>
-<script src="assets/js/10-running-hour.js?v=202609100500"></script>
-<script src="assets/js/11-berita-acara.js?v=202609100500"></script>
-<script src="assets/js/12-data-page.js?v=202609100500"></script>
-<script src="assets/js/13-hasil-db.js?v=202609100500"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202609100500"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202609100500"></script>
-<script src="assets/js/16-actions-init.js?v=202609100500"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202609100500"></script>
-<script src="assets/js/18-model-dispersi.js?v=202609100500"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202609100500"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202609100500"></script>
+<script src="assets/data/default-data.js?v=202609100900"></script>
+<script src="assets/data/brand-assets.js?v=202609100900"></script>
+<script src="assets/data/travel-routes.js?v=202609100900"></script>
+<script src="assets/js/00-icons.js?v=202609100900"></script>
+<script src="assets/js/01-state.js?v=202609100900"></script>
+<script src="assets/js/02-nav-util.js?v=202609100900"></script>
+<script src="assets/js/03-period-logic.js?v=202609100900"></script>
+<script src="assets/js/04-dashboard.js?v=202609100900"></script>
+<script src="assets/js/05-master-data.js?v=202609100900"></script>
+<script src="assets/js/06-plan-personil.js?v=202609100900"></script>
+<script src="assets/js/07-rules-planner.js?v=202609100900"></script>
+<script src="assets/js/08-gantt-print.js?v=202609100900"></script>
+<script src="assets/js/09-tracking-map.js?v=202609100900"></script>
+<script src="assets/js/10-running-hour.js?v=202609100900"></script>
+<script src="assets/js/11-berita-acara.js?v=202609100900"></script>
+<script src="assets/js/12-data-page.js?v=202609100900"></script>
+<script src="assets/js/13-hasil-db.js?v=202609100900"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202609100900"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202609100900"></script>
+<script src="assets/js/16-actions-init.js?v=202609100900"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202609100900"></script>
+<script src="assets/js/18-model-dispersi.js?v=202609100900"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202609100900"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202609100900"></script>
 </body>
 </html>

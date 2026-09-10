@@ -8,6 +8,41 @@
 ========================================================= */
 const MONTH_SHORT_EN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function monthLabel(year, month0){ return MONTH_SHORT_EN[((month0%12)+12)%12]+"-"+String(year).slice(-2); }
+// Perbaikan sekali-jalan untuk label bulan terbalik ("21-Jan", bukan "Jan-21") yang pernah masuk ke
+// DB.rhMonths lewat re-import CSV riwayat bulanan — Excel gemar "membetulkan" teks semacam "Jan-21"
+// jadi tanggal beneran begitu file CSV dibuka lalu disimpan ulang, sehingga saat diimpor lagi header
+// itu terbaca sbg kolom bulan baru yang berbeda (duplikat), bukan dikenali sbg bulan yg sama. Import
+// Excel (.xlsx) yang baru tidak rawan masalah ini lagi (tipe sel tersimpan eksplisit, bukan ditebak
+// ulang dari teks polos), tapi data lama yang sudah kadung terduplikat tetap perlu dirapikan sekali.
+function rhNormalizeMonthLabels(){
+  if(!DB.rhMonths || !DB.rhMonths.length) return;
+  const canonicalSet = new Set(DB.rhMonths.filter(lab=>/^[A-Za-z]{3}-\d{2}$/.test(lab) && MONTH_SHORT_EN.includes(lab.split("-")[0])));
+  const removeIdx = [];
+  DB.rhMonths.forEach((lab,i)=>{
+    const m = /^(\d{2})-([A-Za-z]{3})$/.exec(lab);
+    if(!m || !MONTH_SHORT_EN.includes(m[2])) return; // bukan pola terbalik yg dikenali, biarkan apa adanya
+    const canonical = m[2]+"-"+m[1];
+    const canonicalIdx = DB.rhMonths.indexOf(canonical);
+    if(canonicalIdx>=0 && canonicalIdx!==i){
+      // Sudah ada kolom kanonik utk bulan yg sama — pindahkan nilai yg cuma ada di kolom terbalik
+      // (kalau kolom kanoniknya masih kosong utk engine itu), lalu buang kolom terbalik ini.
+      Object.keys(DB.rhMonthly).forEach(nama=>{
+        const arr = DB.rhMonthly[nama]; if(!arr) return;
+        if(arr[canonicalIdx]==null && arr[i]!=null) arr[canonicalIdx] = arr[i];
+      });
+      removeIdx.push(i);
+    } else if(!canonicalSet.has(canonical)){
+      // Tidak ada kolom kanonik yg bentrok — cukup ganti namanya jadi format kanonik, data aman.
+      DB.rhMonths[i] = canonical;
+      canonicalSet.add(canonical);
+    }
+  });
+  if(!removeIdx.length) return;
+  removeIdx.sort((a,b)=>b-a).forEach(i=>{
+    DB.rhMonths.splice(i,1);
+    Object.keys(DB.rhMonthly).forEach(nama=>{ if(DB.rhMonthly[nama]) DB.rhMonthly[nama].splice(i,1); });
+  });
+}
 function parsePeriod(str){
   const m = /^S\s*([12])\D*(\d{4})$/i.exec(String(str||"").trim());
   if(!m) return null;

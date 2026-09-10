@@ -7,9 +7,9 @@ const ACTIONS = {
   goToPage:(t)=>showPage(t.dataset.page),
   importPointsXlsx, exportPointsXlsx,
   addPersonil, editPersonil:(t)=>editPersonil(t.dataset.id), deletePersonil:(t)=>deletePersonil(t.dataset.id), savePersonil:(t)=>savePersonil(t.dataset.id),
-  importPersonilCsv, exportPersonilCsv, printPersonilRoster,
-  importRhCsv, exportRhCsv, doImportRhCsv,
-  importRhMonthlyCsv, exportRhMonthlyCsv, doImportRhMonthlyCsv,
+  importPersonilXlsx, exportPersonilXlsx, printPersonilRoster,
+  importRhXlsx, exportRhXlsx, downloadTemplateRhXlsx,
+  importRhMonthlyXlsx, exportRhMonthlyXlsx, downloadTemplateRhMonthlyXlsx,
   openRhDetail:(t)=>openRhDetail(t.dataset.id),
   openPeriodModal, savePeriod,
   rcPickAll:()=>{ document.querySelectorAll(".rcChk").forEach(c=>c.checked=true); },
@@ -24,7 +24,7 @@ const ACTIONS = {
     document.getElementById("rcCardWrap").style.display = rcView==="card" ? "block" : "none";
   },
   closeModal,
-  newBatch, deleteBatch, generateSchedule, recalcSchedule, carryOverBatch, printSamplingGuide, doPrintSamplingGuide, printBeritaAcara, exportTrackingCsv, importTrackingCsv,
+  newBatch, deleteBatch, generateSchedule, recalcSchedule, carryOverBatch, printSamplingGuide, doPrintSamplingGuide, printBeritaAcara, exportTrackingXlsx, importTrackingXlsx, downloadTemplateTrackingXlsx,
   finalizeBatchSchedule, unfinalizeBatchSchedule,
   expandAllSitePreview:()=>spToggleAll(true), collapseAllSitePreview:()=>spToggleAll(false),
   spSetFilterAll:()=>spSetFilter(false), spSetFilterIssues:()=>spSetFilter(true),
@@ -68,10 +68,11 @@ const ACTIONS = {
     logChange(`Urutan rute ${list==="routeEmisi"?"Emisi":"Ambient"} diubah — "${arr[j]}" & "${arr[idx]}" ditukar`);
     save(); refreshRouteViews();
   },
-  exportAll, resetDefault, resetEmpty, downloadTemplatePointsXlsx, downloadTemplatePersonil,
+  exportAll, resetDefault, resetEmpty, downloadTemplatePointsXlsx, downloadTemplatePersonilXlsx,
   checkFullBackupUpdate, checkRepoBackupUpdate, applyFullBackupImport,
   dismissOnboarding, startOnboardingUpdate, replayOnboarding, openAboutModal,
-  importHasilCsv, exportHasilCsv, downloadTemplateHasil, resetHasilData,
+  importHasilXlsx, exportHasilXlsx, downloadTemplateHasilXlsx, resetHasilData,
+  addHasil, editHasil:(t)=>editHasil(t.dataset.id), saveHasil:(t)=>saveHasil(t.dataset.id), deleteHasil:(t)=>deleteHasil(t.dataset.id),
   hdChip:(t)=>{
     const field = t.dataset.field, val = t.dataset.val;
     if(!val){ hdSel[field].clear(); }
@@ -218,7 +219,8 @@ const ACTIONS = {
     recomputeSiteForPoint(b, pointId, nowExcluded);
   },
   restoreSnapshotBtn:(t)=>{ restoreSnapshot(Number(t.dataset.idx)); },
-  exportCoordsCsv, importCoordsCsv, doImportCoordsCsv,
+  exportCoordsXlsx, importCoordsXlsx, downloadTemplateCoordsXlsx,
+  addCoord, editCoord:(t)=>editCoord(t.dataset.key), saveCoord:(t)=>saveCoord(t.dataset.key), deleteCoord:(t)=>deleteCoord(t.dataset.key),
   toggleCoordSite:(t)=>{
     const key = t.dataset.key;
     if(coordTableExpanded.has(key)) coordTableExpanded.delete(key); else coordTableExpanded.add(key);
