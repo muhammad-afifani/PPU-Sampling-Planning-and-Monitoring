@@ -629,6 +629,38 @@ function dispersiLegendHtml(){
     <div class="hint" style="margin-top:4px;">Konsentrasi ground-level (µg/m&sup3;) — merah = puncak lokal saat ini (<b>${dispersiFmt(peak,decimals)} µg/m&sup3;</b>), biru tua = mendekati nol. Skala dinormalisasi ulang tiap plume dihitung ulang (peta digeser/zoom/ganti filter/angin), jadi warna yang sama bisa berarti nilai berbeda antar tampilan — selalu baca angka di sini, bukan cuma warnanya.</div>
   </div>`;
 }
+// --- Util anotasi kartografis kecil, dipakai HANYA utk snapshot statis PDF (bukan peta Leaflet
+// interaktif) — cincin jarak, scale bar, panah utara/angin, spy peta cetak tidak "polosan". ---
+function dispersiNiceNumber(x){
+  if(!(x>0)) return 1;
+  const exp = Math.floor(Math.log10(x));
+  const base = x/Math.pow(10,exp);
+  const niceBase = base<1.5?1:base<3.5?2:base<7.5?5:10;
+  return niceBase*Math.pow(10,exp);
+}
+function dispersiFmtDistance(m){
+  return m>=1000 ? dispersiFmt(m/1000,(m%1000===0)?0:1)+" km" : dispersiFmt(m,0)+" m";
+}
+// Panah generik (dipakai utk panah utara & panah arah angin) — menunjuk ke bearingDeg (0=atas
+// kanvas/utara, searah jarum jam, konsisten dgn dispersiPlumeBearing), label kecil di bawahnya.
+function dispersiDrawCompassArrow(ctx, cx, cy, len, bearingDeg, color, label){
+  const th = bearingDeg*Math.PI/180;
+  const dx = Math.sin(th), dy = -Math.cos(th);
+  const tipX = cx+dx*len, tipY = cy+dy*len, tailX = cx-dx*len*0.35, tailY = cy-dy*len*0.35;
+  ctx.save();
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2.5; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(tailX,tailY); ctx.lineTo(tipX,tipY); ctx.stroke();
+  const headLen = len*0.32, headAng = 0.45;
+  ctx.beginPath(); ctx.moveTo(tipX,tipY);
+  ctx.lineTo(tipX-Math.sin(th+headAng)*headLen, tipY+Math.cos(th+headAng)*headLen);
+  ctx.lineTo(tipX-Math.sin(th-headAng)*headLen, tipY+Math.cos(th-headAng)*headLen);
+  ctx.closePath(); ctx.fill();
+  if(label){
+    ctx.font = "700 12px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillText(label, cx, cy+len*0.55);
+  }
+  ctx.restore();
+}
 // Grid konsentrasi 200x200 (CALC) dihitung lalu diperhalus (box blur 3x) supaya batas antar-band
 // jadi kurva mulus, dibagi 8 band non-linear (akar pangkat 0.55 spy band rendah tidak keliatan
 // kepipihkan oleh puncak plume), lalu diupscale dgn image-smoothing kualitas tinggi ke ukuran
@@ -760,23 +792,72 @@ function dispersiComputePlumeNow(){
   octx.imageSmoothingEnabled = true; octx.imageSmoothingQuality = "high";
   octx.drawImage(canvas,0,0,CALC,CALC,0,0,OUT,OUT);
   dispersiPlumeLayerObj = L.imageOverlay(outCanvas.toDataURL(), bounds, {opacity:1}).addTo(dispersiMapInstance);
-  // Simpan snapshot statis (plume + titik-titik sumber di atas latar netral) utk opsi "sertakan
-  // gambar" di export PDF — SENGAJA tidak mencoba merender tile satelit/jalan asli ke canvas ini
-  // (tile Esri/OSM lintas-origin akan men-taint canvas, gagal di-toDataURL) — tetap prototipe
-  // sesuai catatan sendiri di halaman ini, cukup memberi konteks posisi relatif antar titik.
+  // Simpan snapshot statis (plume + anotasi kartografis + titik-titik sumber BERNOMOR di atas
+  // latar netral) utk opsi "sertakan gambar" di export PDF — SENGAJA tidak mencoba merender tile
+  // satelit/jalan asli ke canvas ini (tile Esri/OSM lintas-origin akan men-taint canvas, gagal di-
+  // toDataURL) — tetap prototipe sesuai catatan sendiri di halaman ini. Cincin jarak/scale bar/
+  // panah utara & angin ditambahkan supaya gambar tidak "polosan" (cuma blob warna di latar kosong)
+  // — nomor tiap titik dipakai lagi di tabel "Indeks Titik" pada laporan PDF, jadi peta bisa
+  // ditelusuri per titik tanpa perlu satu peta terpisah per sumber.
   const snapCanvas = document.createElement("canvas"); snapCanvas.width=OUT; snapCanvas.height=OUT;
   const sctx = snapCanvas.getContext("2d");
+  const pxPerMx = OUT/(halfWidthM*2), pxPerMy = OUT/(halfHeightM*2);
+  const scx = OUT/2, scy = OUT/2;
   sctx.fillStyle = "#eef2f5"; sctx.fillRect(0,0,OUT,OUT);
+  // Cincin jarak dari pusat viewport — elips (bukan lingkaran sungguhan) krn sumbu X/Y sengaja beda
+  // meter/piksel kalau viewport tidak persegi, konsisten dgn cara grid plume-nya sendiri dihitung.
+  const ringStep = dispersiNiceNumber(Math.min(halfWidthM,halfHeightM)/2.6);
+  sctx.save();
+  sctx.strokeStyle = "rgba(13,31,56,.13)"; sctx.lineWidth = 1;
+  sctx.font = "10px sans-serif"; sctx.fillStyle = "rgba(13,31,56,.55)"; sctx.textBaseline = "bottom";
+  for(let r=ringStep, n=0; r<Math.max(halfWidthM,halfHeightM)*1.45 && n<6; r+=ringStep, n++){
+    sctx.beginPath(); sctx.ellipse(scx,scy,r*pxPerMx,r*pxPerMy,0,0,Math.PI*2); sctx.stroke();
+    const lx = scx + r*pxPerMx*Math.SQRT1_2, ly = scy - r*pxPerMy*Math.SQRT1_2;
+    if(lx<OUT-32 && ly>16) sctx.fillText(dispersiFmtDistance(r), lx+3, ly-2);
+  }
+  sctx.restore();
   sctx.drawImage(outCanvas,0,0);
-  sources.forEach(src=>{
+  const sourcePins = sources.map((src,i)=>{
     const {dx,dy} = dispersiToLocalXY(src.stack.lat, src.stack.lng, centerLat, centerLng);
-    const px = ((dx/(halfWidthM*2))+0.5)*OUT, py = (0.5-(dy/(halfHeightM*2)))*OUT;
-    sctx.beginPath(); sctx.arc(px,py,5,0,Math.PI*2);
-    sctx.fillStyle = src.stack.tipe.color; sctx.fill();
-    sctx.lineWidth = 1.5; sctx.strokeStyle = "#0d1f38"; sctx.stroke();
+    return {no:i+1, stack:src.stack, px:scx+dx*pxPerMx, py:scy-dy*pxPerMy};
   });
+  sourcePins.forEach(pin=>{
+    sctx.beginPath(); sctx.arc(pin.px,pin.py,9,0,Math.PI*2);
+    sctx.fillStyle = pin.stack.tipe.color; sctx.fill();
+    sctx.lineWidth = 1.8; sctx.strokeStyle = "#fff"; sctx.stroke();
+    sctx.lineWidth = 1; sctx.strokeStyle = "#0d1f38"; sctx.stroke();
+    sctx.font = "700 10px sans-serif"; sctx.fillStyle = "#fff"; sctx.textAlign = "center"; sctx.textBaseline = "middle";
+    sctx.fillText(String(pin.no), pin.px, pin.py+0.5);
+  });
+  sctx.textAlign = "left";
+  // Panah utara (peta tidak dirotasi, atas kanvas = Utara — sama spt konvensi worldY di grid plume).
+  dispersiDrawCompassArrow(sctx, OUT-46, 46, 22, 0, "#0d1f38", "U");
+  // Panah arah angin dominan (kasus berbobot terbesar kalau mode Periode; satu-satunya kasus kalau
+  // Live) — bearingnya SAMA dgn dispersiPlumeBearing yg dipakai menghitung plume-nya sendiri, jadi
+  // panahnya konsisten dgn ke mana plume sungguhan mengarah, bukan sekadar dekorasi lepas.
+  const dominantCase = windCases.reduce((a,b)=>(b.weight>a.weight?b:a), windCases[0]);
+  dispersiDrawCompassArrow(sctx, 46, 46, 22, dispersiPlumeBearing(dominantCase.dirFrom), "#1a6fb0", `${dispersiFmt(dominantCase.u,1)} m/s`);
+  // Scale bar bawah-kiri — lebar piksel target dulu, lalu dibulatkan ke angka meter yg "enak dibaca".
+  const niceM = dispersiNiceNumber((OUT*0.22)/pxPerMx);
+  const barPx = niceM*pxPerMx, barX = 24, barY = OUT-28;
+  sctx.save();
+  sctx.strokeStyle = "#0d1f38"; sctx.fillStyle = "#0d1f38"; sctx.lineWidth = 2;
+  sctx.beginPath(); sctx.moveTo(barX,barY); sctx.lineTo(barX+barPx,barY); sctx.stroke();
+  [barX,barX+barPx].forEach(x=>{ sctx.beginPath(); sctx.moveTo(x,barY-5); sctx.lineTo(x,barY+5); sctx.stroke(); });
+  sctx.font = "11px sans-serif"; sctx.textAlign = "left"; sctx.textBaseline = "bottom";
+  sctx.fillText(dispersiFmtDistance(niceM), barX, barY-7);
+  sctx.restore();
+  // Bingkai tipis spy kelihatan "final" (bukan potongan gambar mentah tanpa batas).
+  sctx.strokeStyle = "#c7d0da"; sctx.lineWidth = 2; sctx.strokeRect(1,1,OUT-2,OUT-2);
+
   dispersiState.lastPlumeSnapshotDataUrl = snapCanvas.toDataURL();
-  dispersiState.lastPlumeSnapshotMeta = {site:dispersiState.site, paramLabel:dispersiCurrentParamMeta().label, windMode:dispersiState.windMode, stability:dispersiState.stability, sel:dispersiSelectionLabel(dispersiState.sel)};
+  dispersiState.lastPlumeSnapshotMeta = {
+    site:dispersiState.site, paramLabel:dispersiCurrentParamMeta().label, windMode:dispersiState.windMode,
+    stability:dispersiState.stability, sel:dispersiSelectionLabel(dispersiState.sel),
+    peakConcUgm3: dispersiState.lastPeakConcUgm3, qualitative: flowMode || dispersiIsQualitativeMode(),
+    windDirFrom: dominantCase.dirFrom, windSpeed: dominantCase.u,
+    sourceIndex: sourcePins.map(p=>({no:p.no, nama:p.stack.nama, tipe:p.stack.tipe.key, color:p.stack.tipe.color}))
+  };
   dispersiSetPlumeStatus("ready");
 }
 
@@ -1243,11 +1324,45 @@ function buildDispersiReportHtml(selectedPeriods, includeMap){
 
   const genDate = new Date().toLocaleDateString("id-ID", {day:"numeric",month:"long",year:"numeric"});
   const snapMeta = dispersiState.lastPlumeSnapshotMeta;
-  const mapSection = !includeMap ? "" : (dispersiState.lastPlumeSnapshotDataUrl ? `
+  let mapSection = "";
+  if(includeMap){
+    if(!dispersiState.lastPlumeSnapshotDataUrl){
+      mapSection = `<div style="font-size:11px;color:#a02a24;margin:10px 0;">Gambar peta sebaran belum tersedia (belum ada plume berhasil dihitung utk titik/parameter saat ini) — buka halaman Model Dispersi Emisi, pastikan plume tampil di peta, baru cetak ulang.</div>`;
+    } else {
+      // Legenda warna dibekukan dari kondisi SAAT snapshot diambil (bukan state layar saat ini,
+      // krn bisa saja user sudah ganti filter lagi sebelum benar2 klik cetak) — sama spt seluruh
+      // konten laporan lain di sini, yg selalu berdasar data riil bukan tampilan layar sesaat.
+      const gradientCss = DISPERSI_COLOR_STOPS.map(([f,c])=>`rgb(${c[0]},${c[1]},${c[2]}) ${(f*100).toFixed(0)}%`).join(", ");
+      const bar = `<div style="height:9px;border-radius:4px;background:linear-gradient(to right, ${gradientCss});border:1px solid #ccc;max-width:320px;"></div>`;
+      const legendHtml = snapMeta?.qualitative ? `${bar}
+          <div style="display:flex;justify-content:space-between;font-size:9px;color:#777;max-width:320px;margin-top:2px;"><span>Rendah</span><span>Tinggi (relatif)</span></div>
+          <div style="font-size:9.5px;color:#777;margin-top:3px;">Skala relatif — bukan konsentrasi terukur, tanpa satuan.</div>`
+        : (()=>{
+            const peak = snapMeta?.peakConcUgm3;
+            const decimals = peak==null?1:(peak<1?3:peak<10?2:1);
+            const ticks = [0,0.5,1].map(f=>dispersiFmt((peak||0)*f, decimals));
+            return `${bar}
+          <div style="display:flex;justify-content:space-between;font-size:9px;font-family:monospace;color:#777;max-width:320px;margin-top:2px;">${ticks.map(t=>`<span>${t}</span>`).join("")}</div>
+          <div style="font-size:9.5px;color:#777;margin-top:3px;">Puncak konsentrasi lokal saat digenerate: <b>${dispersiFmt(peak,decimals)} &micro;g/m&sup3;</b> (merah) &middot; biru tua &asymp; nol.</div>`;
+          })();
+      const windLabel = snapMeta?.windDirFrom!=null ? `${dispersiFmt(snapMeta.windSpeed,1)} m/s dari ${dispersiCompassLabel(snapMeta.windDirFrom)} (${Math.round(snapMeta.windDirFrom)}&deg;)` : "—";
+      const idxRows = (snapMeta?.sourceIndex||[]).map(s=>`<tr><td style="text-align:center;font-weight:700;">${s.no}</td><td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${s.color};margin-right:5px;vertical-align:1px;"></span>${escHtml(s.nama)}</td><td style="color:#777;font-size:9.5px;">${escHtml(s.tipe)}</td></tr>`).join("");
+      mapSection = `
     <div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;">Peta Sebaran (Prototipe)</div>
-    <div style="font-size:10px;color:#a02a24;margin-bottom:6px;">Gambar berikut bersifat PROTOTIPE — latar BUKAN citra satelit riil, hanya pola sebaran relatif hasil model screening &amp; posisi titik sumber (lingkaran berwarna). Kondisi saat digenerate: site ${escHtml(snapMeta?.site||"")}, parameter ${escHtml(snapMeta?.paramLabel||"")}, mode angin ${snapMeta?.windMode==="live"?"Live":"Periode"}, stabilitas ${escHtml(snapMeta?.stability||"")}.</div>
-    <img src="${dispersiState.lastPlumeSnapshotDataUrl}" style="width:100%;max-width:480px;display:block;margin:0 auto 10px;border:1px solid #ccc;border-radius:6px;">
-  ` : `<div style="font-size:11px;color:#a02a24;margin:10px 0;">Gambar peta sebaran belum tersedia (belum ada plume berhasil dihitung utk titik/parameter saat ini) — buka halaman Model Dispersi Emisi, pastikan plume tampil di peta, baru cetak ulang.</div>`);
+    <div style="font-size:10px;color:#a02a24;margin-bottom:8px;">Gambar berikut bersifat PROTOTIPE — latar BUKAN citra satelit riil, murni pola sebaran relatif hasil model screening (cincin jarak, panah utara/angin &amp; skala bar cuma bantu orientasi, bukan basemap sungguhan). Kondisi saat digenerate: site ${escHtml(snapMeta?.site||"")}, parameter ${escHtml(snapMeta?.paramLabel||"")}, mode angin ${snapMeta?.windMode==="live"?"Live":"Periode"} (dominan ${windLabel}), stabilitas ${escHtml(snapMeta?.stability||"")}.</div>
+    <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+      <div style="flex:0 0 auto;max-width:560px;">
+        <img src="${dispersiState.lastPlumeSnapshotDataUrl}" style="width:100%;display:block;border:1px solid #ccc;border-radius:6px;">
+        <div style="margin-top:8px;">${legendHtml}</div>
+      </div>
+      <div style="flex:1 1 180px;min-width:170px;">
+        <div style="font-weight:700;font-size:11px;margin-bottom:4px;color:#0d1f38;">Indeks Titik pada Peta</div>
+        <table class="pg-ba-table" style="font-size:10px;"><thead><tr><th style="width:20px;">No</th><th>Titik</th><th>Jenis</th></tr></thead>
+          <tbody>${idxRows||`<tr><td colspan="3" style="text-align:center;">&mdash;</td></tr>`}</tbody></table>
+      </div>
+    </div>`;
+    }
+  }
 
   return `<div class="pg-batch pg-dispersi">
     <div class="pg-ba-logos">
