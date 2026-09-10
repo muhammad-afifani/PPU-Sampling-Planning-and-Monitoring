@@ -679,13 +679,19 @@ textarea.mono{font-family:var(--font-mono);font-size:11.5px;}
 /* Master tree view — tree-head & tree-subhead sticky: nempel di atas selama masih scroll di
    dalam site/grup itu, lalu otomatis lepas & digantikan header berikutnya (perilaku bawaan
    position:sticky, dibatasi otomatis oleh box parent-nya). "overflow:hidden" SENGAJA tidak
-   dipakai di .tree-site karena itu mematikan position:sticky pada anaknya. */
+   dipakai di .tree-site karena itu mematikan position:sticky pada anaknya.
+   --tree-head-h SATU-SATUNYA sumber tinggi .tree-head, dipakai lagi di top: .tree-subhead —
+   sebelumnya .tree-subhead pakai angka tetap "+34px" yang TIDAK cocok dgn tinggi asli .tree-head
+   (~25px dgn padding 5px atas-bawah di atas), jadi nyisain celah ~9px tempat baris tabel di
+   baliknya "mengintip" tampil di antara kedua bar sticky itu saat discroll — kelihatan spt
+   transparan/tembus padahal background keduanya solid. Dengan height eksplisit + var yang sama
+   dipakai di top: .tree-subhead, celah itu selalu 0 berapa pun perubahan font/padding nanti. */
 .tree-toolbar{display:flex;gap:6px;margin-bottom:10px;}
-.tree-site{border:1px solid var(--gray-200);border-radius:8px;margin-bottom:8px;background:var(--surface-card);}
-.tree-head{display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--navy-900);color:#fff;font-size:13px;user-select:none;border-radius:8px 8px 0 0;position:sticky;top:var(--stickyoffset,0px);z-index:12;}
+.tree-site{--tree-head-h:26px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:8px;background:var(--surface-card);}
+.tree-head{display:flex;align-items:center;gap:8px;height:var(--tree-head-h);padding:0 8px;background:var(--navy-900);color:#fff;font-size:13px;user-select:none;border-radius:8px 8px 0 0;position:sticky;top:var(--stickyoffset,0px);z-index:12;}
 .tree-caret{width:12px;display:inline-block;color:var(--teal-400);}
 .tree-sub{border-top:1px solid var(--gray-200);}
-.tree-subhead{display:flex;align-items:center;gap:7px;padding:5px 10px 5px 22px;background:var(--gray-100);font-size:12px;font-weight:700;color:var(--heading-2);user-select:none;position:sticky;top:calc(var(--stickyoffset,0px) + 34px);z-index:11;}
+.tree-subhead{display:flex;align-items:center;gap:7px;padding:5px 10px 5px 22px;background:var(--gray-100);font-size:12px;font-weight:700;color:var(--heading-2);user-select:none;position:sticky;top:calc(var(--stickyoffset,0px) + var(--tree-head-h));z-index:11;}
 .tree-toggle{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;flex:1;min-width:0;}
 .tree-head .tree-toggle:hover{background:rgba(255,255,255,.14);}
 .tree-subhead .tree-toggle:hover{background:var(--gray-200);}
