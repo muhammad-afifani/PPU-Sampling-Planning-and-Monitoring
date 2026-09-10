@@ -18,6 +18,12 @@ const DISPERSI_MASS_PARAMS = {
   "SO₂": {label:"SO₂", desc:"Sulfur dioksida — dari bahan bakar bersulfur; penyebab utama hujan asam & iritasi saluran pernapasan."},
   "CO": {label:"CO", desc:"Karbon monoksida — produk pembakaran tidak sempurna; mengikat hemoglobin darah."},
   "Total Partikulat": {label:"Partikulat (TSP)", desc:"Partikel padat/cair tersuspensi di udara — berdampak pada sistem pernapasan & visibilitas."},
+  // CO2 dicatat di data hasil pemantauan dlm % VOLUME (bukan mg/Nm3 spt 4 parameter di atas) —
+  // molarMassGMol menandai param mana yg perlu dikonversi & dgn massa molar apa (lihat
+  // dispersiConcMgNm3). Bukan pencemar kriteria beracun spt yg lain (tidak ada baku mutu ambien
+  // PP22/EPA), jadi TIDAK muncul di DISPERSI_AMBIENT_STD — tetap dimodelkan sbg beban massa emisi
+  // (kg CO2) krn ini gas rumah kaca yg relevan dilaporkan, cuma bukan utk pembanding baku mutu udara.
+  "CO₂": {label:"CO₂", desc:"Karbon dioksida — gas rumah kaca utama hasil pembakaran sempurna bahan bakar. Dicatat dlm % volume di stack test, dikonversi ke mg/Nm³ via massa molar (44 g/mol) sblm dihitung beban massanya. Tidak dibandingkan ke baku mutu udara ambien (bukan pencemar kriteria beracun spt NOx/SO₂/CO/Partikulat).", molarMassGMol:44.01},
   // Opasitas BUKAN konsentrasi massa (cuma kepekatan visual %), jadi "Qgs"-nya di sini murni
   // opasitas x laju alir sbg proxy pola sebaran RELATIF — bukan g/s riil, tidak dipakai utk
   // beban/kg (qualitative:true menandai ini ke semua tabel beban/ringkasan/tren/dampak ambien).
@@ -197,11 +203,27 @@ function dispersiFlowRecord(engineId, periode){
 function dispersiParamRecord(engineId, param, periode){
   return DB.hasilPemantauan.find(r=>r.engineId===engineId && r.periode===periode && r.parameter===param) || null;
 }
-// g/s dari konsentrasi (mg/Nm3) x laju alir tercatat (m3/s, diperlakukan setara Nm3/s —
-// penyederhanaan yang ditandai transparan di UI, bukan normalisasi suhu/tekanan penuh).
-function dispersiEmissionRateGs(concRec, flowRec){
+// Sebagian parameter (CO2) dicatat hasil sampling-nya dlm % VOLUME, bukan mg/Nm3 spt param massa
+// lain — dikonversi via massa molar gas ideal pd kondisi Normal (Nm3 = 0derajatC/1atm, volume molar
+// 22,414 L/mol, konvensi baku konversi ppm<->mg/m3 di kondisi standar/normal):
+//   mg/Nm3 = (%vol x 10.000 ppm/%) x (massaMolar g/mol / 22,414 L/mol)
+// Param tanpa molarMassGMol (NOx/SO2/CO/Total Partikulat, semua sudah mg/Nm3 asli) dikembalikan
+// apa adanya tanpa konversi apapun.
+function dispersiConcMgNm3(concRec, param){
+  if(!concRec || concRec.resultNumeric==null) return null;
+  const meta = DISPERSI_MASS_PARAMS[param];
+  if(meta && meta.molarMassGMol && concRec.unit==="%"){
+    return concRec.resultNumeric * 10000 * meta.molarMassGMol / 22.414;
+  }
+  return concRec.resultNumeric;
+}
+// g/s dari konsentrasi (mg/Nm3, sesudah dikonversi kalau param-nya % volume spt CO2) x laju alir
+// tercatat (m3/s, diperlakukan setara Nm3/s — penyederhanaan yang ditandai transparan di UI, bukan
+// normalisasi suhu/tekanan penuh).
+function dispersiEmissionRateGs(concRec, flowRec, param){
   if(!concRec || !flowRec || concRec.resultNumeric==null || flowRec.resultNumeric==null) return null;
-  return concRec.resultNumeric * flowRec.resultNumeric / 1000;
+  const concMgNm3 = dispersiConcMgNm3(concRec, param);
+  return concMgNm3 * flowRec.resultNumeric / 1000;
 }
 // Mode "Keluaran Cerobong": pakai laju alir APA ADANYA sbg kekuatan sumber (bukan g/s riil) —
 // hanya utk bentuk/pola sebaran relatif antar titik & sektor angin, bukan angka beban yg berarti,
@@ -236,7 +258,7 @@ function dispersiQgsForStack(stack, param, sel){
 function dispersiBebanSinglePeriode(stack, param, periode){
   const concRec = dispersiParamRecord(stack.id, param, periode);
   const flowRec = dispersiFlowRecord(stack.id, periode);
-  const Qgs = dispersiEmissionRateGs(concRec, flowRec);
+  const Qgs = dispersiEmissionRateGs(concRec, flowRec, param);
   if(Qgs==null) return null;
   const runningHour = concRec.runningHour!=null ? concRec.runningHour : (flowRec.runningHour!=null ? flowRec.runningHour : null);
   const bebanJamKg = Qgs*3.6;
@@ -360,7 +382,7 @@ function dispersiPeriodDateRange(sel){
 /* ---------- State halaman ---------- */
 let dispersiState = {
   site: null, param: "NOx", sel: null, stability: "D", windMode: "live", mapLayer: "satellite",
-  selectedStackIds: null, lastPeakConcUgm3: null, lastPlumeSnapshotDataUrl: null, lastPlumeSnapshotMeta: null,
+  selectedStackIds: null, lastPeakConcUgm3: null, lastPlumeSnapshotDataUrl: null, lastPlumeBasemapUrl: null, lastPlumeSnapshotMeta: null,
   wind: {speed:null, dirFrom:null, temp:null, humidity:null, updatedAt:null, error:null, loading:false, history:[], historyLabel:""},
   periodWind: {loading:false, error:null, avgSpeed:null, avgTemp:null, avgHumidity:null, dominantDeg:null, dominantLabel:null, sampleCount:0, clamped:false, history:[], historyLabel:""}
 };
@@ -661,6 +683,17 @@ function dispersiDrawCompassArrow(ctx, cx, cy, len, bearingDeg, color, label){
   }
   ctx.restore();
 }
+// URL basemap statis (Esri REST "export" — bukan ubin XYZ) utk 1 area bbox jadi SATU gambar PNG,
+// dipakai lewat <img src> LANGSUNG (bukan digambar ke canvas) — jadi TIDAK PERNAH men-taint canvas
+// manapun di sini, beda dgn coba merender tile peta lintas-origin ke dalam canvas (itu bikin
+// toDataURL gagal). Basemap ditempatkan sbg lapisan TERPISAH di belakang lapisan plume+anotasi
+// (lihat mapSection di buildDispersiReportHtml) — kalau basemap gagal dimuat (mis. tidak ada
+// internet sama sekali saat window.print()), lapisan plume+anotasi di atasnya tetap tampil normal.
+function dispersiBasemapExportUrl(mode, sw, ne, w, h){
+  const service = mode==="street" ? "World_Street_Map" : "World_Imagery";
+  const bbox = `${sw.lng},${sw.lat},${ne.lng},${ne.lat}`;
+  return `https://server.arcgisonline.com/ArcGIS/rest/services/${service}/MapServer/export?bbox=${bbox}&bboxSR=4326&imageSR=4326&size=${w},${h}&format=png32&transparent=false&f=image`;
+}
 // Grid konsentrasi 200x200 (CALC) dihitung lalu diperhalus (box blur 3x) supaya batas antar-band
 // jadi kurva mulus, dibagi 8 band non-linear (akar pangkat 0.55 spy band rendah tidak keliatan
 // kepipihkan oleh puncak plume), lalu diupscale dgn image-smoothing kualitas tinggi ke ukuran
@@ -676,6 +709,7 @@ function dispersiComputePlumeNow(){
   // Kualitas Udara Ambien — jalur sukses di akhir fungsi ini yg akan mengisinya lagi kalau relevan.
   dispersiState.lastPeakConcUgm3 = null;
   dispersiState.lastPlumeSnapshotDataUrl = null;
+  dispersiState.lastPlumeBasemapUrl = null;
   const flowMode = dispersiIsFlowMode();
   if(!flowMode && !DISPERSI_MASS_PARAMS[dispersiState.param]){ dispersiSetPlumeStatus("no-data","Parameter tidak dikenal."); return; }
   const sel = dispersiResolveSelection(dispersiState.sel);
@@ -718,15 +752,25 @@ function dispersiComputePlumeNow(){
     return;
   }
   const bounds = [[sw.lat, sw.lng],[ne.lat, ne.lng]];
-  const CALC=200, OUT=900;
-  const canvas = document.createElement("canvas"); canvas.width=CALC; canvas.height=CALC;
+  // Grid & kanvas output SEBANDING dgn rasio viewport asli (halfWidthM:halfHeightM), BUKAN dipaksa
+  // persegi spt sebelumnya — persegi paksa bikin skala meter/piksel X vs Y beda (anisotropik),
+  // jadi plume-nya melar/menyusut tidak wajar dibanding tampilan interaktifnya (Leaflet imageOverlay
+  // diam2 "membetulkan" ini via bounds-stretch, tapi gambar statis di laporan PDF TIDAK pernah
+  // dibetulkan siapapun) — sekaligus inilah penyebab hasil cetak sebelumnya kelihatan "kotak" &
+  // kepotong, bukan menampilkan bentuk sebenarnya area yg sedang dilihat.
+  const aspect = halfWidthM/halfHeightM;
+  const GW = aspect>=1 ? 200 : Math.max(70,Math.round(200*aspect));
+  const GH = aspect>=1 ? Math.max(70,Math.round(200/aspect)) : 200;
+  const OW = aspect>=1 ? 900 : Math.max(320,Math.round(900*aspect));
+  const OH = aspect>=1 ? Math.max(320,Math.round(900/aspect)) : 900;
+  const canvas = document.createElement("canvas"); canvas.width=GW; canvas.height=GH;
   const ctx = canvas.getContext("2d");
-  const grid = new Float32Array(CALC*CALC);
+  const grid = new Float32Array(GW*GH);
   const originXY = sources.map(src=>dispersiToLocalXY(src.stack.lat, src.stack.lng, centerLat, centerLng));
-  for(let py=0; py<CALC; py++){
-    const worldY = (0.5-py/CALC)*halfHeightM*2;
-    for(let px=0; px<CALC; px++){
-      const worldX = (px/CALC-0.5)*halfWidthM*2;
+  for(let py=0; py<GH; py++){
+    const worldY = (0.5-py/GH)*halfHeightM*2;
+    for(let px=0; px<GW; px++){
+      const worldX = (px/GW-0.5)*halfWidthM*2;
       let total = 0;
       for(let wc=0; wc<windCases.length; wc++){
         const bearing = dispersiPlumeBearing(windCases[wc].dirFrom);
@@ -739,20 +783,20 @@ function dispersiComputePlumeNow(){
           total += weight*dispersiGroundConc(sources[i].Qgs, u, sy, sz, sources[i].stack.stackHeight, y);
         }
       }
-      grid[py*CALC+px] = total;
+      grid[py*GW+px] = total;
     }
   }
   const boxBlur = (src)=>{
     const out = new Float32Array(src.length);
-    for(let py=0; py<CALC; py++){
-      for(let px=0; px<CALC; px++){
+    for(let py=0; py<GH; py++){
+      for(let px=0; px<GW; px++){
         let sum=0,n=0;
         for(let oy=-1;oy<=1;oy++) for(let ox=-1;ox<=1;ox++){
           const nx=px+ox, ny=py+oy;
-          if(nx<0||nx>=CALC||ny<0||ny>=CALC) continue;
-          sum += src[ny*CALC+nx]; n++;
+          if(nx<0||nx>=GW||ny<0||ny>=GH) continue;
+          sum += src[ny*GW+nx]; n++;
         }
-        out[py*CALC+px] = sum/n;
+        out[py*GW+px] = sum/n;
       }
     }
     return out;
@@ -772,10 +816,10 @@ function dispersiComputePlumeNow(){
   // resolusi/zoom tertentu) — transisi antar band sekarang murni dari gradasi warnanya sendiri.
   const BANDS=8;
   const bandOf = (frac)=>Math.min(BANDS-1, Math.floor(Math.pow(frac,0.55)*BANDS));
-  const imgData = ctx.createImageData(CALC,CALC);
-  for(let py=0; py<CALC; py++){
-    for(let px=0; px<CALC; px++){
-      const i = py*CALC+px;
+  const imgData = ctx.createImageData(GW,GH);
+  for(let py=0; py<GH; py++){
+    for(let px=0; px<GW; px++){
+      const i = py*GW+px;
       const frac = smooth[i]/maxV;
       const di = i*4;
       if(frac<0.02){ imgData.data[di+3]=0; continue; }
@@ -787,39 +831,40 @@ function dispersiComputePlumeNow(){
     }
   }
   ctx.putImageData(imgData,0,0);
-  const outCanvas = document.createElement("canvas"); outCanvas.width=OUT; outCanvas.height=OUT;
+  const outCanvas = document.createElement("canvas"); outCanvas.width=OW; outCanvas.height=OH;
   const octx = outCanvas.getContext("2d");
   octx.imageSmoothingEnabled = true; octx.imageSmoothingQuality = "high";
-  octx.drawImage(canvas,0,0,CALC,CALC,0,0,OUT,OUT);
+  octx.drawImage(canvas,0,0,GW,GH,0,0,OW,OH);
   dispersiPlumeLayerObj = L.imageOverlay(outCanvas.toDataURL(), bounds, {opacity:1}).addTo(dispersiMapInstance);
-  // Simpan snapshot statis (plume + anotasi kartografis + titik-titik sumber BERNOMOR di atas
-  // latar netral) utk opsi "sertakan gambar" di export PDF — SENGAJA tidak mencoba merender tile
-  // satelit/jalan asli ke canvas ini (tile Esri/OSM lintas-origin akan men-taint canvas, gagal di-
-  // toDataURL) — tetap prototipe sesuai catatan sendiri di halaman ini. Cincin jarak/scale bar/
-  // panah utara & angin ditambahkan supaya gambar tidak "polosan" (cuma blob warna di latar kosong)
-  // — nomor tiap titik dipakai lagi di tabel "Indeks Titik" pada laporan PDF, jadi peta bisa
-  // ditelusuri per titik tanpa perlu satu peta terpisah per sumber.
-  const snapCanvas = document.createElement("canvas"); snapCanvas.width=OUT; snapCanvas.height=OUT;
+  // Simpan snapshot statis LATAR TRANSPARAN (plume + anotasi kartografis + titik-titik sumber
+  // BERNOMOR, TANPA warna latar) utk opsi "sertakan gambar" di export PDF — ditempel sbg lapisan
+  // TERPISAH di ATAS gambar basemap riil (dispersiBasemapExportUrl, <img> biasa, lihat mapSection)
+  // via CSS position:absolute, bukan digambar bareng ke satu canvas — jadi kanvas ini SENDIRI tetap
+  // 100% hasil gambar sendiri (tidak pernah menyentuh pixel tile eksternal apapun), aman dari
+  // masalah taint/toDataURL berapa pun basemap-nya nanti berhasil dimuat atau tidak saat cetak.
+  // Cincin jarak/scale bar/panah utara & angin ditambahkan supaya tetap informatif walau basemap
+  // gagal dimuat — nomor tiap titik dipakai lagi di tabel "Indeks Titik" pada laporan PDF.
+  const snapCanvas = document.createElement("canvas"); snapCanvas.width=OW; snapCanvas.height=OH;
   const sctx = snapCanvas.getContext("2d");
-  const pxPerMx = OUT/(halfWidthM*2), pxPerMy = OUT/(halfHeightM*2);
-  const scx = OUT/2, scy = OUT/2;
-  sctx.fillStyle = "#eef2f5"; sctx.fillRect(0,0,OUT,OUT);
-  // Cincin jarak dari pusat viewport — elips (bukan lingkaran sungguhan) krn sumbu X/Y sengaja beda
-  // meter/piksel kalau viewport tidak persegi, konsisten dgn cara grid plume-nya sendiri dihitung.
+  // Grid & output kini SEBANDING dgn rasio viewport asli (lihat GW/GH/OW/OH di atas), jadi
+  // meter/piksel X == meter/piksel Y (isotropik) — cincin jarak skrg lingkaran sungguhan, bukan
+  // elips lagi.
+  const pxPerM = OW/(halfWidthM*2);
+  const scx = OW/2, scy = OH/2;
   const ringStep = dispersiNiceNumber(Math.min(halfWidthM,halfHeightM)/2.6);
   sctx.save();
-  sctx.strokeStyle = "rgba(13,31,56,.13)"; sctx.lineWidth = 1;
-  sctx.font = "10px sans-serif"; sctx.fillStyle = "rgba(13,31,56,.55)"; sctx.textBaseline = "bottom";
+  sctx.strokeStyle = "rgba(13,31,56,.16)"; sctx.lineWidth = 1;
+  sctx.font = "10px sans-serif"; sctx.fillStyle = "rgba(13,31,56,.6)"; sctx.textBaseline = "bottom";
   for(let r=ringStep, n=0; r<Math.max(halfWidthM,halfHeightM)*1.45 && n<6; r+=ringStep, n++){
-    sctx.beginPath(); sctx.ellipse(scx,scy,r*pxPerMx,r*pxPerMy,0,0,Math.PI*2); sctx.stroke();
-    const lx = scx + r*pxPerMx*Math.SQRT1_2, ly = scy - r*pxPerMy*Math.SQRT1_2;
-    if(lx<OUT-32 && ly>16) sctx.fillText(dispersiFmtDistance(r), lx+3, ly-2);
+    sctx.beginPath(); sctx.arc(scx,scy,r*pxPerM,0,Math.PI*2); sctx.stroke();
+    const lx = scx + r*pxPerM*Math.SQRT1_2, ly = scy - r*pxPerM*Math.SQRT1_2;
+    if(lx<OW-32 && lx>0 && ly>16) sctx.fillText(dispersiFmtDistance(r), lx+3, ly-2);
   }
   sctx.restore();
-  sctx.drawImage(outCanvas,0,0);
+  sctx.drawImage(outCanvas,0,0,OW,OH);
   const sourcePins = sources.map((src,i)=>{
     const {dx,dy} = dispersiToLocalXY(src.stack.lat, src.stack.lng, centerLat, centerLng);
-    return {no:i+1, stack:src.stack, px:scx+dx*pxPerMx, py:scy-dy*pxPerMy};
+    return {no:i+1, stack:src.stack, px:scx+dx*pxPerM, py:scy-dy*pxPerM};
   });
   sourcePins.forEach(pin=>{
     sctx.beginPath(); sctx.arc(pin.px,pin.py,9,0,Math.PI*2);
@@ -831,15 +876,15 @@ function dispersiComputePlumeNow(){
   });
   sctx.textAlign = "left";
   // Panah utara (peta tidak dirotasi, atas kanvas = Utara — sama spt konvensi worldY di grid plume).
-  dispersiDrawCompassArrow(sctx, OUT-46, 46, 22, 0, "#0d1f38", "U");
+  dispersiDrawCompassArrow(sctx, OW-46, 46, 22, 0, "#0d1f38", "U");
   // Panah arah angin dominan (kasus berbobot terbesar kalau mode Periode; satu-satunya kasus kalau
   // Live) — bearingnya SAMA dgn dispersiPlumeBearing yg dipakai menghitung plume-nya sendiri, jadi
   // panahnya konsisten dgn ke mana plume sungguhan mengarah, bukan sekadar dekorasi lepas.
   const dominantCase = windCases.reduce((a,b)=>(b.weight>a.weight?b:a), windCases[0]);
   dispersiDrawCompassArrow(sctx, 46, 46, 22, dispersiPlumeBearing(dominantCase.dirFrom), "#1a6fb0", `${dispersiFmt(dominantCase.u,1)} m/s`);
   // Scale bar bawah-kiri — lebar piksel target dulu, lalu dibulatkan ke angka meter yg "enak dibaca".
-  const niceM = dispersiNiceNumber((OUT*0.22)/pxPerMx);
-  const barPx = niceM*pxPerMx, barX = 24, barY = OUT-28;
+  const niceM = dispersiNiceNumber((Math.min(OW,OH)*0.24)/pxPerM);
+  const barPx = niceM*pxPerM, barX = 24, barY = OH-28;
   sctx.save();
   sctx.strokeStyle = "#0d1f38"; sctx.fillStyle = "#0d1f38"; sctx.lineWidth = 2;
   sctx.beginPath(); sctx.moveTo(barX,barY); sctx.lineTo(barX+barPx,barY); sctx.stroke();
@@ -847,15 +892,14 @@ function dispersiComputePlumeNow(){
   sctx.font = "11px sans-serif"; sctx.textAlign = "left"; sctx.textBaseline = "bottom";
   sctx.fillText(dispersiFmtDistance(niceM), barX, barY-7);
   sctx.restore();
-  // Bingkai tipis spy kelihatan "final" (bukan potongan gambar mentah tanpa batas).
-  sctx.strokeStyle = "#c7d0da"; sctx.lineWidth = 2; sctx.strokeRect(1,1,OUT-2,OUT-2);
 
   dispersiState.lastPlumeSnapshotDataUrl = snapCanvas.toDataURL();
+  dispersiState.lastPlumeBasemapUrl = dispersiBasemapExportUrl(dispersiState.mapLayer, sw, ne, OW, OH);
   dispersiState.lastPlumeSnapshotMeta = {
     site:dispersiState.site, paramLabel:dispersiCurrentParamMeta().label, windMode:dispersiState.windMode,
     stability:dispersiState.stability, sel:dispersiSelectionLabel(dispersiState.sel),
     peakConcUgm3: dispersiState.lastPeakConcUgm3, qualitative: flowMode || dispersiIsQualitativeMode(),
-    windDirFrom: dominantCase.dirFrom, windSpeed: dominantCase.u,
+    windDirFrom: dominantCase.dirFrom, windSpeed: dominantCase.u, aspectW: OW, aspectH: OH,
     sourceIndex: sourcePins.map(p=>({no:p.no, nama:p.stack.nama, tipe:p.stack.tipe.key, color:p.stack.tipe.color}))
   };
   dispersiSetPlumeStatus("ready");
@@ -1198,6 +1242,11 @@ function printDispersiReport(){
         ${periods.map(p=>`<label class="checkline"><input type="checkbox" class="dispPrintPeriode" value="${escHtml(p.periode)}" checked> ${escHtml(p.periode)}</label>`).join("")}
       </div>
     </div>
+    <div class="field" style="margin-top:12px;"><label>Parameter yang Dicetak</label>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;">
+        ${Object.keys(DISPERSI_MASS_PARAMS).filter(p=>!DISPERSI_MASS_PARAMS[p].qualitative).map(p=>`<label class="checkline"><input type="checkbox" class="dispPrintParam" value="${escHtml(p)}" checked> ${escHtml(DISPERSI_MASS_PARAMS[p].label)}</label>`).join("")}
+      </div>
+    </div>
     <div class="checkline" style="margin-top:12px;"><label><input type="checkbox" id="dispPrintIncludeMap"> Sertakan gambar peta sebaran (prototipe)</label></div>
     <div class="hint" style="margin-top:2px;">Kalau tidak dicentang, laporan hanya berisi data angka (tanpa gambar peta) — cocok utk laporan resmi. Gambar peta memakai kondisi angin/parameter yang sedang aktif di layar saat ini.</div>
     <div class="field" style="margin-top:12px;"><label>Orientasi Kertas</label>
@@ -1208,10 +1257,12 @@ function printDispersiReport(){
 }
 async function doPrintDispersiReport(){
   const selectedPeriods = [...document.querySelectorAll(".dispPrintPeriode:checked")].map(el=>el.value);
+  const selectedParams = [...document.querySelectorAll(".dispPrintParam:checked")].map(el=>el.value);
   const includeMap = document.getElementById("dispPrintIncludeMap").checked;
   const orientation = document.getElementById("dispPrintOrientation").value;
   if(!selectedPeriods.length){ toast("Pilih minimal 1 periode.","err"); return; }
-  const html = buildDispersiReportHtml(selectedPeriods, includeMap);
+  if(!selectedParams.length){ toast("Pilih minimal 1 parameter.","err"); return; }
+  const html = buildDispersiReportHtml(selectedPeriods, includeMap, selectedParams);
   closeModal();
   if(!html){ toast("Tidak ada titik terpilih dengan data pada periode yang dipilih.","err"); return; }
   setPrintOrientation(orientation, 15);
@@ -1230,10 +1281,14 @@ async function doPrintDispersiReport(){
   window.print();
   document.title = originalTitle;
 }
-function buildDispersiReportHtml(selectedPeriods, includeMap){
+function buildDispersiReportHtml(selectedPeriods, includeMap, selectedParams){
   const stacks = dispersiSelectedStacks();
   if(!stacks.length) return null;
-  const massParams = Object.keys(DISPERSI_MASS_PARAMS).filter(p=>!DISPERSI_MASS_PARAMS[p].qualitative);
+  const allMassParams = Object.keys(DISPERSI_MASS_PARAMS).filter(p=>!DISPERSI_MASS_PARAMS[p].qualitative);
+  // selectedParams opsional (default: SEMUA parameter massa) — supaya user bisa pilih mau cetak
+  // NOx/CO/dst yang mana saja lewat checkbox "Parameter yang Dicetak", bukan selalu semuanya
+  // sekaligus tanpa opsi spt sebelumnya.
+  const massParams = (selectedParams && selectedParams.length) ? allMassParams.filter(p=>selectedParams.includes(p)) : allMassParams;
   const compParams = massParams.concat(["Opasitas"]);
   const periodsSorted = dispersiPeriodList().filter(p=>selectedPeriods.includes(p.periode));
 
@@ -1347,12 +1402,19 @@ function buildDispersiReportHtml(selectedPeriods, includeMap){
           })();
       const windLabel = snapMeta?.windDirFrom!=null ? `${dispersiFmt(snapMeta.windSpeed,1)} m/s dari ${dispersiCompassLabel(snapMeta.windDirFrom)} (${Math.round(snapMeta.windDirFrom)}&deg;)` : "—";
       const idxRows = (snapMeta?.sourceIndex||[]).map(s=>`<tr><td style="text-align:center;font-weight:700;">${s.no}</td><td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${s.color};margin-right:5px;vertical-align:1px;"></span>${escHtml(s.nama)}</td><td style="color:#777;font-size:9.5px;">${escHtml(s.tipe)}</td></tr>`).join("");
+      // Rasio gambar dari aspectW:aspectH sungguhan (ikut viewport peta saat digenerate, TIDAK
+      // dipaksa persegi lagi) — dipakai sbg aspect-ratio wrapper spy kedua layer (basemap + plume)
+      // pas bertumpuk tanpa perlu tahu ukuran aslinya di CSS statis.
+      const ratio = (snapMeta?.aspectW && snapMeta?.aspectH) ? `${snapMeta.aspectW}/${snapMeta.aspectH}` : "1/1";
       mapSection = `
-    <div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;">Peta Sebaran (Prototipe)</div>
-    <div style="font-size:10px;color:#a02a24;margin-bottom:8px;">Gambar berikut bersifat PROTOTIPE — latar BUKAN citra satelit riil, murni pola sebaran relatif hasil model screening (cincin jarak, panah utara/angin &amp; skala bar cuma bantu orientasi, bukan basemap sungguhan). Kondisi saat digenerate: site ${escHtml(snapMeta?.site||"")}, parameter ${escHtml(snapMeta?.paramLabel||"")}, mode angin ${snapMeta?.windMode==="live"?"Live":"Periode"} (dominan ${windLabel}), stabilitas ${escHtml(snapMeta?.stability||"")}.</div>
+    <div style="font-weight:700;font-size:12.5px;margin:14px 0 6px;">Peta Sebaran</div>
+    <div style="font-size:10px;color:#a02a24;margin-bottom:8px;">Latar peta (citra satelit/jalan) diambil dari layanan basemap Esri saat laporan digenerate — kalau tidak ada koneksi internet saat mencetak, latar bisa jadi kosong tapi lapisan pola sebaran &amp; titik sumber di atasnya tetap tampil normal. Pola sebaran (warna) &amp; anotasi (cincin jarak, panah utara/angin, skala bar) tetap hasil MODEL SCREENING, bukan pengukuran langsung. Kondisi saat digenerate: site ${escHtml(snapMeta?.site||"")}, parameter ${escHtml(snapMeta?.paramLabel||"")}, mode angin ${snapMeta?.windMode==="live"?"Live":"Periode"} (dominan ${windLabel}), stabilitas ${escHtml(snapMeta?.stability||"")}.</div>
     <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
-      <div style="flex:0 0 auto;max-width:560px;">
-        <img src="${dispersiState.lastPlumeSnapshotDataUrl}" style="width:100%;display:block;border:1px solid #ccc;border-radius:6px;">
+      <div style="flex:1 1 420px;max-width:640px;min-width:320px;">
+        <div style="position:relative;width:100%;aspect-ratio:${ratio};background:#eef2f5;border:1px solid #ccc;border-radius:6px;overflow:hidden;">
+          <img src="${dispersiState.lastPlumeBasemapUrl||""}" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+          <img src="${dispersiState.lastPlumeSnapshotDataUrl}" style="position:absolute;inset:0;width:100%;height:100%;">
+        </div>
         <div style="margin-top:8px;">${legendHtml}</div>
       </div>
       <div style="flex:1 1 180px;min-width:170px;">
@@ -1403,11 +1465,40 @@ function buildDispersiReportHtml(selectedPeriods, includeMap){
   </div>`;
 }
 
+// Penjelasan sumber data angin & cara kerja model, dipisah dari sekian banyak hint kecil yang
+// tersebar di halaman ini (tooltip, footer laporan, dst) jadi SATU tempat lengkap yang gampang
+// ditemukan — sesuai pola openAboutModal/renderOnboardingModal (12-data-page.js) yang sudah ada.
+function dispersiInfoModal(){
+  openModal(`
+    <h3>&#8505;&#65039; Info Model Dispersi &amp; Data Angin</h3>
+    <div style="max-height:65vh;overflow:auto;font-size:13px;line-height:1.65;">
+      <h4 style="margin:14px 0 4px;color:var(--navy-800);">Sumber Data Angin</h4>
+      <p>Data angin diambil otomatis dari <b>Open-Meteo</b> (layanan cuaca gratis, tanpa API key) berdasarkan koordinat pusat site yang sedang dipilih:</p>
+      <ul style="margin:4px 0 10px;padding-left:20px;">
+        <li><b>Mode Live</b>: Forecast API &mdash; kondisi angin (kecepatan, arah, suhu, kelembapan) SAAT INI, plus riwayat per jam 7 hari terakhir (dipakai jg utk Wind Rose &amp; tren kecepatan di kartu Data Angin). Auto-refresh tiap 5 menit.</li>
+        <li><b>Mode Periode</b>: Archive API &mdash; riwayat angin per jam SEPANJANG semester/periode yang dipilih (bukan cuma 7 hari), dikelompokkan jadi 16 sektor arah &amp; dibobot frekuensi kejadian tiap sektor. Ada delay arsip Open-Meteo &plusmn;5 hari &mdash; kalau periode masih berjalan, tanggal akhir otomatis dipotong ke data terbaru yang tersedia.</li>
+      </ul>
+      <h4 style="margin:14px 0 4px;color:var(--navy-800);">Cara Kerja Model &amp; Visualisasi</h4>
+      <p>Pola sebaran dihitung pakai <b>model Gaussian plume ground-level</b> (dengan refleksi tanah) + koefisien sigma-y/sigma-z pendekatan Briggs (rural power-law) per <b>kelas stabilitas atmosfer Pasquill-Gifford (A&ndash;F)</b> &mdash; dasar matematis yang sama dipakai basis model screening AERMOD/ISCST3 versi sederhana.</p>
+      <ul style="margin:4px 0 10px;padding-left:20px;">
+        <li><b>Live</b>: satu snapshot arah+kecepatan angin &rarr; plume berbentuk kerucut sempit.</li>
+        <li><b>Periode</b>: superposisi SEMUA sektor arah angin sepanjang periode, dibobot frekuensi &rarr; plume berbentuk kipas melebar (mendekati pola sebaran jangka panjang).</li>
+        <li>Grid konsentrasi dihitung ulang otomatis mengikuti VIEWPORT peta saat ini (bukan kotak tetap di sekitar titik) &mdash; tidak pernah kepotong saat zoom-out, tidak blur saat zoom-in.</li>
+        <li><b>Skala warna SELALU dinormalisasi ke puncak konsentrasi lokal saat itu juga</b> (bukan skala tetap) &mdash; warna yang sama bisa berarti NILAI BERBEDA di tampilan berbeda. Legenda angka di bawah peta ikut berubah tiap plume dihitung ulang (peta digeser/zoom/ganti filter/angin) &mdash; selalu baca angkanya, bukan cuma warnanya.</li>
+      </ul>
+      <h4 style="margin:14px 0 4px;color:var(--navy-800);">Peta pada Laporan PDF</h4>
+      <p>Latar peta (citra satelit/jalan, mengikuti pilihan Satelit/Jalan di layar) diambil dari layanan basemap <b>Esri</b> saat laporan dicetak &mdash; butuh koneksi internet SAAT ITU. Kalau tidak ada internet, latar peta bisa kosong tapi lapisan pola sebaran, cincin jarak, panah utara/angin, &amp; titik sumber di atasnya tetap tampil normal (digambar lokal di browser dari data yang sama dengan peta interaktif).</p>
+      <h4 style="margin:14px 0 4px;color:var(--navy-800);">Keterbatasan</h4>
+      <p class="hint">Ini model SCREENING sederhana: medan datar, angin &amp; stabilitas seragam di seluruh area, tanpa transformasi kimia atmosfer. BUKAN pengganti kajian dispersi regulatory penuh (perlu simulasi meteorologi per jam minimal 1 tahun, model AERMOD lengkap). Gunakan sebagai indikasi awal/screening, silangkan ke kajian resmi untuk keputusan kepatuhan.</p>
+    </div>
+    <div class="actions"><button class="btn primary" data-action="closeModal">Tutup</button></div>
+  `, {wide:true});
+}
 Object.assign(ACTIONS, {
   dispersiSetSite, dispersiSetParam, dispersiOnPeriodeChange, dispersiOnStabilityChange,
   dispersiSetWindModeLive, dispersiSetWindModePeriode, dispersiSetMapLayerSat, dispersiSetMapLayerStreet,
   dispersiRefreshWind, dispersiSelectAllAtSite, dispersiDeselectAll, printDispersiReport, doPrintDispersiReport,
-  dispersiToggleTipe, dispersiManualRefreshPlume
+  dispersiToggleTipe, dispersiManualRefreshPlume, dispersiInfoModal
 });
 document.addEventListener("change", e=>{
   if(e.target.id==="dispersiPeriode") dispersiOnPeriodeChange();
