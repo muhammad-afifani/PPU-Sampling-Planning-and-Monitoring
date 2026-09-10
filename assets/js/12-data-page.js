@@ -213,8 +213,12 @@ function resetEmpty(){
     save(); toast("Data dikosongkan total.","ok"); showPage("dashboard");
   });
 }
-function downloadTemplatePoints(){
-  csvExport(["id","site","kategori","nama","kategoriSumber","regulasi","parameter","parameterCatatan","wajib","frekuensiBulan","tidakBeroperasi","alasanTidakWajib","kapasitas","kapasitasKW","jenisBahanBakar","runningHour","pemantauanTerakhir","prediksiBerikutnya","lastSampling"], [], "template_titik_pantau.csv");
+function downloadTemplatePointsXlsx(){
+  const wb = xlsxWorkbookFromSheets([
+    ["Emisi", xlsxSheetFromRows(POINTS_XLSX_HEADERS_EMISI, [])],
+    ["Ambient & Lingkungan", xlsxSheetFromRows(POINTS_XLSX_HEADERS_AMBIENT, [])]
+  ]);
+  xlsxDownload(wb, "template_titik_pantau.xlsx");
 }
 function downloadTemplatePersonil(){
   csvExport(["nama","role","ktpExp","mcuExp","spkExp","medpassExp","clsrExp","ppcExp","fotoBiruAda","bosietExp","vaksinAda","ptsidExp"], [], "template_personil.csv");
