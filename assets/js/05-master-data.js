@@ -3,7 +3,7 @@
 ========================================================= */
 let masterView = "tree";
 let masterExpanded = new Set();
-const MASTER_SITE_ORDER = ["SPS","BEKAPAI","HCA","CPU","NPU","SPU","BPN"];
+const MASTER_SITE_ORDER = ["SPS","BKP","HCA","CPU","NPU","SPU","BPN"];
 const NONEMISI_LABEL = {ambient:"Ambient Udara", kebisingan:"Kebisingan", kebauan:"Kebauan", getaran:"Getaran"};
 const NONEMISI_BADGE = {ambient:"b-blue", kebisingan:"b-amber", kebauan:"b-teal", getaran:"b-gray"};
 

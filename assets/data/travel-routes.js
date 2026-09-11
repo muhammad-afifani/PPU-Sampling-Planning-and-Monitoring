@@ -23,13 +23,13 @@
 
    Field "bookingOverride" (opsional): rute khusus di mana tanggung jawab booking transport BUKAN
    site keberangkatan (aturan umum), melainkan site tetap yang disebut di sini — dipakai kode
-   (lihat bookingResponsibilityText di 08-gantt-print.js). Kasus BEKAPAI: booking laut ke/dari
-   BEKAPAI SELALU jadi urusan BEKAPAI sendiri, termasuk pas keberangkatan dari SPS menuju BEKAPAI
+   (lihat bookingResponsibilityText di 08-gantt-print.js). Kasus BKP: booking laut ke/dari
+   BKP SELALU jadi urusan BKP sendiri, termasuk pas keberangkatan dari SPS menuju BKP
    (SPS tidak ikut booking sama sekali) — lihat catatan user.
 ========================================================= */
 const TRAVEL_ROUTES = {
-  "SPS>BEKAPAI": {label:"Laut · berangkat ±06:30 WITA", mode:"laut", note:"Dari Jetty Senipah (SPS). Personil standby di jetty plg lambat ±06:00 WITA.", equipmentNote:"Peralatan sampling didrop sore hari H-1 keberangkatan (perlu diangkut ke basket dulu) — koordinasikan dengan tim Marine di jetty Senipah.", bookingOverride:"BEKAPAI"},
-  "BEKAPAI>SPS": {label:"Laut · siang–sore", mode:"laut", note:"Tergantung jadwal tim Marine Transport — umumnya berangkat dari BEKAPAI ±13:00–16:00 WITA (setelah istirahat siang)."},
+  "SPS>BKP": {label:"Laut · berangkat ±06:30 WITA", mode:"laut", note:"Dari Jetty Senipah (SPS). Personil standby di jetty plg lambat ±06:00 WITA.", equipmentNote:"Peralatan sampling didrop sore hari H-1 keberangkatan (perlu diangkut ke basket dulu) — koordinasikan dengan tim Marine di jetty Senipah.", bookingOverride:"BKP"},
+  "BKP>SPS": {label:"Laut · siang–sore", mode:"laut", note:"Tergantung jadwal tim Marine Transport — umumnya berangkat dari BKP ±13:00–16:00 WITA (setelah istirahat siang)."},
   "SPS>HCA": {label:"Darat · fleksibel", mode:"darat", note:"Transport SCI sendiri, jadwal menyesuaikan kebutuhan (tidak terpaku jam tetap)."},
   "HCA>SPS": {label:"Darat · fleksibel", mode:"darat", note:"Transport SCI sendiri, jadwal menyesuaikan kebutuhan (tidak terpaku jam tetap)."},
   "HCA>SPU": {label:"Seatruck · ±09:00 WITA", mode:"seatruck"},

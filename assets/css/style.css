@@ -240,6 +240,7 @@ nav .navbtn.hidden-by-search{display:none;}
 .main{flex:1;min-width:0;padding:22px 26px 60px;}
 .pagehead{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
 #plStickyBody.collapsed{display:none;}
+#dispersiStats.collapsed{display:none;}
 .pagehead h2{margin:0;font-size:19px;color:var(--heading);}
 .pagehead .desc{font-size:12.5px;color:var(--gray-500);margin-top:3px;}
 .page{display:none;}
@@ -674,7 +675,11 @@ textarea.mono{font-family:var(--font-mono);font-size:11.5px;}
    preview di layar (dalam openModal) MAUPUN sbg halaman cetak (#printGuideArea) — grid 2:1 sengaja
    TETAP di kedua konteks (bukan cuma di layar) krn tombol cetak-nya memakai orientasi Lanskap. */
 .pg-dispersi-pro{display:grid;grid-template-columns:2fr 1fr;gap:0;border:1.5px solid #333;background:#fff;}
-.pg-dispersi-pro-map{position:relative;background:#eef2f5;}
+/* Map cell diregangkan mengisi TINGGI PENUH baris grid (stretch bawaan CSS Grid) alih-alih dibatasi
+   kotak aspect-ratio sendiri — dulu kalau sidebar (daftar Indeks Titik Sumber panjang) lebih tinggi
+   drpd kotak rasio peta, sisanya jadi ruang kosong abu-abu di bawah peta, buruk utk hasil cetak.
+   Isinya (2 lapis img + panah angin) posisi absolute inset:0 mengikuti tinggi sel ini apa adanya. */
+.pg-dispersi-pro-map{position:relative;background:#eef2f5;min-height:380px;}
 .pg-dispersi-pro-sidebar{border-left:1.5px solid #333;padding:14px 16px;background:#fff;font-size:11.5px;color:#1a1a1a;}
 .pg-dispersi-pro-title{text-align:center;margin:2px 0 12px;padding-bottom:10px;border-bottom:1.5px solid #333;}
 .pg-dispersi-pro-title .eyebrow{font-size:8px;letter-spacing:.08em;color:#a02a24;font-weight:700;margin-bottom:5px;}

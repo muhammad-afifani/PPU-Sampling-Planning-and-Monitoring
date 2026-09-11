@@ -109,6 +109,48 @@ function migrateDB(){
     DB.komStatus = migrated;
     DB.meta.komMigratedV2 = true;
   }
+  // Migrasi sekali: site "BEKAPAI" diganti jadi kode 3-huruf "BKP" supaya konsisten dgn site lain
+  // (CPU/SPU/NPU/SPS/HCA/BPN semuanya sudah 3 huruf — BEKAPAI dulu satu-satunya nama panjang).
+  // Field .site di tiap koleksi diganti langsung; key gabungan "site::nama" (pointCoords,
+  // coordVerification) & "periode::site" (komStatus) ikut diganti supaya tidak jadi entry
+  // yatim/tidak ketemu lagi oleh titik yang site-nya sudah berubah.
+  if(!DB.meta.siteBekapaiRenamedToBkp){
+    const renameSite = s => s==="BEKAPAI" ? "BKP" : s;
+    DB.points.forEach(p=>{ p.site = renameSite(p.site); });
+    DB.hasilPemantauan.forEach(r=>{ if(r.site) r.site = renameSite(r.site); });
+    ["ambien","kebisingan","kebauan","getaran"].forEach(k=>{
+      (DB.hasilAmbien[k]||[]).forEach(r=>{ if(r.site) r.site = renameSite(r.site); });
+    });
+    DB.routeAmbient = DB.routeAmbient.map(renameSite);
+    DB.routeEmisi = DB.routeEmisi.map(renameSite);
+    if(DB.siteRules && DB.siteRules.BEKAPAI){ DB.siteRules.BKP = DB.siteRules.BEKAPAI; delete DB.siteRules.BEKAPAI; }
+    const renameSitePrefixedKeys = (obj)=>{
+      const out = {};
+      Object.keys(obj).forEach(key=>{
+        const newKey = key.indexOf("BEKAPAI::")===0 ? "BKP::"+key.slice("BEKAPAI::".length) : key;
+        out[newKey] = obj[key];
+      });
+      return out;
+    };
+    DB.pointCoords = renameSitePrefixedKeys(DB.pointCoords);
+    DB.coordVerification = renameSitePrefixedKeys(DB.coordVerification);
+    Object.values(DB.coordVerification).forEach(v=>{ if(v && v.site) v.site = renameSite(v.site); });
+    // Jadwal batch (Gantt) & override per-hari-nya sama-sama menyimpan site: schedule[].site dipakai
+    // langsung utk pengelompokan baris Gantt, dayOverrides di-key "site::engineId" persis pola
+    // pointCoords di atas.
+    DB.batches.forEach(b=>{
+      (b.schedule||[]).forEach(row=>{ if(row.site) row.site = renameSite(row.site); });
+      if(b.dayOverrides) b.dayOverrides = renameSitePrefixedKeys(b.dayOverrides);
+    });
+    const renamedKom = {};
+    Object.keys(DB.komStatus).forEach(key=>{
+      const suffix = "::BEKAPAI";
+      const newKey = key.slice(-suffix.length)===suffix ? key.slice(0,-suffix.length)+"::BKP" : key;
+      renamedKom[newKey] = DB.komStatus[key];
+    });
+    DB.komStatus = renamedKom;
+    DB.meta.siteBekapaiRenamedToBkp = true;
+  }
   DB.personil.forEach(p=>{ if(p.dokumentasiLink===undefined) p.dokumentasiLink = ""; });
   DB.points.forEach(p=>{
     if(p.groupOverride===undefined) p.groupOverride = "";

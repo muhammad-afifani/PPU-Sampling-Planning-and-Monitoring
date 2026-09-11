@@ -11,7 +11,7 @@
 // H2S punya ambang batas sendiri (0,5% berat, lihat field "standard" pada rekaman datanya).
 const HD_EMISI_PARAMS = new Set(["NOx","CO","SO₂","Total Partikulat","Opasitas","H2S"]);
 function hdIsEmisiParam(p){ return HD_EMISI_PARAMS.has(p); }
-const HASIL_SITE_COLORS = {SPS:"#0ea5a0", HCA:"#3d78c9", CPU:"#e0554f", NPU:"#e8a33d", SPU:"#7c5cbf", BEKAPAI:"#3fb27f", BPN:"#64748b"};
+const HASIL_SITE_COLORS = {SPS:"#0ea5a0", HCA:"#3d78c9", CPU:"#e0554f", NPU:"#e8a33d", SPU:"#7c5cbf", BKP:"#3fb27f", BPN:"#64748b"};
 const HD_PALETTE = ["#0ea5a0","#e0554f","#e8a33d","#3d78c9","#7c5cbf","#3fb27f","#c2478a","#8a5c11","#64748b","#2b7fb0","#a02a24","#1c7a4f"];
 const HD_PERMEN_LABEL = {"PERMEN LH 13 2009":"Permen LH 13/2009 (Turbin/Heater/Flare)", "PERMEN LH 11 2021":"Permen LHK 11/2021 (Genset Diesel & Gas)"};
 
