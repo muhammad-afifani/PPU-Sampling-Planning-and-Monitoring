@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202609101900">
+<link rel="stylesheet" href="assets/css/style.css?v=202609112200">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -436,7 +436,7 @@
       </div>
       <div class="card">
         <h3>Transport Arrange</h3>
-        <div class="hint" style="margin-bottom:10px;">Rekap semua leg perpindahan antar-site dari jadwal batch yang sedang tampil di filter di atas, per tim, diurut tanggal — dipisah Transport Darat (BPN/SPS/HCA, booking oleh PPC SCI) dan Transport Air/Laut &amp; Seatruck (BEKAPAI/CPU/SPU/NPU, booking oleh ENV Site/Site Reps. asal kecuali rute khusus). Termasuk leg keberangkatan dari &amp; kembali ke BPN (Base Office) kalau datanya tersedia.</div>
+        <div class="hint" style="margin-bottom:10px;">Rekap semua leg perpindahan antar-site dari jadwal batch yang sedang tampil di filter di atas, per tim, diurut tanggal — dipisah Transport Darat (BPN/SPS/HCA, booking oleh PPC SCI) dan Transport Air/Laut &amp; Seatruck (BKP/CPU/SPU/NPU, booking oleh ENV Site/Site Reps. asal kecuali rute khusus). Termasuk leg keberangkatan dari &amp; kembali ke BPN (Base Office) kalau datanya tersedia.</div>
         <div id="transportArrangeWrap"></div>
       </div>
       <div class="card">
@@ -777,9 +777,10 @@
       <div class="pagehead"><div><h2>Model Dispersi Emisi</h2><div class="desc">Peta sebaran (plume) &amp; beban pencemar per titik cerobong — dihitung dari data riil hasil pemantauan, laju alir, running hour, koordinat titik, dan data angin Open-Meteo</div></div>
         <div class="toolbar">
           <button class="btn ghost" data-action="dispersiInfoModal" title="Sumber data angin &amp; cara kerja model">&#8505;&#65039; Info Model &amp; Data Angin</button>
-          <button class="btn ghost" data-action="dispersiOpenProfessionalPreview" title="Preview peta format AMDAL dgn logo PHM, siap cetak">&#128506;&#65039; Preview Peta Profesional</button>
-          <button class="btn ghost" data-action="dispersiOpenExpertMode" title="Animasi timelapse sebaran per jam pada 1 tanggal pilihan">&#127916; Mode Expert (Timelapse)</button>
+          <button class="btn ghost" data-action="dispersiOpenProfessionalPreview" title="Preview peta kartografis dgn logo PHM, siap cetak">&#128506;&#65039; Preview Peta Profesional</button>
+          <button class="btn ghost" data-action="dispersiOpenExpertMode" title="Animasi timelapse sebaran per jam pada 1 tanggal pilihan">&#127916; Simulasi Transien (Timelapse)</button>
           <button class="btn primary" data-action="printDispersiReport">Cetak Laporan Beban Emisi (PDF)</button>
+          <button class="btn small ghost" data-action="toggleDispersiStats" id="btnDispersiStatsToggle">&#9650; Ciutkan Ringkasan</button>
         </div>
       </div>
       <div class="card" id="dispersiStats" style="margin-bottom:0;"></div>
@@ -1398,32 +1399,32 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202609101900"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202609101900"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202609112200"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202609112200"></script>
 
-<script src="assets/data/default-data.js?v=202609101900"></script>
-<script src="assets/data/brand-assets.js?v=202609101900"></script>
-<script src="assets/data/travel-routes.js?v=202609101900"></script>
-<script src="assets/js/00-icons.js?v=202609101900"></script>
-<script src="assets/js/01-state.js?v=202609101900"></script>
-<script src="assets/js/02-nav-util.js?v=202609101900"></script>
-<script src="assets/js/03-period-logic.js?v=202609101900"></script>
-<script src="assets/js/04-dashboard.js?v=202609101900"></script>
-<script src="assets/js/05-master-data.js?v=202609101900"></script>
-<script src="assets/js/06-plan-personil.js?v=202609101900"></script>
-<script src="assets/js/07-rules-planner.js?v=202609101900"></script>
-<script src="assets/js/08-gantt-print.js?v=202609101900"></script>
-<script src="assets/js/09-tracking-map.js?v=202609101900"></script>
-<script src="assets/js/10-running-hour.js?v=202609101900"></script>
-<script src="assets/js/11-berita-acara.js?v=202609101900"></script>
-<script src="assets/js/12-data-page.js?v=202609101900"></script>
-<script src="assets/js/13-hasil-db.js?v=202609101900"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202609101900"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202609101900"></script>
-<script src="assets/js/16-actions-init.js?v=202609101900"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202609101900"></script>
-<script src="assets/js/18-model-dispersi.js?v=202609101900"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202609101900"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202609101900"></script>
+<script src="assets/data/default-data.js?v=202609112200"></script>
+<script src="assets/data/brand-assets.js?v=202609112200"></script>
+<script src="assets/data/travel-routes.js?v=202609112200"></script>
+<script src="assets/js/00-icons.js?v=202609112200"></script>
+<script src="assets/js/01-state.js?v=202609112200"></script>
+<script src="assets/js/02-nav-util.js?v=202609112200"></script>
+<script src="assets/js/03-period-logic.js?v=202609112200"></script>
+<script src="assets/js/04-dashboard.js?v=202609112200"></script>
+<script src="assets/js/05-master-data.js?v=202609112200"></script>
+<script src="assets/js/06-plan-personil.js?v=202609112200"></script>
+<script src="assets/js/07-rules-planner.js?v=202609112200"></script>
+<script src="assets/js/08-gantt-print.js?v=202609112200"></script>
+<script src="assets/js/09-tracking-map.js?v=202609112200"></script>
+<script src="assets/js/10-running-hour.js?v=202609112200"></script>
+<script src="assets/js/11-berita-acara.js?v=202609112200"></script>
+<script src="assets/js/12-data-page.js?v=202609112200"></script>
+<script src="assets/js/13-hasil-db.js?v=202609112200"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202609112200"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202609112200"></script>
+<script src="assets/js/16-actions-init.js?v=202609112200"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202609112200"></script>
+<script src="assets/js/18-model-dispersi.js?v=202609112200"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202609112200"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202609112200"></script>
 </body>
 </html>

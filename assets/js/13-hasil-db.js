@@ -41,7 +41,7 @@ function hasilPeriodParts(p){
   const sem = Number(m[1]), tahun = Number(m[2]);
   return {sem, tahun, order: tahun*2+(sem-1)};
 }
-const HASIL_SITE_MAP = {BKP:"BEKAPAI", PCK:"SPS"};
+const HASIL_SITE_MAP = {PCK:"SPS"};
 function hasilBuildRecord(r, idx, engineLookup){
   const cerobong = (r["NAMA CEROBONG (SK NO 2020)"]||"").trim();
   const periode = (r["PERIODE"]||"").trim();

@@ -840,7 +840,7 @@ function permitReminderText(site, startDate){
 // Kalimat tanggung jawab booking transport — dipakai bareng oleh panduan cetak & preview per-site.
 // Diringkas sesuai masukan: cukup sebut siapa yang booking (ENV Site/Site Reps site ASAL), tanpa
 // embel-embel "site tujuan tidak perlu booking" yang dianggap sudah umum diketahui. Rute yang
-// punya "bookingOverride" di TRAVEL_ROUTES (mis. semua rute ke/dari BEKAPAI) MENGESAMPINGKAN aturan
+// punya "bookingOverride" di TRAVEL_ROUTES (mis. semua rute ke/dari BKP) MENGESAMPINGKAN aturan
 // "site asal" ini — site yang disebut di override itu yang booking, walau bukan site keberangkatan.
 function bookingResponsibilityText(fromSite, toSite){
   const route = travelRouteInfo(fromSite, toSite);
@@ -1141,7 +1141,7 @@ function renderSitePreview(batches){
    Leg BPN <-> site pertama/terakhir (berangkat & kembali ke Base Office) ditambahkan otomatis
    KALAU BPN memang terdaftar di rute tim ybs (DB.routeEmisi/routeAmbient, lihat default-data.js)
    DAN datanya ada di TRAVEL_ROUTES — tidak dipaksakan/dikarang kalau rutenya belum terdaftar
-   (mis. BPN<->BEKAPAI), supaya recap ini tidak pernah menampilkan info yg belum tervalidasi tim
+   (mis. BPN<->BKP), supaya recap ini tidak pernah menampilkan info yg belum tervalidasi tim
    lapangan (lebih baik tidak muncul drpd salah/menyesatkan utk urusan booking transport riil).
    Booking transport darat (BPN/SPS/HCA) dipesan PPC SCI (sesuai catatan tim lapangan) — beda dari
    aturan umum bookingResponsibilityText (site asal) yg dipakai laut/seatruck, jadi utk leg darat

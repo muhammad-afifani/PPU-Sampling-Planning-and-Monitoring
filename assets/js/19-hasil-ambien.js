@@ -60,10 +60,9 @@ function ambEngineLookup(kategori){
   DB.points.forEach(p=>{ if(p.kategori===kategori) map[p.nama.trim()] = p; });
   return map;
 }
-// BKP di sheet Excel sumber = BEKAPAI di Database Titik Pantau — sama seperti HASIL_SITE_MAP yang
-// sudah dipakai utk Hasil Pemantauan Emisi (13-hasil-db.js), dipakai ulang di sini apa adanya.
+// HASIL_SITE_MAP (13-hasil-db.js) dipakai ulang di sini apa adanya — dipakai kalau sheet Excel
+// sumber suatu saat pakai alias site yang beda dari kode 3-huruf internal (mis. PCK->SPS).
 function ambSite(raw){ const s=(raw||"").trim(); return HASIL_SITE_MAP[s] || s; }
-function ambSiteRaw(site){ return site==="BEKAPAI" ? "BKP" : site; }
 function ambResult(raw){ return hasilParseResult(raw==null ? "" : String(raw)); }
 function ambStatusVsBaku(resultNumeric, resultStatus, baku){
   if(resultNumeric==null || (resultStatus!=="measured" && resultStatus!=="below_detection")) return "not_evaluated";
@@ -226,7 +225,7 @@ const KEBISINGAN_XLSX_HEADERS = ["NO","SAMPLE IDENTIFICATION","SITE","LATITUDE",
 const GETARAN_XLSX_HEADERS = ["NO","SAMPLE IDENTIFICATION","DATE OF MEASUREMENT","SEMESTER","SITE","LATITUDE","LONGITUDE","FREQUENCY (Hz)","UNIT","TEST RESULT","NOTDISTURB","DISTURB","UNCOMFORTABLE","PAINFUL","STATUS","METHOD"];
 function ambExportAmbienRows(){
   return DB.hasilAmbien.ambien.map((r,i)=>({
-    "NO":i+1, "SAMPLE IDENTIFICATION":r.titik, "SITE":ambSiteRaw(r.site), "LATITUDE":"", "LONGITUDE":"",
+    "NO":i+1, "SAMPLE IDENTIFICATION":r.titik, "SITE":r.site, "LATITUDE":"", "LONGITUDE":"",
     "DATE OF SAMPLING":r.tanggal, "SEMESTER":r.periode, "PARAMETER":r.parameter, "PERIODE":r.durasi,
     "TEST RESULT":r.resultRaw, "REQUIREMENT": r.baku!=null?r.baku:"", "METHOD":r.metode,
     "TEMPERATUR(°C)":r.cuaca.suhu, "HUMIDITY(%)":r.cuaca.kelembapan, "PRESSURE(mmHg)":r.cuaca.tekanan,
@@ -235,7 +234,7 @@ function ambExportAmbienRows(){
 }
 function ambExportKebauanRows(){
   return DB.hasilAmbien.kebauan.map((r,i)=>({
-    "NO":i+1, "SAMPLE IDENTIFICATION":r.titik, "SITE":ambSiteRaw(r.site), "LATITUDE":"", "LONGITUDE":"",
+    "NO":i+1, "SAMPLE IDENTIFICATION":r.titik, "SITE":r.site, "LATITUDE":"", "LONGITUDE":"",
     "PARAMETER":r.parameter, "DATE OF MEASUREMENT":r.tanggal, "SEMESTER":r.periode, "UNIT":r.unit,
     "TEST RESULT":r.resultRaw, "REQUIREMENT": r.baku!=null?r.baku:"", "METHOD":r.metode
   }));
@@ -243,7 +242,7 @@ function ambExportKebauanRows(){
 function ambExportKebisinganRows(){
   const out = [];
   DB.hasilAmbien.kebisingan.forEach((r,i)=>{
-    const base = {"NO":i+1, "SAMPLE IDENTIFICATION":r.titik, "SITE":ambSiteRaw(r.site), "LATITUDE":"", "LONGITUDE":"",
+    const base = {"NO":i+1, "SAMPLE IDENTIFICATION":r.titik, "SITE":r.site, "LATITUDE":"", "LONGITUDE":"",
       "DATE OF MEASURMENT":r.tanggal, "SEMESTER":r.periode, "UNIT":r.unit, "METHOD":r.metode};
     r.hourly.forEach(h=> out.push({...base, "TIME OF MEASURMENT":h.label, "TEST RESULT":h.nilai, "REQUIREMENT":"-", "REMARKS":"Result"}));
     out.push({...base, "TIME OF MEASURMENT":"L Day (06.00 - 21.00)", "TEST RESULT": r.lSiang!=null?r.lSiang:"", "REQUIREMENT":"-", "REMARKS":"Final Result"});
@@ -256,7 +255,7 @@ function ambExportGetaranRows(){
   const out = [];
   DB.hasilAmbien.getaran.forEach((r,i)=>{
     const base = {"NO":i+1, "SAMPLE IDENTIFICATION":r.titik, "DATE OF MEASUREMENT":r.tanggal, "SEMESTER":r.periode,
-      "SITE":ambSiteRaw(r.site), "LATITUDE":"", "LONGITUDE":"", "UNIT":r.unit, "METHOD":r.metode};
+      "SITE":r.site, "LATITUDE":"", "LONGITUDE":"", "UNIT":r.unit, "METHOD":r.metode};
     r.bands.forEach(b=> out.push({...base, "FREQUENCY (Hz)":b.freq, "TEST RESULT":b.nilai,
       "NOTDISTURB":b.notDisturb, "DISTURB":b.disturb, "UNCOMFORTABLE":b.uncomfortable, "PAINFUL":b.painful, "STATUS":b.status}));
   });

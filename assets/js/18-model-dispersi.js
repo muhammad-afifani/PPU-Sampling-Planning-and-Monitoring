@@ -46,16 +46,27 @@ function dispersiIsQualitativeMode(){
 const DISPERSI_FLOW_MODE_KEY = "FLOW";
 const DISPERSI_FLOW_MODE_META = {label:"Keluaran Cerobong (Semua Arah)", desc:"Pola sebaran KESELURUHAN gas buang berdasarkan laju alir tercatat (bukan konsentrasi pencemar tertentu) — menunjukkan ke arah mana asap/gas buang bergerak, bukan beban pencemar. Pilih salah satu parameter pencemar untuk melihat beban & kepatuhan baku mutu."};
 function dispersiIsFlowMode(){ return dispersiState.param===DISPERSI_FLOW_MODE_KEY; }
-// Baku Mutu Udara Ambien Nasional (PP 22/2021 Lampiran VII) & US EPA NAAQS — acuan umum
-// pembanding (µg/m³) utk konsentrasi PUNCAK hasil model, BUKAN pengganti kajian dispersi
-// regulatory penuh (perlu simulasi meteorologi per jam sepanjang minimal 1 tahun, bukan
+// Baku Mutu Udara Ambien Nasional (PP 22/2021 Lampiran VII, "Baku Mutu Udara Ambien Nasional") &
+// US EPA National Ambient Air Quality Standards/NAAQS (40 CFR Part 50, berlandaskan Clean Air Act)
+// — acuan umum pembanding (µg/m³) utk konsentrasi PUNCAK hasil model, BUKAN pengganti kajian
+// dispersi regulatory penuh (perlu simulasi meteorologi per jam sepanjang minimal 1 tahun, bukan
 // screening satu kombinasi angin+stabilitas seperti di halaman ini). Cross-check ke teks resmi
-// PP 22/2021 sebelum dipakai pelaporan kepatuhan — angka di sini murni konteks/indikasi awal.
+// PP 22/2021 Lampiran VII sebelum dipakai pelaporan kepatuhan — angka di sini murni konteks/
+// indikasi awal. "category" = penjelasan singkat kedudukan parameter ini sbg pencemar apa &
+// kenapa dibandingkan ke ambang di atas (ditampilkan di panel Dampak Kualitas Udara Ambien).
 const DISPERSI_AMBIENT_STD = {
-  "NOx": {ambientLabel:"NO₂ (ambien)", pp22:{"24 jam":65,"1 tahun":50}, epa:{"1 jam":188,"1 tahun":100}},
-  "SO₂": {ambientLabel:"SO₂ (ambien)", pp22:{"24 jam":75,"1 tahun":45}, epa:{"1 jam":196}},
-  "CO": {ambientLabel:"CO (ambien)", pp22:{"8 jam":10000}, epa:{"8 jam":10000}},
-  "Total Partikulat": {ambientLabel:"PM10/TSP (ambien)", pp22:{"24 jam":75,"1 tahun":40}, epa:{"24 jam":150}}
+  "NOx": {ambientLabel:"NO₂ (ambien)",
+    category:"NOx (NO+NO₂) yang dilepas cerobong teroksidasi di atmosfer jadi NO₂ — itulah yang dipakai sbg parameter baku mutu udara ambien, bukan NOx totalnya. NO₂ termasuk salah satu dari 6 pencemar kriteria (criteria air pollutant) baku US EPA NAAQS, dan juga parameter baku mutu udara ambien nasional PP 22/2021.",
+    pp22:{"24 jam":65,"1 tahun":50}, epa:{"1 jam":188,"1 tahun":100}},
+  "SO₂": {ambientLabel:"SO₂ (ambien)",
+    category:"SO₂ termasuk salah satu dari 6 pencemar kriteria (criteria air pollutant) baku US EPA NAAQS, dan juga parameter baku mutu udara ambien nasional PP 22/2021 — indikator utama pencemaran dari bahan bakar bersulfur.",
+    pp22:{"24 jam":75,"1 tahun":45}, epa:{"1 jam":196}},
+  "CO": {ambientLabel:"CO (ambien)",
+    category:"CO termasuk salah satu dari 6 pencemar kriteria (criteria air pollutant) baku US EPA NAAQS, dan juga parameter baku mutu udara ambien nasional PP 22/2021 — indikator produk pembakaran tidak sempurna.",
+    pp22:{"8 jam":10000}, epa:{"8 jam":10000}},
+  "Total Partikulat": {ambientLabel:"PM10/TSP (ambien)",
+    category:"Partikulat termasuk salah satu dari 6 pencemar kriteria (criteria air pollutant) baku US EPA NAAQS (diukur sbg PM10/PM2.5); baku mutu udara ambien nasional PP 22/2021 memakai istilah TSP (Total Suspended Particulate) utk kelompok parameter ini.",
+    pp22:{"24 jam":75,"1 tahun":40}, epa:{"24 jam":150}}
 };
 
 /* ---------- Pengelompokan jenis sumber (utk warna & default geometri cerobong) dari 17 nilai
@@ -117,7 +128,7 @@ function dispersiRotateToPlume(dx,dy,bearingDeg){
 }
 const DISPERSI_COLOR_STOPS = [[0,[13,31,56]],[0.12,[45,120,150]],[0.28,[14,165,160]],[0.48,[90,200,90]],[0.65,[232,214,60]],[0.82,[232,140,50]],[1,[224,40,30]]];
 // Palet kelas kecepatan angin baku — dipakai bareng oleh Wind Rose & grafik ringkasan angin harian
-// Mode Expert, supaya konvensi warna "kecepatan angin" konsisten di semua visualisasi halaman ini.
+// Simulasi Transien, supaya konvensi warna "kecepatan angin" konsisten di semua visualisasi halaman ini.
 const DISPERSI_SPEED_BINS = [
   {max:2, label:"<2", color:"#bfe3ea"},
   {max:4, label:"2–4", color:"#7cc3d6"},
@@ -805,7 +816,7 @@ function dispersiWindCasesFromHistory(hist){
 }
 // Grid konsentrasi 200x200 dihitung lalu diperhalus (box blur 3x) supaya batas antar-band jadi
 // kurva mulus — inti fisika Gaussian plume, dipisah dari dispersiComputePlumeNow supaya bisa
-// dipakai ulang PERSIS SAMA oleh render peta interaktif MAUPUN kanvas Mode Expert (timelapse per
+// dipakai ulang PERSIS SAMA oleh render peta interaktif MAUPUN kanvas Simulasi Transien (timelapse per
 // jam), tanpa duplikasi rumus. Murni angka in-out (parameter eksplisit semua, tidak menyentuh
 // DOM/Leaflet/dispersiState) — supaya aman dipanggil berulang-ulang cepat (tiap jam) tanpa efek
 // samping/state bersama.
@@ -856,7 +867,7 @@ function dispersiComputeConcGrid(sources, windCases, stability, centerLat, cente
   return {smooth, maxV};
 }
 // Grid hasil dispersiComputeConcGrid -> kanvas berwarna (8 band non-linear, transparan di luar
-// badan plume) — sama spt di atas, dipisah utk dipakai ulang oleh peta interaktif & Mode Expert.
+// badan plume) — sama spt di atas, dipisah utk dipakai ulang oleh peta interaktif & Simulasi Transien.
 function dispersiGridToColorCanvas(smooth, maxV, GW, GH, OW, OH){
   const canvas = document.createElement("canvas"); canvas.width=GW; canvas.height=GH;
   const ctx = canvas.getContext("2d");
@@ -1182,11 +1193,12 @@ function dispersiAmbientImpactHtml(){
   const peak = dispersiState.lastPeakConcUgm3;
   if(peak==null) return `<div class="hint">Belum ada plume terhitung pada titik/angin saat ini.</div>`;
   const rows = [];
-  Object.entries(std.pp22||{}).forEach(([period,val])=>rows.push({source:"PP 22/2021 (Nasional)", period, val}));
+  Object.entries(std.pp22||{}).forEach(([period,val])=>rows.push({source:"PP 22/2021 Lampiran VII", period, val}));
   Object.entries(std.epa||{}).forEach(([period,val])=>rows.push({source:"US EPA NAAQS", period, val}));
   return `
     <div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;letter-spacing:.02em;margin-bottom:3px;">Konsentrasi Puncak Terdekat Sumber &middot; ${escHtml(std.ambientLabel)}</div>
-    <div style="font-family:var(--font-mono);font-size:19px;font-weight:800;color:var(--heading);margin-bottom:6px;">${dispersiFmt(peak,1)} <span style="font-size:11px;font-weight:600;color:var(--gray-500);">µg/m³</span></div>
+    <div style="font-family:var(--font-mono);font-size:19px;font-weight:800;color:var(--heading);margin-bottom:4px;">${dispersiFmt(peak,1)} <span style="font-size:11px;font-weight:600;color:var(--gray-500);">µg/m³</span></div>
+    ${std.category?`<div style="font-size:10px;color:var(--gray-500);line-height:1.5;margin-bottom:7px;">${escHtml(std.category)}</div>`:""}
     <table style="width:100%;border-collapse:collapse;font-size:10.5px;">
       <thead><tr><th style="text-align:left;padding:2px 4px;color:var(--gray-500);font-weight:600;">Acuan</th><th style="text-align:right;padding:2px 4px;color:var(--gray-500);font-weight:600;">Ambang</th><th style="text-align:right;padding:2px 4px;color:var(--gray-500);font-weight:600;">%</th></tr></thead>
       <tbody>${rows.map(r=>{
@@ -1195,7 +1207,7 @@ function dispersiAmbientImpactHtml(){
         return `<tr style="border-top:1px solid var(--gray-200);"><td style="padding:2px 4px;">${escHtml(r.source)} <span style="color:var(--gray-500);">(${escHtml(r.period)})</span></td><td style="text-align:right;padding:2px 4px;font-family:var(--font-mono);">${dispersiFmt(r.val,0)}</td><td style="text-align:right;padding:2px 4px;font-family:var(--font-mono);font-weight:700;color:${color};">${dispersiFmt(pct,0)}%</td></tr>`;
       }).join("")}</tbody>
     </table>
-    <div class="hint" style="margin-top:6px;">Nilai TERTINGGI di mana pun dalam tampilan peta saat ini (biasanya persis di dekat cerobong, bukan di lokasi reseptor publik) — estimasi screening 1 kombinasi angin+stabilitas dari mode ${dispersiWindModeLabel(dispersiState.windMode)}, bukan rata-rata 24 jam/tahunan tervalidasi. Kajian AMDAL/kepatuhan resmi perlu simulasi meteorologi per jam min. 1 tahun (AERMOD penuh); silangkan angka baku mutu nasional ke teks resmi PP 22/2021 sebelum dipakai pelaporan.</div>
+    <div class="hint" style="margin-top:6px;">Sumber ambang: <b>PP Nomor 22 Tahun 2021 tentang Penyelenggaraan Perlindungan dan Pengelolaan Lingkungan Hidup, Lampiran VII (Baku Mutu Udara Ambien Nasional)</b>, dan <b>US EPA National Ambient Air Quality Standards (NAAQS)</b> berdasar Clean Air Act (40 CFR Part 50). Nilai TERTINGGI di mana pun dalam tampilan peta saat ini (biasanya persis di dekat cerobong, bukan di lokasi reseptor publik) — estimasi screening 1 kombinasi angin+stabilitas dari mode ${dispersiWindModeLabel(dispersiState.windMode)}, bukan rata-rata 24 jam/tahunan tervalidasi. Kajian AMDAL/kepatuhan resmi perlu simulasi meteorologi per jam min. 1 tahun (AERMOD penuh); silangkan angka baku mutu di atas ke teks resmi PP 22/2021 Lampiran VII sebelum dipakai pelaporan.</div>
   `;
 }
 function dispersiWindPanelHtml(){
@@ -1403,6 +1415,14 @@ function dispersiSetMapLayerStreet(){ dispersiSetMapLayer("street"); }
 function dispersiSelectAllAtSite(){ dispersiState.selectedStackIds = new Set(dispersiStacks().filter(s=>s.site===dispersiState.site).map(s=>s.id)); dispersiDrawMarkers(); dispersiScheduleUpdatePlume(); dispersiRenderSidePanels(); }
 function dispersiDeselectAll(){ dispersiState.selectedStackIds = new Set(); dispersiDrawMarkers(); dispersiScheduleUpdatePlume(); dispersiRenderSidePanels(); }
 function dispersiManualRefreshPlume(){ dispersiScheduleUpdatePlume(0); }
+// Sama pola dgn togglePlSticky (Perencanaan Batch) — ringkasan kartu statistik di header sticky
+// bisa diciutkan spy tidak makan tempat layar terus-menerus saat scroll ke bawah.
+function toggleDispersiStats(t){
+  const el = document.getElementById("dispersiStats");
+  const collapsed = el.classList.toggle("collapsed");
+  t.innerHTML = collapsed ? "&#9660; Tampilkan Ringkasan" : "&#9650; Ciutkan Ringkasan";
+  syncActiveStickyOffset();
+}
 
 /* ---------- Export PDF: Laporan Beban Emisi (per semester, BUKAN estimasi tahunan) ----------
    Laporan ini SENGAJA dipisah dari terminologi "dispersi"/model plume — ini murni rekap data
@@ -1420,12 +1440,12 @@ function printDispersiReport(){
     <div class="hint" style="margin-bottom:10px;">Mengikuti site &amp; titik yang sedang dipilih di peta: <b>${escHtml(dispersiState.site)}</b>, ${stacks.length} titik. Beban dihitung PER SEMESTER, jam operasi selalu dari semester yang dilaporkan (riwayat Running Hour bulanan) — konsentrasi pakai hasil sampling semester itu kalau ada, atau hasil terakhir yang masih berlaku (ditandai &dagger;) utk titik yang frekuensi pemantauannya lebih jarang dari 1x/semester. Total tahunan hanya muncul kalau semester 1 &amp; 2 pada tahun yang sama-sama tercentang &amp; punya beban (riil maupun &dagger;).</div>
     <div class="field"><label>Periode yang Dicetak</label>
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;">
-        ${periods.map(p=>`<label class="checkline"><input type="checkbox" class="dispPrintPeriode" value="${escHtml(p.periode)}" checked> ${escHtml(p.periode)}</label>`).join("")}
+        ${periods.map(p=>`<label class="checkline"><input type="checkbox" class="dispPrintPeriode" value="${escHtml(p.periode)}"> ${escHtml(p.periode)}</label>`).join("")}
       </div>
     </div>
     <div class="field" style="margin-top:12px;"><label>Parameter yang Dicetak</label>
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;">
-        ${Object.keys(DISPERSI_MASS_PARAMS).filter(p=>!DISPERSI_MASS_PARAMS[p].qualitative).map(p=>`<label class="checkline"><input type="checkbox" class="dispPrintParam" value="${escHtml(p)}" checked> ${escHtml(DISPERSI_MASS_PARAMS[p].label)}</label>`).join("")}
+        ${Object.keys(DISPERSI_MASS_PARAMS).filter(p=>!DISPERSI_MASS_PARAMS[p].qualitative).map(p=>`<label class="checkline"><input type="checkbox" class="dispPrintParam" value="${escHtml(p)}"> ${escHtml(DISPERSI_MASS_PARAMS[p].label)}</label>`).join("")}
       </div>
     </div>
     <div class="checkline" style="margin-top:12px;"><label><input type="checkbox" id="dispPrintIncludeMap"> Sertakan gambar peta sebaran (prototipe)</label></div>
@@ -1684,7 +1704,11 @@ function dispersiWindVectorFieldSvg(dirFromDeg, speedMs, boxW, boxH){
       arrows += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${colorCss}" stroke-width="${Math.max(1,unit*0.006).toFixed(1)}" stroke-linecap="round" marker-end="url(#dispArrowHead)"/>`;
     }
   }
-  return `<svg viewBox="0 0 ${boxW} ${boxH}" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;">
+  // preserveAspectRatio "slice" (bukan default "meet") — perilakunya spt object-fit:cover pada 2
+  // <img> di sebelahnya (lihat pg-dispersi-pro-map): kalau kotak tampil beda rasio dari boxW:boxH
+  // asli (skrg peta diregangkan penuh tinggi baris, bukan kotak rasio tetap lagi), SVG ini ikut
+  // di-crop-tengah SAMA seperti gambar peta di bawahnya, bukan malah kena letterbox/geser sendiri.
+  return `<svg viewBox="0 0 ${boxW} ${boxH}" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;">
     <defs><marker id="dispArrowHead" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.4" markerHeight="3.4" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="${colorCss}"/></marker></defs>
     ${arrows}
   </svg>`;
@@ -1700,7 +1724,6 @@ function dispersiProfessionalPreviewBody(){
   if(!dispersiState.lastPlumeSnapshotDataUrl || !snapMeta){
     return `<div style="padding:34px 20px;text-align:center;color:#a02a24;font-size:13px;">Gambar peta sebaran belum tersedia untuk kondisi filter saat ini — pastikan minimal 1 titik terpilih &amp; plume berhasil tampil di peta pada halaman Model Dispersi Emisi, baru buka preview ini lagi.</div>`;
   }
-  const ratio = (snapMeta.aspectW && snapMeta.aspectH) ? `${snapMeta.aspectW}/${snapMeta.aspectH}` : "1/1";
   const windLabel = dispersiWindLabelFromMeta(snapMeta);
   const stab = DISPERSI_STABILITY_CLASSES.find(s=>s.key===snapMeta.stability);
   const vectorField = dispersiWindVectorFieldSvg(snapMeta.windDirFrom, snapMeta.windSpeed, snapMeta.aspectW, snapMeta.aspectH);
@@ -1708,9 +1731,9 @@ function dispersiProfessionalPreviewBody(){
   return `
   <div class="pg-dispersi-pro">
     <div class="pg-dispersi-pro-map">
-      <div style="position:relative;width:100%;aspect-ratio:${ratio};background:#eef2f5;overflow:hidden;">
+      <div style="position:absolute;inset:0;overflow:hidden;">
         <img src="${dispersiState.lastPlumeBasemapUrl||""}" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
-        <img src="${dispersiState.lastPlumeSnapshotDataUrl}" style="position:absolute;inset:0;width:100%;height:100%;">
+        <img src="${dispersiState.lastPlumeSnapshotDataUrl}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
         ${vectorField}
       </div>
     </div>
@@ -1756,7 +1779,7 @@ function dispersiProfessionalPreviewBody(){
 }
 function dispersiOpenProfessionalPreview(){
   openModal(`
-    <h3>Preview Peta Profesional (Format AMDAL)</h3>
+    <h3>Preview Peta Profesional</h3>
     <div class="hint" style="margin-bottom:10px;">Mengikuti kondisi filter yang sedang aktif di halaman peta saat ini (site, parameter, periode/tanggal, mode &amp; kelas stabilitas angin). Untuk melihat kondisi lain (mis. semester atau tanggal berbeda) — tutup preview ini, ganti filter di halaman, lalu buka preview lagi.</div>
     <div style="max-height:68vh;overflow:auto;border:1px solid var(--gray-200);border-radius:8px;">${dispersiProfessionalPreviewBody()}</div>
     <div class="actions"><button class="btn ghost" data-action="closeModal">Tutup</button><button class="btn primary" data-action="dispersiPrintProfessionalPreview">Cetak / Simpan PDF</button></div>
@@ -1781,7 +1804,7 @@ async function dispersiPrintProfessionalPreview(){
   document.title = originalTitle;
 }
 
-/* ---------- Mode Expert: Timelapse Sebaran Per Jam ----------
+/* ---------- Simulasi Transien: Timelapse Sebaran Per Jam ----------
    Animasi jam-per-jam (00:00 s/d jam terakhir data tersedia) dari SATU tanggal pilihan — beda dari
    mode Live/Periode/Kustom di panel utama (yang menunjukkan kondisi SAAT INI atau RATA-RATA sebuah
    rentang), di sini tiap frame pakai data angin SATU JAM SPESIFIK apa adanya (kerucut sempit spt
@@ -1790,7 +1813,7 @@ async function dispersiPrintProfessionalPreview(){
    (bukan ikut berubah tiap jam — data sampling toh tidak ada per jam) — transparansi ini ditulis
    eksplisit di caption bawah supaya tidak disalahartikan sbg rekonstruksi kejadian aktual per jam.
    Geometri peta (pusat & lebar area) dihitung MANDIRI dari sebaran titik sumber terpilih (bukan
-   bergantung viewport peta utama) supaya Mode Expert selalu punya framing yang masuk akal
+   bergantung viewport peta utama) supaya Simulasi Transien selalu punya framing yang masuk akal
    walaupun peta utama belum pernah di-zoom/geser ke titik yang relevan. */
 let dispersiTimelapse = {
   loaded:false, date:null, hours:[], frameCache:{}, frameIdx:0, playing:false, timer:null,
@@ -1821,7 +1844,7 @@ function dispersiTimelapseComputeGeo(sources){
 // arsip &plusmn;5 hari yg sama dipakai mode Periode/Kustom) atau fallback Forecast API (utk tanggal
 // yg terlalu baru utk arsip — forecast API-nya sendiri sudah menyertakan riwayat 7 hari terakhir
 // lewat past_days). Menyertakan suhu/kelembapan tiap jam jg (bukan cuma arah+kecepatan) supaya
-// panel detail Mode Expert bisa menampilkan info selengkap mode Live/Periode.
+// panel detail Simulasi Transien bisa menampilkan info selengkap mode Live/Periode.
 async function dispersiFetchTimelapseWindHours(lat, lng, dateStr){
   const maxArchiveDate = new Date(Date.now()-5*86400000).toISOString().slice(0,10);
   let times=[], dirs=[], speeds=[], temps=[], hums=[];
@@ -1883,7 +1906,7 @@ function dispersiOpenExpertMode(){
   const defaultDate = new Date(Date.now()-7*86400000).toISOString().slice(0,10);
   dispersiTimelapse = {loaded:false, date:null, hours:[], frameCache:{}, frameIdx:0, playing:false, timer:null, geo:null, basemapUrl:null, sources:[], staticSvg:"", sourcePins:[], paramLabel:"", selLabel:"", stabilityLabel:"", qualitative:false};
   openModal(`
-    <h3>&#127916; Mode Expert &mdash; Timelapse Sebaran Per Jam</h3>
+    <h3>&#127916; Simulasi Transien &mdash; Timelapse Sebaran Per Jam</h3>
     <div class="hint" style="margin-bottom:10px;">Simulasikan bagaimana pola sebaran berubah sepanjang hari mengikuti data angin per jam pada satu tanggal pilihan. Kekuatan sumber emisi dibekukan dari Parameter &amp; Periode Data yang sedang aktif di halaman (<b>${escHtml(dispersiCurrentParamMeta().label)}</b>, periode <b>${escHtml(dispersiSelectionLabel(dispersiState.sel))}</b>); titik yang dipakai mengikuti seleksi peta/filter Titik Emisi saat ini (<b>${dispersiSelectedStacks().length} titik</b>).</div>
     <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
       <div class="field" style="margin:0;"><label>Tanggal</label><input type="date" id="tlDateInput" value="${defaultDate}"></div>
@@ -2093,7 +2116,8 @@ Object.assign(ACTIONS, {
   dispersiOpenProfessionalPreview, dispersiPrintProfessionalPreview,
   dispersiToggleTitikPanel, dispersiTitikCheckAllVisible, dispersiTitikUncheckAllVisible,
   dispersiSetWindModeCustom, dispersiApplyCustomWindRange,
-  dispersiOpenExpertMode, dispersiTimelapseLoad, dispersiTimelapseTogglePlay, dispersiTimelapseCloseModal
+  dispersiOpenExpertMode, dispersiTimelapseLoad, dispersiTimelapseTogglePlay, dispersiTimelapseCloseModal,
+  toggleDispersiStats
 });
 document.addEventListener("change", e=>{
   if(e.target.id==="dispersiPeriode") dispersiOnPeriodeChange();
