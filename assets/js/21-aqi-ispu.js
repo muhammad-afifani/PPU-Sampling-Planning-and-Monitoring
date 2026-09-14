@@ -153,21 +153,25 @@ function aqiIspuBuildTimeline(events){
   const bySite = {};
   events.forEach(ev=>{ (bySite[ev.site]=bySite[ev.site]||[]).push(ev); });
   const sites = Object.keys(bySite).sort();
-  const rowH=44, padL=118, padR=20, padT=14, dotGap=34;
+  const rowH=25, padL=68, padR=14, padT=8, dotGap=21;
   const maxCols = Math.max(...sites.map(s=>bySite[s].length));
-  const W = Math.max(560, padL + maxCols*dotGap + padR);
-  const H = padT + sites.length*rowH + 6;
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:10px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;">`;
+  const W = Math.max(280, padL + maxCols*dotGap + padR);
+  const H = padT + sites.length*rowH + 4;
+  // Sengaja PAKAI atribut width/height eksplisit (ukuran natural piksel), BUKAN width:100% —
+  // width:100%+height:auto di kartu selebar penuh (bukan cols-2) bikin SVG ikut melar proporsional
+  // sebesar lebar kartu (persis bug ukuran chart Kebisingan yg pernah diperbaiki sebelumnya).
+  // max-width:100%;height:auto di CSS cuma jaga-jaga supaya menyusut (bukan melar) di layar sempit.
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="max-width:100%;height:auto;display:block;font-size:9px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:8px;">`;
   sites.forEach((site,ri)=>{
     const y = padT + ri*rowH + rowH/2;
     const evs = bySite[site].slice().sort((a,b)=>(a.tanggalSort||"").localeCompare(b.tanggalSort||""));
-    svg += `<text x="10" y="${y+4}" font-weight="700" fill="var(--gray-900)" font-size="11">${escHtml(site)}</text>`;
+    svg += `<text x="6" y="${y+3}" text-anchor="start" font-weight="700" fill="var(--gray-900)" font-size="9.5">${escHtml(site)}</text>`;
     if(ri>0) svg += `<line x1="0" y1="${padT+ri*rowH}" x2="${W}" y2="${padT+ri*rowH}" stroke="var(--gray-200)"/>`;
     evs.forEach((ev,ci)=>{
-      const x = padL + ci*dotGap + 15;
+      const x = padL + ci*dotGap + 9;
       const cat = ev.category;
-      svg += `<circle cx="${x}" cy="${y}" r="11" fill="${cat.color}" stroke="var(--surface-card)" stroke-width="1.5"><title>${escHtml(ev.titik)} — ${ev.tanggal||"-"} (${ev.periode})\nIndeks: ${ev.index} — ${cat.name}\nParameter dominan: ${AQIISPU_POLLUTANT_LABEL[ev.dominant]||ev.dominant}</title></circle>`;
-      svg += `<text x="${x}" y="${y+3.5}" text-anchor="middle" font-size="8.5" font-weight="800" fill="${cat.text}" style="pointer-events:none;">${ev.index}</text>`;
+      svg += `<circle cx="${x}" cy="${y}" r="7.5" fill="${cat.color}" stroke="var(--surface-card)" stroke-width="1"><title>${escHtml(ev.titik)} — ${ev.tanggal||"-"} (${ev.periode})\nIndeks: ${ev.index} — ${cat.name}\nParameter dominan: ${AQIISPU_POLLUTANT_LABEL[ev.dominant]||ev.dominant}</title></circle>`;
+      svg += `<text x="${x}" y="${y+2.3}" text-anchor="middle" font-size="6" font-weight="800" fill="${cat.text}" style="pointer-events:none;">${ev.index}</text>`;
     });
   });
   svg += `</svg>`;
