@@ -50,6 +50,10 @@ function migrateDB(){
   if(!DB.pointCoords) DB.pointCoords = {...POINT_COORDS};
   if(!DB.coordVerification) DB.coordVerification = {};
   if(!DB.dokumentasiFoto) DB.dokumentasiFoto = {};
+  // _dokFotoExcluded cuma penanda sementara di payload export (backup tanpa foto), bukan bagian skema DB —
+  // kalau ada file backup lama yg nyangkut lewat import & ke-load sbg DB langsung, bersihkan biar tidak
+  // ikut kebawa ke export berikutnya (bisa bikin foto yg sebenarnya ada dianggap "sengaja dikecualikan").
+  if(DB._dokFotoExcluded !== undefined) delete DB._dokFotoExcluded;
   if(!DB.rhMonths) DB.rhMonths = [...RH_MONTHS_DEFAULT];
   if(!DB.rhMonthly) DB.rhMonthly = JSON.parse(JSON.stringify(RH_MONTHLY_DEFAULT));
   if(!DB.meta) DB.meta = {semester:"S1", tahun:new Date().getFullYear(), lastBatchIdEmisi:0, lastBatchIdAmbient:0};
@@ -283,10 +287,10 @@ function updateStorageUsageBadge(){
   const quotaLabel = isReal
     ? `dari &#8776;${fmtBytesHuman(quota)} kuota browser aktual (${pct}%)`
     : `(&#8776;${pct}% dari perkiraan kapasitas browser — kuota aktual blm bisa dibaca di browser ini)`;
-  [document.getElementById("storageUsageBadge"), document.getElementById("storageUsageBadgeRiwayat")].forEach(el=>{
-    if(!el) return;
-    el.innerHTML = `<span>~${mb} MB terpakai ${quotaLabel}</span><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>`;
-  });
+  // Cuma 1 target nyata di HTML (halaman Riwayat & Restore) — "storageUsageBadge" polos yg dulu
+  // disebut di sini tidak pernah punya elemen padanannya, jadi dihapus drpd terus jadi lookup mati.
+  const el = document.getElementById("storageUsageBadgeRiwayat");
+  if(el) el.innerHTML = `<span>~${mb} MB terpakai ${quotaLabel}</span><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>`;
 }
 // Pencatatan "terakhir diupdate" per kategori dataset yang punya kebutuhan CSV (import/export),
 // dipakai oleh daftar dataset di halaman Data (Import/Export) supaya terlihat mana yang sudah lama
@@ -369,6 +373,14 @@ function snapshotBefore(label){
   if(!DB.snapshots) DB.snapshots = [];
   const copy = JSON.parse(JSON.stringify(DB));
   delete copy.snapshots;
+  // dokumentasiFoto SENGAJA tidak ikut disalin — snapshot ini titik-balik utk data operasional
+  // (jadwal/titik/tracking/hasil pemantauan), bukan riwayat foto (foto sudah py tombol hapus
+  // sendiri di halaman Dokumentasi Foto). Ikut menyalin foto ke tiap snapshot artinya tiap foto
+  // terhitung sampai 6x (1 salinan aktif + maks 5 salinan snapshot) thd kuota localStorage —
+  // penyebab utama keluhan "penyimpanan penuh" walau foto sendiri sudah dikompres saat upload.
+  // restoreSnapshot() di bawah mempertahankan dokumentasiFoto AKTIF saat restore, konsisten
+  // dgn snapshot yang memang tidak pernah menyimpan foto sama sekali.
+  delete copy.dokumentasiFoto;
   DB.snapshots.unshift({ts: new Date().toISOString(), label, data: copy});
   // Dikecilkan dari 8 ke 5 — tiap snapshot itu SALINAN PENUH seluruh database, jadi 8 salinan
   // riwayat gampang bikin localStorage kepenuhan begitu data operasional (titik/tracking/hasil
@@ -390,8 +402,12 @@ function restoreSnapshot(idx){
   const snap = DB.snapshots[idx]; if(!snap) return;
   askConfirm(`Restore ke kondisi "${snap.label}" (${new Date(snap.ts).toLocaleString("id-ID")})? Perubahan setelah titik itu akan hilang.`, ()=>{
     const keepSnapshots = DB.snapshots;
+    const keepDokFoto = DB.dokumentasiFoto;
     DB = JSON.parse(JSON.stringify(snap.data));
     DB.snapshots = keepSnapshots;
+    // dokumentasiFoto tidak pernah ikut tersimpan di snapshot (lihat snapshotBefore) — dipertahankan
+    // dari kondisi AKTIF saat ini, bukan ikut ditimpa/dikosongkan oleh restore.
+    DB.dokumentasiFoto = keepDokFoto;
     logChange(`Restore ke snapshot "${snap.label}" (${new Date(snap.ts).toLocaleString("id-ID")})`);
     save();
     toast("Data berhasil di-restore.","ok");
