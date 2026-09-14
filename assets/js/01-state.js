@@ -58,6 +58,27 @@ function migrateDB(){
   if(!DB.rhMonthly) DB.rhMonthly = JSON.parse(JSON.stringify(RH_MONTHLY_DEFAULT));
   if(!DB.meta) DB.meta = {semester:"S1", tahun:new Date().getFullYear(), lastBatchIdEmisi:0, lastBatchIdAmbient:0};
   if(DB.meta.currentPeriod!==undefined) delete DB.meta.currentPeriod; // field lama, tidak dipakai lagi — diganti meta.semester+meta.tahun
+  // Backfill koordinat 12 titik Udara Ambien/Kebisingan/Kebauan/Getaran (Akomodasi/Camp/Office/
+  // Kompleks) yg sebelumnya belum punya entry di pointCoords sama sekali (murni tambahan data,
+  // bukan koreksi — jadi aman ditambahkan tanpa syarat, sekali saja lewat flag di meta).
+  if(!DB.meta.ambientCoordsSeeded){
+    const AMBIENT_COORDS_SEED = {
+      "CPU::Akomodasi CPU (CPU Camp)":[-0.461833333,117.5852778],
+      "NPU::Akomodasi NPU (NPU Camp)":[-0.823914444,117.2510131],
+      "SPS::SPS Camp Accomodation":[-0.582527778,117.3774444],
+      "SPU::Akomodasi SPU (SPU Camp)":[-0.998277778,117.4993333],
+      "BKP::Main Deck (Living Quarter-LQ) Bekapai":[-0.965572222,117.1445306],
+      "HCA::Handil Village":[-0.843882222,117.2632981],
+      "SPS::SPS Main Gate":[-1.258666667,116.8838333],
+      "HCA::Handil Camp":[-0.818742778,117.2517603],
+      "BPN::Kompleks Gunung Utara":[-0.972438889,117.1515278],
+      "BPN::Kompleks Sepinggan":[-1.255555556,116.8285278],
+      "CPU::TRF Office":[-0.972444444,117.1515278],
+      "HCA::CPA Camp":[-0.340161389,117.4226011]
+    };
+    Object.keys(AMBIENT_COORDS_SEED).forEach(key=>{ if(!DB.pointCoords[key]) DB.pointCoords[key] = AMBIENT_COORDS_SEED[key]; });
+    DB.meta.ambientCoordsSeeded = true;
+  }
   if(!DB.meta.rhMonthsNormalized){ rhNormalizeMonthLabels(); DB.meta.rhMonthsNormalized = true; }
   // Tur onboarding "pertama kali buka tools ini" cuma utk sesi yg BENAR2 baru (freshDB, belum
   // pernah ada data sama sekali) — sesi yg sudah pernah jalan sebelumnya (lewat baris migrateDB

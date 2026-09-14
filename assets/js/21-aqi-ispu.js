@@ -92,17 +92,28 @@ function aqiIspuCategoryFor(index, standard){
   const cats = standard==="ispu" ? ISPU_CATEGORIES : AQI_CATEGORIES;
   return cats.find(c=>index>=c.lo && index<=c.hi) || cats[cats.length-1];
 }
-// Kelompokkan baris parameter Udara Ambien jadi "event sampling" (1 titik + 1 tanggal + 1 periode
-// = 1 event, berisi banyak parameter) — sama seperti pengelompokan Kebisingan/Getaran per jam/pita.
+// Kelompokkan baris parameter Udara Ambien jadi "event sampling" (1 titik + 1 periode = 1 event,
+// berisi banyak parameter). Dikelompokkan per PERIODE (bukan per tanggal persis) krn data riil
+// kadang mencatat 1-2 parameter (mis. SO2) dgn tanggal sedikit beda dari parameter lain pada
+// putaran sampling yang sama (mis. CPA Camp S2 2025: SO2 tercatat 2025-08-19, 7 parameter lain
+// 2025-08-27) — kalau dikelompokkan per tanggal persis, parameter itu kepisah jadi event sendiri
+// beranggota 1 parameter, bukan tergabung ke event lengkapnya. Semua tanggal berbeda yang muncul
+// dalam 1 periode tetap dikumpulkan (tanggalRange) supaya tidak ada info yang hilang/disamarkan.
 function aqiIspuGroupEvents(){
   const groups = new Map();
   DB.hasilAmbien.ambien.forEach(r=>{
     if(!AQIISPU_POLLUTANT_LABEL[r.parameterKode] || r.resultNumeric==null) return;
-    const key = (r.titikId||r.titik)+"|"+r.tanggal+"|"+r.periode;
-    if(!groups.has(key)) groups.set(key, {titikId:r.titikId, titik:r.titik, site:r.site, tanggal:r.tanggal, periode:r.periode, periodeOrder:r.periodeOrder, params:{}});
-    groups.get(key).params[r.parameterKode] = r.resultNumeric;
+    const key = (r.titikId||r.titik)+"|"+r.periode;
+    if(!groups.has(key)) groups.set(key, {titikId:r.titikId, titik:r.titik, site:r.site, tanggals:new Set(), periode:r.periode, periodeOrder:r.periodeOrder, params:{}});
+    const g = groups.get(key);
+    if(r.tanggal) g.tanggals.add(r.tanggal);
+    g.params[r.parameterKode] = r.resultNumeric;
   });
-  return [...groups.values()];
+  return [...groups.values()].map(g=>{
+    const dates = [...g.tanggals].sort();
+    const tanggal = dates.length<=1 ? (dates[0]||null) : (dates[0]+" s/d "+dates[dates.length-1]);
+    return {titikId:g.titikId, titik:g.titik, site:g.site, tanggal, tanggalSort:dates[dates.length-1]||"", periode:g.periode, periodeOrder:g.periodeOrder, params:g.params};
+  });
 }
 function aqiIspuComputeEvent(ev, standard){
   const subIdx = {};
@@ -149,7 +160,7 @@ function aqiIspuBuildTimeline(events){
   let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:10px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;">`;
   sites.forEach((site,ri)=>{
     const y = padT + ri*rowH + rowH/2;
-    const evs = bySite[site].slice().sort((a,b)=>(a.tanggal||"").localeCompare(b.tanggal||""));
+    const evs = bySite[site].slice().sort((a,b)=>(a.tanggalSort||"").localeCompare(b.tanggalSort||""));
     svg += `<text x="10" y="${y+4}" font-weight="700" fill="var(--gray-900)" font-size="11">${escHtml(site)}</text>`;
     if(ri>0) svg += `<line x1="0" y1="${padT+ri*rowH}" x2="${W}" y2="${padT+ri*rowH}" stroke="var(--gray-200)"/>`;
     evs.forEach((ev,ci)=>{
@@ -183,6 +194,57 @@ function aqiIspuBuildTable(rows){
     </tr>`).join("")}</tbody>`;
 }
 
+/* ---------- Peta sebaran (Leaflet) — gaya kartu IQAir: lingkaran berwarna kategori + angka indeks ---------- */
+let aqiIspuMapInstance=null, aqiIspuMapMarkersLayer=null;
+let aqiIspuMapPeriode = ""; // "" = ikut periode terakhir pada filter aktif (auto-follow)
+function aqiIspuInitMap(){
+  if(aqiIspuMapInstance) return;
+  const el = document.getElementById("aqiIspuMap");
+  if(!el) return;
+  if(typeof L==="undefined"){
+    el.innerHTML = "<div class='hint' style='padding:20px;'>Peta tidak bisa dimuat — perlu koneksi internet saat pertama kali buka halaman ini (untuk load tile peta). Coba refresh setelah online.</div>";
+    return;
+  }
+  aqiIspuMapInstance = L.map(el, {maxZoom:19}).setView([-0.75,117.4], 9);
+  const satellite = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom:19, maxNativeZoom:17, attribution:"Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics"
+  });
+  const street = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19, maxNativeZoom:19, attribution:"&copy; OpenStreetMap contributors"});
+  satellite.addTo(aqiIspuMapInstance);
+  L.control.layers({"Satelit":satellite, "Peta Jalan":street}).addTo(aqiIspuMapInstance);
+  aqiIspuMapMarkersLayer = L.layerGroup().addTo(aqiIspuMapInstance);
+  if(window.ResizeObserver) new ResizeObserver(()=>{ if(aqiIspuMapInstance) aqiIspuMapInstance.invalidateSize(); }).observe(el);
+  [30,150,500,1200].forEach(ms=>setTimeout(()=>{ if(aqiIspuMapInstance) aqiIspuMapInstance.invalidateSize(); }, ms));
+}
+function aqiIspuMapIcon(ev){
+  const cat = ev.category, size=38;
+  return L.divIcon({
+    className:"",
+    html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:${cat.color};color:${cat.text};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;border:2.5px solid rgba(255,255,255,.92);box-shadow:0 1px 6px rgba(0,0,0,.4);">${ev.index}</div>`,
+    iconSize:[size,size], iconAnchor:[size/2,size/2], popupAnchor:[0,-size/2-2]
+  });
+}
+// Kembalikan jumlah titik yang berhasil digambar (punya koordinat) — dipakai render() utk catatan
+// "sekian titik belum berkoordinat" biar transparan, bukan cuma diam-diam hilang dari peta.
+function aqiIspuDrawMapMarkers(events){
+  if(!aqiIspuMapInstance || !aqiIspuMapMarkersLayer) return 0;
+  aqiIspuMapMarkersLayer.clearLayers();
+  const coordsList = [];
+  events.forEach(ev=>{
+    const c = DB.pointCoords[ev.site+"::"+ev.titik];
+    if(!c) return;
+    coordsList.push(c);
+    L.marker(c, {icon: aqiIspuMapIcon(ev)}).bindPopup(`<div style="font-size:12px;min-width:200px;">
+        <b>${escHtml(ev.titik)}</b><br><span class="muted">${ev.site} &middot; ${ev.periode} &middot; ${ev.tanggal||"-"}</span>
+        <div style="margin-top:6px;">${aqiIspuSubIndexBreakdownHtml(ev)}</div>
+        <div style="margin-top:6px;"><span class="badge" style="background:${ev.category.color};color:${ev.category.text};">${escHtml(ev.category.name)}</span> <b style="font-family:var(--font-mono);">${ev.index}</b></div>
+      </div>`).addTo(aqiIspuMapMarkersLayer);
+  });
+  if(coordsList.length===1) aqiIspuMapInstance.setView(coordsList[0], 13);
+  else if(coordsList.length>1) aqiIspuMapInstance.fitBounds(L.latLngBounds(coordsList), {padding:[40,40], maxZoom:13});
+  return coordsList.length;
+}
+
 /* ---------- Page render ---------- */
 function aqiIspuPopulateFilters(sites, periods){
   const siteSel = document.getElementById("aqiIspuFltSite");
@@ -209,7 +271,7 @@ function renderAqiIspu(){
   const filtered = allEvents.filter(ev=>{
     if(aqiIspuFlt.site && ev.site!==aqiIspuFlt.site) return false;
     return ev.periodeOrder>=fromOrder && ev.periodeOrder<=toOrder;
-  }).sort((a,b)=>(a.tanggal||"").localeCompare(b.tanggal||""));
+  }).sort((a,b)=>(a.tanggalSort||"").localeCompare(b.tanggalSort||""));
 
   if(!DB.hasilAmbien.ambien.length){
     document.getElementById("aqiIspuBody").innerHTML = `<div class="card"><div class="hint" style="padding:14px;">Belum ada data kategori "Udara Ambien" di Database Hasil Ambient — isi atau import data dulu, indeks akan otomatis terhitung dari situ.</div></div>`;
@@ -230,8 +292,18 @@ function renderAqiIspu(){
   const rankRows = filtered.filter(ev=>ev.periode===lastPeriod).sort((a,b)=>b.index-a.index).slice(0,15)
     .map(ev=>({titik:ev.titik, index:ev.index, standard:aqiIspuStandard}));
 
-  const detail = filtered.slice().sort((a,b)=>(b.tanggal||"").localeCompare(a.tanggal||"")).slice(0,200);
+  const detail = filtered.slice().sort((a,b)=>(b.tanggalSort||"").localeCompare(a.tanggalSort||"")).slice(0,200);
   const stdLabel = aqiIspuStandard==="ispu" ? "ISPU" : "AQI";
+
+  // Peta selalu pakai HANYA data pada filter Site aktif (tapi TIDAK ikut filter Dari/Sampai Periode
+  // — peta punya selector periode sendiri) supaya bisa lihat sebaran periode manapun tanpa perlu
+  // ubah filter atas dulu.
+  const mapScope = allEvents.filter(ev=> !aqiIspuFlt.site || ev.site===aqiIspuFlt.site);
+  const mapPeriods = [...new Set(mapScope.map(e=>e.periode))].sort((a,b)=>hasilPeriodParts(a).order-hasilPeriodParts(b).order);
+  const mapPeriode = (aqiIspuMapPeriode && mapPeriods.includes(aqiIspuMapPeriode)) ? aqiIspuMapPeriode : mapPeriods[mapPeriods.length-1];
+  const mapEvents = mapScope.filter(ev=>ev.periode===mapPeriode);
+  const mapPeriodeSel = document.getElementById("aqiIspuMapPeriodeSel");
+  mapPeriodeSel.innerHTML = mapPeriods.map(p=>`<option value="${p}" ${p===mapPeriode?"selected":""}>${p}</option>`).join("");
 
   document.getElementById("aqiIspuBody").innerHTML = `
     <div class="grid cols-4" style="margin-bottom:16px;">
@@ -241,7 +313,7 @@ function renderAqiIspu(){
       <div class="stat ${badN>0?'bad':'good'}"><div class="num">${badN}</div><div class="lbl">Event ${aqiIspuStandard==="ispu"?"Tidak Sehat+":"Unhealthy+"}</div></div>
     </div>
     <div class="card">
-      <h3>Visual per Tanggal Sampling <span class="muted" style="text-transform:none;font-weight:400;">— tiap titik berwarna sesuai kategori ${stdLabel} hasil sampling hari itu</span></h3>
+      <h3>Riwayat Seluruh Titik (Timeline) <span class="muted" style="text-transform:none;font-weight:400;">— tiap titik berwarna sesuai kategori ${stdLabel} hasil sampling hari itu</span></h3>
       <div class="hint" style="margin-top:-6px;margin-bottom:8px;">Arahkan kursor ke tiap titik untuk detail (titik, tanggal, indeks, parameter dominan). Diurutkan kronologis per site.</div>
       ${aqiIspuBuildTimeline(filtered)}
       ${aqiIspuLegendHtml(aqiIspuStandard)}
@@ -268,6 +340,21 @@ function renderAqiIspu(){
       <div class="hint">Menampilkan ${detail.length} dari ${filtered.length} event sampling (1 event = 1 titik + 1 tanggal, gabungan semua parameter yang diukur hari itu), urut tanggal terbaru.</div>
     </div>
   `;
+
+  aqiIspuInitMap();
+  document.getElementById("aqiIspuMapLegend").innerHTML = aqiIspuLegendHtml(aqiIspuStandard);
+  const noteEl = document.getElementById("aqiIspuMapNote");
+  if(typeof L==="undefined"){
+    noteEl.textContent = "";
+  } else if(!mapEvents.length){
+    noteEl.textContent = "Tidak ada event sampling pada periode/site ini.";
+  } else {
+    const mappedN = aqiIspuDrawMapMarkers(mapEvents);
+    const missingN = mapEvents.length - mappedN;
+    noteEl.textContent = missingN>0
+      ? `${mappedN} dari ${mapEvents.length} titik tampil di peta (${missingN} titik belum punya koordinat, tetap ada di tabel rincian di bawah).`
+      : `${mappedN} titik ditampilkan untuk periode ${mapPeriode}.`;
+  }
 }
 function aqiIspuInfoModal(){
   function bpTableHtml(table, unit){
@@ -317,6 +404,9 @@ function aqiIspuInfoModal(){
     if(id==="aqiIspuFltTo") aqiIspuFlt.to = e.target.value;
     renderAqiIspu();
   });
+});
+document.addEventListener("change", e=>{
+  if(e.target.id==="aqiIspuMapPeriodeSel"){ aqiIspuMapPeriode = e.target.value; renderAqiIspu(); }
 });
 Object.assign(ACTIONS, {
   aqiIspuInfoModal,
