@@ -630,7 +630,17 @@ function savePoint(id){
 function deletePoint(id){
   askConfirm("Hapus titik pantau ini?", ()=>{
     DB.points = DB.points.filter(p=>p.id!==id);
-    delete DB.dokumentasiFoto[id]; // ikut hapus foto dokumentasi titik ini, kalau ada
+    // Ikut hapus foto dokumentasi titik ini, kalau ada — metadata di DB.dokumentasiFoto SEKALIGUS
+    // byte-nya di IndexedDB (lihat 17-dokumentasi-foto.js), supaya tidak jadi blob yatim yang
+    // menumpuk diam-diam di penyimpanan foto tanpa titik pemiliknya.
+    const dokFoto = DB.dokumentasiFoto[id];
+    if(dokFoto){
+      const fotoIds = [];
+      Object.keys(dokFoto).forEach(cat=>(dokFoto[cat]||[]).forEach(ph=>fotoIds.push(ph.id)));
+      dokFotoIdbDeleteMany(fotoIds).catch(()=>{});
+      fotoIds.forEach(fid=>dokFotoUrlCache.delete(fid));
+    }
+    delete DB.dokumentasiFoto[id];
     touchDataset("points"); save(); renderMaster(); toast("Titik pantau dihapus.");
   });
 }

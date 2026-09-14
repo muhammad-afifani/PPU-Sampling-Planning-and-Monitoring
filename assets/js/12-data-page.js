@@ -24,12 +24,37 @@ function cacheBustUrl(url){
 // _dokFotoExcluded:true (properti sementara, bukan bagian skema DB) — dibaca applyFullBackupImport
 // supaya foto yang SUDAH ADA di device tujuan TIDAK ikut terhapus cuma krn file yg diimport memang
 // sengaja tidak menyertakan foto (beda dgn file yang foto-nya betul-betul kosong krn belum diisi).
-function exportAll(){
+async function exportAll(){
   const finalizedCount = DB.batches.filter(b=>b.finalized).length;
   const includePhotos = document.getElementById("exportIncludePhotos").checked;
-  const data = includePhotos ? DB : {...DB, dokumentasiFoto:{}, _dokFotoExcluded:true};
+  let data, fotoBytes = 0;
+  if(includePhotos){
+    // Byte foto (dataUrl) sekarang di IndexedDB, bukan lagi ikut nyempil di DB.dokumentasiFoto
+    // (lihat 17-dokumentasi-foto.js) — direkonstruksi PENUH dgn dataUrl disisipkan lagi KHUSUS utk
+    // file JSON export ini, supaya file backup tetap 1 file portable yang berdiri sendiri (bisa
+    // di-restore di perangkat lain tanpa bergantung IndexedDB perangkat asal sama sekali).
+    const idbEntries = await dokFotoIdbGetAll();
+    const idbMap = new Map(idbEntries.map(e=>[e.id, e.dataUrl]));
+    fotoBytes = idbEntries.reduce((s,e)=>s+(e.dataUrl?e.dataUrl.length:0),0);
+    const fullDokFoto = {};
+    Object.keys(DB.dokumentasiFoto||{}).forEach(pointId=>{
+      fullDokFoto[pointId] = {};
+      const cats = DB.dokumentasiFoto[pointId];
+      Object.keys(cats).forEach(cat=>{
+        fullDokFoto[pointId][cat] = (cats[cat]||[]).map(ph=>({...ph, dataUrl: idbMap.get(ph.id)||""}));
+      });
+    });
+    data = {...DB, dokumentasiFoto: fullDokFoto};
+    // _dokFotoExcluded murni penanda sementara KHUSUS utk file export yg SENGAJA tidak menyertakan
+    // foto (lihat applyFullBackupImport) — kalau DB yang sedang aktif kebetulan sendiri membawa
+    // properti ini (mis. file backup lama sempat dimuat langsung jadi localStorage tanpa lewat
+    // migrateDB), jangan sampai ikut ter-spread ke file export yg SEBENARNYA menyertakan foto.
+    delete data._dokFotoExcluded;
+  } else {
+    data = {...DB, dokumentasiFoto:{}, _dokFotoExcluded:true};
+  }
   const fotoNote = includePhotos
-    ? ` Foto Dokumentasi Sampling ${fmtBytes(dokFotoStorageBytes())} ikut disertakan.`
+    ? ` Foto Dokumentasi Sampling ${fmtBytes(fotoBytes)} ikut disertakan.`
     : ` Foto Dokumentasi Sampling TIDAK disertakan (centang opsinya kalau perlu pindah foto ke perangkat lain).`;
   const summary = `Mengekspor: ${DB.points.length} titik, ${DB.batches.length} batch (${finalizedCount} sudah final), ${DB.personil.length} personil, ${DB.hasilPemantauan.length} data hasil pemantauan, ${Object.keys(DB.tracking||{}).length} tracking.${fotoNote} Dari session browser INI — cek angkanya sesuai yang kamu kerjakan sebelum dikirim ke laptop lain.`;
   toast(summary, DB.batches.length ? "ok" : "err");
@@ -71,13 +96,35 @@ function handleFullBackupPackage(data, sourceLabel){
     </div>
   `);
 }
-function applyFullBackupImport(){
+async function applyFullBackupImport(){
   const pending = pendingFullBackup; if(!pending) return;
   const {data, sourceLabel} = pending;
   snapshotBefore(`Sebelum import backup "${sourceLabel}"`);
   const keepSnapshots = DB.snapshots, keepLog = DB.activityLog;
   const keepDokFoto = DB.dokumentasiFoto;
   const dokFotoWasExcluded = !!data._dokFotoExcluded;
+  // Foto yg datang DENGAN dataUrl (file export lama dari sebelum migrasi IndexedDB, atau file baru
+  // yg "Sertakan Foto" dicentang — lihat exportAll) ditulis dulu ke IndexedDB DI SINI, dataUrl-nya
+  // baru dilepas dari metadata SETELAH tulisnya benar2 berhasil — supaya kalau IndexedDB gagal
+  // (browser lama dsb), foto tetap tidak hilang (metadata tetap membawa datanya sendiri spt sedia
+  // kala, cuma tidak dapat untung penyimpanan lebih hemat).
+  if(!dokFotoWasExcluded && data.dokumentasiFoto){
+    const toPut = [];
+    Object.keys(data.dokumentasiFoto).forEach(pointId=>{
+      const cats = data.dokumentasiFoto[pointId];
+      Object.keys(cats).forEach(cat=>{
+        (cats[cat]||[]).forEach(ph=>{ if(ph.dataUrl) toPut.push(ph); });
+      });
+    });
+    if(toPut.length){
+      try{
+        await dokFotoIdbBulkPut(toPut.map(ph=>({id:ph.id, dataUrl:ph.dataUrl})));
+        toPut.forEach(ph=>{ dokFotoUrlCache.set(ph.id, ph.dataUrl); delete ph.dataUrl; });
+      }catch(err){
+        toast("Sebagian/seluruh foto gagal ditulis ke penyimpanan IndexedDB saat restore (foto tetap tersimpan apa adanya, cuma belum optimal) — coba lagi nanti kalau perlu.","err");
+      }
+    }
+  }
   DB = data;
   migrateDB();
   if(!DB.snapshots.length) DB.snapshots = keepSnapshots; else DB.snapshots = keepSnapshots.concat(DB.snapshots).slice(0,8);
