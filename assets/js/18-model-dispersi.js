@@ -34,7 +34,7 @@ const DISPERSI_MASS_PARAMS = {
 // H2S/"Pemantauan Kandungan Sulfur Bahan Bakar" SENGAJA tidak diikutkan di halaman ini sama
 // sekali (plume, DISPERSI_MASS_PARAMS, ATAU tabel Laporan Kepatuhan): itu uji kadar sulfur BAHAN
 // BAKAR (% berat, bukan konsentrasi di keluaran cerobong) sesuai Pasal 12 ayat (2) huruf b Permen
-// LH 13/2009, jadi bukan fenomena dispersi cerobong — lihat Dashboard Hasil Pemantauan utk data
+// LH 13/2009, jadi bukan fenomena dispersi cerobong — lihat Dashboard Hasil Emisi utk data
 // itu. Array ini disiapkan kalau suatu saat ada parameter kepatuhan tambahan di luar 5 di atas.
 const DISPERSI_COMPLIANCE_EXTRA = [];
 function dispersiIsQualitativeMode(){
@@ -648,7 +648,7 @@ function dispersiRenderTipeChips(){
 }
 
 /* ---------- Filter Titik Emisi (checklist gaya Excel, pola .xsel yang sama dgn checklist
-   Titik/Cerobong di Dashboard Hasil Pemantauan) — pelengkap klik-per-marker di peta & chip Jenis
+   Titik/Cerobong di Dashboard Hasil Emisi) — pelengkap klik-per-marker di peta & chip Jenis
    Sumber: kadang mau pilih 2-3 titik SPESIFIK by name (misal buat preview/laporan 1 unit saja)
    tanpa harus mencari-cari pin-nya di peta satu-satu. Tidak menambah state baru — tetap menulis ke
    dispersiState.selectedStackIds yang sama dipakai peta/plume/tabel/preview, jadi semuanya otomatis

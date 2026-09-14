@@ -111,6 +111,7 @@ function renderPage(p){
   if(p==="hasildb") renderHasilDb();
   if(p==="ambiendashboard") renderAmbienDashboard();
   if(p==="ambiendb") renderAmbienDb();
+  if(p==="aqiispu") renderAqiIspu();
   if(p==="riwayat") renderRiwayat();
   if(p==="lokasi") renderMap();
   if(p==="data") renderDataStatus();

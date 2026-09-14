@@ -335,7 +335,7 @@ function buildH2STrendChart(records){
 }
 function renderH2SSection(){
   const wrap = document.getElementById("h2sDetailTable");
-  if(!wrap) return; // halaman lain, bukan Dashboard Hasil Pemantauan
+  if(!wrap) return; // halaman lain, bukan Dashboard Hasil Emisi
   const records = DB.hasilPemantauan.filter(r=>r.parameter==="H2S" && r.resultNumeric!=null)
     .slice().sort((a,b)=> a.site.localeCompare(b.site) || a.cerobong.localeCompare(b.cerobong) || a.periodeOrder-b.periodeOrder);
 

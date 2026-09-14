@@ -245,7 +245,7 @@ function save(){
       }
     }
     updateStorageUsageBadge();
-    toast("Penyimpanan browser (localStorage) penuh dan semua snapshot riwayat sudah dikosongkan otomatis, tapi tetap belum cukup. Buka menu Data (Import/Export) → Export Semua Data utk backup, lalu hapus data lama yang tidak perlu (mis. Hasil Pemantauan periode sangat lampau) utk mengosongkan ruang.","err");
+    toast("Penyimpanan browser (localStorage) penuh dan semua snapshot riwayat sudah dikosongkan otomatis, tapi tetap belum cukup. Buka menu Data (Import/Export) → Export Semua Data utk backup, lalu hapus data lama yang tidak perlu (mis. Hasil Emisi periode sangat lampau) utk mengosongkan ruang.","err");
     throw err;
   }
 }
@@ -300,7 +300,7 @@ const DATASET_LABELS = {
   points: "Database Titik Pantau",
   personil: "Personil PPC & Observer",
   coords: "Koordinat Titik Pantau",
-  hasilPemantauan: "Hasil Pemantauan (Database Hasil Pemantauan)",
+  hasilPemantauan: "Hasil Emisi (Database Hasil Emisi)",
   hasilAmbien: "Hasil Pemantauan Ambient (Udara Ambien, Kebisingan, Kebauan, Getaran)",
   rh: "Running Hour Harian",
   rhMonthly: "Running Hour Bulanan",
@@ -322,7 +322,7 @@ function formatRelativeTime(iso){
   return `${Math.floor(days/365)} tahun yang lalu`;
 }
 const DATASET_PAGE = {points:"master", personil:"personil", coords:"lokasi", hasilPemantauan:"hasildb", hasilAmbien:"ambiendb", rh:"runninghour", rhMonthly:"runninghour", tracking:"tracking"};
-const DATASET_PAGE_LABEL = {master:"Database Titik Pantau", personil:"Personil PPC & Observer", lokasi:"Lokasi Titik Pantau", hasildb:"Database Hasil Pemantauan", ambiendb:"Database Hasil Ambient", runninghour:"Running Hour Detail", tracking:"Tracking BA / CoA"};
+const DATASET_PAGE_LABEL = {master:"Database Titik Pantau", personil:"Personil PPC & Observer", lokasi:"Lokasi Titik Pantau", hasildb:"Database Hasil Emisi", ambiendb:"Database Hasil Ambient", runninghour:"Running Hour Detail", tracking:"Tracking BA / CoA"};
 function datasetCount(key){
   if(key==="points") return DB.points.length;
   if(key==="personil") return DB.personil.length;

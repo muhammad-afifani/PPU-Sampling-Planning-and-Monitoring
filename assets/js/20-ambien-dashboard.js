@@ -272,6 +272,10 @@ function ambRenderKebisinganTab(){
   const lastPeriod = periodsInScope[periodsInScope.length-1];
   const rankRows = filtered.filter(r=>r.periode===lastPeriod).map(r=>({titik:r.titik, lSiangMalam:r.lSiangMalam})).sort((a,b)=>b.lSiangMalam-a.lSiangMalam).slice(0,15);
 
+  const bySite = {};
+  filtered.filter(r=>r.pctOfBaku!=null).forEach(r=>{ (bySite[r.site]=bySite[r.site]||[]).push(r.pctOfBaku); });
+  const siteRows = Object.keys(bySite).map(s=>({site:s, avgPct: Math.round(bySite[s].reduce((a,b)=>a+b,0)/bySite[s].length*10)/10})).sort((a,b)=>b.avgPct-a.avgPct);
+
   const profileOptions = filtered.slice().sort((a,b)=>b.periodeOrder-a.periodeOrder);
   if(!ambDashProfileKey || !profileOptions.some(r=>r.id===ambDashProfileKey)) ambDashProfileKey = profileOptions[0] ? profileOptions[0].id : "";
   const profileRec = profileOptions.find(r=>r.id===ambDashProfileKey);
@@ -300,8 +304,13 @@ function ambRenderKebisinganTab(){
         <div>${donut.svg}</div><div class="legend">${donut.legend}</div>
       </div>
     </div>
-    <div class="card"><h3>Peringkat Titik Berdasarkan L Siang-Malam <span class="muted" style="text-transform:none;font-weight:400;">(periode terakhir: ${lastPeriod||"-"})</span></h3>
-      ${ambBuildRankChart(rankRows, "lSiangMalam", "titik", standardRef, " dB(A)")}
+    <div class="grid cols-2">
+      <div class="card"><h3>Peringkat Titik Berdasarkan L Siang-Malam <span class="muted" style="text-transform:none;font-weight:400;">(periode terakhir: ${lastPeriod||"-"})</span></h3>
+        ${ambBuildRankChart(rankRows, "lSiangMalam", "titik", standardRef, " dB(A)")}
+      </div>
+      <div class="card"><h3>Perbandingan Rata Rata per Site <span class="muted" style="text-transform:none;font-weight:400;">(% baku mutu)</span></h3>
+        ${ambBuildRankChart(siteRows, "avgPct", "site", 100, "%")}
+      </div>
     </div>
     <div class="card">
       <h3>Profil Pengukuran 24 Jam</h3>
