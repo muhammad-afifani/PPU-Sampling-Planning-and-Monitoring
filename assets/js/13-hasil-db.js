@@ -135,9 +135,9 @@ function downloadTemplateHasilXlsx(){
   xlsxDownload(wb, "template_hasil_pemantauan.xlsx");
 }
 function resetHasilData(){
-  askConfirm("Reset Database Hasil Pemantauan ke data default (kembali ke dataset awal, semua data yang kamu import akan hilang)?", ()=>{
+  askConfirm("Reset Database Hasil Emisi ke data default (kembali ke dataset awal, semua data yang kamu import akan hilang)?", ()=>{
     DB.hasilPemantauan = [...DEFAULT_HASIL_PEMANTAUAN];
-    save(); toast("Database Hasil Pemantauan direset ke default.","ok"); renderHasilDb();
+    save(); toast("Database Hasil Emisi direset ke default.","ok"); renderHasilDb();
   });
 }
 
@@ -152,7 +152,7 @@ function hasilFormHtml(rec){
   const periodeList = [...new Set(DB.hasilPemantauan.map(r=>r.periode))].filter(Boolean).sort((a,b)=>hasilPeriodParts(a).order-hasilPeriodParts(b).order);
   const permenList = [...new Set(DB.hasilPemantauan.map(r=>r.regulasiCek))].filter(Boolean).sort();
   return `
-  <h3>${rec.id?"Edit":"Tambah"} Data Hasil Pemantauan</h3>
+  <h3>${rec.id?"Edit":"Tambah"} Data Hasil Emisi</h3>
   <div class="grid cols-2">
     <div class="field"><label>Cerobong (Titik Emisi)</label>
       <select id="h_cerobongSel">
