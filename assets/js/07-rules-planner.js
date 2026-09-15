@@ -278,8 +278,20 @@ function renderPlanner(){
     // beda visualnya di baris (lihat badge "manual" di bawah) supaya tetap jelas beda dari yg
     // memang wajib menurut aturan.
     if(!(effectiveWajib(p) || verifyStatus(p)==="verified") || p.tidakBeroperasi) return false;
-    if(p.status==="done") return false;
-    if(p.batchId && p.batchId!==b.id) return false; // already in another batch
+    // Wajib pantau berulang tiap periode — titik yg "done" tapi utk PERIODE LAIN (bukan periode
+    // batch ini) tetap wajib disampling ulang periode ini, jangan dikecualikan selamanya cuma krn
+    // pernah selesai periode sebelumnya (p.status="done" itu status TERKINI apa adanya, bukan
+    // per-periode — savePeriod() ganti periode aktif tanpa mereset field ini di titik manapun).
+    if(periodOfPointStatus(p, b.period)==="done-period") return false;
+    // "Masih terikat" batch lain HANYA kalau titik itu masih AKTIF terjadwal (status "scheduled",
+    // belum dieksekusi/gagal/dikeluarkan) di batch LAIN yg periodenya SAMA dgn batch ini — batch
+    // periode lampau, atau titik yg sudah dikeluarkan/gagal/done di batch lain, tidak lagi
+    // menghalangi (lihat hint "Titik Dikeluarkan dari Batch Ini" di Detail Harian Gantt: titik yg
+    // dikeluarkan MEMANG dimaksudkan supaya bisa dipilih lagi di batch berikutnya).
+    if(p.batchId && p.batchId!==b.id && p.status==="scheduled"){
+      const otherBatch = DB.batches.find(x=>x.id===p.batchId);
+      if(otherBatch && otherBatch.period===b.period) return false;
+    }
     return true;
   });
   const bySite = {};

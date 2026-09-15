@@ -65,6 +65,13 @@ document.getElementById("navMenu").addEventListener("click", e=>{
   setCollapsed(localStorage.getItem("phmSidebarCollapsed")==="1");
 })();
 
+// Tombol Undo/Redo global di sidebar — selalu ada di semua halaman (beda dari tombol per-halaman
+// yang lain). performUndo/performRedo/updateUndoRedoButtons didefinisikan di 01-state.js (dekat
+// save()) krn itu memang bagian dari mekanisme persistensi data, bukan bagian nav — di sini cuma
+// menyambungkan klik ke fungsinya, sama seperti pola tombol ciutkan sidebar & tema di atas.
+document.getElementById("btnUndo").addEventListener("click", performUndo);
+document.getElementById("btnRedo").addEventListener("click", performRedo);
+
 // Toggle tema terang/gelap — atribut data-theme di <html> sudah distempel lebih dulu oleh inline
 // script anti-FOUC di <head> (index.html, jalan sebelum CSS/JS lain), jadi di sini cuma perlu BACA
 // nilai yg sudah ada itu (bukan tentukan ulang dari nol) supaya toggle & stempel awal selalu sinkron.

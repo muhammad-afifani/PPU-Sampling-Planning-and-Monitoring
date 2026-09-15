@@ -351,6 +351,14 @@ function savePeriod(){
   DB.meta.semester = sem; DB.meta.tahun = tahun;
   logChange(`Periode pemantauan aktif diubah ke ${periodLabel(Number(sem.replace(/\D/g,"")), tahun)}`);
   save(); closeModal(); updateMetaLine();
+  // Selector Periode di Plan Pemantauan cuma diisi SEKALI per sesi (dataset.filled) supaya pilihan
+  // manual user di halaman itu tidak ketimpa tiap render — tapi itu jadi berarti kalau periode aktif
+  // diubah dari sini (halaman lain), dropdown itu tidak pernah ikut update ke default baru sampai
+  // reload penuh. Lepas flag-nya di sini spy render BERIKUTNYA ke halaman itu (baik krn baris di
+  // bawah kalau lagi aktif, atau nanti kalau user pindah ke sana) mengisi ulang & default ke
+  // periode aktif yang baru, bukan nyangkut di periode lama.
+  const rcPeriodeSel = document.getElementById("rcPeriode");
+  if(rcPeriodeSel) delete rcPeriodeSel.dataset.filled;
   renderPage(document.querySelector(".navbtn.active")?.dataset.page || "dashboard");
   toast(`Periode aktif sekarang ${currentPeriodStr()}.`,"ok");
 }
