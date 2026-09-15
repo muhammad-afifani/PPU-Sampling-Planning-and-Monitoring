@@ -238,6 +238,15 @@ function load(){
   migrateDB();
   updateStorageUsageBadge();
   probeRealStorageQuota();
+  // Titik awal undo/redo (lihat blok di bawah save()) — state persis begitu file ini dibuka,
+  // sebelum interaksi apapun sesi ini. lastUndoPushTime SENGAJA 0 (bukan Date.now()) — kalau
+  // diisi waktu sekarang, save() PERTAMA yang terjadi dlm UNDO_COALESCE_MS stlh file dibuka
+  // (sangat mungkin, mis. user langsung klik sesuatu) akan gagal terdorong ke undoStack sama
+  // sekali (dikira "lanjutan ketukan beruntun" dari load(), padahal actionnya sendiri belum
+  // pernah ada) — 0 menjamin cek "sudah lewat UNDO_COALESCE_MS" selalu benar utk dorongan pertama.
+  lastSavedSnapshot = snapshotForUndo(DB);
+  lastUndoPushTime = 0;
+  updateUndoRedoButtons();
 }
 // Kalau localStorage penuh (QuotaExceededError), penyebab paling umum adalah DB.snapshots —
 // tiap snapshot (lihat snapshotBefore) adalah salinan PENUH seluruh database, dibuat otomatis
@@ -248,8 +257,20 @@ function load(){
 // bisa tampilkan pesannya ke user.
 function save(){
   try{
+    // Dorong state SEBELUM perubahan ini ke undoStack (lihat blok Undo/Redo di bawah) — ketukan
+    // beruntun (mis. tiap huruf field teks) dlm UNDO_COALESCE_MS digabung jd 1 langkah, TIDAK
+    // dorong entry baru tiap panggilan, spy Undo tidak cuma mundur 1 huruf demi 1 huruf.
+    const nowTs = Date.now();
+    if(lastSavedSnapshot && (nowTs-lastUndoPushTime>UNDO_COALESCE_MS)){
+      undoStack.push(lastSavedSnapshot);
+      if(undoStack.length>UNDO_MAX_STEPS) undoStack.shift();
+      redoStack = [];
+      lastUndoPushTime = nowTs;
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
+    lastSavedSnapshot = snapshotForUndo(DB);
     updateStorageUsageBadge();
+    updateUndoRedoButtons();
   }catch(err){
     const isQuotaErr = err && (err.name==="QuotaExceededError" || err.code===22 || err.code===1014);
     if(!isQuotaErr) throw err;
@@ -258,7 +279,9 @@ function save(){
       DB.snapshots.pop();
       try{
         localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
+        lastSavedSnapshot = snapshotForUndo(DB);
         updateStorageUsageBadge();
+        updateUndoRedoButtons();
         toast(`Penyimpanan browser hampir penuh — ${droppedCount-DB.snapshots.length} snapshot riwayat lama dihapus otomatis utk mengosongkan ruang (data titik/tracking/hasil pemantauan tidak terpengaruh). Cek halaman Riwayat & Restore.`,"err");
         return;
       }catch(err2){
@@ -434,6 +457,76 @@ function restoreSnapshot(idx){
     toast("Data berhasil di-restore.","ok");
     showPage("riwayat");
   });
+}
+
+/* =========================================================
+   UNDO / REDO — jaring pengaman generik utk SEMUA perubahan, beda dari snapshot Riwayat & Restore
+   di atas (yang manual/bernama & tersimpan permanen di DB.snapshots, sengaja dibatasi 5 biar hemat
+   kuota). Ini sebaliknya: otomatis & diam-diam tiap panggilan save(), tapi HANYA di memori (tidak
+   ikut ke localStorage) — reset tiap file di-reload, sama seperti undo history aplikasi lain pada
+   umumnya kalau ditutup-buka lagi, dan supaya tidak menambah beban kuota localStorage yang sudah
+   pernah jadi masalah (lihat catatan foto/IndexedDB). dokumentasiFoto juga TIDAK ikut ke-cover di
+   sini, sama seperti snapshot Riwayat — foto sudah punya penyimpanan & alur hapusnya sendiri
+   (IndexedDB), sengaja dikecualikan drpd bikin undo/redo ikut coba sinkron ulang blob tiap langkah.
+========================================================= */
+let undoStack = [], redoStack = [], lastSavedSnapshot = null, lastUndoPushTime = 0;
+const UNDO_MAX_STEPS = 20;
+// Ketukan beruntun dlm jendela ini (mis. tiap huruf yg diketik di field teks yg pakai event
+// "input", jadi save() terpanggil tiap keystroke) digabung jd SATU langkah undo, bukan puluhan.
+const UNDO_COALESCE_MS = 1200;
+function snapshotForUndo(db){
+  const copy = JSON.parse(JSON.stringify(db));
+  delete copy.snapshots;
+  delete copy.dokumentasiFoto;
+  return copy;
+}
+function updateUndoRedoButtons(){
+  const undoBtn = document.getElementById("btnUndo");
+  const redoBtn = document.getElementById("btnRedo");
+  if(undoBtn){
+    undoBtn.disabled = !undoStack.length;
+    undoBtn.title = undoStack.length ? `Undo — batalkan perubahan terakhir (${undoStack.length} langkah tersimpan)` : "Tidak ada perubahan untuk di-undo";
+  }
+  if(redoBtn){
+    redoBtn.disabled = !redoStack.length;
+    redoBtn.title = redoStack.length ? `Redo — kembalikan lagi (${redoStack.length} langkah tersimpan)` : "Tidak ada perubahan untuk di-redo";
+  }
+}
+function applyUndoRedoState(snapshotData){
+  const keepSnapshots = DB.snapshots;
+  const keepDokFoto = DB.dokumentasiFoto;
+  DB = JSON.parse(JSON.stringify(snapshotData));
+  DB.snapshots = keepSnapshots;
+  DB.dokumentasiFoto = keepDokFoto;
+  lastSavedSnapshot = snapshotForUndo(DB);
+  // 0, bukan Date.now() — sama alasannya dgn load() di atas: spy save() PERTAMA setelah
+  // undo/redo ini (kapanpun user bertindak lagi) pasti terdorong sbg langkah baru, bukan
+  // dianggap "masih lanjutan" dari aksi undo/redo itu sendiri.
+  lastUndoPushTime = 0;
+  // Tulis LANGSUNG ke localStorage (bukan lewat save()) supaya tindakan undo/redo ini sendiri
+  // TIDAK ikut mendorong entry baru ke undoStack — kalau lewat save(), undo akan "mengunci diri
+  // sendiri" (redo jadi tidak pernah bisa balik ke keadaan semula krn undoStack ikut berubah
+  // tiap kali di-undo). Dua stack terpisah (undo/redo) sudah menangani riwayat maju-mundurnya.
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }catch(err){ /* quota — Undo/Redo tetap jalan di memori, tanpa alur recovery penuh spt save() */ }
+  updateStorageUsageBadge();
+  updateUndoRedoButtons();
+  renderPage(document.querySelector(".navbtn.active")?.dataset.page || "dashboard");
+}
+function performUndo(){
+  if(!undoStack.length){ toast("Tidak ada perubahan untuk di-undo.","err"); return; }
+  const target = undoStack.pop();
+  redoStack.push(lastSavedSnapshot);
+  if(redoStack.length>UNDO_MAX_STEPS) redoStack.shift();
+  applyUndoRedoState(target);
+  toast("Perubahan terakhir dibatalkan (Undo).","ok");
+}
+function performRedo(){
+  if(!redoStack.length){ toast("Tidak ada perubahan untuk di-redo.","err"); return; }
+  const target = redoStack.pop();
+  undoStack.push(lastSavedSnapshot);
+  if(undoStack.length>UNDO_MAX_STEPS) undoStack.shift();
+  applyUndoRedoState(target);
+  toast("Perubahan dikembalikan lagi (Redo).","ok");
 }
 function deleteSnapshot(idx){
   DB.snapshots.splice(idx,1); save(); renderRiwayat();

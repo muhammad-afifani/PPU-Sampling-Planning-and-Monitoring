@@ -240,6 +240,12 @@ function renderTracking(){
   renderSamplingEmisiTable(beforeStatus);
 
   const docPts = pts.filter(p=>ensureTracking(p.id).samplingStatus==="sampled");
+  if(!docPts.length){
+    document.getElementById("trackingTable").innerHTML = `<tbody><tr><td style="padding:16px;">
+      <div class="hint">Belum ada titik berstatus "Sudah Disampling" utk filter yang dipilih — checklist dokumen (BA, draft SHU, dst) baru muncul di sini setelah statusnya diisi "Sudah Disampling" di tabel <b>Tahap 1 (Sampling di Lapangan)</b> di atas.</div>
+    </td></tr></tbody>`;
+    return;
+  }
   document.getElementById("trackingTable").innerHTML = `
     <thead><tr><th>Site</th><th>Titik</th>${TRACK_STEPS.map(([key,label])=>`<th>${label}<br><button class="btn small ghost" data-action="bulkTrackColumn" data-key="${key}" style="margin-top:3px;padding:2px 6px;font-size:10px;">Centang Semua</button></th>`).join("")}<th>Status</th></tr></thead>
     <tbody>${docPts.map(p=>{
@@ -259,6 +265,13 @@ function renderTracking(){
 function renderSamplingEmisiTable(pts){
   const el = document.getElementById("samplingEmisiTable");
   if(!el) return;
+  if(!pts.length){
+    el.innerHTML = `<tbody><tr><td style="padding:16px;">
+      <div class="hint">Belum ada titik yang tampil di sini utk filter Tim/Batch/Site yang dipilih — halaman ini cuma menampilkan titik yang <b>sudah dijadwalkan lewat Perencanaan Batch</b> (klik "+ Batch Baru", pilih titiknya, lalu buat jadwal). Kalau kamu yakin sudah bikin batch utk tim/periode ini tapi tetap kosong di sini, cek juga filter Batch &amp; Site di atas (mungkin ke-set ke pilihan yang tidak cocok).</div>
+      <button class="btn small ghost" style="margin-top:8px;" data-action="goToPage" data-page="planner">Buka Perencanaan Batch &rarr;</button>
+    </td></tr></tbody>`;
+    return;
+  }
   el.innerHTML = `
     <thead><tr><th>Site</th><th>Titik</th><th>Kategori Sumber</th><th>Wajib Pantau</th><th style="width:190px;">Status Sampling</th><th style="width:150px;">Tanggal Sampling</th><th>Catatan</th><th style="width:60px;">Aksi</th></tr></thead>
     <tbody>${pts.map(p=>{
