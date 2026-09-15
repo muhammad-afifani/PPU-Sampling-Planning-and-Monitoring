@@ -146,32 +146,35 @@ function aqiIspuBuildRankChart(rows){ // rows: [{titik, index, standard}]
   svg += `</svg>`;
   return svg;
 }
-// "Visual per tanggal sampling": 1 baris per site, tiap event sampling digambar sbg lingkaran
-// berwarna sesuai kategori, urut kronologis — hover utk detail titik/tanggal/indeks.
-function aqiIspuBuildTimeline(events){
-  if(!events.length) return "<div class='hint' style='padding:14px;'>Tidak ada data sampling pada filter ini.</div>";
-  const bySite = {};
-  events.forEach(ev=>{ (bySite[ev.site]=bySite[ev.site]||[]).push(ev); });
-  const sites = Object.keys(bySite).sort();
-  const rowH=44, padL=118, padR=20, padT=14, dotGap=34;
-  const maxCols = Math.max(...sites.map(s=>bySite[s].length));
-  const W = Math.max(560, padL + maxCols*dotGap + padR);
-  const H = padT + sites.length*rowH + 6;
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:10px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;">`;
-  sites.forEach((site,ri)=>{
-    const y = padT + ri*rowH + rowH/2;
-    const evs = bySite[site].slice().sort((a,b)=>(a.tanggalSort||"").localeCompare(b.tanggalSort||""));
-    svg += `<text x="10" y="${y+4}" font-weight="700" fill="var(--gray-900)" font-size="11">${escHtml(site)}</text>`;
-    if(ri>0) svg += `<line x1="0" y1="${padT+ri*rowH}" x2="${W}" y2="${padT+ri*rowH}" stroke="var(--gray-200)"/>`;
-    evs.forEach((ev,ci)=>{
-      const x = padL + ci*dotGap + 15;
-      const cat = ev.category;
-      svg += `<circle cx="${x}" cy="${y}" r="11" fill="${cat.color}" stroke="var(--surface-card)" stroke-width="1.5"><title>${escHtml(ev.titik)} — ${ev.tanggal||"-"} (${ev.periode})\nIndeks: ${ev.index} — ${cat.name}\nParameter dominan: ${AQIISPU_POLLUTANT_LABEL[ev.dominant]||ev.dominant}</title></circle>`;
-      svg += `<text x="${x}" y="${y+3.5}" text-anchor="middle" font-size="8.5" font-weight="800" fill="${cat.text}" style="pointer-events:none;">${ev.index}</text>`;
-    });
+// "Riwayat Seluruh Titik": tabel kompak tren per semester — baris = titik, kolom = periode
+// (S1/S2 berurutan), sel = badge warna kategori berisi angka indeks. Baik nunjukin tren
+// naik/turun tiap titik antar semester (baca 1 baris ke kanan) maupun ringkas krn lebar kolom
+// tetap (beda dgn timeline lingkaran lama yg makin lebar kalau titik makin sering disampling).
+function aqiIspuBuildTrendTable(events, periods){
+  if(!events.length || !periods.length) return "<div class='hint' style='padding:14px;'>Tidak ada data sampling pada filter ini.</div>";
+  const byTitik = {};
+  events.forEach(ev=>{
+    const key = ev.site+"::"+ev.titik;
+    if(!byTitik[key]) byTitik[key] = {site:ev.site, titik:ev.titik, byPeriode:{}};
+    byTitik[key].byPeriode[ev.periode] = ev;
   });
-  svg += `</svg>`;
-  return svg;
+  const rows = Object.values(byTitik).sort((a,b)=> a.site===b.site ? a.titik.localeCompare(b.titik) : a.site.localeCompare(b.site));
+  const headerHtml = periods.map(p=>{
+    const {sem, tahun} = hasilPeriodParts(p);
+    return `<th style="text-align:center;white-space:nowrap;">${sem?`S${sem}<br><span class="muted" style="font-weight:400;font-size:10px;">${tahun}</span>`:escHtml(p)}</th>`;
+  }).join("");
+  const rowsHtml = rows.map(r=>`<tr>
+    <td>${escHtml(r.titik)}</td><td class="muted">${r.site}</td>
+    ${periods.map(p=>{
+      const ev = r.byPeriode[p];
+      if(!ev) return `<td class="muted" style="text-align:center;">-</td>`;
+      return `<td style="text-align:center;"><span class="badge" style="background:${ev.category.color};color:${ev.category.text};" title="${escHtml(ev.tanggal||"")} — ${escHtml(ev.category.name)} — parameter dominan ${AQIISPU_POLLUTANT_LABEL[ev.dominant]||ev.dominant}">${ev.index}</span></td>`;
+    }).join("")}
+  </tr>`).join("");
+  return `<div class="tablewrap"><table style="font-size:11.5px;">
+    <thead><tr><th>Titik</th><th>Site</th>${headerHtml}</tr></thead>
+    <tbody>${rowsHtml}</tbody>
+  </table></div>`;
 }
 function aqiIspuLegendHtml(standard){
   const cats = standard==="ispu" ? ISPU_CATEGORIES : AQI_CATEGORIES;
@@ -294,6 +297,7 @@ function renderAqiIspu(){
 
   const detail = filtered.slice().sort((a,b)=>(b.tanggalSort||"").localeCompare(a.tanggalSort||"")).slice(0,200);
   const stdLabel = aqiIspuStandard==="ispu" ? "ISPU" : "AQI";
+  const trendPeriods = [...new Set(filtered.map(e=>e.periode))].sort((a,b)=>hasilPeriodParts(a).order-hasilPeriodParts(b).order);
 
   // Peta selalu pakai HANYA data pada filter Site aktif (tapi TIDAK ikut filter Dari/Sampai Periode
   // — peta punya selector periode sendiri) supaya bisa lihat sebaran periode manapun tanpa perlu
@@ -313,9 +317,9 @@ function renderAqiIspu(){
       <div class="stat ${badN>0?'bad':'good'}"><div class="num">${badN}</div><div class="lbl">Event ${aqiIspuStandard==="ispu"?"Tidak Sehat+":"Unhealthy+"}</div></div>
     </div>
     <div class="card">
-      <h3>Riwayat Seluruh Titik (Timeline) <span class="muted" style="text-transform:none;font-weight:400;">— tiap titik berwarna sesuai kategori ${stdLabel} hasil sampling hari itu</span></h3>
-      <div class="hint" style="margin-top:-6px;margin-bottom:8px;">Arahkan kursor ke tiap titik untuk detail (titik, tanggal, indeks, parameter dominan). Diurutkan kronologis per site.</div>
-      ${aqiIspuBuildTimeline(filtered)}
+      <h3>Riwayat Seluruh Titik <span class="muted" style="text-transform:none;font-weight:400;">— tren indeks ${stdLabel} tiap titik per semester</span></h3>
+      <div class="hint" style="margin-top:-6px;margin-bottom:8px;">Baca 1 baris ke kanan untuk lihat tren naik/turun tiap titik antar periode. Arahkan kursor ke tiap angka untuk detail tanggal &amp; parameter dominan.</div>
+      ${aqiIspuBuildTrendTable(filtered, trendPeriods)}
       ${aqiIspuLegendHtml(aqiIspuStandard)}
     </div>
     <div class="grid cols-2">
