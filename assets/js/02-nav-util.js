@@ -158,6 +158,23 @@ window.addEventListener("resize", syncActiveStickyOffset);
 document.addEventListener("toggle", e=>{
   if(e.target.closest && e.target.closest(".stickytop")) syncActiveStickyOffset();
 }, true);
+// Listener resize/toggle di atas cuma nangkep 2 penyebab spesifik — tapi .stickytop bisa berubah
+// tinggi krn banyak sebab lain yg tidak ada event khususnya: chip ringkasan yg re-render beda
+// baris (mis. breakdown titik terpilih di Perencanaan Batch tiap centang/kosongkan checkbox），
+// webfont yang baru selesai load & mengubah lebar teks/jumlah baris wrap setelah render pertama,
+// dst. Kalau --stickyoffset kepakai NILAI LAMA yg lebih kecil dari tinggi .stickytop yg
+// sebenarnya SEKARANG, .tree-head/.tree-subhead nempel terlalu tinggi (di bawah posisi yg
+// seharusnya) — hasilnya baris tabel yg harusnya sudah "ketutup" header sticky malah masih
+// kelihatan sekilas dulu pas discroll, spt header-nya "tembus"/transparan padahal background-nya
+// solid. ResizeObserver di sini nangkep SEMUA kemungkinan penyebab sekaligus (bukan cuma 2 yg
+// sudah ketahuan) krn dia lihat langsung ukuran render akhirnya, bukan nebak lewat event spesifik
+// — diamati di SETIAP .stickytop yg ada (satu per halaman) supaya kepasang sekali di awal & tetap
+// jalan walau pindah halaman aktif; halaman yang lagi disembunyikan (display:none) otomatis tidak
+// pernah memicu callback (ukurannya nol/tidak dirender), jadi aman diamati semuanya sekaligus.
+if(window.ResizeObserver){
+  const stickytopObserver = new ResizeObserver(()=>syncActiveStickyOffset());
+  document.querySelectorAll(".stickytop").forEach(el=>stickytopObserver.observe(el));
+}
 
 /* =========================================================
    UTIL
