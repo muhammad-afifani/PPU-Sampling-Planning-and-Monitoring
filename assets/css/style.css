@@ -1016,8 +1016,12 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 /* Model Dispersi Emisi punya peta Leaflet + .stickytop yang lebih tinggi (header + 4 stat card) —
    masalah "bocor" yang sama persis seperti #siteMap di atas, jadi solusinya sama: z-index eksplisit. */
 #dispersiMap{position:relative;z-index:0;}
-/* Model AQI/ISPU Ambient — masalah "bocor" Leaflet yang sama persis lagi, solusi sama: z-index eksplisit. */
-#aqiIspuMap{position:relative;z-index:0;}
+/* Model AQI/ISPU Ambient — masalah "bocor" Leaflet yang sama persis lagi. z-index eksplisit ternyata
+   TIDAK cukup di halaman ini (masih kebukti tembus ke atas .stickytop saat discroll) — dipakai
+   isolation:isolate juga, yang MEMAKSA stacking context baru tanpa syarat (position:relative +
+   z-index:0 SEHARUSNYA sudah cukup per spec, tapi isolation eksplisit jauh lebih tegas & tidak
+   bergantung nuansa perhitungan z-index browser). overflow:hidden sbg lapis pengaman tambahan. */
+#aqiIspuMap{position:relative;z-index:0;isolation:isolate;overflow:hidden;}
 .map-legend-dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:4px;vertical-align:middle;}
 .leaflet-popup-content b{color:var(--heading);}
 .map-pin{border-radius:50%;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);transition:transform .12s ease;}
