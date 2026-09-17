@@ -1630,7 +1630,10 @@ function buildSCurveDailyBars(minDate, totalDays, plannedDaily, actualDaily){
   const maxV = Math.max(1, ...plannedDaily, ...actualDaily);
   const slotW = plotW/totalDays;
   const barW = Math.max(1.5, Math.min(10, slotW/2-2));
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:9.5px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;">`;
+  // TANPA background/border/radius sendiri (beda dari SVG kurva-S di atas) — chart ini sengaja
+  // menyatu jadi kelanjutan visual kartu S-Curve yang sama (pembatasnya cukup border-top+label di
+  // wrapper div-nya), bukan kotak baru yang keliatan seperti chart/kartu terpisah di bawahnya.
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:9.5px;">`;
   for(let g=0; g<=2; g++){
     const v = Math.round(maxV*g/2), y = padT+plotH-(g/2)*plotH;
     svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--gray-200)"/>`;
@@ -1649,7 +1652,11 @@ function buildSCurveDailyBars(minDate, totalDays, plannedDaily, actualDaily){
     }
   }
   svg += `</svg>`;
-  return `<div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin:14px 0 6px;">Target vs Aktual per Hari</div>${svg}<div class="legend"><span class="item"><span class="sw" style="background:#3d78c9"></span>Target (rencana selesai hari itu)</span><span class="item"><span class="sw" style="background:#3fb27f"></span>Aktual (selesai hari itu)</span></div>`;
+  return `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--gray-200);">
+    <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px;">Target vs Aktual per Hari</div>
+    ${svg}
+    <div class="legend"><span class="item"><span class="sw" style="background:#3d78c9"></span>Target (rencana selesai hari itu)</span><span class="item"><span class="sw" style="background:#3fb27f"></span>Aktual (selesai hari itu)</span></div>
+  </div>`;
 }
 // Info paling relevan per status utk ditampilkan di kolom kanan baris drilldown — beda2 krn
 // pertanyaan "kenapa/kapan" jawabannya beda tiap status (tanggal selesai vs jendela rencana vs
