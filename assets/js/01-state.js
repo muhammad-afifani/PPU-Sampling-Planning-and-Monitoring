@@ -98,6 +98,23 @@ function migrateDB(){
     const m = (b.name||"").match(/S[12]\s+\d{4}/);
     b.period = m ? m[0] : currentPeriodStr();
   });
+  // b.period di atas MEMANG sudah keisi (bukan kosong) utk sebagian besar batch — tapi bisa basi:
+  // sendPlanToBatch() nge-stamp period dari dropdown "rcPeriode" di Plan Pemantauan pada saat batch
+  // dibuat (b.start masih "" waktu itu), lalu Nama Batch bisa diketik ulang manual belakangan di
+  // Perencanaan Batch (bebas teks, terpisah dari field period) begitu user sadar dropdown-nya salah
+  // pilih — namanya kekoreksi tapi b.period yang tidak pernah ditampilkan ke user tidak ikut
+  // kekoreksi, jadi tetap basi selamanya. Baru ketahuan sekarang krn b.period ditampilkan tekstual
+  // di filter S-Curve Dashboard. Disamakan sekali di sini ke periode yg ditunjukkan tanggal mulai
+  // ASLI (periodOfDateStr, sumber paling bisa diandalkan) utk batch yg sudah py tanggal — supaya
+  // data yg sudah kepalanjur basi di banyak user ikut kekoreksi, bukan cuma mencegah kasus baru.
+  if(!DB.meta.batchPeriodSyncedFromDates){
+    DB.batches.forEach(b=>{
+      if(!b.start) return;
+      const po = periodOfDateStr(b.start);
+      if(po && po.label!==b.period) b.period = po.label;
+    });
+    DB.meta.batchPeriodSyncedFromDates = true;
+  }
   DB.batches.forEach(b=>{
     if(!b.dayOverrides) b.dayOverrides = {};
     if(b.finalized===undefined) b.finalized = false;

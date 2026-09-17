@@ -189,6 +189,13 @@ function loadBatchIntoForm(){
     b.end = document.getElementById("plEnd").value;
     b.ratio = Number(document.getElementById("plRatio").value)||1;
     b.buffer = Number(document.getElementById("plBuffer").value)||0;
+    // b.period di-stamp dari currentPeriodStr() sekali doang waktu batch masih kosong (lihat
+    // newBatch()) — kalau baru BELAKANGAN diisi tanggal mulai (atau periode aktif keburu diganti
+    // di antaranya), period jadi basi & tidak pernah sinkron lagi ke tanggal jadwal yang sebenarnya
+    // (baru ketahuan skrg krn ditampilkan tekstual di filter S-Curve Dashboard). Disamakan lagi ke
+    // tanggal ASLI tiap kali tanggal mulai berubah — sumber kebenaran yg lebih bisa diandalkan
+    // drpd toggle periode aktif yg bisa saja belum sempat diganti user.
+    if(b.start){ const po = periodOfDateStr(b.start); if(po) b.period = po.label; }
     save(); refreshBatchSelect();
     if(id==="plEnd" || id==="plStart") renderScheduleTable(b);
   });
@@ -459,6 +466,10 @@ function generateSchedule(){
   b = currentBatch(); if(!b){ toast("Buat/pilih batch dulu — klik \"+ Batch Baru\".","err"); return; }
   const team = document.getElementById("plTeam").value;
   if(!b.start){ toast("Isi Tanggal Mulai Rencana dulu.","err"); return; }
+  // Jaga2 samakan lagi b.period ke tanggal mulai yg asli (lihat catatan di listener plStart/plEnd
+  // di atas) — generateSchedule bisa jadi titik terakhir yg pasti punya b.start valid sebelum
+  // jadwal dipakai di tempat lain (S-Curve, dst).
+  { const po = periodOfDateStr(b.start); if(po) b.period = po.label; }
   const checked = [...document.querySelectorAll(".ptChk:checked")].map(c=>c.dataset.id);
   if(!checked.length){ toast("Pilih minimal satu titik pantau (default seharusnya sudah tercentang semua).","err"); return; }
   snapshotBefore(`Sebelum generate jadwal "${b.name}"`);
