@@ -79,6 +79,30 @@ function migrateDB(){
     Object.keys(AMBIENT_COORDS_SEED).forEach(key=>{ if(!DB.pointCoords[key]) DB.pointCoords[key] = AMBIENT_COORDS_SEED[key]; });
     DB.meta.ambientCoordsSeeded = true;
   }
+  // Koreksi sekali: 11 dari 12 koordinat di atas ternyata tertukar antar titik (nilai lat/lon-nya
+  // benar sbg SATU SET, tapi ke-assign ke site::nama yg SALAH — user kirim ulang tabel DMS yg sudah
+  // dikoreksi & dicocokkan manual ke lokasi asli). "Main Deck (Living Quarter-LQ) Bekapai" SENGAJA
+  // tidak diikutkan — nilai di tabel resend-nya ternyata masih duplikat persis dari 2 titik lain
+  // (fragment lat SPS Camp Accomodation + fragment lon Handil Village), jadi kemungkinan besar juga
+  // salah ketik/salah tempel, bukan data GPS asli offshore Bekapai yg sebenarnya — dibiarkan apa
+  // adanya sampai user kirim koordinat yg benar-benar terverifikasi utk titik itu.
+  if(!DB.meta.ambientCoordsCorrectedV2){
+    const AMBIENT_COORDS_FIX_V2 = {
+      "CPU::Akomodasi CPU (CPU Camp)":[-0.5825197,117.3774403],
+      "NPU::Akomodasi NPU (NPU Camp)":[-0.4618381,117.5852825],
+      "SPS::SPS Camp Accomodation":[-0.9655722,117.1445306],
+      "SPU::Akomodasi SPU (SPU Camp)":[-0.6924583,117.5029056],
+      "HCA::Handil Village":[-0.8187428,117.2517603],
+      "SPS::SPS Main Gate":[-0.9724389,117.1515278],
+      "HCA::Handil Camp":[-0.8239144,117.2510131],
+      "BPN::Kompleks Gunung Utara":[-1.2555417,116.8285250],
+      "BPN::Kompleks Sepinggan":[-1.2586528,116.8866111],
+      "CPU::TRF Office":[-0.3401614,117.4226011],
+      "HCA::CPA Camp":[-0.8438822,117.2632981],
+    };
+    Object.keys(AMBIENT_COORDS_FIX_V2).forEach(key=>{ DB.pointCoords[key] = AMBIENT_COORDS_FIX_V2[key]; });
+    DB.meta.ambientCoordsCorrectedV2 = true;
+  }
   if(!DB.meta.rhMonthsNormalized){ rhNormalizeMonthLabels(); DB.meta.rhMonthsNormalized = true; }
   // Tur onboarding "pertama kali buka tools ini" cuma utk sesi yg BENAR2 baru (freshDB, belum
   // pernah ada data sama sekali) — sesi yg sudah pernah jalan sebelumnya (lewat baris migrateDB
