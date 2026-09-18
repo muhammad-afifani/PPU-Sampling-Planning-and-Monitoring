@@ -241,13 +241,13 @@ nav .navbtn.hidden-by-search{display:none;}
 .pagehead{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
 #plStickyBody.collapsed{display:none;}
 #dispersiStats.collapsed{display:none;}
-.pagehead h2{margin:0;font-size:19px;color:var(--heading);}
-.pagehead .desc{font-size:12.5px;color:var(--gray-500);margin-top:3px;}
+.pagehead h2{margin:0;font-size:27px;font-weight:800;letter-spacing:-.01em;color:var(--heading);}
+.pagehead .desc{font-size:13.5px;color:var(--gray-700);margin-top:5px;}
 .page{display:none;}
 .page.active{display:block;}
 
-.card{background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;padding:16px 18px;margin-bottom:16px;}
-.card h3{margin:0 0 12px;font-size:13.5px;color:var(--heading-2);text-transform:uppercase;letter-spacing:.03em;}
+.card{background:var(--surface-card);border:1px solid var(--gray-200);border-radius:14px;padding:20px 22px;margin-bottom:18px;box-shadow:0 1px 2px rgba(10,22,40,.04),0 10px 24px -20px rgba(10,22,40,.25);}
+.card h3{margin:0 0 14px;font-size:15.5px;font-weight:800;color:var(--heading-2);letter-spacing:-.005em;}
 
 /* Card section yang bisa di-collapse (native <details>, default terbuka) — beda dari details.guide
    (itu utk panduan cara pakai, defaultnya tertutup); ini utk bagian tabel/data yg cuma ingin
@@ -272,9 +272,9 @@ details.collapse-section summary:hover{color:var(--teal-600,#0b6b66);}
 
 /* Kartu "Progress per Grup Sumber" di Dashboard — grid responsif, lebarnya menyesuaikan jumlah
    kartu yang muat (lihat dashGrpCardHtml di 04-dashboard.js). */
-.dash-grpgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;}
-.dash-grp-card{display:flex;align-items:center;gap:11px;padding:9px 11px;border:1px solid var(--gray-200);border-radius:10px;transition:border-color .15s ease;}
-.dash-grp-card:hover{border-color:var(--teal-500);}
+.dash-grpgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;}
+.dash-grp-card{display:flex;align-items:center;gap:11px;padding:12px 13px;border:1px solid var(--gray-200);border-radius:12px;transition:border-color .15s ease,box-shadow .15s ease;}
+.dash-grp-card:hover{border-color:var(--teal-500);box-shadow:0 4px 14px -8px rgba(14,165,160,.35);}
 .dash-grp-body{min-width:0;}
 .dash-grp-label{font-size:11.5px;font-weight:700;color:var(--heading-2);line-height:1.3;}
 .dash-grp-frac{font-size:12px;color:var(--gray-500);margin-top:2px;}
@@ -282,14 +282,22 @@ details.collapse-section summary:hover{color:var(--teal-600,#0b6b66);}
 
 /* Baris Peringatan Dashboard — kartu kecil beraksen warna per tingkat urgensi (bukan <ul> polos),
    supaya tingginya ngikut isi (tidak ada spasi kosong lagi) & langsung kelihatan mana yang genting. */
-.dash-alert{padding:8px 10px;border-radius:8px;border-left:3px solid var(--gray-400);background:var(--gray-100);font-size:12px;line-height:1.55;margin-bottom:7px;}
+.dash-alert{display:flex;align-items:flex-start;gap:11px;padding:12px 13px;border-radius:12px;border:1px solid var(--gray-200);background:var(--gray-100);font-size:12.5px;line-height:1.55;margin-bottom:9px;}
 .dash-alert:last-child{margin-bottom:0;}
-.dash-alert.sev-critical{border-left-color:var(--red-500);background:color-mix(in srgb, var(--red-500) 8%, var(--surface-card));}
-.dash-alert.sev-warning{border-left-color:var(--amber-500);background:color-mix(in srgb, var(--amber-500) 9%, var(--surface-card));}
+.dash-alert-icon{flex-shrink:0;width:28px;height:28px;border-radius:8px;background:var(--surface-card);display:flex;align-items:center;justify-content:center;}
+.dash-alert-body{flex:1;min-width:0;}
+.dash-alert.sev-critical{border-color:color-mix(in srgb, var(--red-500) 35%, var(--gray-200));background:color-mix(in srgb, var(--red-500) 9%, var(--surface-card));}
+.dash-alert.sev-critical .dash-alert-icon{color:var(--red-500);}
+.dash-alert.sev-warning{border-color:color-mix(in srgb, var(--amber-500) 40%, var(--gray-200));background:color-mix(in srgb, var(--amber-500) 10%, var(--surface-card));}
+.dash-alert.sev-warning .dash-alert-icon{color:var(--amber-500);}
 
-.stat{background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;padding:14px 16px;}
-.stat .num{font-size:26px;font-weight:800;color:var(--heading);font-family:var(--font-mono);}
-.stat .lbl{font-size:11.5px;color:var(--gray-500);margin-top:2px;text-transform:uppercase;letter-spacing:.03em;}
+.stat{position:relative;overflow:hidden;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:14px;padding:20px 18px 16px;box-shadow:0 1px 2px rgba(10,22,40,.04),0 10px 22px -20px rgba(10,22,40,.3);}
+.stat::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--navy-700);}
+.stat .num{font-size:28px;font-weight:800;color:var(--heading);font-variant-numeric:tabular-nums;line-height:1;}
+.stat .lbl{font-size:11.5px;font-weight:600;color:var(--gray-500);margin-top:9px;text-transform:uppercase;letter-spacing:.03em;line-height:1.4;}
+.stat.warn::before{background:var(--amber-500);}
+.stat.bad::before{background:var(--red-500);}
+.stat.good::before{background:var(--green-500);}
 .stat.warn .num{color:var(--amber-500);}
 .stat.bad .num{color:var(--red-500);}
 .stat.good .num{color:var(--green-500);}
@@ -302,7 +310,7 @@ tbody tr:hover{background:var(--gray-100);}
    tbody td di atas) supaya tabel tidak selebar mungkin & scroll horizontal ke kolom
    Dokumentasi/Ditugaskan/Aksi di ujung kanan tidak sejauh sebelumnya. */
 #personilTable td, #personilTable th{padding:7px 10px;}
-.tablewrap{overflow:auto;max-height:64vh;border:1px solid var(--gray-200);border-radius:8px;}
+.tablewrap{overflow:auto;max-height:64vh;border:1px solid var(--gray-200);border-radius:12px;}
 .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:700;letter-spacing:.02em;}
 .b-gray{background:var(--gray-200);color:var(--gray-700);}
 .b-teal{background:var(--teal-100);color:#0b6b66;}
@@ -311,9 +319,9 @@ tbody tr:hover{background:var(--gray-100);}
 .b-green{background:#d7f0e2;color:#1c7a4f;}
 .b-blue{background:#dbe8fb;color:#1a4c8a;}
 
-.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:7px;border:1px solid var(--gray-300);background:var(--surface-card);color:var(--gray-900);font-size:12.5px;font-weight:600;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:9px;border:1px solid var(--gray-300);background:var(--surface-card);color:var(--gray-900);font-size:12.5px;font-weight:600;transition:border-color .12s ease,background .12s ease,box-shadow .12s ease;}
 .btn:hover{border-color:var(--gray-500);}
-.btn.primary{background:var(--ms-accent);border-color:var(--ms-accent);color:#fff;}
+.btn.primary{background:var(--ms-accent);border-color:var(--ms-accent);color:#fff;box-shadow:0 1px 2px rgba(0,0,0,.06);}
 .btn.primary:hover{background:var(--ms-accent-600);border-color:var(--ms-accent-600);}
 .btn.primary:active{background:var(--ms-accent-700);border-color:var(--ms-accent-700);}
 .btn.danger{background:var(--surface-card);border-color:var(--red-500);color:var(--red-500);}
@@ -362,12 +370,13 @@ tbody tr:hover{background:var(--gray-100);}
 .tag-pill{padding:1px 7px;border-radius:5px;background:var(--navy-900);color:#fff;font-size:10px;font-weight:700;}
 .muted{color:var(--gray-500);}
 .hint{font-size:11.5px;color:var(--gray-500);margin-top:6px;line-height:1.5;}
-.progressbar{height:7px;border-radius:6px;background:var(--gray-200);overflow:hidden;}
+.progressbar{height:8px;border-radius:8px;background:var(--gray-200);overflow:hidden;}
 .progressbar > div{height:100%;background:var(--teal-500);}
 /* Baris "Distribusi Status" di panel S-Curve yang bisa diklik (lihat distributionBarRow di
    02-nav-util.js) — highlight halus + cursor pointer supaya kelihatan interaktif, buka modal
    drilldown daftar titiknya (openScurveStatusDrilldownModal, 08-gantt-print.js). */
-.dist-row-clickable{cursor:pointer;border-radius:7px;padding:5px 7px;margin:-5px -7px 4px -7px;transition:background .15s ease;}
+.dist-row{padding:6px 8px;margin:0 -8px;border-radius:8px;}
+.dist-row-clickable{cursor:pointer;transition:background .15s ease;}
 .dist-row-clickable:hover{background:var(--gray-100);}
 .dist-row-clickable:active{background:var(--gray-200);}
 /* Modal drilldown "Distribusi Status" S-Curve — struktur header/body-scroll/footer eksplisit spt

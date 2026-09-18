@@ -243,9 +243,11 @@ function distributionBarRow(label, count, grandTotal, color, statusKey){
   const pct = grandTotal? Math.round(count/grandTotal*100) : 0;
   const clickable = statusKey && count>0;
   const attrs = clickable ? `data-action="openScurveStatusDrilldown" data-status="${statusKey}" title="Klik untuk lihat daftar titik ${escHtml(label)}"` : "";
-  return `<div class="dist-row${clickable?" dist-row-clickable":""}" ${attrs}>
-    <div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;margin-bottom:3px;"><span>${escHtml(label)}</span><b>${count}</b></div>
-    <div class="progressbar"><div style="width:${pct}%;background:${color||"var(--teal-500)"};"></div></div>
+  return `<div class="dist-row${clickable?" dist-row-clickable":""}" ${attrs} style="display:flex;align-items:center;gap:9px;${count?"":"opacity:.55;"}">
+    <span style="width:9px;height:9px;border-radius:50%;background:${color||"var(--teal-500)"};flex-shrink:0;"></span>
+    <span style="font-size:13px;color:var(--heading-2);flex:1;">${escHtml(label)}</span>
+    <span style="font-size:13px;font-weight:700;color:var(--heading);">${count}</span>
+    <span style="font-size:11.5px;color:var(--gray-500);width:34px;text-align:right;">${pct}%</span>
   </div>`;
 }
 function openModal(html, opts){
