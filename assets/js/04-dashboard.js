@@ -19,16 +19,21 @@ function renderDashboard(){
   const pct = wajib.length? Math.round(done.length/wajib.length*100):0;
   const emgTriggered = pts.filter(p=>wajibReason(p, period).type==="emergency-triggered");
 
-  document.getElementById("dashStats").innerHTML = `
-    <div class="stat"><div class="num">${wajib.length}</div><div class="lbl">Titik Wajib Pantau · ${escHtml(period)}</div></div>
-    <div class="stat good"><div class="num">${pct}%</div><div class="lbl">Progress Selesai (${done.length}/${wajib.length})</div></div>
-    <div class="stat warn"><div class="num">${scheduled.length}</div><div class="lbl">Terjadwal, Belum Sampling</div></div>
-    <div class="stat ${failed.length?"bad":"good"}"><div class="num">${failed.length}</div><div class="lbl">Gagal / Lanjut Batch</div></div>
-  `;
+  const statCards = [
+    `<div class="stat"><div class="num">${wajib.length}</div><div class="lbl">Titik Wajib Pantau · ${escHtml(period)}</div></div>`,
+    `<div class="stat good"><div class="num">${pct}%</div><div class="lbl">Progress Selesai (${done.length}/${wajib.length})</div></div>`,
+    `<div class="stat warn"><div class="num">${scheduled.length}</div><div class="lbl">Terjadwal, Belum Sampling</div></div>`,
+    `<div class="stat ${failed.length?"bad":"good"}"><div class="num">${failed.length}</div><div class="lbl">Gagal / Lanjut Batch</div></div>`,
+  ];
   if(emgTriggered.length){
-    document.getElementById("dashStats").innerHTML += `
-    <div class="stat bad"><div class="num">${emgTriggered.length}</div><div class="lbl">Emergency Engine RH&gt;200 jam · Wajib Pantau</div></div>`;
+    statCards.push(`<div class="stat bad"><div class="num">${emgTriggered.length}</div><div class="lbl">Emergency Engine RH&gt;200 jam · Wajib Pantau</div></div>`);
   }
+  // Jumlah kolom grid = jumlah kartu (4 atau 5 kalau kartu Emergency ikut muncul) — dipasang lewat
+  // JS (bukan cuma class CSS tetap) supaya baris ini SELALU 1 baris rata, tidak pernah numpuk ke
+  // baris ke-2 gara-gara kartu ke-5 kelebihan dari grid 4 kolom tetap.
+  const dashStatsEl = document.getElementById("dashStats");
+  dashStatsEl.style.gridTemplateColumns = `repeat(${statCards.length}, 1fr)`;
+  dashStatsEl.innerHTML = statCards.join("");
 
   // s-curve — lihat renderDashboardSCurve() di bawah (scoped ke filter Periode/Tim/Batch).
   renderDashboardSCurve();

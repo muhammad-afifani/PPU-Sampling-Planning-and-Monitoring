@@ -13,6 +13,38 @@
 function cacheBustUrl(url){
   return url + (url.includes("?") ? "&" : "?") + "_cb=" + Date.now();
 }
+// File backup lengkap bisa beberapa MB (foto ikut disertakan) — fetch(...).json() biasa tidak
+// kasih progress apapun sampai selesai total, jadi kalau koneksi lambat kelihatan spt macet/hang.
+// Baca body-nya manual per potongan (ReadableStream) & panggil onProgress(pct, bytesSoFar, totalBytes)
+// tiap potongan diterima, baru JSON.parse di akhir setelah semua potongan digabung — persis proses
+// yang sama dgn res.json(), cuma dipecah supaya progresnya kelihatan di tengah jalan (lihat
+// progressToast di 02-nav-util.js, dipakai checkRepoBackupUpdate/checkFullBackupUpdate di bawah).
+async function fetchJsonWithProgress(url, onProgress){
+  const res = await fetch(url, {cache:"no-store"});
+  if(!res.ok) throw new Error("HTTP "+res.status);
+  const totalStr = res.headers.get("content-length");
+  const total = totalStr ? Number(totalStr) : 0;
+  // Tanpa body.getReader() (browser sangat lama) atau tanpa Content-Length (mis. server tidak
+  // mengirimnya, atau di-strip proxy) — tidak bisa dapat progres asli, fallback ke res.json() biasa
+  // apa adanya, tapi tetap kasih tanda "indeterminate" (lihat pemanggil) drpd diam total.
+  if(!res.body || !total){
+    onProgress(null, 0, 0);
+    return await res.json();
+  }
+  const reader = res.body.getReader();
+  const chunks = [];
+  let received = 0;
+  while(true){
+    const {done, value} = await reader.read();
+    if(done) break;
+    chunks.push(value);
+    received += value.length;
+    onProgress(Math.min(99, Math.round(received/total*100)), received, total);
+  }
+  onProgress(100, received, total);
+  const text = await new Blob(chunks).text();
+  return JSON.parse(text);
+}
 // Ringkasan isi file SEBELUM di-download — supaya user bisa cek sendiri dgn mata "file yg baru
 // aku buat ini beneran isinya lengkap ya" TANPA harus kirim dulu ke laptop lain buat tahu, karena
 // mekanisme export/import-nya sendiri sudah diverifikasi benar berkali-kali; kalau ada yg hilang,
@@ -156,12 +188,18 @@ document.getElementById("importAllFile").addEventListener("change", e=>{
 async function checkFullBackupUpdate(){
   const url = document.getElementById("fullBackupUrl").value.trim();
   if(!url){ toast("Isi dulu URL backup lengkap.","err"); return; }
+  const fname = url.split("/").pop()||url;
+  const prog = progressToast(`Mengunduh ${fname}…`);
   try{
-    const res = await fetch(cacheBustUrl(url), {cache:"no-store"});
-    if(!res.ok) throw new Error("HTTP "+res.status);
-    const data = await res.json();
-    handleFullBackupPackage(data, url.split("/").pop()||url);
+    const data = await fetchJsonWithProgress(cacheBustUrl(url), (pct, received)=>{
+      prog.update(pct, pct==null
+        ? `Mengunduh ${fname}… (${fmtBytes(received)})`
+        : `Mengunduh ${fname}… ${pct}%`);
+    });
+    prog.remove();
+    handleFullBackupPackage(data, fname);
   }catch(err){
+    prog.remove();
     toast('Gagal mengambil data online: '+err.message+'. Kalau file ini dibuka langsung dari folder (bukan lewat alamat web), browser menolak koneksi online-nya — pakai "Pilih File" sebagai gantinya.',"err");
   }
 }
@@ -175,6 +213,7 @@ async function checkFullBackupUpdate(){
 const REPO_CONTENTS_API = "https://api.github.com/repos/muhammad-afifani/PPU-Sampling-Planning-and-Monitoring/contents/";
 const BACKUP_FILENAME_RE = /^phm_emisi_backup_\d{4}-\d{2}-\d{2}\.json$/;
 async function checkRepoBackupUpdate(){
+  const prog = progressToast("Mencari backup terbaru di repository…");
   try{
     const res = await fetch(cacheBustUrl(REPO_CONTENTS_API), {cache:"no-store"});
     if(!res.ok) throw new Error("HTTP "+res.status);
@@ -185,11 +224,16 @@ async function checkRepoBackupUpdate(){
     // tidak perlu parsing tanggal terpisah.
     backups.sort((a,b)=> b.name.localeCompare(a.name));
     const latest = backups[0];
-    const dataRes = await fetch(cacheBustUrl(latest.download_url), {cache:"no-store"});
-    if(!dataRes.ok) throw new Error("HTTP "+dataRes.status);
-    const data = await dataRes.json();
+    prog.update(0, `Mengunduh ${latest.name}…`);
+    const data = await fetchJsonWithProgress(cacheBustUrl(latest.download_url), (pct, received)=>{
+      prog.update(pct, pct==null
+        ? `Mengunduh ${latest.name}… (${fmtBytes(received)})`
+        : `Mengunduh ${latest.name}… ${pct}%`);
+    });
+    prog.remove();
     handleFullBackupPackage(data, latest.name);
   }catch(err){
+    prog.remove();
     toast('Gagal mengambil data terbaru dari repository: '+err.message+'. Kalau aplikasi ini dibuka langsung dari folder (bukan lewat alamat web), browser menolak koneksi online-nya — pakai "Pilih File" sebagai gantinya.',"err");
   }
 }
