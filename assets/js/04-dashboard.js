@@ -1,6 +1,14 @@
 /* =========================================================
    DASHBOARD
 ========================================================= */
+// Ikon kecil di kartu "Peringatan" — SATU bentuk (segitiga seru) utk semua sumber peringatan
+// (dokumen personil, titik gagal, emergency engine dst — subjeknya beda2, lihat renderDashboard),
+// tingkat keparahannya sudah dibedakan lewat warna tint kartu (.dash-alert.sev-* di style.css) +
+// warna ikon ini sendiri (currentColor ikut warna itu) — bukan lewat ganti bentuk per subjek, supaya
+// tidak menyiratkan makna yang salah (mis. ikon orang dipakai utk peringatan titik/mesin).
+function dashAlertIcon(){
+  return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" x2="12" y1="9" y2="13"></line><line x1="12" x2="12.01" y1="17" y2="17"></line></svg>`;
+}
 function renderDashboard(){
   const pts = DB.points;
   const period = currentPeriodStr();
@@ -15,7 +23,7 @@ function renderDashboard(){
     <div class="stat"><div class="num">${wajib.length}</div><div class="lbl">Titik Wajib Pantau · ${escHtml(period)}</div></div>
     <div class="stat good"><div class="num">${pct}%</div><div class="lbl">Progress Selesai (${done.length}/${wajib.length})</div></div>
     <div class="stat warn"><div class="num">${scheduled.length}</div><div class="lbl">Terjadwal, Belum Sampling</div></div>
-    <div class="stat bad"><div class="num">${failed.length}</div><div class="lbl">Gagal / Lanjut Batch</div></div>
+    <div class="stat ${failed.length?"bad":"good"}"><div class="num">${failed.length}</div><div class="lbl">Gagal / Lanjut Batch</div></div>
   `;
   if(emgTriggered.length){
     document.getElementById("dashStats").innerHTML += `
@@ -42,7 +50,7 @@ function renderDashboard(){
     warn.push({sev:"critical", html:`<b>${escHtml(p.nama)}</b> (${p.site}) — Emergency Engine, RH 12 bulan terakhir <b>${rh} jam</b> (&gt;200 jam) &rarr; <b>wajib dipantau periode ${escHtml(period)}</b> tapi belum selesai.`});
   });
   document.getElementById("dashWarnings").innerHTML = warn.length
-    ? warn.slice(0,12).map(w=>`<div class="dash-alert sev-${w.sev}">${w.html}</div>`).join("")
+    ? warn.slice(0,12).map(w=>`<div class="dash-alert sev-${w.sev}"><span class="dash-alert-icon">${dashAlertIcon()}</span><div class="dash-alert-body">${w.html}</div></div>`).join("")
     : "<div class='hint'>Tidak ada peringatan aktif.</div>";
 
   // per site recap
