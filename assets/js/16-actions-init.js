@@ -80,6 +80,20 @@ const ACTIONS = {
     else{ hdSel[field].add(val); }
     renderHasilDashboard();
   },
+  dashScTeamChip:(t)=>{
+    const val = t.dataset.val;
+    if(!val){ dashScSel.team.clear(); }
+    else if(dashScSel.team.has(val)){ dashScSel.team.delete(val); }
+    else{ dashScSel.team.add(val); }
+    renderDashboardSCurve();
+  },
+  dashScBatchChip:(t)=>{
+    const val = t.dataset.val;
+    if(!val){ dashScSel.batch.clear(); }
+    else if(dashScSel.batch.has(val)){ dashScSel.batch.delete(val); }
+    else{ dashScSel.batch.add(val); }
+    renderDashboardSCurve();
+  },
   hdResetFilters:()=>{
     hdSel.site.clear(); hdSel.sumber.clear(); hdSel.cerobong.clear();
     const p = document.getElementById("hdFltPermen"); if(p) p.value="";

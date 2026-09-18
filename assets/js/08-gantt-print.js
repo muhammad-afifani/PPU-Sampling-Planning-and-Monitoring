@@ -1117,7 +1117,7 @@ function renderGantt(){
     if(view==="overlay") rows.sort((a,c)=> a.team===c.team ? 0 : (a.team==="emisi"?-1:1));
     document.getElementById("ganttWrap").innerHTML = buildDayGridView(rows);
   }
-  document.getElementById("scurveWrap").innerHTML = buildSCurveSVG(batches, DB.points, view);
+  document.getElementById("scurveWrap").innerHTML = buildSCurveSVG(batches, DB.points, view==="overlay"?["emisi","ambient"]:[view]);
   renderSitePreview(batches);
   document.getElementById("transportArrangeWrap").innerHTML = buildTransportArrangeHtml(batches);
 }
@@ -1495,16 +1495,22 @@ const SCURVE_STATUS_META = {
 let scurveStatusGroups = {};
 
 function buildSCurveSVG(batches, points, view){
+  // `view` menerima array kategori ("emisi"/"ambient", bisa dua-duanya sekaligus — lihat
+  // dashScSel.team di 04-dashboard.js) ATAU string lama ("emisi"/"ambient"/"overlay"/"all", dipakai
+  // Scheduling Tools/08-gantt-print.js sendiri, lihat renderGantt) supaya kedua caller tetap jalan
+  // tanpa perlu ikut diubah semua.
+  const cats = Array.isArray(view) ? view : (view==="emisi"||view==="ambient" ? [view] : ["emisi","ambient"]);
+  const hasEmisi = cats.includes("emisi"), hasAmbient = cats.includes("ambient");
   // batchIds membatasi kurva ke titik yang MEMANG bagian dari batch yang dikirim caller (lihat
   // p.batchId, diisi/di-update tiap applyScheduleToPoints jalan) — sebelumnya param `batches` ini
   // tidak dipakai sama sekali di sini, jadi kurva SELALU menggabung titik dari SEMUA batch/periode
   // yang pernah dibuat (rentang tanggal makin panjang tiap semester baru). Dashboard sekarang
   // mengirim batch yang sudah difilter Periode/Tim/Batch (lihat renderDashboardSCurve di
-  // 04-dashboard.js) supaya kurva cuma menampilkan satu jendela jadwal yang koheren.
+  // 04-dashboard.js) supaya kurva cuma menampilkan jendela jadwal yang koheren.
   const batchIds = new Set((batches||[]).map(b=>b.id));
   let relevant = points.filter(p=>p.planStart && p.planEnd && effectiveWajib(p) && !p.tidakBeroperasi && batchIds.has(p.batchId));
-  if(view==="emisi") relevant = relevant.filter(p=>p.kategori==="emisi");
-  if(view==="ambient") relevant = relevant.filter(p=>p.kategori!=="emisi");
+  if(hasEmisi && !hasAmbient) relevant = relevant.filter(p=>p.kategori==="emisi");
+  else if(hasAmbient && !hasEmisi) relevant = relevant.filter(p=>p.kategori!=="emisi");
   if(!relevant.length) return "<div class='hint' style='padding:14px;'>Belum ada jadwal untuk kurva-S pada filter Periode/Tim/Batch yang dipilih. Coba ganti filter di atas, atau buka <b>Perencanaan Batch</b> → isi tanggal mulai → klik <b>Buat &amp; Terapkan Jadwal</b>.</div>";
 
   const allDates = relevant.flatMap(p=>[p.planStart,p.planEnd]);
@@ -1514,7 +1520,7 @@ function buildSCurveSVG(batches, points, view){
   const total = relevant.length;
   const doneNow = relevant.filter(p=>p.status==="done").length;
 
-  const W = Math.max(600, Math.min(1200, totalDays*18)), H=300, padL=44,padB=30,padT=18,padR=14;
+  const W = Math.max(600, Math.min(1200, totalDays*18)), H=320, padL=44,padB=34,padT=18,padR=40;
   const plotW = W-padL-padR, plotH = H-padT-padB;
 
   let plannedPts=[], actualPts=[];
@@ -1530,9 +1536,11 @@ function buildSCurveSVG(batches, points, view){
     acum = relevant.filter(p=>p.status==="done" && p.actualEnd && p.actualEnd<=dt).length;
     actualPts.push([i,acum]);
   }
-  // Hitungan HARIAN (bukan kumulatif) — dasar bar chart "Target vs Aktual per Hari" di bawah,
-  // pelengkap kurva-S yang kumulatif (selalu naik/rata) — bar ini bisa naik-turun per hari, jadi
-  // langsung kelihatan hari mana yang padat/kosong.
+  // Hitungan HARIAN (bukan kumulatif) — digambar sbg batang di chart yang SAMA dgn garis kumulatif
+  // di bawah (dulu dipisah jadi chart kedua terpisah lewat buildSCurveDailyBars, sekarang disatukan
+  // spt referensi "S Curve" gabungan bar+line yang dikirim user) — bar ini bisa naik-turun per hari
+  // (beda dari garis kumulatif yang selalu naik/rata), jadi langsung kelihatan hari mana yang
+  // padat/kosong TANPA perlu scroll ke chart terpisah.
   let plannedDaily=[], actualDaily=[];
   for(let i=0;i<totalDays;i++){
     const dt = addDays(minDate,i);
@@ -1542,12 +1550,39 @@ function buildSCurveSVG(batches, points, view){
   function toXY(i,v){ return [padL + (i/(totalDays-1||1))*plotW, padT + plotH - (v/total)*plotH]; }
   const pathPlanned = plannedPts.map((pt,i)=>(i===0?"M":"L")+toXY(pt[0],pt[1]).join(",")).join(" ");
   const pathActual = actualPts.map((pt,i)=>(i===0?"M":"L")+toXY(pt[0],pt[1]).join(",")).join(" ");
+  // Skala batang HARIAN pakai sumbu kanan sendiri (bukan 0..total spt garis kumulatif di sumbu kiri)
+  // krn rentangnya jauh lebih kecil (jumlah titik selesai PER HARI, bukan akumulasi s/d hari itu) —
+  // batang tertinggi sengaja dibatasi cuma sampai grid 25% (bukan 100%) spt referensi chart gabungan
+  // yang dikirim user, supaya batangnya tetap "di bawah" & tidak menutupi bentuk garis-S di atasnya.
+  const maxDaily = Math.max(1, ...plannedDaily, ...actualDaily);
+  const barUnitPx = (0.25*plotH)/maxDaily;
+  function barY(v){ return padT+plotH-v*barUnitPx; }
+  const barBaseY = barY(0);
+  const slotW = plotW/totalDays;
+  const barW = Math.max(1.5, Math.min(9, slotW/2-2));
 
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:12px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;">`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:12px;">`;
   for(let g=0; g<=4; g++){
-    const v = total*g/4, y = padT+plotH-(g/4)*plotH;
+    const frac = g/4, y = padT+plotH-frac*plotH;
     svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--gray-200)"/>`;
-    svg += `<text x="2" y="${y+4}" fill="var(--gray-500)" font-size="11px">${Math.round(g/4*100)}%</text>`;
+    svg += `<text x="2" y="${y+4}" fill="var(--gray-500)" font-size="11px">${Math.round(frac*100)}%</text>`;
+    svg += `<text x="${W-padR+7}" y="${y+4}" fill="var(--gray-500)" font-size="10.5px">${Math.round((frac*plotH)/barUnitPx)}</text>`;
+  }
+
+  // Batang target/aktual PER HARI — digambar sebelum garis kumulatif supaya garisnya tetap kelihatan
+  // jelas di atas batang (bukan ketutupan).
+  for(let i=0;i<totalDays;i++){
+    const dt = addDays(minDate,i);
+    const [cx] = toXY(i,0);
+    const pv = plannedDaily[i], av = actualDaily[i];
+    if(pv>0){
+      const y = barY(pv);
+      svg += `<rect x="${(cx-barW-1).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(1,barBaseY-y).toFixed(1)}" rx="2" fill="var(--navy-600)" opacity="0.8"><title>${dt} — target selesai: ${pv} titik</title></rect>`;
+    }
+    if(av>0){
+      const y = barY(av);
+      svg += `<rect x="${(cx+1).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(1,barBaseY-y).toFixed(1)}" rx="2" fill="var(--teal-500)" opacity="0.8"><title>${dt} — aktual selesai: ${av} titik</title></rect>`;
+    }
   }
 
   // Garis "Hari ini" — biar langsung kelihatan posisi sekarang relatif ke rencana.
@@ -1556,7 +1591,7 @@ function buildSCurveSVG(batches, points, view){
   if(today>=minDate && today<=maxDate){
     const todayIdx = daysBetweenInclusive(minDate, today)-1;
     const [tx] = toXY(todayIdx, 0);
-    svg += `<line x1="${tx}" y1="${padT}" x2="${tx}" y2="${padT+plotH}" stroke="#e0a53d" stroke-width="1.5" stroke-dasharray="3,3"/>`;
+    svg += `<line x1="${tx}" y1="${padT}" x2="${tx}" y2="${padT+plotH}" stroke="var(--amber-500)" stroke-width="1.5" stroke-dasharray="3,3"/>`;
     svg += `<text x="${tx+4}" y="${padT+11}" fill="#b5790f" font-size="10.5px" font-weight="700">Hari ini</text>`;
     const plannedAtToday = plannedPts[todayIdx][1], actualAtToday = actualPts[todayIdx][1];
     const delta = actualAtToday - plannedAtToday;
@@ -1565,26 +1600,53 @@ function buildSCurveSVG(batches, points, view){
     else deltaHtml = `<span class="badge b-blue">Tepat sesuai rencana</span>`;
   }
 
-  svg += `<path d="${pathPlanned}" fill="none" stroke="#3d78c9" stroke-width="2.5" stroke-dasharray="6,4"/>`;
-  svg += `<path d="${pathActual}" fill="none" stroke="#3fb27f" stroke-width="3"/>`;
+  // Area tipis di bawah garis aktual — cuma penekanan visual (bukan data baru), biar progres yang
+  // sudah tercapai kelihatan sebagai "wilayah terisi", bukan cuma garis tipis di atas grid kosong.
+  const [areaFirstX] = toXY(actualPts[0][0], 0);
+  const [areaLastX] = toXY(actualPts[actualPts.length-1][0], 0);
+  const areaPath = actualPts.map((pt,i)=>(i===0?"M":"L")+toXY(pt[0],pt[1]).join(",")).join(" ")
+    + ` L${areaLastX},${padT+plotH} L${areaFirstX},${padT+plotH} Z`;
+  svg += `<path d="${areaPath}" fill="var(--teal-500)" opacity="0.08"/>`;
+  svg += `<path d="${pathPlanned}" fill="none" stroke="var(--navy-600)" stroke-width="2.5" stroke-dasharray="6,4"/>`;
+  svg += `<path d="${pathActual}" fill="none" stroke="var(--teal-500)" stroke-width="3"/>`;
   // Titik hover (native tooltip lewat <title>) tiap kelipatan minggu + hari terakhir, biar bisa
   // cek angka pastinya tanpa bikin SVG kebanjiran node kalau rentangnya panjang.
   const markEvery = Math.max(1, Math.round(totalDays/24));
   plannedPts.forEach((pt,i)=>{
     if(i%markEvery!==0 && i!==plannedPts.length-1) return;
     const [x,y] = toXY(pt[0],pt[1]);
-    svg += `<circle cx="${x}" cy="${y}" r="3" fill="#3d78c9"><title>${addDays(minDate,i)} — rencana: ${pt[1]}/${total}</title></circle>`;
+    svg += `<circle cx="${x}" cy="${y}" r="3" fill="var(--navy-600)"><title>${addDays(minDate,i)} — rencana: ${pt[1]}/${total}</title></circle>`;
   });
   actualPts.forEach((pt,i)=>{
     if(i%markEvery!==0 && i!==actualPts.length-1) return;
     const [x,y] = toXY(pt[0],pt[1]);
-    svg += `<circle cx="${x}" cy="${y}" r="3.5" fill="#3fb27f"><title>${addDays(minDate,i)} — aktual: ${pt[1]}/${total}</title></circle>`;
+    svg += `<circle cx="${x}" cy="${y}" r="3.5" fill="var(--teal-500)" stroke="var(--surface-card)" stroke-width="1.5"><title>${addDays(minDate,i)} — aktual: ${pt[1]}/${total}</title></circle>`;
   });
-  svg += `<text x="${padL}" y="${H-8}" fill="var(--gray-500)" font-size="11px">${minDate}</text>`;
-  svg += `<text x="${W-padR-70}" y="${H-8}" fill="var(--gray-500)" font-size="11px">${maxDate}</text>`;
+  // Label tanggal sumbu-X per interval (bukan cuma dua ujung spt sebelumnya) — sekarang chart ini
+  // juga menampilkan batang harian, jadi pembaca butuh lebih banyak titik acuan tanggal di sepanjang
+  // sumbu, sama seperti bar chart harian yang dulu terpisah (buildSCurveDailyBars, sekarang disatukan
+  // ke sini). Ujung awal/akhir tetap ditulis lengkap (YYYY-MM-DD), titik tengah cukup MM-DD.
+  const labelEvery = Math.max(1, Math.ceil(totalDays/8));
+  let tickIdx = [];
+  for(let i=0;i<totalDays;i+=labelEvery) tickIdx.push(i);
+  if(tickIdx[tickIdx.length-1]!==totalDays-1){
+    // Tick terakhir SELALU dipaksa ada (biar batas kanan kelihatan) — tapi kalau jaraknya ke tick
+    // sebelumnya kurang dari separuh labelEvery, ganti tick sebelumnya itu (bukan ditambah di
+    // sampingnya) supaya dua label tidak numpuk berdempetan di ujung kanan.
+    if(totalDays-1-tickIdx[tickIdx.length-1] <= Math.max(1,Math.ceil(labelEvery/2))) tickIdx.pop();
+    tickIdx.push(totalDays-1);
+  }
+  tickIdx.forEach(i=>{
+    const [x] = toXY(i,0);
+    const dt = addDays(minDate,i);
+    const label = (i===0||i===totalDays-1) ? dt : dt.slice(5);
+    const anchor = i===0 ? "start" : (i===totalDays-1 ? "end" : "middle");
+    svg += `<text x="${x}" y="${H-10}" text-anchor="${anchor}" fill="var(--gray-500)" font-size="10.5px">${label}</text>`;
+  });
   svg += `</svg>`;
   svg = `<div class="hint" style="margin-bottom:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">${doneNow} dari ${total} titik selesai (${Math.round(doneNow/total*100)}%) ${deltaHtml}</div>` + svg;
-  svg += `<div class="legend"><span class="item"><span class="sw" style="background:#3d78c9"></span>Rencana (kumulatif)</span><span class="item"><span class="sw" style="background:#3fb27f"></span>Aktual (kumulatif)</span><span class="item"><span class="sw" style="background:#e0a53d"></span>Hari ini</span></div>`;
+  svg += `<div class="legend"><span class="item"><span class="sw" style="background:var(--navy-600)"></span>Rencana (garis kumulatif &middot; batang per hari)</span><span class="item"><span class="sw" style="background:var(--teal-500)"></span>Aktual (garis kumulatif &middot; batang per hari)</span><span class="item"><span class="sw" style="background:var(--amber-500)"></span>Hari ini</span></div>`;
+  svg += `<div class="hint" style="margin-top:2px;">Sumbu kiri: % kumulatif titik selesai. Sumbu kanan: jumlah titik per hari (skala batang).</div>`;
   // Panel status di sebelah kanan chart — supaya ruang di samping S-Curve tidak kosong, dan
   // sekalian kasih sudut pandang lain (distribusi status) dari data yang sama. Titik per status
   // disimpan di scurveStatusGroups (bukan cuma dihitung) supaya baris di bawah ini bisa diklik utk
@@ -1600,63 +1662,49 @@ function buildSCurveSVG(batches, points, view){
   // Populasi di sini disamakan cakupannya dgn itu supaya jumlahnya konsisten & titik yang dieliminasi/
   // ditunda ke batch berikutnya tetap kelihatan sebagai Hold, bukan hilang diam-diam.
   let statusPts = points.filter(p=>effectiveWajib(p) && !p.tidakBeroperasi);
-  if(view==="emisi") statusPts = statusPts.filter(p=>p.kategori==="emisi");
-  if(view==="ambient") statusPts = statusPts.filter(p=>p.kategori!=="emisi");
+  if(hasEmisi && !hasAmbient) statusPts = statusPts.filter(p=>p.kategori==="emisi");
+  else if(hasAmbient && !hasEmisi) statusPts = statusPts.filter(p=>p.kategori!=="emisi");
   const statusGroups = {done:[], scheduled:[], pending:[], failed:[]};
   statusPts.forEach(p=>{ (statusGroups[p.status]=statusGroups[p.status]||[]).push(p); });
   scurveStatusGroups = statusGroups;
   const statusTotal = statusPts.length;
-  const statusPanel = `<div style="min-width:170px;flex-shrink:0;">
-    <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Distribusi Status</div>
+  // Donut ringkas di atas baris2 legend — dashoffset tiap segmen dihitung kumulatif dari segmen
+  // sebelumnya (bukan diulang dari 0) supaya potongan2nya nyambung tanpa celah/tumpang tindih,
+  // urutannya sama persis dgn urutan baris legend di bawahnya biar gampang dicocokkan.
+  const donutR = 42, donutC = 2*Math.PI*donutR;
+  let donutOffset = 0;
+  const donutSegs = ["done","scheduled","pending","failed"].map(key=>{
+    const meta = SCURVE_STATUS_META[key];
+    const count = statusGroups[key].length;
+    if(!count) return "";
+    const len = statusTotal? (count/statusTotal)*donutC : 0;
+    const seg = `<circle cx="52" cy="52" r="${donutR}" fill="none" stroke="${meta.barColor}" stroke-width="14" stroke-dasharray="${len.toFixed(1)} ${(donutC-len).toFixed(1)}" stroke-dashoffset="${(-donutOffset).toFixed(1)}"/>`;
+    donutOffset += len;
+    return seg;
+  }).join("");
+  const statusPanel = `<div style="min-width:190px;flex-shrink:0;">
+    <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px;">Distribusi Status</div>
+    <div style="display:flex;justify-content:center;margin-bottom:14px;">
+      <svg width="104" height="104" viewBox="0 0 104 104">
+        <g transform="rotate(-90 52 52)">
+          <circle cx="52" cy="52" r="${donutR}" fill="none" stroke="var(--gray-200)" stroke-width="14"/>
+          ${donutSegs}
+        </g>
+        <text x="52" y="48" font-size="19" font-weight="800" fill="var(--heading)" text-anchor="middle">${statusTotal}</text>
+        <text x="52" y="64" font-size="9.5" fill="var(--gray-500)" text-anchor="middle">titik</text>
+      </svg>
+    </div>
     ${["done","scheduled","pending","failed"].map(key=>{
       const meta = SCURVE_STATUS_META[key];
       return distributionBarRow(meta.label, statusGroups[key].length, statusTotal, meta.barColor, key);
     }).join("")}
-    <div class="hint" style="margin-top:4px;">Mencakup SEMUA titik wajib pantau (${statusTotal}) — beda dari kurva di samping yang cuma menghitung titik yang sudah masuk jadwal aktif (${total}).</div>
+    <div class="hint" style="margin-top:8px;">Mencakup SEMUA titik wajib pantau (${statusTotal}) — beda dari kurva di samping yang cuma menghitung titik yang sudah masuk jadwal aktif (${total}).</div>
   </div>`;
   const combined = `<div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;">
     <div style="flex:2;min-width:280px;">${svg}</div>
     ${statusPanel}
-  </div>
-  ${buildSCurveDailyBars(minDate, totalDays, plannedDaily, actualDaily)}`;
-  return combined;
-}
-// Bar chart HARIAN (target vs aktual) yang melengkapi kurva-S kumulatif di atas — dipakai sumbu Y
-// SENDIRI (bukan digabung 1 chart dgn garis kumulatif di atas) krn skalanya beda total: garis di
-// atas itu 0..total (kumulatif s/d hari ke-N), bar ini 0..beberapa per hari (harian, naik-turun).
-function buildSCurveDailyBars(minDate, totalDays, plannedDaily, actualDaily){
-  const W = Math.max(600, Math.min(1200, totalDays*20)), H=160, padL=30,padR=12,padT=10,padB=26;
-  const plotW = W-padL-padR, plotH = H-padT-padB;
-  const maxV = Math.max(1, ...plannedDaily, ...actualDaily);
-  const slotW = plotW/totalDays;
-  const barW = Math.max(1.5, Math.min(10, slotW/2-2));
-  // TANPA background/border/radius sendiri (beda dari SVG kurva-S di atas) — chart ini sengaja
-  // menyatu jadi kelanjutan visual kartu S-Curve yang sama (pembatasnya cukup border-top+label di
-  // wrapper div-nya), bukan kotak baru yang keliatan seperti chart/kartu terpisah di bawahnya.
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:9.5px;">`;
-  for(let g=0; g<=2; g++){
-    const v = Math.round(maxV*g/2), y = padT+plotH-(g/2)*plotH;
-    svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--gray-200)"/>`;
-    svg += `<text x="1" y="${y+3}" fill="var(--gray-500)">${v}</text>`;
-  }
-  const labelEvery = Math.max(1, Math.round(totalDays/16));
-  for(let i=0;i<totalDays;i++){
-    const dt = addDays(minDate,i);
-    const xSlot = padL + i*slotW;
-    const pv = plannedDaily[i], av = actualDaily[i];
-    const ph = (pv/maxV)*plotH, ah = (av/maxV)*plotH;
-    if(pv>0) svg += `<rect x="${(xSlot+slotW/2-barW-1).toFixed(1)}" y="${(padT+plotH-ph).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(1,ph).toFixed(1)}" rx="2" fill="#3d78c9"><title>${dt} — target selesai: ${pv} titik</title></rect>`;
-    if(av>0) svg += `<rect x="${(xSlot+slotW/2+1).toFixed(1)}" y="${(padT+plotH-ah).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(1,ah).toFixed(1)}" rx="2" fill="#3fb27f"><title>${dt} — aktual selesai: ${av} titik</title></rect>`;
-    if(i%labelEvery===0 || i===totalDays-1){
-      svg += `<text x="${(xSlot+slotW/2).toFixed(1)}" y="${H-8}" text-anchor="middle" fill="var(--gray-500)">${dt.slice(5)}</text>`;
-    }
-  }
-  svg += `</svg>`;
-  return `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--gray-200);">
-    <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px;">Target vs Aktual per Hari</div>
-    ${svg}
-    <div class="legend"><span class="item"><span class="sw" style="background:#3d78c9"></span>Target (rencana selesai hari itu)</span><span class="item"><span class="sw" style="background:#3fb27f"></span>Aktual (selesai hari itu)</span></div>
   </div>`;
+  return combined;
 }
 // Info paling relevan per status utk ditampilkan di kolom kanan baris drilldown — beda2 krn
 // pertanyaan "kenapa/kapan" jawabannya beda tiap status (tanggal selesai vs jendela rencana vs
