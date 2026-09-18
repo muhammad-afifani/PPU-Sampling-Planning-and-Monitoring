@@ -82,6 +82,9 @@ function renderDashboard(){
   document.getElementById("dashGroupBars").innerHTML = groupRows.length
     ? groupRows.map(g=>dashGrpCardHtml(g.label, g.done, g.total)).join("")
     : "<div class='hint'>Belum ada titik wajib pantau.</div>";
+
+  // Peringkat beban emisi & kualitas ambien — lihat renderDashboardEmisiAmbienRanking() di bawah.
+  renderDashboardEmisiAmbienRanking();
 }
 
 /* ---------------------------------------------------------
@@ -223,3 +226,114 @@ function dashGrpCardHtml(label, done, total){
     </div>
   </div>`;
 }
+
+/* ---------------------------------------------------------
+   PERINGKAT BEBAN EMISI & KUALITAS AMBIEN
+   ---------------------------------------------------------
+   Panel baru "siapa yang paling besar" — pelengkap kartu2 progress di atas (yang jawab "sudah
+   disampling belum"), ini jawab "dari yang sudah disampling, bebannya berapa & yang paling besar
+   yang mana" — mirip dashboard dekarbonisasi korporat (ranking per site/sumber). Data beban emisi
+   dihitung ulang dari fungsi yang SAMA PERSIS dipakai halaman Model Dispersi Emisi
+   (dispersiStacks/dispersiBebanCarryForward di 18-model-dispersi.js, sudah termasuk logika
+   carry-forward utk titik yg frekuensi pantaunya <1x/semester) — bukan hitungan baru dari nol,
+   supaya angkanya selalu konsisten dgn laporan Beban Emisi yang sudah ada. Kualitas ambien dari
+   aqiIspuGroupEvents/aqiIspuComputeEvent (21-aqi-ispu.js, halaman Model AQI/ISPU) dgn cara yang sama.
+   Kedua file itu di-load SETELAH file ini (18 & 21 > 04) tapi aman krn semua pemanggilannya ada di
+   DALAM fungsi (baru dieksekusi saat render, bukan saat script ini di-parse) — pola yang sama dgn
+   groupOrder/HASIL_SITE_COLORS di atas.
+--------------------------------------------------------- */
+function dashRankBarRow(rank, label, valueLabel, value, maxValue, color){
+  const pct = maxValue>0 ? Math.max(2, Math.round(value/maxValue*100)) : 0;
+  return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+    <div style="width:14px;flex-shrink:0;font-size:10.5px;font-weight:800;color:var(--gray-500);text-align:right;">${rank}</div>
+    <div style="flex:1;min-width:0;">
+      <div style="display:flex;justify-content:space-between;gap:6px;font-size:11px;margin-bottom:3px;">
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(label)}">${escHtml(label)}</span>
+        <b style="flex-shrink:0;font-family:var(--font-mono);">${valueLabel}</b>
+      </div>
+      <div class="progressbar"><div style="width:${pct}%;background:${color};"></div></div>
+    </div>
+  </div>`;
+}
+// Total beban [param] per site & per grup sumber, dari periode data TERBARU yang tersedia (carry-
+// forward otomatis mencakup titik yg bukan giliran sampling periode itu) — lihat catatan blok di atas.
+function dashEmisiRankData(param){
+  const periods = dispersiPeriodList();
+  const stacks = dispersiStacks();
+  if(!periods.length || !stacks.length) return {bySite:{}, byGroup:{}, latestPeriode:null, total:0};
+  const latestPeriode = periods[periods.length-1].periode;
+  const bySite = {}, byGroup = {};
+  let total = 0;
+  stacks.forEach(s=>{
+    const b = dispersiBebanCarryForward(s, param, latestPeriode);
+    if(!b || b.bebanTahunTon==null) return;
+    const p = DB.points.find(x=>x.id===s.id);
+    const grp = p ? subgroupOf(p) : (s.kategoriSumber||"Lainnya");
+    bySite[s.site] = (bySite[s.site]||0) + b.bebanTahunTon;
+    byGroup[grp] = (byGroup[grp]||0) + b.bebanTahunTon;
+    total += b.bebanTahunTon;
+  });
+  return {bySite, byGroup, latestPeriode, total};
+}
+function dashRankedEntries(obj){
+  return Object.entries(obj).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value);
+}
+// Kualitas ambien terkini per site — event PALING BARU (periodeOrder tertinggi) per site, dari
+// SEMUA titik ambien di site itu (indeks tertinggi kalau ada >1 event di periode yg sama).
+function dashAmbienRankData(){
+  const events = aqiIspuGroupEvents();
+  const bySite = {};
+  events.forEach(ev=>{
+    const computed = aqiIspuComputeEvent(ev, aqiIspuStandard);
+    if(!computed) return;
+    const cur = bySite[ev.site];
+    if(!cur || computed.periodeOrder>cur.periodeOrder || (computed.periodeOrder===cur.periodeOrder && computed.index>cur.index)){
+      bySite[ev.site] = computed;
+    }
+  });
+  return Object.entries(bySite).map(([site,ev])=>({site, index:ev.index, category:ev.category})).sort((a,b)=>b.index-a.index);
+}
+function refreshDashEmisiParamSelect(){
+  const sel = document.getElementById("dashEmisiParam");
+  if(sel.options.length) return; // statis (bukan bergantung DB), cukup diisi sekali
+  const keys = Object.keys(DISPERSI_MASS_PARAMS).filter(k=>!DISPERSI_MASS_PARAMS[k].qualitative);
+  sel.innerHTML = keys.map(k=>`<option value="${escHtml(k)}">${escHtml(DISPERSI_MASS_PARAMS[k].label)}</option>`).join("");
+  sel.value = keys.includes("CO₂") ? "CO₂" : keys[0];
+}
+function renderDashboardEmisiAmbienRanking(){
+  // showPage("dashboard") dipanggil SINKRON di init 16-actions-init.js, yang jalan SEBELUM script
+  // tag 18 (Model Dispersi, sumber DISPERSI_MASS_PARAMS/dispersiStacks/dll) & 21 (AQI/ISPU, sumber
+  // aqiIspuGroupEvents/aqiIspuStandard) selesai dimuat — beda dari helper lain yg dipakai kartu2
+  // Dashboard lainnya (HASIL_SITE_COLORS/KATEGORI_SUMBER_ORDER/buildSCurveSVG, semuanya dari file
+  // BERNOMOR LEBIH KECIL drpd 16). Coba lagi di tick berikutnya (setelah SEMUA <script> tag beres
+  // dimuat scr sinkron) drpd lempar error yg memutus sisa init() di 16-actions-init.js.
+  if(typeof DISPERSI_MASS_PARAMS==="undefined" || typeof aqiIspuGroupEvents==="undefined"){
+    setTimeout(renderDashboardEmisiAmbienRanking, 0);
+    return;
+  }
+  refreshDashEmisiParamSelect();
+  const param = document.getElementById("dashEmisiParam").value;
+  const {bySite, byGroup, latestPeriode, total} = dashEmisiRankData(param);
+  const siteRows = dashRankedEntries(bySite), groupRows = dashRankedEntries(byGroup);
+  const maxSite = Math.max(1, ...siteRows.map(r=>r.value));
+  const maxGroup = Math.max(1, ...groupRows.map(r=>r.value));
+  const paramLabel = (DISPERSI_MASS_PARAMS[param]||{}).label || param;
+
+  document.getElementById("dashEmisiRankNote").innerHTML = latestPeriode
+    ? `Total beban ${escHtml(paramLabel)} seluruh site periode <b>${escHtml(latestPeriode)}</b>: <b>${dispersiFmt(total,1)} ton/tahun</b>. Dihitung dari titik yang sudah punya hasil sampling &amp; jam operasi tercatat (sama dgn perhitungan di Model Dispersi Emisi).`
+    : `Belum ada data hasil pemantauan emisi untuk dihitung bebannya.`;
+
+  document.getElementById("dashEmisiRankSite").innerHTML = siteRows.length
+    ? siteRows.slice(0,8).map((r,i)=>dashRankBarRow(i+1, r.label, dispersiFmt(r.value,1)+" ton", r.value, maxSite, HASIL_SITE_COLORS[r.label]||"#7f8fa0")).join("")
+    : "<div class='hint'>Belum ada data.</div>";
+  document.getElementById("dashEmisiRankGroup").innerHTML = groupRows.length
+    ? groupRows.slice(0,8).map((r,i)=>dashRankBarRow(i+1, r.label, dispersiFmt(r.value,1)+" ton", r.value, maxGroup, dashGrpVisual(r.label).color)).join("")
+    : "<div class='hint'>Belum ada data.</div>";
+
+  document.getElementById("dashAmbienStdLabel").textContent = aqiIspuStandard==="ispu" ? "ISPU" : "AQI";
+  const ambienRows = dashAmbienRankData();
+  document.getElementById("dashAmbienRank").innerHTML = ambienRows.length
+    ? ambienRows.slice(0,8).map((r,i)=>dashRankBarRow(i+1, r.site, String(r.index), r.index, 500, r.category.color)).join("")
+    : "<div class='hint'>Belum ada data hasil pemantauan ambien.</div>";
+}
+document.getElementById("dashEmisiParam").addEventListener("change", renderDashboardEmisiAmbienRanking);

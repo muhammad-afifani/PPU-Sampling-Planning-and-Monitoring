@@ -1160,7 +1160,7 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 .pg-dokfoto-title .sub{font-size:11.5px;font-weight:700;}
 .pg-dokfoto-table{width:100%;border-collapse:collapse;font-size:10.5px;margin-top:10px;}
 .pg-dokfoto-table th,.pg-dokfoto-table td{border:1px solid #999;padding:8px 10px;text-align:left;vertical-align:top;background:#fff;}
-.pg-dokfoto-table th{font-weight:700;text-align:center;}
+.pg-dokfoto-table th{font-weight:700;text-align:center;color:#000;}
 .pg-dokfoto-table td:first-child{text-align:center;}
 .pg-dokfoto-table tr{page-break-inside:avoid;}
 .coord-tbl .coord-nama{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
