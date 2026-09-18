@@ -244,36 +244,61 @@ function dashGrpCardHtml(label, done, total){
 --------------------------------------------------------- */
 function dashRankBarRow(rank, label, valueLabel, value, maxValue, color){
   const pct = maxValue>0 ? Math.max(2, Math.round(value/maxValue*100)) : 0;
-  return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-    <div style="width:14px;flex-shrink:0;font-size:10.5px;font-weight:800;color:var(--gray-500);text-align:right;">${rank}</div>
+  // Badge peringkat berwarna (pakai warna baris itu sendiri) utk 3 besar, abu netral utk sisanya —
+  // penekanan visual "juara" tanpa nambah channel warna baru yang tidak terkait warna datanya.
+  const badgeBg = rank<=3 ? color : "var(--gray-200)";
+  const badgeFg = rank<=3 ? "#fff" : "var(--gray-700)";
+  return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;">
+    <div style="width:20px;height:20px;flex-shrink:0;border-radius:50%;background:${badgeBg};color:${badgeFg};font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;">${rank}</div>
     <div style="flex:1;min-width:0;">
-      <div style="display:flex;justify-content:space-between;gap:6px;font-size:11px;margin-bottom:3px;">
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(label)}">${escHtml(label)}</span>
-        <b style="flex-shrink:0;font-family:var(--font-mono);">${valueLabel}</b>
+      <div style="display:flex;justify-content:space-between;gap:6px;font-size:11.5px;margin-bottom:4px;">
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--heading-2);font-weight:600;" title="${escHtml(label)}">${escHtml(label)}</span>
+        <b style="flex-shrink:0;font-variant-numeric:tabular-nums;color:var(--heading);">${valueLabel}</b>
       </div>
       <div class="progressbar"><div style="width:${pct}%;background:${color};"></div></div>
     </div>
   </div>`;
 }
-// Total beban [param] per site & per grup sumber, dari periode data TERBARU yang tersedia (carry-
-// forward otomatis mencakup titik yg bukan giliran sampling periode itu) — lihat catatan blok di atas.
-function dashEmisiRankData(param){
+// Total beban [param] per site & per grup sumber, utk SATU periode (default periode data TERBARU
+// kalau `periode` diisi tidak valid/kosong — carry-forward otomatis mencakup titik yg bukan giliran
+// sampling periode itu) — lihat catatan blok di atas. `periode` bisa periode manapun dari
+// dispersiPeriodList() (dipilih lewat filter "Periode Beban" di kartu ini), bukan cuma yang terbaru
+// — dipakai juga oleh dashEmisiTrendSeries utk menghitung tiap titik di kurva tren.
+function dashEmisiRankData(param, periode){
   const periods = dispersiPeriodList();
   const stacks = dispersiStacks();
-  if(!periods.length || !stacks.length) return {bySite:{}, byGroup:{}, latestPeriode:null, total:0};
-  const latestPeriode = periods[periods.length-1].periode;
+  if(!periods.length || !stacks.length) return {bySite:{}, byGroup:{}, periode:null, total:0, pointCount:0};
+  const usePeriode = periode && periods.some(p=>p.periode===periode) ? periode : periods[periods.length-1].periode;
   const bySite = {}, byGroup = {};
-  let total = 0;
+  let total = 0, pointCount = 0;
   stacks.forEach(s=>{
-    const b = dispersiBebanCarryForward(s, param, latestPeriode);
+    const b = dispersiBebanCarryForward(s, param, usePeriode);
     if(!b || b.bebanTahunTon==null) return;
     const p = DB.points.find(x=>x.id===s.id);
     const grp = p ? subgroupOf(p) : (s.kategoriSumber||"Lainnya");
     bySite[s.site] = (bySite[s.site]||0) + b.bebanTahunTon;
     byGroup[grp] = (byGroup[grp]||0) + b.bebanTahunTon;
     total += b.bebanTahunTon;
+    pointCount++;
   });
-  return {bySite, byGroup, latestPeriode, total};
+  return {bySite, byGroup, periode: usePeriode, total, pointCount};
+}
+// Total beban [param] SELURUH site, dihitung ulang utk SETIAP periode yang ada (bukan cuma periode
+// yang lagi difilter) — dasar chart "Tren Total Beban per Periode". Titik yang periode itu belum
+// (belum ada hasil sampling apapun utk di-carry-forward-kan) otomatis null, bukan 0 — supaya chart
+// tidak menyiratkan "beban-nya nol" padahal sebenarnya "belum ada data sama sekali" pada periode itu.
+function dashEmisiTrendSeries(param){
+  const periods = dispersiPeriodList();
+  const stacks = dispersiStacks();
+  const values = periods.map(p=>{
+    let sum = 0, any = false;
+    stacks.forEach(s=>{
+      const b = dispersiBebanCarryForward(s, param, p.periode);
+      if(b && b.bebanTahunTon!=null){ sum += b.bebanTahunTon; any = true; }
+    });
+    return any ? sum : null;
+  });
+  return {labels: periods.map(p=>p.periode), values};
 }
 function dashRankedEntries(obj){
   return Object.entries(obj).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value);
@@ -300,40 +325,103 @@ function refreshDashEmisiParamSelect(){
   sel.innerHTML = keys.map(k=>`<option value="${escHtml(k)}">${escHtml(DISPERSI_MASS_PARAMS[k].label)}</option>`).join("");
   sel.value = keys.includes("CO₂") ? "CO₂" : keys[0];
 }
+// Filter "Periode Beban" — beda dari filter Periode di kartu S-Curve (itu periode BATCH/jadwal
+// sampling), ini periode HASIL PEMANTAUAN EMISI (dispersiPeriodList, sumber yg sama dgn Model
+// Dispersi Emisi) — pola refresh sama dgn refreshDashScSelects: simpan pilihan lama SEBELUM
+// innerHTML diganti, balikin kalau masih ada di daftar baru, else default ke yang PALING BARU.
+function refreshDashEmisiPeriodeSelect(){
+  const sel = document.getElementById("dashEmisiPeriode");
+  const periods = dispersiPeriodList();
+  const prev = sel.value;
+  sel.innerHTML = periods.length
+    ? periods.map(p=>`<option value="${escHtml(p.periode)}">${escHtml(p.periode)}</option>`).join("")
+    : `<option value="">(belum ada data)</option>`;
+  if(periods.some(p=>p.periode===prev)) sel.value = prev;
+  else if(periods.length) sel.value = periods[periods.length-1].periode;
+}
+function refreshDashEmisiTopNSelect(){
+  const sel = document.getElementById("dashEmisiTopN");
+  if(sel.options.length) return; // statis, cukup diisi sekali
+  sel.innerHTML = `<option value="5">Top 5</option><option value="8" selected>Top 8</option><option value="10">Top 10</option>`;
+}
 function renderDashboardEmisiAmbienRanking(){
   // showPage("dashboard") dipanggil SINKRON di init 16-actions-init.js, yang jalan SEBELUM script
-  // tag 18 (Model Dispersi, sumber DISPERSI_MASS_PARAMS/dispersiStacks/dll) & 21 (AQI/ISPU, sumber
-  // aqiIspuGroupEvents/aqiIspuStandard) selesai dimuat — beda dari helper lain yg dipakai kartu2
-  // Dashboard lainnya (HASIL_SITE_COLORS/KATEGORI_SUMBER_ORDER/buildSCurveSVG, semuanya dari file
-  // BERNOMOR LEBIH KECIL drpd 16). Coba lagi di tick berikutnya (setelah SEMUA <script> tag beres
-  // dimuat scr sinkron) drpd lempar error yg memutus sisa init() di 16-actions-init.js.
-  if(typeof DISPERSI_MASS_PARAMS==="undefined" || typeof aqiIspuGroupEvents==="undefined"){
+  // tag 18 (Model Dispersi, sumber DISPERSI_MASS_PARAMS/dispersiStacks/dll), 20 (ambBuildDonut/
+  // ambBuildTrendChart, dipakai lagi di sini spy chart tren & donutnya konsisten dgn Dashboard Hasil
+  // Ambient) & 21 (AQI/ISPU, sumber aqiIspuGroupEvents/aqiIspuStandard) selesai dimuat — beda dari
+  // helper lain yg dipakai kartu2 Dashboard lainnya (HASIL_SITE_COLORS/KATEGORI_SUMBER_ORDER/
+  // buildSCurveSVG, semuanya dari file BERNOMOR LEBIH KECIL drpd 16). Coba lagi di tick berikutnya
+  // (setelah SEMUA <script> tag beres dimuat scr sinkron) drpd lempar error yg memutus sisa init()
+  // di 16-actions-init.js.
+  if(typeof DISPERSI_MASS_PARAMS==="undefined" || typeof aqiIspuGroupEvents==="undefined" || typeof ambBuildDonut==="undefined"){
     setTimeout(renderDashboardEmisiAmbienRanking, 0);
     return;
   }
   refreshDashEmisiParamSelect();
+  refreshDashEmisiPeriodeSelect();
+  refreshDashEmisiTopNSelect();
   const param = document.getElementById("dashEmisiParam").value;
-  const {bySite, byGroup, latestPeriode, total} = dashEmisiRankData(param);
+  const periodeFilter = document.getElementById("dashEmisiPeriode").value;
+  const topN = Number(document.getElementById("dashEmisiTopN").value) || 8;
+  const {bySite, byGroup, periode, total, pointCount} = dashEmisiRankData(param, periodeFilter);
   const siteRows = dashRankedEntries(bySite), groupRows = dashRankedEntries(byGroup);
   const maxSite = Math.max(1, ...siteRows.map(r=>r.value));
   const maxGroup = Math.max(1, ...groupRows.map(r=>r.value));
   const paramLabel = (DISPERSI_MASS_PARAMS[param]||{}).label || param;
 
-  document.getElementById("dashEmisiRankNote").innerHTML = latestPeriode
-    ? `Total beban ${escHtml(paramLabel)} seluruh site periode <b>${escHtml(latestPeriode)}</b>: <b>${dispersiFmt(total,1)} ton/tahun</b>. Dihitung dari titik yang sudah punya hasil sampling &amp; jam operasi tercatat (sama dgn perhitungan di Model Dispersi Emisi).`
+  document.getElementById("dashEmisiRankNote").innerHTML = periode
+    ? `Total beban ${escHtml(paramLabel)} seluruh site periode <b>${escHtml(periode)}</b>: <b>${dispersiFmt(total,1)} ton/tahun</b>. Dihitung dari titik yang sudah punya hasil sampling &amp; jam operasi tercatat (sama dgn perhitungan di Model Dispersi Emisi).`
     : `Belum ada data hasil pemantauan emisi untuk dihitung bebannya.`;
 
   document.getElementById("dashEmisiRankSite").innerHTML = siteRows.length
-    ? siteRows.slice(0,8).map((r,i)=>dashRankBarRow(i+1, r.label, dispersiFmt(r.value,1)+" ton", r.value, maxSite, HASIL_SITE_COLORS[r.label]||"#7f8fa0")).join("")
+    ? siteRows.slice(0,topN).map((r,i)=>dashRankBarRow(i+1, r.label, dispersiFmt(r.value,1)+" ton", r.value, maxSite, HASIL_SITE_COLORS[r.label]||"#7f8fa0")).join("")
     : "<div class='hint'>Belum ada data.</div>";
   document.getElementById("dashEmisiRankGroup").innerHTML = groupRows.length
-    ? groupRows.slice(0,8).map((r,i)=>dashRankBarRow(i+1, r.label, dispersiFmt(r.value,1)+" ton", r.value, maxGroup, dashGrpVisual(r.label).color)).join("")
+    ? groupRows.slice(0,topN).map((r,i)=>dashRankBarRow(i+1, r.label, dispersiFmt(r.value,1)+" ton", r.value, maxGroup, dashGrpVisual(r.label).color)).join("")
     : "<div class='hint'>Belum ada data.</div>";
 
-  document.getElementById("dashAmbienStdLabel").textContent = aqiIspuStandard==="ispu" ? "ISPU" : "AQI";
+  const ambienStdLabel = aqiIspuStandard==="ispu" ? "ISPU" : "AQI";
+  document.getElementById("dashAmbienStdLabel").textContent = ambienStdLabel;
   const ambienRows = dashAmbienRankData();
   document.getElementById("dashAmbienRank").innerHTML = ambienRows.length
-    ? ambienRows.slice(0,8).map((r,i)=>dashRankBarRow(i+1, r.site, String(r.index), r.index, 500, r.category.color)).join("")
+    ? ambienRows.slice(0,topN).map((r,i)=>dashRankBarRow(i+1, r.site, String(r.index), r.index, 500, r.category.color)).join("")
     : "<div class='hint'>Belum ada data hasil pemantauan ambien.</div>";
+
+  // KPI ringkas — 4 angka kunci dari data yang SAMA persis dgn yang dirender di bawahnya (bukan
+  // hitungan terpisah), sekadar dirangkum jadi angka besar spy langsung kebaca sekilas.
+  const avgAmbien = ambienRows.length ? Math.round(ambienRows.reduce((s,r)=>s+r.index,0)/ambienRows.length) : null;
+  const kpis = [
+    {num: periode ? dispersiFmt(total,1) : "—", lbl:`Total Beban ${paramLabel} (ton/thn)`},
+    {num: pointCount, lbl:"Titik Terhitung"},
+    {num: siteRows.length, lbl:"Site Terpantau"},
+    {num: avgAmbien!=null ? avgAmbien : "—", lbl:`Rata-rata Indeks ${ambienStdLabel}`},
+  ];
+  document.getElementById("dashEmisiKpiRow").innerHTML = kpis.map(k=>`<div class="dash-rank-kpi"><div class="num">${k.num}</div><div class="lbl">${escHtml(k.lbl)}</div></div>`).join("");
+
+  // Tren total beban per periode — line chart generik yg SAMA dipakai Dashboard Hasil Ambient
+  // (ambBuildTrendChart, 20-ambien-dashboard.js) spy gaya chart-nya konsisten 1 aplikasi, bukan
+  // reinvent chart baru lagi. 1 series (Total Beban), titik null (belum ada data periode itu)
+  // otomatis diputus/dilewati oleh chart-nya sendiri.
+  const trend = dashEmisiTrendSeries(param);
+  document.getElementById("dashEmisiTrend").innerHTML = trend.labels.length
+    ? ambBuildTrendChart(trend.labels, [{label:`Total Beban ${paramLabel}`, color:"#0ea5a0", values:trend.values}], {})
+    : "<div class='hint' style='padding:14px;'>Belum ada data historis untuk ditampilkan.</div>";
+
+  // Donut kontribusi site — Top N (sama populasinya dgn daftar "Top Site — Beban Emisi" di bawah)
+  // + "Lainnya" kalau masih ada site di luar Top N, spy totalnya tetap 100% dari total beban asli
+  // (bukan cuma proporsi antar-Top-N yang keliatan doang).
+  // ambBuildDonut menulis value legend apa adanya (dirancang utk hitungan bulat spt jumlah event
+  // di tempat lain dipakai) — beban ton di sini presisi float panjang, jadi dibulatkan dulu ke ton
+  // bulat SEBELUM dikirim spy legend-nya kebaca ("457.712" bukan "457711.66948175966").
+  const donutSegs = siteRows.slice(0,topN).map(r=>[r.label, Math.round(r.value), HASIL_SITE_COLORS[r.label]||"#7f8fa0"]);
+  const restVal = siteRows.slice(topN).reduce((s,r)=>s+r.value,0);
+  if(restVal>0) donutSegs.push(["Lainnya", Math.round(restVal), "#a8b2bd"]);
+  const donut = donutSegs.length
+    ? ambBuildDonut(donutSegs, dispersiFmt(total,0), "ton/thn")
+    : {svg:"<div class='hint' style='padding:14px;'>Belum ada data.</div>", legend:""};
+  document.getElementById("dashEmisiDonut").innerHTML = donut.svg;
+  document.getElementById("dashEmisiDonutLegend").innerHTML = donut.legend;
 }
 document.getElementById("dashEmisiParam").addEventListener("change", renderDashboardEmisiAmbienRanking);
+document.getElementById("dashEmisiPeriode").addEventListener("change", renderDashboardEmisiAmbienRanking);
+document.getElementById("dashEmisiTopN").addEventListener("change", renderDashboardEmisiAmbienRanking);

@@ -281,6 +281,19 @@ details.collapse-section summary:hover{color:var(--teal-600,#0b6b66);}
 .dash-stats-row .stat .lbl{font-size:10.5px;margin-top:6px;}
 @media(max-width:980px){.dash-stats-row{grid-template-columns:repeat(2,1fr) !important;}}
 
+/* KPI ringkas di kartu "Peringkat Beban Emisi & Kualitas Ambien" (Dashboard) — beda dari
+   .dash-stats-row (kartu putih besar di puncak halaman): tile lebih kecil/padat, nempel di dalam
+   .card yang sudah ada jadi latarnya cukup tint abu-abu (--gray-100) drpd kartu putih terpisah lagi
+   di dalam kartu (dobel kotak). Lihat renderDashboardEmisiAmbienRanking (04-dashboard.js). */
+.dash-rank-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+.dash-rank-kpi{padding:11px 13px;border-radius:10px;background:var(--gray-100);}
+.dash-rank-kpi .num{font-size:18px;font-weight:800;color:var(--heading);font-variant-numeric:tabular-nums;line-height:1.1;}
+.dash-rank-kpi .lbl{font-size:10px;font-weight:600;color:var(--gray-500);margin-top:5px;text-transform:uppercase;letter-spacing:.02em;line-height:1.35;}
+@media(max-width:980px){.dash-rank-kpi-row{grid-template-columns:repeat(2,1fr);}}
+/* Sub-kartu chart (tren & donut) di dalam kartu Peringkat — border tipis tanpa shadow-nya sendiri
+   (beda dari .card biasa) supaya tidak jadi "kotak di dalam kotak" yang menonjol dobel. */
+.dash-rank-subcard{border:1px solid var(--gray-200);border-radius:12px;padding:16px;background:var(--surface-card);}
+
 /* Kartu "Progress per Grup Sumber" di Dashboard — grid responsif, lebarnya menyesuaikan jumlah
    kartu yang muat (lihat dashGrpCardHtml di 04-dashboard.js). */
 .dash-grpgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;}
