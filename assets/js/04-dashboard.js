@@ -86,8 +86,9 @@ function renderDashboard(){
    (buildSCurveSVG(DB.batches,...) tanpa filter), jadi rentang tanggalnya makin panjang tiap kali
    ada batch baru dibuat di periode berikutnya. Filter di bawah mempersempit populasi batch yang
    dikirim ke buildSCurveSVG (lihat parameter `batches` di 08-gantt-print.js, sekarang dipakai utk
-   membatasi titik yg dihitung lewat keanggotaan p.batchId) supaya kurva cuma menampilkan SATU
-   jendela jadwal yang koheren sesuai pilihan user.
+   membatasi titik yg dihitung lewat keanggotaan p.batchId) supaya kurva tetap satu jendela periode
+   yang koheren — Tim & Batch sendiri boleh gabungan beberapa pilihan sekaligus (chip multi-pilih,
+   Set kosong = "Semua", lihat dashScSel di bawah), bukan cuma satu tim/satu batch spt sebelumnya.
 ========================================================= */
 function dashScPeriodList(){
   const periods = [...new Set(DB.batches.map(b=>b.period).filter(Boolean))];
@@ -98,10 +99,16 @@ function dashScPeriodList(){
   });
   return periods;
 }
+// Tim & Batch dulu <select> satu-pilihan (radio) — sekarang chip multi-pilih (Set kosong = "Semua",
+// pola sama persis dgn hdSel di 14-hasil-dashboard.js) supaya bisa lihat gabungan mis. Emisi+Ambient
+// atau beberapa batch sekaligus dalam satu kurva-S, bukan cuma satu per satu.
+let dashScSel = { team: new Set(), batch: new Set() };
+function dashScTeamMatches(team){ return dashScSel.team.size===0 || dashScSel.team.has(team); }
+function dashScAvailableBatches(periode){
+  return DB.batches.filter(b=>b.period===periode && dashScTeamMatches(b.team));
+}
 function refreshDashScSelects(){
   const periodeSel = document.getElementById("dashScPeriode");
-  const teamSel = document.getElementById("dashScTeam");
-  const batchSel = document.getElementById("dashScBatch");
   const periods = dashScPeriodList();
   // Simpan pilihan lama SEBELUM innerHTML diganti — rebuild <select> otomatis reset ke opsi
   // pertama walau opsi lama masih ada (pola sama dgn refreshBatchSelect/refreshGanttBatchSelect).
@@ -113,25 +120,33 @@ function refreshDashScSelects(){
   else if(periods.includes(currentPeriodStr())) periodeSel.value = currentPeriodStr();
   else if(periods.length) periodeSel.value = periods[periods.length-1];
 
-  const periode = periodeSel.value, team = teamSel.value;
-  const batchOpts = DB.batches.filter(b=>b.period===periode && (team==="all"||b.team===team));
-  const prevBatch = batchSel.value;
-  batchSel.innerHTML = `<option value="">Semua Batch</option>` + batchOpts.map(b=>`<option value="${b.id}">${escHtml(b.name)}</option>`).join("");
-  batchSel.value = batchOpts.some(b=>b.id===prevBatch) ? prevBatch : "";
+  document.getElementById("dashScTeamChips").innerHTML = `
+    <button type="button" class="chip-toggle all ${dashScSel.team.size===0?'active':''}" data-action="dashScTeamChip" data-val="">Semua</button>
+    <button type="button" class="chip-toggle ${dashScSel.team.has('emisi')?'active':''}" data-action="dashScTeamChip" data-val="emisi">Emisi</button>
+    <button type="button" class="chip-toggle ${dashScSel.team.has('ambient')?'active':''}" data-action="dashScTeamChip" data-val="ambient">Ambient</button>
+  `;
+
+  const periode = periodeSel.value;
+  const batchOpts = dashScAvailableBatches(periode);
+  // Buang pilihan batch yang sudah tidak ada di daftar (mis. krn filter Tim baru saja diubah) —
+  // pola sama dgn hdRenderCerobongChecklist, supaya filter tidak diam-diam masih "nyangkut" ke batch
+  // yang sudah tidak relevan/tidak kelihatan lagi chipnya.
+  const batchOptIds = new Set(batchOpts.map(b=>b.id));
+  [...dashScSel.batch].forEach(id=>{ if(!batchOptIds.has(id)) dashScSel.batch.delete(id); });
+  document.getElementById("dashScBatchChips").innerHTML = batchOpts.length
+    ? `<button type="button" class="chip-toggle all ${dashScSel.batch.size===0?'active':''}" data-action="dashScBatchChip" data-val="">Semua Batch</button>`
+      + batchOpts.map(b=>`<button type="button" class="chip-toggle ${dashScSel.batch.has(b.id)?'active':''}" data-action="dashScBatchChip" data-val="${b.id}">${escHtml(b.name)}</button>`).join("")
+    : `<span class="hint" style="margin:0;">(belum ada batch)</span>`;
 }
 function renderDashboardSCurve(){
   refreshDashScSelects();
   const periode = document.getElementById("dashScPeriode").value;
-  const team = document.getElementById("dashScTeam").value;
-  const batchId = document.getElementById("dashScBatch").value;
-  let scBatches = periode ? DB.batches.filter(b=>b.period===periode) : [];
-  if(team!=="all") scBatches = scBatches.filter(b=>b.team===team);
-  if(batchId) scBatches = scBatches.filter(b=>b.id===batchId);
-  document.getElementById("dashSCurve").innerHTML = buildSCurveSVG(scBatches, DB.points, team);
+  let scBatches = periode ? dashScAvailableBatches(periode) : [];
+  if(dashScSel.batch.size) scBatches = scBatches.filter(b=>dashScSel.batch.has(b.id));
+  const teamView = dashScSel.team.size ? [...dashScSel.team] : ["emisi","ambient"];
+  document.getElementById("dashSCurve").innerHTML = buildSCurveSVG(scBatches, DB.points, teamView);
 }
 document.getElementById("dashScPeriode").addEventListener("change", renderDashboardSCurve);
-document.getElementById("dashScTeam").addEventListener("change", renderDashboardSCurve);
-document.getElementById("dashScBatch").addEventListener("change", renderDashboardSCurve);
 
 /* ---------------------------------------------------------
    Kartu grup sumber ber-ilustrasi ("eye-catching", bukan ms-icon linear biasa) — tiap jenis
