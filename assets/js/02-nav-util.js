@@ -130,12 +130,11 @@ function renderPage(p){
 // Ukur tinggi header sticky (.stickytop) halaman aktif lalu simpan sebagai custom property
 // --stickyoffset di elemen halaman itu — dipakai .tree-head/.tree-subhead supaya nempel PAS
 // di bawah header, bukan ketiban/ketimpa olehnya.
-// offsetHeight SAJA tidak cukup — itu cuma border-box (konten+padding), tidak termasuk
-// margin-bottom .stickytop (lihat style.css, 16px, "napas" yang sama dipakai semua halaman
-// lain yg kontennya tidak sticky). Tanpa menambahkannya di sini, .tree-head/.tree-subhead
-// nempel PAS di tepi bawah .stickytop begitu sama-sama posisi stuck — margin 16px-nya seolah
-// hilang/dilewati, jadi kelihatan mepet dibanding halaman lain yg spacing-nya sama tapi kontennya
-// tidak sticky (margin biasa tetap kepakai di flow normal).
+// offsetHeight sendiri sudah termasuk padding-bottom 16px "napas" .stickytop (lihat style.css —
+// dulu ditulis lewat margin-bottom, sekarang padding-bottom supaya strip itu ikut opaque & ikut
+// sticky, bukan celah transparan yang bisa "ditembus" baris tabel di baliknya pas discroll).
+// marginBottom tetap ditambahkan di sini sbg jaga-jaga (0 dlm keadaan normal sekarang) kalau suatu
+// saat ada margin tambahan lain di .stickytop yang perlu ikut terhitung.
 function syncStickyOffset(pageId){
   const pageEl = document.getElementById("page-"+pageId);
   if(!pageEl) return;
@@ -287,6 +286,37 @@ function toast(msg, type){
   el.textContent = msg;
   stack.appendChild(el);
   setTimeout(()=>{ el.style.transition="opacity .3s"; el.style.opacity="0"; setTimeout(()=>el.remove(),320); }, 4200);
+}
+// Toast VERSI TAHAN LAMA dgn progress bar — dipakai proses yg makan waktu & user butuh tahu masih
+// jalan/berapa persen (mis. download JSON backup lengkap dari repository, ukurannya bisa beberapa
+// MB — lihat checkRepoBackupUpdate/checkFullBackupUpdate/fetchJsonWithProgress di 12-data-page.js).
+// Beda dari toast() biasa: TIDAK auto-hilang sendiri (dipanggil selama proses berjalan), dan
+// mengembalikan handle {update, remove} supaya caller bisa memperbarui teks/persentasenya berkali2.
+function progressToast(initialMsg){
+  const stack = document.getElementById("toastStack");
+  const el = document.createElement("div");
+  el.className = "toast toast-progress";
+  el.innerHTML = `<div class="toast-progress-label"></div><div class="toast-progress-bar"><div style="width:0%"></div></div>`;
+  stack.appendChild(el);
+  const label = el.querySelector(".toast-progress-label");
+  const bar = el.querySelector(".toast-progress-bar > div");
+  label.textContent = initialMsg;
+  let removed = false;
+  return {
+    // pct null/undefined = "indeterminate" (ukuran file tidak diketahui, mis. Content-Length tidak
+    // dikirim server) — bar tetap kelihatan bergerak (lihat animasi .toast-progress-bar.indet di
+    // style.css) drpd diam di 0% terus yg keliatan spt macet/hang.
+    update(pct, msg){
+      if(removed) return;
+      if(msg!=null) label.textContent = msg;
+      if(pct==null){ bar.parentElement.classList.add("indet"); }
+      else{ bar.parentElement.classList.remove("indet"); bar.style.width = Math.max(0,Math.min(100,pct))+"%"; }
+    },
+    remove(){
+      if(removed) return; removed = true;
+      el.style.transition="opacity .3s"; el.style.opacity="0"; setTimeout(()=>el.remove(),320);
+    },
+  };
 }
 function askConfirm(msg, onYes){
   openModal(`<h3>Konfirmasi</h3><p style="font-size:13px;color:var(--gray-700);">${escHtml(msg)}</p>
