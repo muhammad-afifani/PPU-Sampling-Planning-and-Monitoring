@@ -1129,6 +1129,12 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 
 /* Dokumentasi Foto Sampling */
 .dokfoto-storage-hint{margin-bottom:14px;}
+/* Budget & Proyeksi Biaya — legend chip yg bisa diklik (toggle tampil/sembunyi per seri warna di
+   chart), beda dari .legend .item biasa (yg cuma statis/tidak interaktif) makanya pakai class sendiri. */
+.bgt-legend-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:14px;border:1px solid var(--gray-300);background:#fff;font-size:11px;cursor:pointer;user-select:none;margin:2px 3px 2px 0;}
+.bgt-legend-chip:hover{border-color:var(--teal-400);}
+.bgt-legend-chip.off{opacity:.4;text-decoration:line-through;}
+.bgt-legend-chip .sw{width:10px;height:10px;border-radius:3px;display:inline-block;flex-shrink:0;}
 /* Rekap Kelengkapan Foto — chip klik-utk-filter (bukan cuma angka statis), imbang dgn pola chip
    filter status yg dipakai di tempat lain (mis. .navbtn/site pill). Warna per status: abu (semua),
    hijau (final), kuning (ada foto tp belum final), merah (belum ada foto sama sekali). */
