@@ -119,6 +119,7 @@ function renderPage(p){
   if(p==="ambiendashboard") renderAmbienDashboard();
   if(p==="ambiendb") renderAmbienDb();
   if(p==="aqiispu") renderAqiIspu();
+  if(p==="roadmap") renderRoadmapPantau();
   if(p==="riwayat") renderRiwayat();
   if(p==="lokasi") renderMap();
   if(p==="data") renderDataStatus();
