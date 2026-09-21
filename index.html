@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202609211600">
+<link rel="stylesheet" href="assets/css/style.css?v=202609211700">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -606,7 +606,11 @@
     <div class="page" id="page-dokumentasi">
       <div class="stickytop">
       <div class="pagehead"><div><h2>Dokumentasi Foto Sampling</h2><div class="desc">Lampiran foto per titik mengikuti format "Data Pendukung/Lampiran SIMPEL PPU": Petugas Laboratorium/PPC, Peralatan Sampling, Aktivitas Sampling (boleh lebih dari 1 foto tiap kategori), dan bukti screenshot BA yang sudah ditandatangani. Foto ikut tersimpan &amp; ter-backup lewat Export/Import Semua Data (JSON) di halaman Data.</div></div>
-        <div class="toolbar"><button class="btn primary" data-action="printAllVisibleDokFotoLampiran">Cetak Semua yang Tampil (PDF)</button></div>
+        <div class="toolbar">
+          <button class="btn primary" data-action="printAllVisibleDokFotoLampiran">Cetak Semua yang Tampil (PDF)</button>
+          <button class="btn" data-action="exportDokFotoOnly" title="Export foto sesuai filter Tim/Batch/Site/Status saat ini — utk dibagi ke orang lain / digabung lagi belakangan, tidak menyertakan data lain">Export Foto Saja</button>
+          <button class="btn ghost" data-action="triggerImportDokFotoOnly" title="Import file Export Foto Saja — MENGGABUNGKAN foto baru, tidak menimpa/menghapus data lain">Import Foto Saja</button>
+        </div>
       </div>
       <div class="toolbar card" style="padding:12px 14px;">
         <div class="field"><label>Tim</label><select id="dokTeam"><option value="">Semua</option><option value="emisi">Emisi</option><option value="ambient">Ambient</option></select></div>
@@ -1501,6 +1505,7 @@
 <div class="overlay" id="overlay"><div class="modal" id="modalBox"></div></div>
 <input type="file" id="hiddenXlsxFile" accept=".xlsx" style="display:none;">
 <input type="file" id="hiddenPhotoFile" accept="image/*" multiple style="display:none;">
+<input type="file" id="importDokFotoFile" accept=".json" style="display:none;">
 <div id="printGuideArea"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <!-- Semua file lokal (CSS di <head> + script di bawah ini) diberi "?v=<timestamp>" SAMA supaya
@@ -1508,34 +1513,34 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202609211600"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202609211600"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202609211700"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202609211700"></script>
 
-<script src="assets/data/default-data.js?v=202609211600"></script>
-<script src="assets/data/brand-assets.js?v=202609211600"></script>
-<script src="assets/data/travel-routes.js?v=202609211600"></script>
-<script src="assets/js/00-icons.js?v=202609211600"></script>
-<script src="assets/js/01-state.js?v=202609211600"></script>
-<script src="assets/js/02-nav-util.js?v=202609211600"></script>
-<script src="assets/js/03-period-logic.js?v=202609211600"></script>
-<script src="assets/js/04-dashboard.js?v=202609211600"></script>
-<script src="assets/js/05-master-data.js?v=202609211600"></script>
-<script src="assets/js/06-plan-personil.js?v=202609211600"></script>
-<script src="assets/js/07-rules-planner.js?v=202609211600"></script>
-<script src="assets/js/08-gantt-print.js?v=202609211600"></script>
-<script src="assets/js/09-tracking-map.js?v=202609211600"></script>
-<script src="assets/js/10-running-hour.js?v=202609211600"></script>
-<script src="assets/js/11-berita-acara.js?v=202609211600"></script>
-<script src="assets/js/12-data-page.js?v=202609211600"></script>
-<script src="assets/js/13-hasil-db.js?v=202609211600"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202609211600"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202609211600"></script>
-<script src="assets/js/16-actions-init.js?v=202609211600"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202609211600"></script>
-<script src="assets/js/18-model-dispersi.js?v=202609211600"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202609211600"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202609211600"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202609211600"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202609211600"></script>
+<script src="assets/data/default-data.js?v=202609211700"></script>
+<script src="assets/data/brand-assets.js?v=202609211700"></script>
+<script src="assets/data/travel-routes.js?v=202609211700"></script>
+<script src="assets/js/00-icons.js?v=202609211700"></script>
+<script src="assets/js/01-state.js?v=202609211700"></script>
+<script src="assets/js/02-nav-util.js?v=202609211700"></script>
+<script src="assets/js/03-period-logic.js?v=202609211700"></script>
+<script src="assets/js/04-dashboard.js?v=202609211700"></script>
+<script src="assets/js/05-master-data.js?v=202609211700"></script>
+<script src="assets/js/06-plan-personil.js?v=202609211700"></script>
+<script src="assets/js/07-rules-planner.js?v=202609211700"></script>
+<script src="assets/js/08-gantt-print.js?v=202609211700"></script>
+<script src="assets/js/09-tracking-map.js?v=202609211700"></script>
+<script src="assets/js/10-running-hour.js?v=202609211700"></script>
+<script src="assets/js/11-berita-acara.js?v=202609211700"></script>
+<script src="assets/js/12-data-page.js?v=202609211700"></script>
+<script src="assets/js/13-hasil-db.js?v=202609211700"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202609211700"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202609211700"></script>
+<script src="assets/js/16-actions-init.js?v=202609211700"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202609211700"></script>
+<script src="assets/js/18-model-dispersi.js?v=202609211700"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202609211700"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202609211700"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202609211700"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202609211700"></script>
 </body>
 </html>

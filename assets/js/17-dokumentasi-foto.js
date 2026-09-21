@@ -638,6 +638,145 @@ function renderDokFotoRecap(){
     ${chip("empty", "Belum Ada Foto", counts.empty, "err")}
   `;
 }
+
+/* ---------- Export/Import "Foto Saja" (terpisah dari backup JSON lengkap) ----------
+   Dipakai saat kerjaan foto dibagi ke banyak orang: tiap orang filter ke titik/batch/site bagiannya
+   sendiri, export, lalu hasilnya digabung (import) satu-satu ke satu perangkat kompilasi — TANPA
+   perlu kirim-terima file JSON lengkap (yang bisa menimpa data LAIN yang sedang dikerjakan orang lain
+   di perangkat kompilasi itu, mis. tracking/batch). Import di sini SELALU menggabungkan (union by
+   photo id), tidak pernah menghapus/menimpa foto yang sudah ada — foto yang id-nya sudah ada dilewati
+   begitu saja (bukan duplikat, bukan hilang), supaya aman diimport berkali-kali dari orang manapun
+   tanpa perlu koordinasi urutan siapa duluan.
+   Format file SENGAJA mandiri (self-contained, byte foto ikut disertakan sbg dataUrl di "photos"
+   terpisah dari metadata di "points") — sama seperti alasan file backup JSON lengkap menyertakan
+   dataUrl (lihat exportAll, 12-data-page.js): supaya file ini bisa dibuka lagi di perangkat manapun
+   tanpa bergantung IndexedDB perangkat asal. */
+const DOKFOTO_EXPORT_TYPE = "phm-dokfoto-export-v1";
+async function exportDokFotoOnly(){
+  const pts = getFilteredDokFotoPoints();
+  if(!pts.length){ toast("Tidak ada titik yang cocok dengan filter Tim/Batch/Site/Status saat ini untuk diekspor.","err"); return; }
+  const allIds = [];
+  const pointsOut = {};
+  pts.forEach(p=>{
+    const d = ensureDokFoto(p.id);
+    const categories = {};
+    let hasAny = false;
+    DOKFOTO_CATEGORIES.forEach(cat=>{
+      const arr = d[cat.key]||[];
+      if(arr.length){
+        categories[cat.key] = arr.map(ph=>({...ph}));
+        hasAny = true;
+        arr.forEach(ph=>allIds.push(ph.id));
+      }
+    });
+    if(!hasAny && !d.final) return; // titik tanpa foto & belum ditandai apapun — tidak perlu ikut file
+    pointsOut[p.id] = { nama: p.nama, site: p.site, categories, final: !!d.final, finalAt: d.finalAt||null };
+  });
+  if(!Object.keys(pointsOut).length){ toast("Tidak ada foto pada titik yang sesuai filter saat ini untuk diekspor.","err"); return; }
+  const idbMap = await dokFotoIdbGetMany(allIds);
+  const photos = {};
+  allIds.forEach(id=>{ const url = dokFotoUrlCache.get(id) || idbMap.get(id); if(url) photos[id] = url; });
+  const payload = { type: DOKFOTO_EXPORT_TYPE, exportedAt: new Date().toISOString(), points: pointsOut, photos };
+  const teamVal = document.getElementById("dokTeam").value;
+  const filterDesc = [teamVal ? (teamVal==="emisi"?"Emisi":"Ambient") : "", document.getElementById("dokSite").value].filter(Boolean).join("_") || "SemuaTitik";
+  downloadBlob(JSON.stringify(payload), `Foto Dokumentasi_${filterDesc}_${todayStr()}.json`, "application/json");
+  toast(`Export foto berhasil: ${Object.keys(pointsOut).length} titik, ${allIds.length} foto.`, "ok");
+}
+let pendingDokFotoImport = null;
+function handleDokFotoImportFile(data, sourceLabel){
+  if(!data || typeof data!=="object" || data.type!==DOKFOTO_EXPORT_TYPE || !data.points || !data.photos){
+    toast('File ini bukan file "Export Foto Saja" yang valid dari tools ini — import dibatalkan.', "err");
+    return;
+  }
+  const preview = [];
+  let totalNewPhotos = 0, totalDupPhotos = 0, totalUnknownPoints = 0, totalFinalChanges = 0;
+  Object.keys(data.points).forEach(pointId=>{
+    const src = data.points[pointId];
+    const p = DB.points.find(x=>x.id===pointId);
+    if(!p){ totalUnknownPoints++; return; }
+    const localD = ensureDokFoto(pointId);
+    const catLines = [];
+    Object.keys(src.categories||{}).forEach(cat=>{
+      const meta = dokFotoCatMeta(cat);
+      if(!meta) return; // kategori tidak dikenal (versi lain) — dilewati aman
+      const localIds = new Set((localD[cat]||[]).map(ph=>ph.id));
+      const incoming = src.categories[cat]||[];
+      const newOnes = incoming.filter(ph=>!localIds.has(ph.id) && data.photos[ph.id]);
+      const dupCount = incoming.length - newOnes.length;
+      totalNewPhotos += newOnes.length;
+      totalDupPhotos += dupCount;
+      if(newOnes.length || dupCount) catLines.push(`${meta.label}: +${newOnes.length}${dupCount?` (${dupCount} sudah ada)`:""}`);
+    });
+    const willFinal = !!src.final && !localD.final;
+    if(willFinal) totalFinalChanges++;
+    if(catLines.length || willFinal) preview.push({ pointId, nama: p.nama, site: p.site, lines: catLines, willFinal });
+  });
+  pendingDokFotoImport = data;
+  const unknownNote = totalUnknownPoints ? `<p class="hint" style="color:#a02a24;">${totalUnknownPoints} titik di file ini tidak ditemukan di database titik pantau perangkat ini (dilewati, tidak diimport).</p>` : "";
+  const rowsHtml = preview.length ? `<div class="tablewrap" style="max-height:280px;"><table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <thead><tr style="border-bottom:1.5px solid var(--gray-300);"><th style="text-align:left;padding:4px 6px;">Titik</th><th style="text-align:left;padding:4px 6px;">Perubahan</th></tr></thead>
+    <tbody>${preview.map(r=>`<tr style="border-bottom:1px solid var(--gray-200);"><td style="padding:4px 6px;">${escHtml(r.nama)} <span class="muted">(${escHtml(r.site)})</span></td><td style="padding:4px 6px;">${r.lines.map(escHtml).join(", ")}${r.willFinal?`${r.lines.length?", ":""}<span style="color:#0d8a4f;font-weight:700;">akan ditandai Final</span>`:""}</td></tr>`).join("")}</tbody>
+  </table></div>` : `<p class="hint">Tidak ada foto baru untuk diimport dari file ini (semua foto di file ini sudah ada di perangkat ini).</p>`;
+  openModal(`
+    <h3>Import Foto Saja</h3>
+    <p class="hint">Dari "${escHtml(sourceLabel)}" &mdash; ${Object.keys(data.points).length} titik, ${Object.keys(data.photos).length} foto di file ini. Ini <b>MENGGABUNGKAN</b> foto baru ke data yang sudah ada (bukan menimpa) — foto yang sudah ada di perangkat ini tidak dihapus/diduplikasi, dan data lain (titik/tracking/hasil pemantauan dst) sama sekali tidak terpengaruh.</p>
+    ${unknownNote}
+    <p style="font-weight:700;">Ringkasan: <span style="color:#0d8a4f;">+${totalNewPhotos} foto baru</span>${totalDupPhotos?`, ${totalDupPhotos} sudah ada (dilewati)`:""}${totalFinalChanges?`, ${totalFinalChanges} titik akan ditandai Final`:""}.</p>
+    ${rowsHtml}
+    <div class="actions">
+      <button class="btn ghost" data-action="closeModal">Batal</button>
+      <button class="btn primary" data-action="applyDokFotoImport" ${(totalNewPhotos||totalFinalChanges)?"":"disabled"}>Gabungkan Foto Ini</button>
+    </div>
+  `, {wide:true});
+}
+async function applyDokFotoImport(){
+  const data = pendingDokFotoImport; if(!data) return;
+  const toPut = [];
+  let addedPhotos = 0, finalizedPoints = 0;
+  Object.keys(data.points).forEach(pointId=>{
+    const p = DB.points.find(x=>x.id===pointId);
+    if(!p) return;
+    const src = data.points[pointId];
+    const localD = ensureDokFoto(pointId);
+    Object.keys(src.categories||{}).forEach(cat=>{
+      if(!dokFotoCatMeta(cat)) return;
+      const localIds = new Set((localD[cat]||[]).map(ph=>ph.id));
+      (src.categories[cat]||[]).forEach(ph=>{
+        if(localIds.has(ph.id)) return;
+        const dataUrl = data.photos[ph.id];
+        if(!dataUrl) return; // metadata tanpa byte foto (file rusak/tak lengkap) — dilewati aman
+        localD[cat].push({...ph});
+        toPut.push({id: ph.id, dataUrl});
+        addedPhotos++;
+      });
+    });
+    if(src.final && !localD.final){
+      localD.final = true;
+      localD.finalAt = src.finalAt || new Date().toISOString();
+      finalizedPoints++;
+    }
+  });
+  if(toPut.length){
+    try{ await dokFotoIdbBulkPut(toPut); toPut.forEach(e=>dokFotoUrlCache.set(e.id, e.dataUrl)); }
+    catch(err){ toast("Sebagian foto gagal ditulis ke penyimpanan (IndexedDB) — coba lagi.", "err"); }
+  }
+  save();
+  closeModal();
+  pendingDokFotoImport = null;
+  renderDokumentasiFoto();
+  toast(`Import foto selesai: ${addedPhotos} foto baru ditambahkan${finalizedPoints?`, ${finalizedPoints} titik ditandai Final`:""}.`, "ok");
+}
+document.getElementById("importDokFotoFile").addEventListener("change", e=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{ handleDokFotoImportFile(JSON.parse(reader.result), file.name); }
+    catch(err){ toast("File tidak valid: "+err.message, "err"); }
+    e.target.value = "";
+  };
+  reader.readAsText(file);
+});
+
 // Sub-kelompok per jenis sumber emisi/ambient (mis. "Turbine Engine Generator" terpisah dari
 // "Flare") supaya daftar titik yang panjang lebih gampang dipindai — dgn urutan prioritas yang
 // SAMA dgn Berita Acara (baKategoriSortRank/BA_KATEGORI_PRIORITY, 11-berita-acara.js) supaya
@@ -796,6 +935,9 @@ Object.assign(ACTIONS, {
     document.getElementById("dokStatus").value = t.dataset.status;
     renderDokumentasiFoto();
   },
+  exportDokFotoOnly,
+  triggerImportDokFotoOnly:()=>document.getElementById("importDokFotoFile").click(),
+  applyDokFotoImport,
   printSingleDokFotoLampiran:(t)=>printSingleDokFotoLampiran(t.dataset.point),
   printAllVisibleDokFotoLampiran,
   expandAllDokFoto:()=>{
