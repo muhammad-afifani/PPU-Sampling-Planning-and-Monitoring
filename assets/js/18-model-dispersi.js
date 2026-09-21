@@ -1453,7 +1453,7 @@ function printDispersiReport(){
     <div class="field" style="margin-top:12px;"><label>Orientasi Kertas</label>
       <select id="dispPrintOrientation"><option value="landscape" selected>Lanskap (Landscape)</option><option value="portrait">Potret (Portrait)</option></select>
     </div>
-    <div class="actions"><button class="btn ghost" data-action="closeModal">Batal</button><button class="btn primary" data-action="doPrintDispersiReport">Cetak</button></div>
+    <div class="actions"><button class="btn ghost" data-action="closeModal">Batal</button><button class="btn" data-action="exportDispersiReportXlsx">Export Excel</button><button class="btn primary" data-action="doPrintDispersiReport">Cetak PDF</button></div>
   `);
 }
 async function doPrintDispersiReport(){
@@ -1481,6 +1481,109 @@ async function doPrintDispersiReport(){
   document.title = dispersiReportFilename(selectedPeriods);
   window.print();
   document.title = originalTitle;
+}
+/* =========================================================
+   EXPORT EXCEL — Laporan Beban Emisi
+   ---------------------------------------------------------
+   Supaya beban emisi bisa dicek ulang manual (hitungan konsentrasi x laju alir x jam operasi),
+   bukan cuma dibaca dari PDF. Sengaja HITUNG ULANG dari sumber yang SAMA PERSIS dgn
+   buildDispersiReportHtml (dispersiSelectedStacks/dispersiBebanCarryForward/dispersiParamRecord —
+   bukan menyalin angka dari HTML yang sudah jadi) supaya kedua laporan (PDF & Excel) TIDAK PERNAH
+   beda angka walau salah satu diubah lagi nanti. Kolom "Carry Forward?" eksplisit (Ya/Tidak) + kolom
+   Tanggal Sampling Asli terpisah — di PDF cuma simbol dagger krn ruang cetak terbatas, di Excel bisa
+   lebih eksplisit/gampang difilter.
+========================================================= */
+function buildDispersiReportXlsx(selectedPeriods, selectedParams){
+  const stacks = dispersiSelectedStacks();
+  if(!stacks.length) return null;
+  const allMassParams = Object.keys(DISPERSI_MASS_PARAMS).filter(p=>!DISPERSI_MASS_PARAMS[p].qualitative);
+  const massParams = (selectedParams && selectedParams.length) ? allMassParams.filter(p=>selectedParams.includes(p)) : allMassParams;
+  const compParams = massParams.concat(["Opasitas"]);
+  const periodsSorted = dispersiPeriodList().filter(p=>selectedPeriods.includes(p.periode));
+  if(!periodsSorted.length) return null;
+
+  const rincianRows = [];
+  const byStackParamYear = {};
+  const summaryMap = {};
+  stacks.forEach(s=>{
+    massParams.forEach(param=>{
+      periodsSorted.forEach(({periode})=>{
+        const r = dispersiBebanCarryForward(s, param, periode);
+        if(!r) return;
+        const {sem, tahun} = hasilPeriodParts(periode);
+        const bebanSemesterKg = r.bebanTahunKg!=null ? r.bebanTahunKg/2 : null;
+        const key = s.id+"|"+param+"|"+tahun;
+        (byStackParamYear[key] = byStackParamYear[key]||[]).push({sem, bebanSemesterKg, stack:s, param, tahun});
+        const sKey = periode+"|"+param;
+        summaryMap[sKey] = summaryMap[sKey] || {periode, param, total:0, titik:0};
+        summaryMap[sKey].total += bebanSemesterKg||0;
+        summaryMap[sKey].titik++;
+        rincianRows.push({
+          "Semester": periode, "Site": s.site, "Titik": s.nama, "Parameter": param,
+          "Frekuensi Pantau": frekuensiLabelShort(s.frekuensiBulan),
+          "Carry Forward?": r.carriedFrom ? "Ya" : "Tidak",
+          "Tanggal Sampling Dipakai": r.concRec.dateOfSampling||"",
+          "Tanggal Sampling Asli (kalau Carry Forward)": r.carriedFrom||"",
+          "Konsentrasi": r.concRec.resultNumeric, "Satuan Konsentrasi": r.concRec.unit||"",
+          "Laju Alir (m3/s)": r.flowRec.resultNumeric,
+          "Jam Operasi Semester (jam)": r.runningHour,
+          "Jam Operasi per Bulan (jam)": r.runningHour!=null ? r.runningHour/12 : null,
+          "Beban Semester (kg)": bebanSemesterKg,
+          "Beban Semester (ton)": bebanSemesterKg!=null ? bebanSemesterKg/1000 : null,
+        });
+      });
+    });
+  });
+
+  const ringkasanRows = Object.values(summaryMap)
+    .sort((a,b)=> (a.periode<b.periode?-1:a.periode>b.periode?1:0) || a.param.localeCompare(b.param))
+    .map(g=>({"Semester":g.periode, "Parameter":g.param, "Jumlah Titik":g.titik, "Total Beban (kg)":Math.round(g.total*10)/10, "Total Beban (ton)":Math.round(g.total)/1000}));
+
+  const tahunanRows = [];
+  Object.values(byStackParamYear).forEach(entries=>{
+    const sems = new Set(entries.map(e=>e.sem));
+    if(sems.has(1) && sems.has(2)){
+      const total = entries.reduce((a,e)=>a+(e.bebanSemesterKg||0),0);
+      const {stack, param, tahun} = entries[0];
+      tahunanRows.push({"Site":stack.site, "Titik":stack.nama, "Parameter":param, "Tahun":tahun, "Total Beban (kg)":Math.round(total*10)/10, "Total Beban (ton)":Math.round(total)/1000});
+    }
+  });
+
+  const STATUS_LABEL = {ok:"Memenuhi", exceed:"Melebihi", not_applicable:"Tidak Dipersyaratkan", not_evaluated:"Belum Dievaluasi"};
+  const kepatuhanRows = [];
+  stacks.forEach(s=>{
+    compParams.forEach(param=>{
+      periodsSorted.forEach(({periode})=>{
+        const rec = dispersiParamRecord(s.id, param, periode);
+        if(!rec || rec.resultNumeric==null) return;
+        kepatuhanRows.push({
+          "Semester":periode, "Site":s.site, "Titik":s.nama, "Parameter":param,
+          "Hasil":rec.resultNumeric, "Satuan":rec.unit||"",
+          "Baku Mutu":rec.standard, "% Baku Mutu": rec.pctOfStandard,
+          "Status": STATUS_LABEL[rec.statusBakuMutu]||rec.statusBakuMutu||"",
+        });
+      });
+    });
+  });
+
+  const sheets = [
+    ["Ringkasan", xlsxSheetFromRows(Object.keys(ringkasanRows[0]||{"Semester":"","Parameter":"","Jumlah Titik":"","Total Beban (kg)":"","Total Beban (ton)":""}), ringkasanRows)],
+    ["Rincian per Semester", xlsxSheetFromRows(Object.keys(rincianRows[0]||{}), rincianRows)],
+  ];
+  if(tahunanRows.length) sheets.push(["Beban Tahunan", xlsxSheetFromRows(Object.keys(tahunanRows[0]), tahunanRows)]);
+  if(kepatuhanRows.length) sheets.push(["Kepatuhan Baku Mutu", xlsxSheetFromRows(Object.keys(kepatuhanRows[0]), kepatuhanRows)]);
+  return xlsxWorkbookFromSheets(sheets);
+}
+function exportDispersiReportXlsx(){
+  const selectedPeriods = [...document.querySelectorAll(".dispPrintPeriode:checked")].map(el=>el.value);
+  const selectedParams = [...document.querySelectorAll(".dispPrintParam:checked")].map(el=>el.value);
+  if(!selectedPeriods.length){ toast("Pilih minimal 1 periode.","err"); return; }
+  if(!selectedParams.length){ toast("Pilih minimal 1 parameter.","err"); return; }
+  const wb = buildDispersiReportXlsx(selectedPeriods, selectedParams);
+  if(!wb){ toast("Tidak ada titik terpilih dengan data pada periode yang dipilih.","err"); return; }
+  closeModal();
+  xlsxDownload(wb, dispersiReportFilename(selectedPeriods)+".xlsx");
+  toast("Excel Laporan Beban Emisi berhasil diunduh — sheet 'Rincian per Semester' berisi konsentrasi, laju alir & jam operasi mentah per baris utk dicek manual.","ok");
 }
 // Tiga helper di bawah ini DIPAKAI BERSAMA oleh laporan tabular (mapSection di
 // buildDispersiReportHtml) & preview kartografis profesional (dispersiProfessionalPreviewBody) —
@@ -2112,6 +2215,7 @@ Object.assign(ACTIONS, {
   dispersiSetSite, dispersiSetParam, dispersiOnPeriodeChange, dispersiOnStabilityChange,
   dispersiSetWindModeLive, dispersiSetWindModePeriode, dispersiSetMapLayerSat, dispersiSetMapLayerStreet,
   dispersiRefreshWind, dispersiSelectAllAtSite, dispersiDeselectAll, printDispersiReport, doPrintDispersiReport,
+  exportDispersiReportXlsx,
   dispersiToggleTipe, dispersiManualRefreshPlume, dispersiInfoModal,
   dispersiOpenProfessionalPreview, dispersiPrintProfessionalPreview,
   dispersiToggleTitikPanel, dispersiTitikCheckAllVisible, dispersiTitikUncheckAllVisible,
