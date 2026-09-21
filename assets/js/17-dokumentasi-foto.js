@@ -15,8 +15,12 @@
    supaya localStorage (kuota per-origin biasanya cuma beberapa MB) tidak cepat penuh kalau titiknya
    banyak. Kategori "baSigned" (screenshot dokumen) pakai PNG (lossless, teks tanda tangan tetap
    tajam), 3 kategori foto lapangan lainnya pakai JPEG (jauh lebih kecil utk foto asli/gradasi warna).
-   TIDAK ada fitur crop/potong sama sekali (dicabut lagi sesuai masukan user) — foto SELALU ditampilkan
-   utuh apa adanya (bukan di-cover/dipotong), baik di grid halaman ini, lightbox, maupun hasil cetak.
+   Crop & ukuran cetak: NON-DESTRUKTIF — file/byte foto asli di IndexedDB TIDAK PERNAH disentuh oleh
+   fitur ini. photo.crop {top,right,bottom,left} (persen dipotong tiap sisi) & photo.printSizePct cuma
+   metadata tampilan, diterapkan saat RENDER SAJA (dokFotoBoxHtml, dipakai bareng di grid/lightbox/cetak
+   PDF spy hasilnya konsisten) — kapan saja bisa direset/diubah lagi krn originalnya selalu utuh. Ini
+   kebalikan dari versi lama (fitur crop sempat dicabut total krn dulu foto bisa kepotong PERMANEN) —
+   sekarang beda krn originalnya dijamin tidak pernah ikut terpotong.
 ========================================================= */
 /* ---------- Penyimpanan blob foto: IndexedDB, BUKAN localStorage ----------
    localStorage per-origin biasanya cuma beberapa MB TOTAL (dipakai bersama SELURUH data aplikasi
@@ -151,6 +155,37 @@ function dokFotoHasAnyPhoto(pointId){
   const d = ensureDokFoto(pointId);
   return DOKFOTO_CATEGORIES.some(c=>d[c.key].length>0);
 }
+
+/* ---------- Render foto non-destruktif (crop & ukuran cetak) ----------
+   SATU helper dipakai di grid thumbnail, lightbox, DAN cetak PDF supaya hasilnya konsisten di mana-
+   mana (prinsip yg sama dipakai di seluruh tools ini utk hal yg muncul di banyak tempat) — byte foto
+   (dataUrl) yang dikirim ke sini SELALU yang asli utuh dari IndexedDB, crop cuma soal bagaimana itu
+   DITAMPILKAN (pakai <img> posisi absolut yg digeser & diperbesar sehingga cuma area crop yg keliatan,
+   BUKAN CSS background-image — supaya elemen fotonya tetap <img> biasa yg pasti ikut tercetak di PDF
+   walau setting "background graphics" browser user mati, beda dgn background-image yg suka disembunyikan
+   printer/PDF secara default). */
+function dokFotoCropOf(photo){
+  const c = photo && photo.crop;
+  if(!c) return null;
+  const top = Number(c.top)||0, right = Number(c.right)||0, bottom = Number(c.bottom)||0, left = Number(c.left)||0;
+  if(!top && !right && !bottom && !left) return null;
+  return {top, right, bottom, left};
+}
+function dokFotoBoxHtml(photo, dataUrl, opts){
+  opts = opts||{};
+  const imgAttrs = opts.imgAttrs||"";
+  const crop = dokFotoCropOf(photo);
+  if(!crop || !photo.w || !photo.h){
+    return `<img src="${dataUrl}" ${imgAttrs} style="${opts.plainImgStyle||"width:100%;height:auto;display:block;"}">`;
+  }
+  const visW = Math.max(5, 100-crop.left-crop.right), visH = Math.max(5, 100-crop.top-crop.bottom);
+  const aspect = `${Math.max(1, photo.w*visW/100).toFixed(0)} / ${Math.max(1, photo.h*visH/100).toFixed(0)}`;
+  const imgW = (10000/visW).toFixed(3), imgH = (10000/visH).toFixed(3);
+  const imgL = (-100*crop.left/visW).toFixed(3), imgT = (-100*crop.top/visH).toFixed(3);
+  return `<div style="position:relative;overflow:hidden;aspect-ratio:${aspect};${opts.cropWrapStyle||""}">
+    <img src="${dataUrl}" ${imgAttrs} style="position:absolute;max-width:none;width:${imgW}%;height:${imgH}%;left:${imgL}%;top:${imgT}%;display:block;">
+  </div>`;
+}
 // Estimasi ukuran penyimpanan foto SAJA (bukan seluruh DB) supaya user bisa pantau sendiri
 // pertumbuhannya dari halaman ini — dihitung dari IndexedDB (tempat dataUrl-nya sekarang benar2
 // tersimpan), bukan DB.dokumentasiFoto lagi (yg skrg cuma metadata ringan {id,addedAt}, ukurannya
@@ -167,6 +202,9 @@ function fmtBytes(n){
 function sanitizeFotoFilename(s){ return String(s||"").replace(/[\\/:*?"<>|]/g,"_"); }
 
 /* ---------- Resize + kompres gambar sebelum disimpan ---------- */
+// Resolve {dataUrl, width, height} — width/height (ukuran hasil resize) disimpan di metadata foto
+// (photo.w/photo.h) supaya fitur crop non-destruktif (dokFotoBoxHtml) bisa langsung hitung aspect
+// ratio area crop tanpa perlu decode ulang gambar tiap kali dirender.
 function readAndResizeImage(file, maxEdge, format, quality){
   return new Promise((resolve, reject)=>{
     if(!file.type || !file.type.startsWith("image/")){ reject(new Error(`"${file.name}" bukan file gambar.`)); return; }
@@ -182,11 +220,23 @@ function readAndResizeImage(file, maxEdge, format, quality){
         const canvas = document.createElement("canvas");
         canvas.width = cw; canvas.height = ch;
         canvas.getContext("2d").drawImage(img, 0, 0, cw, ch);
-        resolve(format==="png" ? canvas.toDataURL("image/png") : canvas.toDataURL("image/jpeg", quality||0.75));
+        const dataUrl = format==="png" ? canvas.toDataURL("image/png") : canvas.toDataURL("image/jpeg", quality||0.75);
+        resolve({dataUrl, width: cw, height: ch});
       };
       img.src = reader.result;
     };
     reader.readAsDataURL(file);
+  });
+}
+// Dimensi gambar dari dataUrl yang SUDAH tersimpan (foto lama, sebelum photo.w/h ada) — dipakai
+// sekali oleh crop editor saat baru pertama kali dibuka utk foto lama, lalu disimpan ke photo.w/h
+// (metadata saja, TIDAK menyentuh byte foto) supaya tidak perlu decode ulang di kesempatan berikutnya.
+function dokFotoImageDims(dataUrl){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    img.onload = ()=>resolve({width: img.naturalWidth, height: img.naturalHeight});
+    img.onerror = ()=>reject(new Error("Gagal membaca dimensi gambar."));
+    img.src = dataUrl;
   });
 }
 
@@ -201,14 +251,14 @@ document.getElementById("hiddenPhotoFile").addEventListener("change", async e=>{
   const addedIds = [];
   for(const file of files){
     try{
-      const dataUrl = await readAndResizeImage(file, 1000, meta.format, 0.75);
+      const {dataUrl, width, height} = await readAndResizeImage(file, 1000, meta.format, 0.75);
       const id = uid("FOTO");
       // Byte foto ditulis ke IndexedDB DULU (kuota jauh lebih besar drpd localStorage) — kalau ini
       // gagal (mis. browser lama tanpa IndexedDB), foto ini dilewati spt error gambar biasa, TANPA
       // sempat masuk metadata DB.dokumentasiFoto sama sekali (tidak ada metadata yatim tanpa byte).
       await dokFotoIdbPut(id, dataUrl);
       dokFotoUrlCache.set(id, dataUrl);
-      ensureDokFoto(pointId)[cat].push({id, addedAt: new Date().toISOString()});
+      ensureDokFoto(pointId)[cat].push({id, addedAt: new Date().toISOString(), w: width, h: height});
       addedIds.push(id);
       okCount++;
     }catch(err){ errors.push(err.message); }
@@ -303,20 +353,28 @@ function dokFotoPointCaptionHtml(pointId){
   return { title: escHtml(p.nama), sub: `${escHtml(p.site)} &middot; ${escHtml(dokFotoKategoriLabel(p))}${dateInfo}` };
 }
 
-/* ---------- Lightbox (lihat foto utuh — TIDAK pernah dipotong/cover, object-fit:contain) ---------- */
+/* ---------- Lightbox (preview foto sebagaimana ditampilkan di grid/cetak — kalau sudah di-crop,
+   yang tampil di sini area crop-nya; tombol "Atur Crop / Ukuran" membuka editor yg menunjukkan foto
+   ASLI utuh utk diubah). ---------- */
 async function openDokFotoLightbox(pointId, cat, photoId){
   const photo = (ensureDokFoto(pointId)[cat]||[]).find(p=>p.id===photoId);
   if(!photo) return;
   const dataUrl = dokFotoUrlCache.get(photoId) || await dokFotoIdbGet(photoId);
   if(!dataUrl){ toast("Foto tidak ditemukan di penyimpanan (mungkin sudah terhapus).","err"); return; }
   const cap = dokFotoPointCaptionHtml(pointId);
+  const cropped = !!dokFotoCropOf(photo);
+  const box = dokFotoBoxHtml(photo, dataUrl, {
+    plainImgStyle:"max-width:100%;max-height:75vh;border-radius:4px;display:block;margin:0 auto;",
+    cropWrapStyle:"max-width:520px;max-height:75vh;margin:0 auto;border-radius:4px;"
+  });
   openModal(`
     <h3>${cap.title} <span class="muted" style="font-weight:400;font-size:13px;">&mdash; ${escHtml(dokFotoCatMeta(cat).label)}</span></h3>
-    <div class="hint" style="margin-top:-6px;">${cap.sub}</div>
+    <div class="hint" style="margin-top:-6px;">${cap.sub}${cropped?` &middot; <span style="color:var(--teal-600,#0d8a7a);">foto ini sudah di-crop/resize (non-destruktif, foto asli tetap utuh)</span>`:""}</div>
     <div style="text-align:center;background:var(--gray-100);border-radius:8px;padding:10px;margin-top:10px;">
-      <img src="${dataUrl}" style="max-width:100%;max-height:75vh;border-radius:4px;">
+      ${box}
     </div>
     <div class="actions">
+      <button class="btn" data-action="openDokFotoCropEditor" data-point="${pointId}" data-cat="${cat}" data-id="${photoId}">Atur Crop / Ukuran</button>
       <button class="btn danger" data-action="deleteDokFoto" data-point="${pointId}" data-cat="${cat}" data-id="${photoId}">Hapus Foto</button>
       <button class="btn ghost" data-action="downloadSingleDokFoto" data-point="${pointId}" data-cat="${cat}" data-id="${photoId}">Download Foto Ini</button>
       <span class="spacer"></span>
@@ -324,6 +382,92 @@ async function openDokFotoLightbox(pointId, cat, photoId){
     </div>
   `, {wide:true});
 }
+
+/* ---------- Editor Crop & Ukuran (non-destruktif) ----------
+   dokFotoCropDraft: state sementara SELAMA modal ini terbuka (belum ditulis ke DB.dokumentasiFoto
+   sampai tombol "Simpan" ditekan) — ditutup/Batal tanpa Simpan = tidak ada perubahan sama sekali.
+   Foto ASLI (byte di IndexedDB) tidak pernah disentuh oleh apapun di sini; yang diubah cuma metadata
+   photo.crop {top,right,bottom,left dalam persen} & photo.printSizePct, dan itu pun bisa direset/
+   diubah lagi kapan saja lewat tombol yang sama. */
+let dokFotoCropDraft = null;
+async function openDokFotoCropEditor(pointId, cat, photoId){
+  const photo = (ensureDokFoto(pointId)[cat]||[]).find(p=>p.id===photoId);
+  if(!photo) return;
+  const dataUrl = dokFotoUrlCache.get(photoId) || await dokFotoIdbGet(photoId);
+  if(!dataUrl){ toast("Foto tidak ditemukan di penyimpanan (mungkin sudah terhapus).","err"); return; }
+  if(!photo.w || !photo.h){
+    try{
+      const dim = await dokFotoImageDims(dataUrl);
+      photo.w = dim.width; photo.h = dim.height;
+      save();
+    }catch(err){ /* biarkan w/h kosong; preview crop tetap jalan berikutnya begitu berhasil */ }
+  }
+  const c = dokFotoCropOf(photo) || {top:0, right:0, bottom:0, left:0};
+  dokFotoCropDraft = { pointId, cat, photoId, dataUrl, w: photo.w, h: photo.h, crop: {...c}, printSizePct: photo.printSizePct||100 };
+  renderDokFotoCropEditor();
+}
+function dokFotoCropPreviewHtml(){
+  const d = dokFotoCropDraft;
+  const previewPhoto = { w: d.w, h: d.h, crop: d.crop };
+  return dokFotoBoxHtml(previewPhoto, d.dataUrl, {
+    plainImgStyle:"max-width:100%;max-height:320px;display:block;margin:0 auto;",
+    cropWrapStyle:"max-width:320px;max-height:320px;margin:0 auto;background:var(--gray-200);"
+  });
+}
+function renderDokFotoCropEditor(){
+  const d = dokFotoCropDraft;
+  if(!d) return;
+  const sideLabels = [["top","Atas"],["bottom","Bawah"],["left","Kiri"],["right","Kanan"]];
+  const sizeOpts = [100, 70, 40];
+  openModal(`
+    <h3>Atur Crop &amp; Ukuran Foto</h3>
+    <div class="hint" style="margin-top:-6px;">Pengaturan ini <b>tidak mengubah file foto asli</b> — foto asli tetap tersimpan utuh, jadi area crop &amp; ukuran cetak bisa diubah atau dikembalikan kapan saja. Berguna utk memangkas bagian foto yang tidak perlu dan mengecilkan ukuran cetak supaya PDF tidak kebanyakan halaman.</div>
+    <div id="dokFotoCropModal" style="display:grid;grid-template-columns:minmax(0,260px) 1fr;gap:18px;margin-top:14px;align-items:start;">
+      <div id="dfcPreviewHost" style="border:1px solid var(--gray-200);border-radius:8px;padding:10px;background:#fff;">${dokFotoCropPreviewHtml()}</div>
+      <div>
+        ${sideLabels.map(([side,label])=>`
+          <label style="display:block;font-size:12px;font-weight:700;margin:10px 0 4px;">Potong dari ${label}: <span id="dfc${side.charAt(0).toUpperCase()+side.slice(1)}Val">${d.crop[side]}</span>%</label>
+          <input type="range" class="dfc-slider" data-side="${side}" min="0" max="45" value="${d.crop[side]}" style="width:100%;">
+        `).join("")}
+        <label style="display:block;font-size:12px;font-weight:700;margin:14px 0 4px;">Ukuran saat Cetak PDF</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${sizeOpts.map(p=>`<button type="button" class="btn small ${d.printSizePct===p?"":"ghost"}" data-dfc-size="${p}">${p===100?"Penuh":p+"%"}</button>`).join("")}
+        </div>
+        <div class="hint" style="margin-top:10px;">Ukuran cetak cuma berlaku saat "Cetak PDF" (grid &amp; lightbox tetap tampil normal) — dipakai kalau foto full-size bikin halaman PDF kebanyakan.</div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn ghost" data-action="dokFotoCropReset">Reset (Tampilkan Penuh)</button>
+      <span class="spacer"></span>
+      <button class="btn ghost" data-action="closeModal">Batal</button>
+      <button class="btn" data-action="dokFotoCropSave">Simpan</button>
+    </div>
+  `, {wide:true});
+}
+function dokFotoCropSliderInput(el){
+  const d = dokFotoCropDraft;
+  if(!d) return;
+  const side = el.dataset.side;
+  const opp = {top:"bottom", bottom:"top", left:"right", right:"left"}[side];
+  let val = Math.max(0, Math.min(45, Number(el.value)||0));
+  const maxForSide = Math.max(0, 90-d.crop[opp]);
+  if(val>maxForSide){ val = maxForSide; el.value = val; }
+  d.crop[side] = val;
+  const lbl = document.getElementById("dfc"+side.charAt(0).toUpperCase()+side.slice(1)+"Val");
+  if(lbl) lbl.textContent = val;
+  // Update label & preview saja (BUKAN render ulang seluruh modal): kalau slider ikut dibuat ulang di
+  // tengah drag, gesture drag-nya keputus di sebagian browser. Tombol ukuran cetak tetap lewat
+  // renderDokFotoCropEditor penuh krn itu klik diskrit, bukan drag berkelanjutan spt slider ini.
+  const host = document.getElementById("dfcPreviewHost");
+  if(host) host.innerHTML = dokFotoCropPreviewHtml();
+}
+document.addEventListener("input", e=>{
+  if(e.target.classList && e.target.classList.contains("dfc-slider")) dokFotoCropSliderInput(e.target);
+});
+document.addEventListener("click", e=>{
+  const btn = e.target.closest("[data-dfc-size]");
+  if(btn && dokFotoCropDraft){ dokFotoCropDraft.printSizePct = Number(btn.dataset.dfcSize); renderDokFotoCropEditor(); }
+});
 
 /* ---------- Cetak / Export PDF, format "Data Pendukung/Lampiran SIMPEL PPU" (contoh dilampirkan
    user): header identitas + tabel 4 baris (Petugas Laboratorium/Peralatan Sampling/Aktivitas
@@ -335,7 +479,16 @@ function dokFotoLampiranTitleFor(team){
 }
 function dokFotoPhotosCellHtml(photos){
   if(!photos.length) return `<span class="muted" style="font-style:italic;">(belum ada foto)</span>`;
-  return photos.map(ph=>`<img src="${dokFotoUrlFor(ph.id)}" style="max-width:100%;height:auto;display:block;margin-bottom:8px;border:1px solid #999;">`).join("");
+  // photo.printSizePct (diatur lewat "Atur Crop / Ukuran") mengecilkan lebar cetak per foto — dipakai
+  // user utk memangkas jumlah halaman PDF saat foto full-size terlalu banyak, TANPA mengubah file asli.
+  return photos.map(ph=>{
+    const pct = (ph.printSizePct && ph.printSizePct<100) ? ph.printSizePct : 100;
+    const box = dokFotoBoxHtml(ph, dokFotoUrlFor(ph.id), {
+      plainImgStyle:"width:100%;height:auto;display:block;border:1px solid #999;",
+      cropWrapStyle:"border:1px solid #999;"
+    });
+    return `<div style="width:${pct}%;margin-bottom:8px;">${box}</div>`;
+  }).join("");
 }
 async function buildDokFotoLampiranHtml(pointIds){
   const cfg = ensureBaConfig();
@@ -427,7 +580,7 @@ function refreshDokSiteSelect(){
 // Semesta titiknya SAMA dgn Tracking BA/CoA (p.batchId terisi) — dokumentasi foto memang cuma
 // relevan utk titik yang benar-benar masuk sebuah batch eksekusi, titik yang tidak wajib/belum
 // pernah dijadwalkan tidak perlu foto apapun.
-function getFilteredDokFotoPoints(){
+function getFilteredDokFotoPointsBase(){
   const team = document.getElementById("dokTeam").value;
   const batchId = document.getElementById("dokBatch").value;
   const site = document.getElementById("dokSite").value;
@@ -437,6 +590,193 @@ function getFilteredDokFotoPoints(){
   if(site) pts = pts.filter(p=>p.site===site);
   return pts.sort((a,b)=> a.site.localeCompare(b.site) || a.nama.localeCompare(b.nama));
 }
+// Filter Status (final/ada foto belum final/belum ada foto) dipisah dari filter dasar Tim/Batch/Site
+// supaya rekap (dokFotoRecapCounts) bisa hitung total PER STATUS dari filter dasar yang sama, tanpa
+// filter status itu sendiri ikut memotong angkanya (baru diterapkan belakangan di sini).
+function getFilteredDokFotoPoints(){
+  const statusEl = document.getElementById("dokStatus");
+  const status = statusEl ? statusEl.value : "";
+  const pts = getFilteredDokFotoPointsBase();
+  return status ? pts.filter(p=>dokFotoStatusOf(p.id)===status) : pts;
+}
+function dokFotoIsFinal(pointId){ return !!ensureDokFoto(pointId).final; }
+function dokFotoStatusOf(pointId){
+  if(dokFotoIsFinal(pointId)) return "final";
+  return dokFotoHasAnyPhoto(pointId) ? "notfinal" : "empty";
+}
+// Tandai/batalkan "final" per TITIK (bukan per foto) — dipakai user utk merekap mana yg fotonya
+// sudah lengkap & oke, mana yg masih perlu direvisi, terutama saat pekerjaan dibagi ke banyak orang.
+function toggleDokFotoFinal(pointId){
+  const d = ensureDokFoto(pointId);
+  if(!d.final && !dokFotoHasAnyPhoto(pointId)){
+    toast("Titik ini belum ada foto sama sekali — tambahkan foto dulu sebelum ditandai final.", "err");
+    return;
+  }
+  d.final = !d.final;
+  d.finalAt = d.final ? new Date().toISOString() : null;
+  save();
+  renderDokumentasiFoto();
+  toast(d.final ? "Foto titik ini ditandai FINAL." : "Tanda final dibatalkan — foto boleh diubah lagi.", "ok");
+}
+function dokFotoRecapCounts(){
+  const pts = getFilteredDokFotoPointsBase();
+  const counts = {total: pts.length, final: 0, notfinal: 0, empty: 0};
+  pts.forEach(p=>{ counts[dokFotoStatusOf(p.id)]++; });
+  return counts;
+}
+function renderDokFotoRecap(){
+  const host = document.getElementById("dokFotoRecap");
+  if(!host) return;
+  const counts = dokFotoRecapCounts();
+  const curStatus = document.getElementById("dokStatus").value;
+  const chip = (status,label,n,cls)=>`<button type="button" class="dokfoto-recap-chip ${cls}${curStatus===status?" active":""}" data-action="dokFotoFilterStatus" data-status="${status}">${escHtml(label)} <b>${n}</b></button>`;
+  host.innerHTML = `
+    <span class="muted" style="font-size:11.5px;font-weight:700;">Rekap Kelengkapan Foto (mengikuti filter Tim/Batch/Site):</span>
+    ${chip("", "Semua Titik", counts.total, "all")}
+    ${chip("final", "Sudah Final", counts.final, "ok")}
+    ${chip("notfinal", "Ada Foto, Belum Final", counts.notfinal, "warn")}
+    ${chip("empty", "Belum Ada Foto", counts.empty, "err")}
+  `;
+}
+
+/* ---------- Export/Import "Foto Saja" (terpisah dari backup JSON lengkap) ----------
+   Dipakai saat kerjaan foto dibagi ke banyak orang: tiap orang filter ke titik/batch/site bagiannya
+   sendiri, export, lalu hasilnya digabung (import) satu-satu ke satu perangkat kompilasi — TANPA
+   perlu kirim-terima file JSON lengkap (yang bisa menimpa data LAIN yang sedang dikerjakan orang lain
+   di perangkat kompilasi itu, mis. tracking/batch). Import di sini SELALU menggabungkan (union by
+   photo id), tidak pernah menghapus/menimpa foto yang sudah ada — foto yang id-nya sudah ada dilewati
+   begitu saja (bukan duplikat, bukan hilang), supaya aman diimport berkali-kali dari orang manapun
+   tanpa perlu koordinasi urutan siapa duluan.
+   Format file SENGAJA mandiri (self-contained, byte foto ikut disertakan sbg dataUrl di "photos"
+   terpisah dari metadata di "points") — sama seperti alasan file backup JSON lengkap menyertakan
+   dataUrl (lihat exportAll, 12-data-page.js): supaya file ini bisa dibuka lagi di perangkat manapun
+   tanpa bergantung IndexedDB perangkat asal. */
+const DOKFOTO_EXPORT_TYPE = "phm-dokfoto-export-v1";
+async function exportDokFotoOnly(){
+  const pts = getFilteredDokFotoPoints();
+  if(!pts.length){ toast("Tidak ada titik yang cocok dengan filter Tim/Batch/Site/Status saat ini untuk diekspor.","err"); return; }
+  const allIds = [];
+  const pointsOut = {};
+  pts.forEach(p=>{
+    const d = ensureDokFoto(p.id);
+    const categories = {};
+    let hasAny = false;
+    DOKFOTO_CATEGORIES.forEach(cat=>{
+      const arr = d[cat.key]||[];
+      if(arr.length){
+        categories[cat.key] = arr.map(ph=>({...ph}));
+        hasAny = true;
+        arr.forEach(ph=>allIds.push(ph.id));
+      }
+    });
+    if(!hasAny && !d.final) return; // titik tanpa foto & belum ditandai apapun — tidak perlu ikut file
+    pointsOut[p.id] = { nama: p.nama, site: p.site, categories, final: !!d.final, finalAt: d.finalAt||null };
+  });
+  if(!Object.keys(pointsOut).length){ toast("Tidak ada foto pada titik yang sesuai filter saat ini untuk diekspor.","err"); return; }
+  const idbMap = await dokFotoIdbGetMany(allIds);
+  const photos = {};
+  allIds.forEach(id=>{ const url = dokFotoUrlCache.get(id) || idbMap.get(id); if(url) photos[id] = url; });
+  const payload = { type: DOKFOTO_EXPORT_TYPE, exportedAt: new Date().toISOString(), points: pointsOut, photos };
+  const teamVal = document.getElementById("dokTeam").value;
+  const filterDesc = [teamVal ? (teamVal==="emisi"?"Emisi":"Ambient") : "", document.getElementById("dokSite").value].filter(Boolean).join("_") || "SemuaTitik";
+  downloadBlob(JSON.stringify(payload), `Foto Dokumentasi_${filterDesc}_${todayStr()}.json`, "application/json");
+  toast(`Export foto berhasil: ${Object.keys(pointsOut).length} titik, ${allIds.length} foto.`, "ok");
+}
+let pendingDokFotoImport = null;
+function handleDokFotoImportFile(data, sourceLabel){
+  if(!data || typeof data!=="object" || data.type!==DOKFOTO_EXPORT_TYPE || !data.points || !data.photos){
+    toast('File ini bukan file "Export Foto Saja" yang valid dari tools ini — import dibatalkan.', "err");
+    return;
+  }
+  const preview = [];
+  let totalNewPhotos = 0, totalDupPhotos = 0, totalUnknownPoints = 0, totalFinalChanges = 0;
+  Object.keys(data.points).forEach(pointId=>{
+    const src = data.points[pointId];
+    const p = DB.points.find(x=>x.id===pointId);
+    if(!p){ totalUnknownPoints++; return; }
+    const localD = ensureDokFoto(pointId);
+    const catLines = [];
+    Object.keys(src.categories||{}).forEach(cat=>{
+      const meta = dokFotoCatMeta(cat);
+      if(!meta) return; // kategori tidak dikenal (versi lain) — dilewati aman
+      const localIds = new Set((localD[cat]||[]).map(ph=>ph.id));
+      const incoming = src.categories[cat]||[];
+      const newOnes = incoming.filter(ph=>!localIds.has(ph.id) && data.photos[ph.id]);
+      const dupCount = incoming.length - newOnes.length;
+      totalNewPhotos += newOnes.length;
+      totalDupPhotos += dupCount;
+      if(newOnes.length || dupCount) catLines.push(`${meta.label}: +${newOnes.length}${dupCount?` (${dupCount} sudah ada)`:""}`);
+    });
+    const willFinal = !!src.final && !localD.final;
+    if(willFinal) totalFinalChanges++;
+    if(catLines.length || willFinal) preview.push({ pointId, nama: p.nama, site: p.site, lines: catLines, willFinal });
+  });
+  pendingDokFotoImport = data;
+  const unknownNote = totalUnknownPoints ? `<p class="hint" style="color:#a02a24;">${totalUnknownPoints} titik di file ini tidak ditemukan di database titik pantau perangkat ini (dilewati, tidak diimport).</p>` : "";
+  const rowsHtml = preview.length ? `<div class="tablewrap" style="max-height:280px;"><table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <thead><tr style="border-bottom:1.5px solid var(--gray-300);"><th style="text-align:left;padding:4px 6px;">Titik</th><th style="text-align:left;padding:4px 6px;">Perubahan</th></tr></thead>
+    <tbody>${preview.map(r=>`<tr style="border-bottom:1px solid var(--gray-200);"><td style="padding:4px 6px;">${escHtml(r.nama)} <span class="muted">(${escHtml(r.site)})</span></td><td style="padding:4px 6px;">${r.lines.map(escHtml).join(", ")}${r.willFinal?`${r.lines.length?", ":""}<span style="color:#0d8a4f;font-weight:700;">akan ditandai Final</span>`:""}</td></tr>`).join("")}</tbody>
+  </table></div>` : `<p class="hint">Tidak ada foto baru untuk diimport dari file ini (semua foto di file ini sudah ada di perangkat ini).</p>`;
+  openModal(`
+    <h3>Import Foto Saja</h3>
+    <p class="hint">Dari "${escHtml(sourceLabel)}" &mdash; ${Object.keys(data.points).length} titik, ${Object.keys(data.photos).length} foto di file ini. Ini <b>MENGGABUNGKAN</b> foto baru ke data yang sudah ada (bukan menimpa) — foto yang sudah ada di perangkat ini tidak dihapus/diduplikasi, dan data lain (titik/tracking/hasil pemantauan dst) sama sekali tidak terpengaruh.</p>
+    ${unknownNote}
+    <p style="font-weight:700;">Ringkasan: <span style="color:#0d8a4f;">+${totalNewPhotos} foto baru</span>${totalDupPhotos?`, ${totalDupPhotos} sudah ada (dilewati)`:""}${totalFinalChanges?`, ${totalFinalChanges} titik akan ditandai Final`:""}.</p>
+    ${rowsHtml}
+    <div class="actions">
+      <button class="btn ghost" data-action="closeModal">Batal</button>
+      <button class="btn primary" data-action="applyDokFotoImport" ${(totalNewPhotos||totalFinalChanges)?"":"disabled"}>Gabungkan Foto Ini</button>
+    </div>
+  `, {wide:true});
+}
+async function applyDokFotoImport(){
+  const data = pendingDokFotoImport; if(!data) return;
+  const toPut = [];
+  let addedPhotos = 0, finalizedPoints = 0;
+  Object.keys(data.points).forEach(pointId=>{
+    const p = DB.points.find(x=>x.id===pointId);
+    if(!p) return;
+    const src = data.points[pointId];
+    const localD = ensureDokFoto(pointId);
+    Object.keys(src.categories||{}).forEach(cat=>{
+      if(!dokFotoCatMeta(cat)) return;
+      const localIds = new Set((localD[cat]||[]).map(ph=>ph.id));
+      (src.categories[cat]||[]).forEach(ph=>{
+        if(localIds.has(ph.id)) return;
+        const dataUrl = data.photos[ph.id];
+        if(!dataUrl) return; // metadata tanpa byte foto (file rusak/tak lengkap) — dilewati aman
+        localD[cat].push({...ph});
+        toPut.push({id: ph.id, dataUrl});
+        addedPhotos++;
+      });
+    });
+    if(src.final && !localD.final){
+      localD.final = true;
+      localD.finalAt = src.finalAt || new Date().toISOString();
+      finalizedPoints++;
+    }
+  });
+  if(toPut.length){
+    try{ await dokFotoIdbBulkPut(toPut); toPut.forEach(e=>dokFotoUrlCache.set(e.id, e.dataUrl)); }
+    catch(err){ toast("Sebagian foto gagal ditulis ke penyimpanan (IndexedDB) — coba lagi.", "err"); }
+  }
+  save();
+  closeModal();
+  pendingDokFotoImport = null;
+  renderDokumentasiFoto();
+  toast(`Import foto selesai: ${addedPhotos} foto baru ditambahkan${finalizedPoints?`, ${finalizedPoints} titik ditandai Final`:""}.`, "ok");
+}
+document.getElementById("importDokFotoFile").addEventListener("change", e=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{ handleDokFotoImportFile(JSON.parse(reader.result), file.name); }
+    catch(err){ toast("File tidak valid: "+err.message, "err"); }
+    e.target.value = "";
+  };
+  reader.readAsText(file);
+});
+
 // Sub-kelompok per jenis sumber emisi/ambient (mis. "Turbine Engine Generator" terpisah dari
 // "Flare") supaya daftar titik yang panjang lebih gampang dipindai — dgn urutan prioritas yang
 // SAMA dgn Berita Acara (baKategoriSortRank/BA_KATEGORI_PRIORITY, 11-berita-acara.js) supaya
@@ -452,17 +792,28 @@ function groupDokFotoPointsByKategori(pts){
   });
   return labels.map(label=>({ label, points: grouped[label] }));
 }
-// Grid natural (bukan cover/crop): tiap foto ditampilkan APA ADANYA (width penuh kolom, height
-// otomatis mengikuti rasio asli) — foto potrait jadi tinggi, foto lanskap jadi pendek, tidak ada
-// yang terpotong sama sekali, sesuai permintaan "jangan ada fitur crop, foto harus utuh".
+// Grid natural (bukan cover/crop) SELAMA foto belum diatur crop-nya sendiri oleh user: foto tampil
+// APA ADANYA (width penuh kolom, height mengikuti rasio asli). Kalau photo.crop diisi lewat "Atur
+// Crop / Ukuran" (non-destruktif, byte asli tidak pernah disentuh), area crop itulah yang ditampilkan
+// di sini juga — supaya grid, lightbox, & hasil cetak PDF konsisten (dokFotoBoxHtml, 1 sumber render).
 function dokFotoThumbHtml(pointId, cat){
   const meta = dokFotoCatMeta(cat.key);
   const photos = ensureDokFoto(pointId)[cat.key];
-  const thumbs = photos.map(ph=>`
+  const thumbs = photos.map(ph=>{
+    const box = dokFotoBoxHtml(ph, dokFotoUrlFor(ph.id), {
+      imgAttrs:`data-action="openDokFotoLightbox" data-point="${pointId}" data-cat="${cat.key}" data-id="${ph.id}" alt="${escHtml(meta.label)}"`,
+      plainImgStyle:"width:100%;height:auto;display:block;cursor:zoom-in;",
+      cropWrapStyle:"cursor:zoom-in;background:var(--gray-200);"
+    });
+    const cropBadge = dokFotoCropOf(ph) ? `<span class="dokfoto-thumb-badge" title="Sudah di-crop/resize (non-destruktif, foto asli tetap utuh &amp; bisa diubah lagi)">&#9986;</span>` : "";
+    return `
     <div class="dokfoto-thumb">
-      <img src="${dokFotoUrlFor(ph.id)}" data-action="openDokFotoLightbox" data-point="${pointId}" data-cat="${cat.key}" data-id="${ph.id}" alt="${escHtml(meta.label)}">
+      ${box}
+      ${cropBadge}
+      <button class="dokfoto-thumb-edit" data-action="openDokFotoCropEditor" data-point="${pointId}" data-cat="${cat.key}" data-id="${ph.id}" title="Atur crop/ukuran foto">&#9998;</button>
       <button class="dokfoto-thumb-del" data-action="deleteDokFoto" data-point="${pointId}" data-cat="${cat.key}" data-id="${ph.id}" title="Hapus">&times;</button>
-    </div>`).join("");
+    </div>`;
+  }).join("");
   return `<div class="dokfoto-cat">
     <div class="dokfoto-cat-label">${escHtml(meta.label)} <span class="muted" style="font-weight:400;">(${photos.length} foto)</span></div>
     <div class="dokfoto-thumbgrid">
@@ -494,6 +845,10 @@ function dokFotoPointCardHtml(p){
   const statusLabel = t.samplingStatus ? (SAMPLING_STATUS_LABELS[t.samplingStatus]||t.samplingStatus) : "Belum diisi statusnya";
   const cap = dokFotoPointCaptionHtml(p.id);
   const isOpen = dokFotoExpanded[p.id]!==false; // default terbuka
+  const isFinal = dokFotoIsFinal(p.id);
+  const finalBtn = isFinal
+    ? `<button class="btn small" style="background:var(--green-500,#1a9e5c);border-color:var(--green-500,#1a9e5c);color:#fff;" data-action="toggleDokFotoFinal" data-point="${p.id}" title="Klik utk batalkan tanda final">&#10003; Final</button>`
+    : `<button class="btn small ghost" data-action="toggleDokFotoFinal" data-point="${p.id}" title="Tandai foto titik ini sudah lengkap/oke">Tandai Final</button>`;
   return `<details class="card dokfoto-point-card" data-point-id="${p.id}" ${isOpen?"open":""}>
     <summary class="dokfoto-point-summary">
       <div>
@@ -501,6 +856,7 @@ function dokFotoPointCardHtml(p){
         <div class="dokfoto-point-sub">${cap.sub}</div>
       </div>
       <div class="dokfoto-point-actions">
+        ${finalBtn}
         <button class="btn small ghost" data-action="downloadDokFotoAll" data-point="${p.id}" title="Download semua foto titik ini">Download Foto</button>
         <button class="btn small" data-action="printSingleDokFotoLampiran" data-point="${p.id}" title="Cetak lampiran SIMPEL PPU titik ini">Cetak PDF</button>
         <span class="badge ${t.samplingStatus==="sampled"?"b-green":"b-teal"}">${escHtml(statusLabel)}</span>
@@ -514,6 +870,7 @@ function dokFotoPointCardHtml(p){
 async function renderDokumentasiFoto(){
   refreshDokBatchSelect();
   refreshDokSiteSelect();
+  renderDokFotoRecap();
   const el = document.getElementById("dokFotoList");
   const sizeEl = document.getElementById("dokFotoStorageSize");
   const pts = getFilteredDokFotoPoints();
@@ -536,6 +893,7 @@ async function renderDokumentasiFoto(){
 document.getElementById("dokTeam").addEventListener("change", ()=>{ refreshDokBatchSelect(); renderDokumentasiFoto(); });
 document.getElementById("dokBatch").addEventListener("change", ()=>renderDokumentasiFoto());
 document.getElementById("dokSite").addEventListener("change", ()=>renderDokumentasiFoto());
+document.getElementById("dokStatus").addEventListener("change", ()=>renderDokumentasiFoto());
 
 Object.assign(ACTIONS, {
   triggerAddDokFoto:(t)=>{
@@ -546,9 +904,40 @@ Object.assign(ACTIONS, {
     inp.click();
   },
   openDokFotoLightbox:(t)=>openDokFotoLightbox(t.dataset.point, t.dataset.cat, t.dataset.id),
+  openDokFotoCropEditor:(t)=>openDokFotoCropEditor(t.dataset.point, t.dataset.cat, t.dataset.id),
+  dokFotoCropReset:()=>{
+    if(!dokFotoCropDraft) return;
+    dokFotoCropDraft.crop = {top:0, right:0, bottom:0, left:0};
+    dokFotoCropDraft.printSizePct = 100;
+    renderDokFotoCropEditor();
+  },
+  dokFotoCropSave:()=>{
+    const d = dokFotoCropDraft;
+    if(!d) return;
+    const photo = (ensureDokFoto(d.pointId)[d.cat]||[]).find(p=>p.id===d.photoId);
+    if(!photo){ dokFotoCropDraft=null; closeModal(); return; }
+    const hasCrop = d.crop.top||d.crop.right||d.crop.bottom||d.crop.left;
+    photo.crop = hasCrop ? {...d.crop} : null;
+    photo.printSizePct = (d.printSizePct && d.printSizePct!==100) ? d.printSizePct : null;
+    if(d.w) photo.w = d.w;
+    if(d.h) photo.h = d.h;
+    save();
+    dokFotoCropDraft = null;
+    closeModal();
+    renderDokumentasiFoto();
+    toast("Pengaturan crop/ukuran foto disimpan (foto asli tetap utuh, bisa diubah lagi kapan saja).", "ok");
+  },
   deleteDokFoto:(t)=>deleteDokFoto(t.dataset.point, t.dataset.cat, t.dataset.id),
   downloadSingleDokFoto:(t)=>downloadSingleDokFoto(t.dataset.point, t.dataset.cat, t.dataset.id),
   downloadDokFotoAll:(t)=>downloadDokFotoAll(t.dataset.point),
+  toggleDokFotoFinal:(t)=>toggleDokFotoFinal(t.dataset.point),
+  dokFotoFilterStatus:(t)=>{
+    document.getElementById("dokStatus").value = t.dataset.status;
+    renderDokumentasiFoto();
+  },
+  exportDokFotoOnly,
+  triggerImportDokFotoOnly:()=>document.getElementById("importDokFotoFile").click(),
+  applyDokFotoImport,
   printSingleDokFotoLampiran:(t)=>printSingleDokFotoLampiran(t.dataset.point),
   printAllVisibleDokFotoLampiran,
   expandAllDokFoto:()=>{

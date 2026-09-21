@@ -92,6 +92,106 @@ async function exportAll(){
   toast(summary, DB.batches.length ? "ok" : "err");
   downloadBlob(JSON.stringify(data,null,2), `phm_emisi_backup_${todayStr()}.json`, "application/json");
 }
+/* ---------- Diff detail per "menu" sebelum backup lengkap menimpa data ----------
+   Permintaan user: sebelum file JSON-ALL diimport/ditimpa, tunjukkan detail APA yg berubah per
+   menu/dataset (ditambah/dihapus/diubah) + kapan terakhir diupdate — supaya tidak "timpa buta".
+   diffArrayById/diffKeyedObject sengaja generic (dipakai ulang utk semua section) drpd nulis
+   perbandingan khusus tiap dataset satu-satu. "Diubah" dihitung dari JSON.stringify tidak sama —
+   kasar (urutan field beda pun kehitung "diubah"), makanya diberi catatan di modal supaya user tidak
+   salah baca angkanya sebagai diff persis field-per-field. "Terakhir diupdate" diambil dari
+   DB.meta.datasetUpdatedAt (touchDataset, 01-state.js) yang MEMANG SUDAH ada di dataset yg
+   punya import/export sendiri — bukan infrastruktur baru. */
+function diffArrayById(oldArr, newArr){
+  oldArr = Array.isArray(oldArr) ? oldArr : [];
+  newArr = Array.isArray(newArr) ? newArr : [];
+  const oldMap = new Map(oldArr.map(x=>[x.id,x]));
+  const newMap = new Map(newArr.map(x=>[x.id,x]));
+  let added=0, removed=0, modified=0;
+  newMap.forEach((v,id)=>{ if(!oldMap.has(id)) added++; else if(JSON.stringify(v)!==JSON.stringify(oldMap.get(id))) modified++; });
+  oldMap.forEach((v,id)=>{ if(!newMap.has(id)) removed++; });
+  return {added, removed, modified};
+}
+function diffKeyedObject(oldObj, newObj){
+  oldObj = (oldObj && typeof oldObj==="object") ? oldObj : {};
+  newObj = (newObj && typeof newObj==="object") ? newObj : {};
+  const oldKeys = Object.keys(oldObj), newKeys = Object.keys(newObj);
+  const oldSet = new Set(oldKeys), newSet = new Set(newKeys);
+  let added=0, removed=0, modified=0;
+  newKeys.forEach(k=>{ if(!oldSet.has(k)) added++; else if(JSON.stringify(newObj[k])!==JSON.stringify(oldObj[k])) modified++; });
+  oldKeys.forEach(k=>{ if(!newSet.has(k)) removed++; });
+  return {added, removed, modified};
+}
+// Dokumentasi Foto strukturnya {pointId:{kategori:[{id,...}], final, finalAt}} — dihitung per FOTO
+// (leaf), bukan per titik, supaya "5 foto baru" lebih informatif drpd "1 titik berubah". Tanda final
+// yang berubah dihitung sbg 1 "diubah" per titik.
+function diffDokFotoSection(oldD, newD){
+  oldD = (oldD && typeof oldD==="object") ? oldD : {};
+  newD = (newD && typeof newD==="object") ? newD : {};
+  let added=0, removed=0, modified=0;
+  const allPoints = new Set([...Object.keys(oldD), ...Object.keys(newD)]);
+  allPoints.forEach(pid=>{
+    const oc = oldD[pid]||{}, nc = newD[pid]||{};
+    const allCats = new Set([...Object.keys(oc), ...Object.keys(nc)]);
+    allCats.forEach(cat=>{
+      const oa = Array.isArray(oc[cat]) ? oc[cat] : null;
+      const na = Array.isArray(nc[cat]) ? nc[cat] : null;
+      if(!oa && !na) return; // field "final"/"finalAt", bukan array foto
+      const oldIds = new Set((oa||[]).map(p=>p.id));
+      const newIds = new Set((na||[]).map(p=>p.id));
+      newIds.forEach(id=>{ if(!oldIds.has(id)) added++; });
+      oldIds.forEach(id=>{ if(!newIds.has(id)) removed++; });
+    });
+    if(!!oc.final !== !!nc.final) modified++;
+  });
+  return {added, removed, modified};
+}
+function computeBackupDiffRows(oldDB, newDB){
+  const rows = [];
+  const push = (label, diff, datasetKey) => {
+    if(!diff.added && !diff.removed && !diff.modified) return;
+    let lastUpdated = null;
+    if(datasetKey && newDB.meta && newDB.meta.datasetUpdatedAt && newDB.meta.datasetUpdatedAt[datasetKey]){
+      lastUpdated = formatRelativeTime(newDB.meta.datasetUpdatedAt[datasetKey]);
+    }
+    rows.push({label, added: diff.added, removed: diff.removed, modified: diff.modified, lastUpdated});
+  };
+  push("Database Titik Pantau", diffArrayById(oldDB.points, newDB.points), "points");
+  push("Koordinat Titik Pantau", diffKeyedObject(oldDB.pointCoords, newDB.pointCoords), "coords");
+  push("Personil PPC & Observer", diffArrayById(oldDB.personil, newDB.personil), "personil");
+  push("Aturan Site & Rute (Emisi)", diffArrayById(oldDB.routeEmisi, newDB.routeEmisi));
+  push("Aturan Site & Rute (Ambient)", diffArrayById(oldDB.routeAmbient, newDB.routeAmbient));
+  push("Perencanaan Batch / Scheduling", diffArrayById(oldDB.batches, newDB.batches));
+  push("Tracking BA / CoA", diffKeyedObject(oldDB.tracking, newDB.tracking), "tracking");
+  push("Running Hour Bulanan", diffKeyedObject(oldDB.rhMonthly, newDB.rhMonthly), "rhMonthly");
+  push("Hasil Emisi (Database Hasil Emisi)", diffArrayById(oldDB.hasilPemantauan, newDB.hasilPemantauan), "hasilPemantauan");
+  const ambienCatLabels = {ambien:"Hasil Ambien — Udara Ambien", kebisingan:"Hasil Ambien — Kebisingan", kebauan:"Hasil Ambien — Kebauan", getaran:"Hasil Ambien — Getaran"};
+  Object.keys(ambienCatLabels).forEach(k=>{
+    push(ambienCatLabels[k], diffArrayById((oldDB.hasilAmbien||{})[k], (newDB.hasilAmbien||{})[k]), "hasilAmbien");
+  });
+  push("Dokumentasi Foto Sampling", diffDokFotoSection(oldDB.dokumentasiFoto, newDB.dokumentasiFoto));
+  return rows;
+}
+function backupDiffTableHtml(rows){
+  if(!rows.length) return `<p class="hint">Tidak ada perbedaan terdeteksi antara data kamu saat ini dan isi file ini (identik).</p>`;
+  return `<div class="tablewrap" style="max-height:260px;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <thead><tr style="border-bottom:1.5px solid var(--gray-300);position:sticky;top:0;background:#fff;">
+      <th style="text-align:left;padding:4px 6px;">Menu / Data</th>
+      <th style="text-align:center;padding:4px 6px;">Ditambah</th>
+      <th style="text-align:center;padding:4px 6px;">Dihapus</th>
+      <th style="text-align:center;padding:4px 6px;">Diubah</th>
+      <th style="text-align:left;padding:4px 6px;">Terakhir Diupdate (file ini)</th>
+    </tr></thead>
+    <tbody>${rows.map(r=>`<tr style="border-bottom:1px solid var(--gray-200);">
+      <td style="padding:4px 6px;">${escHtml(r.label)}</td>
+      <td style="text-align:center;padding:4px 6px;${r.added?"color:#0d8a4f;font-weight:700;":"color:var(--gray-300);"}">${r.added||"&middot;"}</td>
+      <td style="text-align:center;padding:4px 6px;${r.removed?"color:#a02a24;font-weight:700;":"color:var(--gray-300);"}">${r.removed||"&middot;"}</td>
+      <td style="text-align:center;padding:4px 6px;${r.modified?"color:#b8860b;font-weight:700;":"color:var(--gray-300);"}">${r.modified||"&middot;"}</td>
+      <td style="padding:4px 6px;" class="muted">${r.lastUpdated?escHtml(r.lastUpdated):"-"}</td>
+    </tr>`).join("")}</tbody>
+  </table></div>
+  <div class="hint" style="margin-top:6px;">Kolom "Diubah" dihitung kasar dari perbandingan data mentah (bisa saja cuma urutan field yang beda, bukan berarti isinya benar-benar beda) — dipakai utk gambaran skala perubahan, bukan diff presisi field-per-field.</div>`;
+}
 // Satu handler dipakai bareng utk 2 jalur backup-lengkap (pilih file, cek update online) — supaya
 // validasi & cara terapnya identik di manapun sumbernya. Selalu tampilkan perbandingan "punya kamu
 // vs isi file" dulu sebelum tombol tegas "Timpa" diklik — tidak ada auto-apply diam-diam, walaupun
@@ -116,17 +216,24 @@ function handleFullBackupPackage(data, sourceLabel){
   const fotoNote = data._dokFotoExcluded
     ? `Foto Dokumentasi Sampling TIDAK disertakan di file ini — foto yang sudah ada di perangkat ini <b>akan tetap disimpan</b>, tidak ikut terhapus.`
     : `Foto Dokumentasi Sampling: ${Object.keys(data.dokumentasiFoto||{}).length} titik di file ini (akan MENIMPA foto yang sudah ada di perangkat ini).`;
+  // dokumentasiFoto SENGAJA dilewati dari diff kalau file ini _dokFotoExcluded (foto lokal tetap
+  // dipertahankan apa adanya saat diterapkan, lihat applyFullBackupImport — jadi dibandingkan pun
+  // percuma, isi data.dokumentasiFoto={} bukan representasi apa yg SEBENARNYA akan terjadi).
+  const diffCompareData = data._dokFotoExcluded ? {...data, dokumentasiFoto: DB.dokumentasiFoto} : data;
+  const diffRows = computeBackupDiffRows(DB, diffCompareData);
   openModal(`
     <h3>Restore Backup Lengkap</h3>
     <p class="hint"><b>Data kamu SAAT INI</b> (akan hilang kalau lanjut): ${DB.points.length} titik, ${DB.batches.length} batch (${curFinalized} final), ${DB.personil.length} personil, ${Object.keys(DB.tracking||{}).length} tracking.</p>
     <p class="hint"><b>Data DARI "${escHtml(sourceLabel)}"</b>: ${data.points.length} titik, ${data.batches.length} batch (${newFinalized} final), ${data.personil.length} personil, ${Object.keys(data.tracking||{}).length} tracking.</p>
     <p class="hint">${fotoNote}</p>
-    <p style="font-weight:700;color:#a02a24;">Ini akan MENIMPA SELURUH data kamu saat ini dengan data di atas. Ada snapshot pengaman otomatis sebelum diterapkan (bisa di-undo lewat Riwayat &amp; Restore kalau salah pilih).</p>
+    <p style="font-weight:700;margin-bottom:4px;">Detail per menu yang berubah:</p>
+    ${backupDiffTableHtml(diffRows)}
+    <p style="font-weight:700;color:#a02a24;margin-top:10px;">Ini akan MENIMPA SELURUH data kamu saat ini dengan data di atas. Ada snapshot pengaman otomatis sebelum diterapkan (bisa di-undo lewat Riwayat &amp; Restore kalau salah pilih).</p>
     <div class="actions">
       <button class="btn ghost" data-action="closeModal">Batal</button>
       <button class="btn danger" data-action="applyFullBackupImport">Timpa dengan Data Ini</button>
     </div>
-  `);
+  `, {wide:true});
 }
 async function applyFullBackupImport(){
   const pending = pendingFullBackup; if(!pending) return;
