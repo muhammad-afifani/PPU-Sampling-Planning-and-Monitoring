@@ -1162,6 +1162,9 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
    lapangan, yang tidak punya konsep hover sama sekali. */
 .dokfoto-thumb-del{position:absolute;top:7px;right:7px;width:27px;height:27px;border-radius:50%;border:none;background:rgba(10,15,25,.62);color:#fff;font-size:13.5px;line-height:27px;text-align:center;cursor:pointer;padding:0;}
 .dokfoto-thumb-del:hover{background:rgba(10,15,25,.9);}
+.dokfoto-thumb-edit{position:absolute;top:7px;left:7px;width:27px;height:27px;border-radius:50%;border:none;background:rgba(10,15,25,.62);color:#fff;font-size:12px;line-height:27px;text-align:center;cursor:pointer;padding:0;}
+.dokfoto-thumb-edit:hover{background:rgba(10,15,25,.9);}
+.dokfoto-thumb-badge{position:absolute;bottom:7px;left:7px;background:rgba(13,138,122,.85);color:#fff;font-size:11px;line-height:1;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
 .dokfoto-add-btn{border:1.5px dashed var(--gray-300);border-radius:9px;background:transparent;color:var(--gray-500);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;padding:10px;line-height:1.4;min-height:140px;}
 .dokfoto-add-btn:hover{border-color:var(--teal-500);color:var(--teal-500);}
 /* Cetak Lampiran Foto (format Data Pendukung/Lampiran SIMPEL PPU) — reuse .pg-batch (page-break per
