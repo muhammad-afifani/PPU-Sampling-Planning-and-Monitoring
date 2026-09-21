@@ -151,13 +151,30 @@
         </div>
       </div>
       <div class="card" style="margin-top:16px;">
-        <div class="toolbar" style="margin-bottom:2px;">
+        <div class="toolbar" style="margin-bottom:2px;flex-wrap:wrap;">
           <h3 style="margin:0;">Peringkat Beban Emisi &amp; Kualitas Ambien</h3>
           <span class="spacer"></span>
           <div class="field"><label>Parameter Emisi</label><select id="dashEmisiParam"></select></div>
+          <div class="field"><label>Periode Beban</label><select id="dashEmisiPeriode"></select></div>
+          <div class="field"><label>Top</label><select id="dashEmisiTopN"></select></div>
         </div>
-        <div class="hint" id="dashEmisiRankNote" style="margin-bottom:12px;"></div>
-        <div class="grid cols-3">
+        <div class="hint" id="dashEmisiRankNote" style="margin-bottom:14px;"></div>
+
+        <div class="dash-rank-kpi-row" id="dashEmisiKpiRow"></div>
+
+        <div class="grid cols-main-side" style="margin-bottom:0;">
+          <div class="dash-rank-subcard">
+            <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px;">Tren Total Beban per Periode</div>
+            <div id="dashEmisiTrend"></div>
+          </div>
+          <div class="dash-rank-subcard">
+            <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px;">Kontribusi Site Terbesar</div>
+            <div id="dashEmisiDonut"></div>
+            <div class="legend" id="dashEmisiDonutLegend" style="margin-top:10px;justify-content:center;"></div>
+          </div>
+        </div>
+
+        <div class="grid cols-3" style="margin-top:16px;margin-bottom:0;">
           <div>
             <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Top Site — Beban Emisi</div>
             <div id="dashEmisiRankSite"></div>

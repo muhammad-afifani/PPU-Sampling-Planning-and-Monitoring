@@ -30,7 +30,7 @@ function ambBuildDonut(segments, centerVal, centerLabel){
   }
   const svg = `<svg viewBox="0 0 220 220" style="width:220px;height:220px;display:block;margin:0 auto;">
     ${paths}
-    <text x="110" y="104" text-anchor="middle" font-size="24" font-weight="800" fill="var(--navy-900)">${centerVal}</text>
+    <text x="110" y="104" text-anchor="middle" font-size="24" font-weight="800" fill="var(--heading)">${centerVal}</text>
     <text x="110" y="124" text-anchor="middle" font-size="11" fill="var(--gray-500)">${escHtml(centerLabel)}</text>
   </svg>`;
   const legend = segments.map(([label,val,color])=>`<span class="item"><span class="sw" style="background:${color}"></span>${escHtml(label)}: ${val}</span>`).join("");
