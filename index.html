@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202609211700">
+<link rel="stylesheet" href="assets/css/style.css?v=202609212100">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -290,13 +290,20 @@
     <div class="page" id="page-roadmap">
       <div class="pagehead"><div><h2>Roadmap Wajib Pantau</h2><div class="desc">Proyeksi ke depan kapan tiap titik jatuh tempo disampling lagi, berdasarkan frekuensi &amp; pemantauan terakhirnya — otomatis mengikuti Database Titik Pantau, tidak perlu disusun manual.</div></div></div>
       <div class="toolbar card" style="padding:12px 14px;">
+        <div class="field"><label>Tim</label><select id="rmTeam"><option value="">Semua</option><option value="emisi">Emisi</option><option value="ambient">Ambient</option></select></div>
         <div class="field"><label>Site</label><select id="rmSite"></select></div>
-        <div class="field"><label>Rentang</label><div class="chipbar">
+        <div class="field"><label>Riwayat</label><div class="chipbar">
+          <button type="button" class="chip-toggle" data-action="roadmapSetYearsBack" data-years-back="1">1 Thn</button>
+          <button type="button" class="chip-toggle" data-action="roadmapSetYearsBack" data-years-back="2">2 Thn</button>
+          <button type="button" class="chip-toggle" data-action="roadmapSetYearsBack" data-years-back="3">3 Thn</button>
+          <button type="button" class="chip-toggle" data-action="roadmapSetYearsBack" data-years-back="0">Tanpa</button>
+        </div></div>
+        <div class="field"><label>Proyeksi</label><div class="chipbar">
           <button type="button" class="chip-toggle" data-action="roadmapSetYears" data-years="5">5 Tahun</button>
           <button type="button" class="chip-toggle" data-action="roadmapSetYears" data-years="10">10 Tahun</button>
         </div></div>
         <div class="spacer"></div>
-        <div class="hint" style="max-width:360px;align-self:center;">Titik merah = wajib sampling di semester itu. Arahkan kursor ke titik merah untuk lihat parameter yang wajib disampling.</div>
+        <div class="hint" style="max-width:340px;align-self:center;">Centang hijau = sudah ada hasil pemantauan periode itu. Titik merah = wajib tapi belum ada hasil. Arahkan kursor ke tanda untuk lihat parameter.</div>
       </div>
       <div class="card">
         <h3>Rekap Jumlah Titik Wajib Sampling per Semester</h3>
@@ -1513,34 +1520,34 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202609211700"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202609211700"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202609212100"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202609212100"></script>
 
-<script src="assets/data/default-data.js?v=202609211700"></script>
-<script src="assets/data/brand-assets.js?v=202609211700"></script>
-<script src="assets/data/travel-routes.js?v=202609211700"></script>
-<script src="assets/js/00-icons.js?v=202609211700"></script>
-<script src="assets/js/01-state.js?v=202609211700"></script>
-<script src="assets/js/02-nav-util.js?v=202609211700"></script>
-<script src="assets/js/03-period-logic.js?v=202609211700"></script>
-<script src="assets/js/04-dashboard.js?v=202609211700"></script>
-<script src="assets/js/05-master-data.js?v=202609211700"></script>
-<script src="assets/js/06-plan-personil.js?v=202609211700"></script>
-<script src="assets/js/07-rules-planner.js?v=202609211700"></script>
-<script src="assets/js/08-gantt-print.js?v=202609211700"></script>
-<script src="assets/js/09-tracking-map.js?v=202609211700"></script>
-<script src="assets/js/10-running-hour.js?v=202609211700"></script>
-<script src="assets/js/11-berita-acara.js?v=202609211700"></script>
-<script src="assets/js/12-data-page.js?v=202609211700"></script>
-<script src="assets/js/13-hasil-db.js?v=202609211700"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202609211700"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202609211700"></script>
-<script src="assets/js/16-actions-init.js?v=202609211700"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202609211700"></script>
-<script src="assets/js/18-model-dispersi.js?v=202609211700"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202609211700"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202609211700"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202609211700"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202609211700"></script>
+<script src="assets/data/default-data.js?v=202609212100"></script>
+<script src="assets/data/brand-assets.js?v=202609212100"></script>
+<script src="assets/data/travel-routes.js?v=202609212100"></script>
+<script src="assets/js/00-icons.js?v=202609212100"></script>
+<script src="assets/js/01-state.js?v=202609212100"></script>
+<script src="assets/js/02-nav-util.js?v=202609212100"></script>
+<script src="assets/js/03-period-logic.js?v=202609212100"></script>
+<script src="assets/js/04-dashboard.js?v=202609212100"></script>
+<script src="assets/js/05-master-data.js?v=202609212100"></script>
+<script src="assets/js/06-plan-personil.js?v=202609212100"></script>
+<script src="assets/js/07-rules-planner.js?v=202609212100"></script>
+<script src="assets/js/08-gantt-print.js?v=202609212100"></script>
+<script src="assets/js/09-tracking-map.js?v=202609212100"></script>
+<script src="assets/js/10-running-hour.js?v=202609212100"></script>
+<script src="assets/js/11-berita-acara.js?v=202609212100"></script>
+<script src="assets/js/12-data-page.js?v=202609212100"></script>
+<script src="assets/js/13-hasil-db.js?v=202609212100"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202609212100"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202609212100"></script>
+<script src="assets/js/16-actions-init.js?v=202609212100"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202609212100"></script>
+<script src="assets/js/18-model-dispersi.js?v=202609212100"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202609212100"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202609212100"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202609212100"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202609212100"></script>
 </body>
 </html>

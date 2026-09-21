@@ -312,3 +312,18 @@ function renderHasilDb(){
   document.addEventListener("change", e=>{ if(e.target.id===id) renderHasilDb(); });
 });
 
+/* ---------- Lookup "titik X sudah ada hasil AKTUAL di periode Y?" ----------
+   Satu sumber kebenaran dipakai bareng oleh Roadmap Wajib Pantau (tanda "sudah dipantau") dan
+   Budget & Proyeksi Biaya (bedakan biaya AKTUAL yg sudah terjadi vs PROYEKSI yg masih estimasi) —
+   drpd tiap fitur nulis lookup hasilPemantauan/hasilAmbien sendiri-sendiri. HASIL_AMBIEN_KATEGORI_KEY
+   kebalikan arah dari AMB_CAT_POINTS_KATEGORI (19-hasil-ambien.js, hasilAmbien-key -> points.kategori)
+   krn di sini yg dipunya justru points.kategori & butuh hasilAmbien-key-nya. */
+const HASIL_AMBIEN_KATEGORI_KEY = {ambient:"ambien", kebisingan:"kebisingan", kebauan:"kebauan", getaran:"getaran"};
+function hasilAktualUntukPeriode(p, periode){
+  if(!p || !periode) return false;
+  if(p.kategori==="emisi") return DB.hasilPemantauan.some(r=>r.engineId===p.id && r.periode===periode);
+  const catKey = HASIL_AMBIEN_KATEGORI_KEY[p.kategori];
+  if(!catKey || !DB.hasilAmbien || !DB.hasilAmbien[catKey]) return false;
+  return DB.hasilAmbien[catKey].some(r=>r.titikId===p.id && r.periode===periode);
+}
+
