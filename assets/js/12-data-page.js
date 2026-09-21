@@ -85,6 +85,15 @@ async function exportAll(){
   } else {
     data = {...DB, dokumentasiFoto:{}, _dokFotoExcluded:true};
   }
+  // Lampiran sertifikat Personil PPU (byte-nya di IndexedDB terpisah, sama alasan dgn foto di atas)
+  // — SELALU disertakan (bukan opsional spt foto: jumlahnya jauh lebih sedikit, satu per personil,
+  // jadi tidak perlu toggle). lampiranDataUrl ditempel SEMENTARA per record khusus utk file export
+  // ini saja (TIDAK pernah disimpan balik ke DB.personilPPU yang aktif).
+  if(Array.isArray(data.personilPPU) && data.personilPPU.length){
+    const ppuIdbEntries = await ppuLampiranIdbGetAll();
+    const ppuIdbMap = new Map(ppuIdbEntries.map(e=>[e.id, e.dataUrl]));
+    data.personilPPU = data.personilPPU.map(p=> p.lampiranId ? {...p, lampiranDataUrl: ppuIdbMap.get(p.lampiranId)||""} : {...p});
+  }
   const fotoNote = includePhotos
     ? ` Foto Dokumentasi Sampling ${fmtBytes(fotoBytes)} ikut disertakan.`
     : ` Foto Dokumentasi Sampling TIDAK disertakan (centang opsinya kalau perlu pindah foto ke perangkat lain).`;
@@ -145,6 +154,13 @@ function diffDokFotoSection(oldD, newD){
   });
   return {added, removed, modified};
 }
+// personilPPU dari file export bisa membawa field sementara lampiranDataUrl (lihat exportAll) yang
+// TIDAK PERNAH ada di DB.personilPPU yang aktif — dibuang dulu sebelum diff supaya keberadaan field
+// itu sendiri tidak selalu kehitung "diubah" utk tiap personil yang punya lampiran walau isinya sama.
+function diffPersonilPpuSection(oldArr, newArr){
+  const strip = arr => (Array.isArray(arr)?arr:[]).map(p=>{ const {lampiranDataUrl, ...rest} = p; return rest; });
+  return diffArrayById(strip(oldArr), strip(newArr));
+}
 function computeBackupDiffRows(oldDB, newDB){
   const rows = [];
   const push = (label, diff, datasetKey) => {
@@ -158,6 +174,7 @@ function computeBackupDiffRows(oldDB, newDB){
   push("Database Titik Pantau", diffArrayById(oldDB.points, newDB.points), "points");
   push("Koordinat Titik Pantau", diffKeyedObject(oldDB.pointCoords, newDB.pointCoords), "coords");
   push("Personil PPC & Observer", diffArrayById(oldDB.personil, newDB.personil), "personil");
+  push("Personil Kompetensi PPU", diffPersonilPpuSection(oldDB.personilPPU, newDB.personilPPU), "personilPPU");
   push("Aturan Site & Rute (Emisi)", diffArrayById(oldDB.routeEmisi, newDB.routeEmisi));
   push("Aturan Site & Rute (Ambient)", diffArrayById(oldDB.routeAmbient, newDB.routeAmbient));
   push("Perencanaan Batch / Scheduling", diffArrayById(oldDB.batches, newDB.batches));
@@ -263,6 +280,19 @@ async function applyFullBackupImport(){
         toast("Sebagian/seluruh foto gagal ditulis ke penyimpanan IndexedDB saat restore (foto tetap tersimpan apa adanya, cuma belum optimal) — coba lagi nanti kalau perlu.","err");
       }
     }
+  }
+  // Lampiran sertifikat Personil PPU — sama pola dgn dokFoto di atas: ditulis ke IndexedDB dulu,
+  // field sementara lampiranDataUrl baru dilepas SETELAH tulisnya berhasil.
+  if(Array.isArray(data.personilPPU) && data.personilPPU.length){
+    const toPutPpu = data.personilPPU.filter(p=>p.lampiranDataUrl && p.lampiranId);
+    if(toPutPpu.length){
+      try{
+        await ppuLampiranIdbBulkPut(toPutPpu.map(p=>({id:p.lampiranId, dataUrl:p.lampiranDataUrl})));
+      }catch(err){
+        toast("Sebagian/seluruh lampiran Personil PPU gagal ditulis ke penyimpanan IndexedDB saat restore.","err");
+      }
+    }
+    data.personilPPU.forEach(p=>{ delete p.lampiranDataUrl; });
   }
   DB = data;
   migrateDB();

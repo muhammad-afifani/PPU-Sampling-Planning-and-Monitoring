@@ -28,7 +28,8 @@ function freshDB(){
     budgetConfig: JSON.parse(JSON.stringify(DEFAULT_BUDGET_CONFIG)),
     budgetManualItems: [],
     budgetAnnual: {},
-    budgetExpenses: []
+    budgetExpenses: [],
+    personilPPU: []
   };
 }
 function uid(pfx){ return pfx+"_"+Math.random().toString(36).slice(2,9); }
@@ -75,6 +76,11 @@ function migrateDB(){
   if(!Array.isArray(DB.budgetManualItems)) DB.budgetManualItems = [];
   if(!DB.budgetAnnual || typeof DB.budgetAnnual!=="object") DB.budgetAnnual = {};
   if(!Array.isArray(DB.budgetExpenses)) DB.budgetExpenses = [];
+  // Personil Kompetensi PPU (Manager Energi/Penanggung Jawab PPU/Operator PPU) — registri sertifikasi
+  // terpisah dari DB.personil (yg utk kelengkapan dokumen personil sampling lapangan/PPC & Observer),
+  // byte lampiran PDF/gambarnya di IndexedDB terpisah (personilPpuLampiranIdb*), bukan di sini.
+  if(!Array.isArray(DB.personilPPU)) DB.personilPPU = [];
+  DB.personilPPU.forEach(p=>{ if(!Array.isArray(p.sites)) p.sites = []; });
   if(!DB.meta) DB.meta = {semester:"S1", tahun:new Date().getFullYear(), lastBatchIdEmisi:0, lastBatchIdAmbient:0};
   if(DB.meta.currentPeriod!==undefined) delete DB.meta.currentPeriod; // field lama, tidak dipakai lagi — diganti meta.semester+meta.tahun
   // Backfill koordinat 12 titik Udara Ambien/Kebisingan/Kebauan/Getaran (Akomodasi/Camp/Office/
@@ -425,11 +431,12 @@ function formatRelativeTime(iso){
   if(days<365) return `${Math.floor(days/30)} bulan yang lalu`;
   return `${Math.floor(days/365)} tahun yang lalu`;
 }
-const DATASET_PAGE = {points:"master", personil:"personil", coords:"lokasi", hasilPemantauan:"hasildb", hasilAmbien:"ambiendb", rh:"runninghour", rhMonthly:"runninghour", tracking:"tracking"};
+const DATASET_PAGE = {points:"master", personil:"personil", personilPPU:"personil", coords:"lokasi", hasilPemantauan:"hasildb", hasilAmbien:"ambiendb", rh:"runninghour", rhMonthly:"runninghour", tracking:"tracking"};
 const DATASET_PAGE_LABEL = {master:"Database Titik Pantau", personil:"Personil PPC & Observer", lokasi:"Lokasi Titik Pantau", hasildb:"Database Hasil Emisi", ambiendb:"Database Hasil Ambient", runninghour:"Running Hour Detail", tracking:"Tracking BA / CoA"};
 function datasetCount(key){
   if(key==="points") return DB.points.length;
   if(key==="personil") return DB.personil.length;
+  if(key==="personilPPU") return DB.personilPPU.length;
   if(key==="coords") return Object.keys(DB.pointCoords||{}).length;
   if(key==="hasilPemantauan") return DB.hasilPemantauan.length;
   if(key==="hasilAmbien") return Object.values(DB.hasilAmbien||{}).reduce((s,a)=>s+a.length,0);
