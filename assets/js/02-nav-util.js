@@ -120,6 +120,7 @@ function renderPage(p){
   if(p==="ambiendb") renderAmbienDb();
   if(p==="aqiispu") renderAqiIspu();
   if(p==="roadmap") renderRoadmapPantau();
+  if(p==="budget") renderBudgetPage();
   if(p==="riwayat") renderRiwayat();
   if(p==="lokasi") renderMap();
   if(p==="data") renderDataStatus();

@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202609212100">
+<link rel="stylesheet" href="assets/css/style.css?v=202609212200">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -69,6 +69,7 @@
           <button class="navbtn" data-page="planner" data-group="plan" data-label="Perencanaan Batch" title="Perencanaan Batch"><span class="navbtn-icon ms-icon" data-icon="files"></span><span class="label">Perencanaan Batch</span></button>
           <button class="navbtn" data-page="gantt" data-group="plan" data-label="Scheduling Tools" title="Scheduling Tools"><span class="navbtn-icon ms-icon" data-icon="bar-chart-3"></span><span class="label">Scheduling Tools</span></button>
           <button class="navbtn" data-page="roadmap" data-group="plan" data-label="Roadmap Wajib Pantau" title="Roadmap Wajib Pantau"><span class="navbtn-icon ms-icon" data-icon="route"></span><span class="label">Roadmap Wajib Pantau</span></button>
+          <button class="navbtn" data-page="budget" data-group="plan" data-label="Budget &amp; Proyeksi Biaya" title="Budget &amp; Proyeksi Biaya"><span class="navbtn-icon ms-icon" data-icon="wallet"></span><span class="label">Budget &amp; Proyeksi Biaya</span></button>
         </div>
       </div>
       <div class="navgroup" data-navgroup="exec">
@@ -314,6 +315,59 @@
         <h3>Detail per Titik</h3>
         <div class="hint" id="rmCount" style="margin-bottom:8px;"></div>
         <div class="tablewrap" style="max-height:70vh;"><table id="rmDetailTable"></table></div>
+      </div>
+    </div>
+
+    <!-- BUDGET & PROYEKSI BIAYA -->
+    <div class="page" id="page-budget">
+      <div class="pagehead"><div><h2>Budget &amp; Proyeksi Biaya</h2><div class="desc">Estimasi biaya sampling berdasarkan titik yang sudah disampling (aktual) &amp; yang akan jatuh tempo (proyeksi dari Roadmap Wajib Pantau), dikalikan harga satuan per parameter.</div></div>
+        <div class="toolbar">
+          <button class="btn" data-action="openBudgetConfigModal">Atur Harga Satuan</button>
+          <button class="btn ghost" data-action="addBudgetManual">Tambah Biaya Manual</button>
+          <button class="btn ghost" data-action="exportBudgetXlsx">Export Excel</button>
+        </div>
+      </div>
+      <div class="card hint" style="display:flex;align-items:center;gap:8px;" id="bgtContractNote"></div>
+      <div class="toolbar card" style="padding:12px 14px;">
+        <div class="field"><label>Riwayat</label><div class="chipbar">
+          <button type="button" class="chip-toggle" data-action="budgetSetYearsBack" data-years-back="0">Tanpa</button>
+          <button type="button" class="chip-toggle" data-action="budgetSetYearsBack" data-years-back="1">1 Thn</button>
+          <button type="button" class="chip-toggle" data-action="budgetSetYearsBack" data-years-back="2">2 Thn</button>
+        </div></div>
+        <div class="field"><label>Proyeksi</label><div class="chipbar">
+          <button type="button" class="chip-toggle" data-action="budgetSetYearsAhead" data-years-ahead="1">1 Tahun</button>
+          <button type="button" class="chip-toggle" data-action="budgetSetYearsAhead" data-years-ahead="2">2 Tahun</button>
+          <button type="button" class="chip-toggle" data-action="budgetSetYearsAhead" data-years-ahead="3">3 Tahun</button>
+        </div></div>
+        <div class="field"><label>Markup</label><div class="chipbar">
+          <button type="button" class="chip-toggle" data-action="budgetSetMarkup" data-markup="0">Tanpa</button>
+          <button type="button" class="chip-toggle" data-action="budgetSetMarkup" data-markup="10">+10%</button>
+          <button type="button" class="chip-toggle" data-action="budgetSetMarkup" data-markup="15">+15%</button>
+        </div></div>
+        <div class="spacer"></div>
+        <div class="hint" style="max-width:320px;align-self:center;">Aktual = sudah ada hasil pemantauan (biaya pasti). Proyeksi = wajib sampling tapi belum ada hasil (estimasi, dari Roadmap Wajib Pantau).</div>
+      </div>
+      <div id="bgtStatCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:16px;"></div>
+      <div class="card">
+        <h3>Tren Biaya per Semester</h3>
+        <div id="bgtChart"></div>
+        <div class="legend" id="bgtChartLegend" style="margin-top:10px;"></div>
+      </div>
+      <div class="card">
+        <h3>Ringkasan per Semester</h3>
+        <div class="tablewrap"><table id="bgtTable"></table></div>
+      </div>
+      <div class="grid cols-2" style="align-items:start;">
+        <div class="card">
+          <h3>Rincian Biaya per Parameter</h3>
+          <div class="hint" style="margin-bottom:8px;">Diagregasi dari seluruh titik aktual + proyeksi pada rentang periode yang ditampilkan.</div>
+          <div class="tablewrap" style="max-height:50vh;"><table id="bgtParamTable"></table></div>
+        </div>
+        <div class="card">
+          <h3>Item Biaya Manual</h3>
+          <div class="hint" style="margin-bottom:8px;">Mobilisasi/teknisi tambahan yang sifatnya provisional — diisi manual per periode.</div>
+          <div class="tablewrap" style="max-height:50vh;"><table id="bgtManualTable"></table></div>
+        </div>
       </div>
     </div>
 
@@ -1520,34 +1574,35 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202609212100"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202609212100"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202609212200"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202609212200"></script>
 
-<script src="assets/data/default-data.js?v=202609212100"></script>
-<script src="assets/data/brand-assets.js?v=202609212100"></script>
-<script src="assets/data/travel-routes.js?v=202609212100"></script>
-<script src="assets/js/00-icons.js?v=202609212100"></script>
-<script src="assets/js/01-state.js?v=202609212100"></script>
-<script src="assets/js/02-nav-util.js?v=202609212100"></script>
-<script src="assets/js/03-period-logic.js?v=202609212100"></script>
-<script src="assets/js/04-dashboard.js?v=202609212100"></script>
-<script src="assets/js/05-master-data.js?v=202609212100"></script>
-<script src="assets/js/06-plan-personil.js?v=202609212100"></script>
-<script src="assets/js/07-rules-planner.js?v=202609212100"></script>
-<script src="assets/js/08-gantt-print.js?v=202609212100"></script>
-<script src="assets/js/09-tracking-map.js?v=202609212100"></script>
-<script src="assets/js/10-running-hour.js?v=202609212100"></script>
-<script src="assets/js/11-berita-acara.js?v=202609212100"></script>
-<script src="assets/js/12-data-page.js?v=202609212100"></script>
-<script src="assets/js/13-hasil-db.js?v=202609212100"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202609212100"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202609212100"></script>
-<script src="assets/js/16-actions-init.js?v=202609212100"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202609212100"></script>
-<script src="assets/js/18-model-dispersi.js?v=202609212100"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202609212100"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202609212100"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202609212100"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202609212100"></script>
+<script src="assets/data/default-data.js?v=202609212200"></script>
+<script src="assets/data/brand-assets.js?v=202609212200"></script>
+<script src="assets/data/travel-routes.js?v=202609212200"></script>
+<script src="assets/js/00-icons.js?v=202609212200"></script>
+<script src="assets/js/01-state.js?v=202609212200"></script>
+<script src="assets/js/02-nav-util.js?v=202609212200"></script>
+<script src="assets/js/03-period-logic.js?v=202609212200"></script>
+<script src="assets/js/04-dashboard.js?v=202609212200"></script>
+<script src="assets/js/05-master-data.js?v=202609212200"></script>
+<script src="assets/js/06-plan-personil.js?v=202609212200"></script>
+<script src="assets/js/07-rules-planner.js?v=202609212200"></script>
+<script src="assets/js/08-gantt-print.js?v=202609212200"></script>
+<script src="assets/js/09-tracking-map.js?v=202609212200"></script>
+<script src="assets/js/10-running-hour.js?v=202609212200"></script>
+<script src="assets/js/11-berita-acara.js?v=202609212200"></script>
+<script src="assets/js/12-data-page.js?v=202609212200"></script>
+<script src="assets/js/13-hasil-db.js?v=202609212200"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202609212200"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202609212200"></script>
+<script src="assets/js/16-actions-init.js?v=202609212200"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202609212200"></script>
+<script src="assets/js/18-model-dispersi.js?v=202609212200"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202609212200"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202609212200"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202609212200"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202609212200"></script>
+<script src="assets/js/23-budget-proyeksi.js?v=202609212200"></script>
 </body>
 </html>
