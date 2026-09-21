@@ -12,8 +12,17 @@
      ejaan yg dipakai di seluruh Database Titik Pantau) & p.kategori (titik non-emisi, flat per
      titik per kunjungan) -> dikalikan DB.budgetConfig.unitPrices (harga kontrak PHM-SCI 4710009303).
    Kalau titik SUDAH actual periode itu, TIDAK dihitung dobel sbg proyeksi juga (union, actual menang).
+
+   Gerbang password (budgetUnlocked, module-level — reset tiap reload): SEKADAR penghalang kasual
+   sesuai permintaan user, BUKAN keamanan sungguhan — tools ini 100% client-side (HTML/JS statis di
+   GitHub Pages, tanpa server/backend), jadi siapapun yang buka file 23-budget-proyeksi.js ini
+   langsung lihat passwordnya polos di BUDGET_PASSWORD di bawah, dan seluruh data DB (termasuk
+   budgetConfig/budgetManualItems dst) tetap ada di localStorage/file backup JSON terlepas dari
+   gerbang ini. Dijelaskan ke user secara eksplisit di respons chat, bukan diam-diam dianggap aman.
 ========================================================= */
-let budgetState = { yearsBack: 0, yearsAhead: 1, markupPct: 0 };
+let budgetState = { yearsBack: 0, yearsAhead: 1, markupPct: 0, colorBy: "type", hiddenSeries: new Set(), annualYear: null };
+const BUDGET_PASSWORD = "Balikpapan@123";
+let budgetUnlocked = false;
 
 /* ---------- Resolusi parameter -> harga satuan per titik ---------- */
 function budgetParamTokensForPoint(p){
@@ -29,16 +38,35 @@ function budgetPointBreakdown(p){
 function budgetPointCost(p){
   return budgetPointBreakdown(p).reduce((sum,b)=>sum+b.price, 0);
 }
-function budgetTokenLabel(token){
-  const labels = {
-    NOx:"NOx (Stack, Dry Method 7/7E USEPA)", CO:"CO (Stack)", SO2:"SO2 (Stack)",
-    "Total Partikulat":"Partikulat/TSP (Stack, Isokinetik)", Opasitas:"Opasitas (Flare/Stack)",
-    H2S:"H2S (Kandungan Sulfur Bahan Bakar)", BTEX:"BTEX",
-    ambient:"Udara Ambien (per titik/kunjungan)", kebisingan:"Kebisingan (per titik/kunjungan)",
-    kebauan:"Kebauan/Odor (per titik/kunjungan)", getaran:"Getaran/Vibrasi (per titik/kunjungan)"
-  };
-  return labels[token] || token;
+// Urutan KANONIK persis daftar harga kontrak PHM-SCI yg dikirim user (utk tabel Atur Harga & label
+// resmi) — dipakai sbg array acuan urutan (BUKAN Object.keys, supaya urutannya tetap benar walau
+// DB.budgetConfig.unitPrices punya sesi lama yg key-nya sempat ke-insert beda urutan). "NOx (Wet
+// Method)" SENGAJA tidak dibuatkan key harga sendiri — permintaan user "utk NOx selalu pakai yg
+// usepa" berarti token "NOx" cuma dihargai SATU cara (Dry/USEPA), jadi label resminya langsung
+// menyebut itu.
+const BUDGET_PARAM_ORDER = ["NOx","Total Partikulat","SO2","CO","H2S","Opasitas","ambient","kebisingan","kebauan","getaran","BTEX"];
+const BUDGET_PARAM_FULL_LABEL = {
+  NOx: "Stacks NOx Sampling as per PerMenLH No. 13/2009 – Dry Method (Method 7, 7E USEPA)",
+  "Total Partikulat": "Stacks Particulate Sampling as per PerMenLH No. 13/2009 (Isokinetic)",
+  SO2: "Stacks SO2 Sampling as per PerMenLH No. 13/2009",
+  CO: "Stacks CO Sampling as per PerMenLH No. 13/2009",
+  H2S: "H2S (Sulphur Content in Fuel) by Flue Gas Analyzer",
+  Opasitas: "Flares/Stacks Opacity Measurements",
+  ambient: "Ambient Monitoring",
+  kebisingan: "Noise Monitoring",
+  kebauan: "Odor Monitoring",
+  getaran: "Vibration Monitoring (Building)",
+  BTEX: "BTEX Analysis"
+};
+const BUDGET_PARAM_SHORT_LABEL = {
+  NOx:"NOx", "Total Partikulat":"Partikulat", SO2:"SO2", CO:"CO", H2S:"H2S", Opasitas:"Opasitas",
+  ambient:"Ambient", kebisingan:"Noise", kebauan:"Odor", getaran:"Getaran", BTEX:"BTEX"
+};
+function budgetTokenLabel(token, short){
+  if(short) return BUDGET_PARAM_SHORT_LABEL[token] || token;
+  return BUDGET_PARAM_FULL_LABEL[token] || token;
 }
+const BUDGET_KATEGORI_LABEL = {emisi:"Emisi", ambient:"Ambient Udara", kebisingan:"Kebisingan", kebauan:"Kebauan/Odor", getaran:"Getaran"};
 
 /* ---------- Titik AKTUAL (sudah ada hasil) vs PROYEKSI (wajib, belum ada hasil) per periode ---------- */
 function budgetActualPointsForPeriod(periode){
@@ -62,6 +90,14 @@ function budgetPeriodRows(periods, semestersAheadForDue){
     return { periode, actualPts, projectedPts };
   });
 }
+// Biaya item manual — utk jenis "samplingTambahan" (>1x/sampling ulang), biaya SELALU dihitung ULANG
+// dari harga satuan parameter yg SEDANG AKTIF (bukan disimpan statis) — supaya kalau harga di "Atur
+// Harga Satuan" diubah belakangan, item tambahan ini otomatis ikut ter-update juga (tetap "ngelink"),
+// bukan jadi angka mati yg bisa berbeda dari harga resmi terbaru.
+function budgetManualItemCost(m){
+  if(m.jenis==="samplingTambahan") return (Number(m.jumlah)||0) * budgetUnitPrice(m.parameterToken);
+  return (Number(m.jumlah)||1) * (Number(m.biayaSatuan)||0);
+}
 function budgetRowCost(row){
   const sumCost = pts => pts.reduce((s,p)=>s+budgetPointCost(p), 0);
   const actualCost = sumCost(row.actualPts);
@@ -69,45 +105,126 @@ function budgetRowCost(row){
   const totalTitik = row.actualPts.length + row.projectedPts.length;
   const mobilisasi = totalTitik>0 ? (Number(DB.budgetConfig.mobilisasiPaketPerSemester)||0) : 0;
   const manualItems = DB.budgetManualItems.filter(m=>m.periode===row.periode);
-  const manual = manualItems.reduce((s,m)=> s + (Number(m.jumlah)||1)*(Number(m.biayaSatuan)||0), 0);
+  const samplingItems = manualItems.filter(m=>m.jenis==="samplingTambahan");
+  const genericItems = manualItems.filter(m=>m.jenis!=="samplingTambahan");
+  const manualSampling = samplingItems.reduce((s,m)=>s+budgetManualItemCost(m), 0);
+  const manualGeneric = genericItems.reduce((s,m)=>s+budgetManualItemCost(m), 0);
+  const manual = manualSampling + manualGeneric;
   const base = actualCost + projectedCost + mobilisasi + manual;
-  return { actualCost, projectedCost, mobilisasi, manual, manualItems, base, totalTitik };
+  return { actualCost, projectedCost, mobilisasi, manualSampling, manualGeneric, manual, manualItems, samplingItems, genericItems, base, totalTitik };
 }
 function budgetApplyMarkup(base, pct){ return base * (1 + (Number(pct)||0)/100); }
 // Rincian per parameter/kategori, diagregasi lintas SEMUA periode yg ditampilkan (union titik AKTUAL
-// + PROYEKSI tiap periode) — dipakai tabel "Rincian Biaya per Parameter" & basis pie/bar breakdown.
+// + PROYEKSI tiap periode + item manual "samplingTambahan") — dipakai tabel "Rincian Biaya per
+// Parameter" & basis breakdown chart per-parameter.
 function budgetParamTotals(rows){
   const totals = {};
+  const add = (token, count, cost) => { if(!totals[token]) totals[token] = {count:0, cost:0}; totals[token].count+=count; totals[token].cost+=cost; };
+  const periodsInRows = new Set(rows.map(r=>r.periode));
   rows.forEach(row=>{
     [...row.actualPts, ...row.projectedPts].forEach(p=>{
-      budgetPointBreakdown(p).forEach(({token,price})=>{
-        if(!totals[token]) totals[token] = {count:0, cost:0};
-        totals[token].count++; totals[token].cost += price;
-      });
+      budgetPointBreakdown(p).forEach(({token,price})=>add(token,1,price));
     });
+  });
+  DB.budgetManualItems.forEach(m=>{
+    if(m.jenis!=="samplingTambahan" || !periodsInRows.has(m.periode)) return;
+    add(m.parameterToken, Number(m.jumlah)||0, budgetManualItemCost(m));
   });
   return totals;
 }
-function fmtRupiah(n){ return "Rp" + Math.round(n).toLocaleString("id-ID"); }
+// Minus di depan "Rp" (bukan di antara "Rp" dan angka) — toLocaleString taruh tanda minus nempel ke
+// angka, jadi "Rp"+"-500" akan terbaca "Rp-500" yang janggal; sisa budget negatif (over-budget) perlu
+// jelas dibaca sbg NEGATIF, bukan disalahartikan nomor kode.
+function fmtRupiah(n){
+  const neg = n<0;
+  return (neg?"-":"") + "Rp" + Math.round(Math.abs(n)).toLocaleString("id-ID");
+}
 function fmtRupiahRingkas(n){
-  const abs = Math.abs(n);
-  if(abs>=1e9) return "Rp"+(n/1e9).toFixed(2)+" M";
-  if(abs>=1e6) return "Rp"+(n/1e6).toFixed(1)+" jt";
+  const neg = n<0, abs = Math.abs(n);
+  if(abs>=1e9) return (neg?"-":"")+"Rp"+(abs/1e9).toFixed(2)+" M";
+  if(abs>=1e6) return (neg?"-":"")+"Rp"+(abs/1e6).toFixed(1)+" jt";
   return fmtRupiah(n);
 }
 
-/* ---------- Chart batang bertumpuk per semester (Aktual / Proyeksi / Mobilisasi+Lainnya) ----------
+/* ---------- Chart batang bertumpuk per semester — warna bisa dipilih mewakili apa ----------
+   4 pilihan "warnai berdasarkan": Jenis (Aktual/Proyeksi/dll, default), Site, Parameter, Kategori
+   (emisi/ambien/kebisingan/kebauan/getaran). budgetState.hiddenSeries: set key yg lagi disembunyikan
+   dari chart (klik legend utk toggle) — SATU set dipakai apapun dimensinya, dikosongkan otomatis
+   kalau dimensi warna diganti (supaya tidak nyangkut nyembunyiin key yg sudah tidak relevan).
    Pola sumbu/gridline SAMA dgn buildHasilTrendChart (14-hasil-dashboard.js) supaya konsisten dgn
-   chart lain di app ini — 1 sumbu, warna kategori TETAP (bukan diurut ulang per ranking nilai). */
+   chart lain di app ini — warna kategori TETAP (bukan diurut ulang per ranking nilai per periode). */
+const BUDGET_TYPE_COLORS = {"Aktual":"#0ea5a0", "Proyeksi":"#e8a33d", "Sampling Tambahan":"#8a5c11", "Mobilisasi & Lainnya":"#94a3b8"};
+const BUDGET_KATEGORI_COLORS = {emisi:"#0ea5a0", ambient:"#3d78c9", kebisingan:"#e8a33d", kebauan:"#c2478a", getaran:"#7c5cbf"};
+function budgetDimColor(dim, key){
+  if(dim==="type") return BUDGET_TYPE_COLORS[key] || "#94a3b8";
+  if(dim==="site") return HASIL_SITE_COLORS[key] || "#7f8fa0";
+  if(dim==="kategori") return BUDGET_KATEGORI_COLORS[key] || "#94a3b8";
+  if(dim==="parameter") return HD_PALETTE[BUDGET_PARAM_ORDER.indexOf(key) % HD_PALETTE.length] || "#94a3b8";
+  return "#94a3b8";
+}
+function budgetDimKeyForPoint(dim, p){
+  if(dim==="site") return p.site;
+  if(dim==="kategori") return p.kategori==="emisi" ? "emisi" : p.kategori;
+  return null; // "parameter" ditangani per-token di pemanggil (1 titik bisa >1 parameter)
+}
+// Breakdown biaya 1 baris/periode berdasarkan dimensi warna terpilih -> {key: cost}.
+function budgetRowBreakdownByDim(row, cost, dim){
+  const map = {};
+  const add = (k,v) => { if(v<=0) return; map[k] = (map[k]||0)+v; };
+  if(dim==="type"){
+    add("Aktual", cost.actualCost);
+    add("Proyeksi", cost.projectedCost);
+    add("Sampling Tambahan", cost.manualSampling);
+    add("Mobilisasi & Lainnya", cost.mobilisasi + cost.manualGeneric);
+    return map;
+  }
+  if(dim==="parameter"){
+    [...row.actualPts, ...row.projectedPts].forEach(p=>{
+      budgetPointBreakdown(p).forEach(({token,price})=>add(token, price));
+    });
+    cost.samplingItems.forEach(m=>add(m.parameterToken, budgetManualItemCost(m)));
+    add("Lainnya (Mobilisasi/Manual)", cost.mobilisasi + cost.manualGeneric);
+    return map;
+  }
+  // site / kategori: berbasis titik
+  [...row.actualPts, ...row.projectedPts].forEach(p=>add(budgetDimKeyForPoint(dim,p), budgetPointCost(p)));
+  cost.samplingItems.forEach(m=>{
+    const p = DB.points.find(x=>x.id===m.titikId);
+    if(p) add(budgetDimKeyForPoint(dim,p), budgetManualItemCost(m));
+  });
+  add(dim==="site" ? "Mobilisasi/Lainnya" : "lainnya", cost.mobilisasi + cost.manualGeneric);
+  return map;
+}
+// Urutan legend TETAP per dimensi (bukan diurut ulang oleh nilai) — dikumpulkan dari SEMUA baris
+// yg tampil (union key), supaya urutan warnanya stabil walau proporsinya beda tiap periode.
+function budgetDimAllKeys(rows, costs, dim){
+  if(dim==="type") return Object.keys(BUDGET_TYPE_COLORS);
+  if(dim==="parameter") return [...BUDGET_PARAM_ORDER, "Lainnya (Mobilisasi/Manual)"];
+  if(dim==="kategori") return [...Object.keys(BUDGET_KATEGORI_LABEL), "lainnya"];
+  const keys = new Set();
+  rows.forEach((row,i)=>Object.keys(budgetRowBreakdownByDim(row, costs[i], dim)).forEach(k=>keys.add(k)));
+  const sites = [...keys].filter(k=>k!=="Mobilisasi/Lainnya").sort();
+  return keys.has("Mobilisasi/Lainnya") ? [...sites, "Mobilisasi/Lainnya"] : sites;
+}
+function budgetDimKeyLabel(dim, key){
+  if(dim==="parameter") return budgetTokenLabel(key, true);
+  if(dim==="kategori") return BUDGET_KATEGORI_LABEL[key] || key;
+  return key;
+}
 function buildBudgetChart(rows, costs){
-  const W=920, H=320, padL=64, padR=16, padT=18, padB=44;
+  const dim = budgetState.colorBy;
+  const allKeys = budgetDimAllKeys(rows, costs, dim);
+  const visibleKeys = allKeys.filter(k=>!budgetState.hiddenSeries.has(k));
+  const breakdowns = rows.map((row,i)=>budgetRowBreakdownByDim(row, costs[i], dim));
+  const mk = budgetState.markupPct/100;
+  const rowTotals = breakdowns.map(bd=> visibleKeys.reduce((s,k)=>s+(bd[k]||0),0) * (1+mk) );
+
+  const W=920, H=340, padL=64, padR=16, padT=18, padB=44;
   const plotW=W-padL-padR, plotH=H-padT-padB;
   const n = rows.length;
-  const maxY = Math.max(...costs.map(c=>budgetApplyMarkup(c.base, budgetState.markupPct)), 1) * 1.15;
+  const maxY = Math.max(...rowTotals, 1) * 1.15;
   const nowP = currentPeriodStr();
-  const COL_ACTUAL = "#0ea5a0", COL_PROJECTED = "#e8a33d", COL_OTHER = "#94a3b8";
   function xFor(i){ return padL + (i+0.5)*(plotW/n); }
-  function yFor(v){ return padT + plotH - (Math.min(v,maxY)/maxY)*plotH; }
   let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;">`;
   for(let g=0; g<=4; g++){
     const y = padT + plotH - (g/4)*plotH;
@@ -116,17 +233,17 @@ function buildBudgetChart(rows, costs){
   }
   const barW = Math.min(46, (plotW/n)*0.5);
   rows.forEach((row,i)=>{
-    const c = costs[i];
-    const mk = budgetState.markupPct/100;
+    const bd = breakdowns[i];
     const cx = xFor(i);
-    const vA = c.actualCost*(1+mk), vP = c.projectedCost*(1+mk), vO = (c.mobilisasi+c.manual)*(1+mk);
     const yBase = padT+plotH;
-    const hA = (vA/maxY)*plotH, hP = (vP/maxY)*plotH, hO = (vO/maxY)*plotH;
-    let yCur = yBase;
-    if(hA>0){ svg += `<rect x="${cx-barW/2}" y="${yCur-hA}" width="${barW}" height="${hA}" fill="${COL_ACTUAL}"/>`; yCur -= hA; }
-    if(hP>0){ svg += `<rect x="${cx-barW/2}" y="${yCur-hP}" width="${barW}" height="${hP}" fill="${COL_PROJECTED}"/>`; yCur -= hP; }
-    if(hO>0){ svg += `<rect x="${cx-barW/2}" y="${yCur-hO}" width="${barW}" height="${hO}" fill="${COL_OTHER}"/>`; yCur -= hO; }
-    const total = vA+vP+vO;
+    let yCur = yBase, total = 0;
+    visibleKeys.forEach(key=>{
+      const v = (bd[key]||0)*(1+mk);
+      if(v<=0) return;
+      const h = (v/maxY)*plotH;
+      svg += `<rect x="${cx-barW/2}" y="${yCur-h}" width="${barW}" height="${h}" fill="${budgetDimColor(dim,key)}"><title>${escHtml(budgetDimKeyLabel(dim,key))}: ${fmtRupiah(v)}</title></rect>`;
+      yCur -= h; total += v;
+    });
     if(total>0) svg += `<text x="${cx}" y="${yCur-5}" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--gray-700)">${fmtRupiahRingkas(total)}</text>`;
     const isNow = row.periode===nowP;
     svg += `<text x="${cx}" y="${H-padB+16}" text-anchor="middle" font-size="10.5" fill="${isNow?'#0d8a7a':'var(--gray-500)'}" font-weight="${isNow?'800':'400'}">${escHtml(row.periode)}</text>`;
@@ -135,30 +252,55 @@ function buildBudgetChart(rows, costs){
   svg += `</svg>`;
   return svg;
 }
-function budgetChartLegendHtml(){
-  return `<span class="item"><span class="sw" style="background:#0ea5a0"></span>Aktual (sudah ada hasil)</span>
-    <span class="item"><span class="sw" style="background:#e8a33d"></span>Proyeksi (wajib, estimasi)</span>
-    <span class="item"><span class="sw" style="background:#94a3b8"></span>Mobilisasi &amp; Item Manual</span>`;
+function budgetChartLegendHtml(rows, costs){
+  const dim = budgetState.colorBy;
+  const allKeys = budgetDimAllKeys(rows, costs, dim);
+  return allKeys.map(key=>{
+    const off = budgetState.hiddenSeries.has(key);
+    return `<span class="bgt-legend-chip${off?" off":""}" data-action="budgetToggleSeries" data-key="${escHtml(key)}" title="Klik utk ${off?"tampilkan":"sembunyikan"}"><span class="sw" style="background:${budgetDimColor(dim,key)}"></span>${escHtml(budgetDimKeyLabel(dim,key))}</span>`;
+  }).join("");
 }
 
-/* ---------- Item biaya manual (mobilisasi tambahan/teknisi/lainnya) — CRUD ---------- */
-const BUDGET_MANUAL_JENIS_LABEL = {mobilisasi:"Mobilisasi/Demobilisasi Tambahan", teknisi:"Teknisi Tambahan", lainnya:"Lainnya"};
+/* ---------- Item biaya manual (mobilisasi tambahan/teknisi/sampling tambahan/lainnya) — CRUD ---------- */
+const BUDGET_MANUAL_JENIS_LABEL = {
+  mobilisasi: "Mobilization and Demobilization for Additional Sampling (if required/provisional)",
+  teknisi: "Technician for Additional Sampling (if required/provisional) – per day",
+  samplingTambahan: "Sampling Tambahan/Ulang (>1x) — terhubung ke harga parameter",
+  lainnya: "Lainnya"
+};
+function budgetManualPointOptionsHtml(selectedId){
+  const emisi = DB.points.filter(p=>p.kategori==="emisi" && !p.tidakBeroperasi).sort((a,b)=> a.site===b.site?a.nama.localeCompare(b.nama):a.site.localeCompare(b.site));
+  return emisi.map(p=>`<option value="${p.id}" ${p.id===selectedId?"selected":""}>${escHtml(p.site)} — ${escHtml(p.nama)} (${escHtml((p.parameter||"").trim())})</option>`).join("");
+}
 function budgetManualFormHtml(rec){
-  rec = rec || {id:"", periode: currentPeriodStr(), jenis:"mobilisasi", deskripsi:"", jumlah:1, biayaSatuan:3850000, catatan:""};
+  rec = rec || {id:"", periode: currentPeriodStr(), jenis:"mobilisasi", deskripsi:"", jumlah:1, biayaSatuan:3850000, catatan:"", titikId:"", parameterToken:"NOx"};
+  const isSampling = rec.jenis==="samplingTambahan";
   return `<h3>${rec.id?"Edit":"Tambah"} Item Biaya Manual</h3>
-    <div class="hint" style="margin-top:-6px;">Utk biaya "jika diperlukan/provisional" (mobilisasi tambahan, teknisi tambahan, dll) yang sifatnya per-kejadian — diisi manual, tidak dihitung otomatis dari proyeksi titik.</div>
+    <div class="hint" style="margin-top:-6px;">Utk biaya "jika diperlukan/provisional" (mobilisasi tambahan, teknisi tambahan, sampling ulang &gt;1x, dll) yang sifatnya per-kejadian — diisi manual, tidak dihitung otomatis dari proyeksi titik.</div>
     <div class="grid cols-2" style="margin-top:10px;">
       <div class="field"><label>Periode</label><input type="text" id="bm_periode" value="${escHtml(rec.periode)}" placeholder="S1 2026"></div>
       <div class="field"><label>Jenis</label><select id="bm_jenis">
-        ${Object.keys(BUDGET_MANUAL_JENIS_LABEL).map(k=>`<option value="${k}" ${rec.jenis===k?"selected":""}>${BUDGET_MANUAL_JENIS_LABEL[k]}</option>`).join("")}
+        ${Object.keys(BUDGET_MANUAL_JENIS_LABEL).map(k=>`<option value="${k}" ${rec.jenis===k?"selected":""}>${escHtml(BUDGET_MANUAL_JENIS_LABEL[k])}</option>`).join("")}
       </select></div>
     </div>
-    <div class="field" style="margin-top:10px;"><label>Deskripsi</label><input type="text" id="bm_deskripsi" value="${escHtml(rec.deskripsi)}" placeholder="mis. Mobilisasi tambahan sampling ulang GEG 500 BKP"></div>
-    <div class="grid cols-2" style="margin-top:10px;">
-      <div class="field"><label>Jumlah (trip/hari)</label><input type="number" id="bm_jumlah" value="${rec.jumlah}" min="1" step="1"></div>
-      <div class="field"><label>Biaya Satuan (Rp)</label><input type="number" id="bm_biayaSatuan" value="${rec.biayaSatuan}" min="0" step="1000"></div>
+    <div id="bm_fieldsSampling" style="display:${isSampling?"":"none"};margin-top:10px;">
+      <div class="grid cols-2">
+        <div class="field"><label>Titik</label><select id="bm_titikId">${budgetManualPointOptionsHtml(rec.titikId)}</select></div>
+        <div class="field"><label>Parameter</label><select id="bm_parameterToken">
+          ${BUDGET_PARAM_ORDER.filter(t=>!["ambient","kebisingan","kebauan","getaran"].includes(t)).map(t=>`<option value="${t}" ${rec.parameterToken===t?"selected":""}>${escHtml(budgetTokenLabel(t))} (${fmtRupiah(budgetUnitPrice(t))})</option>`).join("")}
+        </select></div>
+      </div>
+      <div class="field" style="margin-top:10px;max-width:220px;"><label>Jumlah Sampling Tambahan (kali)</label><input type="number" id="bm_jumlahSampling" value="${rec.jumlah}" min="1" step="1"></div>
+      <div class="hint" style="margin-top:6px;">Biaya dihitung otomatis = jumlah &times; harga satuan parameter yang SEDANG AKTIF di "Atur Harga Satuan" (tetap ter-update kalau harganya berubah belakangan).</div>
     </div>
-    <div class="field" style="margin-top:10px;"><label>Catatan (opsional)</label><input type="text" id="bm_catatan" value="${escHtml(rec.catatan)}"></div>
+    <div id="bm_fieldsGeneric" style="display:${isSampling?"none":""};">
+      <div class="field" style="margin-top:10px;"><label>Deskripsi</label><input type="text" id="bm_deskripsi" value="${escHtml(rec.deskripsi)}" placeholder="mis. Mobilisasi tambahan sampling ulang GEG 500 BKP"></div>
+      <div class="grid cols-2" style="margin-top:10px;">
+        <div class="field"><label>Jumlah (trip/hari)</label><input type="number" id="bm_jumlah" value="${rec.jumlah}" min="1" step="1"></div>
+        <div class="field"><label>Biaya Satuan (Rp)</label><input type="number" id="bm_biayaSatuan" value="${rec.biayaSatuan}" min="0" step="1000"></div>
+      </div>
+    </div>
+    <div class="field" style="margin-top:10px;"><label>Catatan (opsional)</label><textarea id="bm_catatan" rows="2" style="width:100%;padding:7px 9px;border:1px solid var(--gray-300);border-radius:6px;">${escHtml(rec.catatan)}</textarea></div>
     <div class="actions">
       <button class="btn ghost" data-action="closeModal">Batal</button>
       <button class="btn primary" data-action="saveBudgetManual" data-id="${rec.id}">Simpan</button>
@@ -169,34 +311,61 @@ function editBudgetManual(id){
   const r = DB.budgetManualItems.find(x=>x.id===id); if(!r) return;
   openModal(budgetManualFormHtml(r));
 }
+// Toggle field generik <-> field sampling tambahan saat Jenis diganti — TIDAK render ulang seluruh
+// modal (supaya isian field lain yg sudah diketik tidak hilang), cuma tampilkan/sembunyikan blok.
+document.addEventListener("change", e=>{
+  if(e.target.id==="bm_jenis"){
+    const isSampling = e.target.value==="samplingTambahan";
+    const gen = document.getElementById("bm_fieldsGeneric"), samp = document.getElementById("bm_fieldsSampling");
+    if(gen) gen.style.display = isSampling ? "none" : "";
+    if(samp) samp.style.display = isSampling ? "" : "none";
+  }
+});
 function saveBudgetManual(id){
   const periode = document.getElementById("bm_periode").value.trim();
   if(!parsePeriodStr(periode)){ toast('Format Periode harus "S1 2026" atau "S2 2026".', "err"); return; }
-  const val = {
-    periode, jenis: document.getElementById("bm_jenis").value,
-    deskripsi: document.getElementById("bm_deskripsi").value.trim(),
-    jumlah: Math.max(1, Number(document.getElementById("bm_jumlah").value)||1),
-    biayaSatuan: Math.max(0, Number(document.getElementById("bm_biayaSatuan").value)||0),
-    catatan: document.getElementById("bm_catatan").value.trim()
-  };
+  const jenis = document.getElementById("bm_jenis").value;
+  let val;
+  if(jenis==="samplingTambahan"){
+    const titikId = document.getElementById("bm_titikId").value;
+    const p = DB.points.find(x=>x.id===titikId);
+    if(!p){ toast("Pilih titik dulu.", "err"); return; }
+    const parameterToken = document.getElementById("bm_parameterToken").value;
+    const jumlah = Math.max(1, Number(document.getElementById("bm_jumlahSampling").value)||1);
+    val = {
+      periode, jenis, titikId, parameterToken, jumlah,
+      deskripsi: `Sampling tambahan ${budgetTokenLabel(parameterToken,true)} — ${p.nama} (${p.site})`,
+      biayaSatuan: null,
+      catatan: document.getElementById("bm_catatan").value.trim()
+    };
+  } else {
+    val = {
+      periode, jenis,
+      deskripsi: document.getElementById("bm_deskripsi").value.trim(),
+      jumlah: Math.max(1, Number(document.getElementById("bm_jumlah").value)||1),
+      biayaSatuan: Math.max(0, Number(document.getElementById("bm_biayaSatuan").value)||0),
+      titikId: "", parameterToken: "",
+      catatan: document.getElementById("bm_catatan").value.trim()
+    };
+  }
   if(id){ Object.assign(DB.budgetManualItems.find(x=>x.id===id), val); }
   else { DB.budgetManualItems.push({id:uid("BGT"), ...val}); }
-  save(); closeModal(); renderBudgetPage();
+  save(); closeModal(); renderBudgetPageContent();
   toast(id?"Item biaya diperbarui.":"Item biaya ditambahkan.", "ok");
 }
 function deleteBudgetManual(id){
   askConfirm("Hapus item biaya manual ini?", ()=>{
     DB.budgetManualItems = DB.budgetManualItems.filter(x=>x.id!==id);
-    save(); renderBudgetPage(); toast("Item biaya dihapus.", "ok");
+    save(); renderBudgetPageContent(); toast("Item biaya dihapus.", "ok");
   });
 }
 
-/* ---------- Pengaturan harga satuan (kontrak PHM-SCI) ---------- */
+/* ---------- Pengaturan harga satuan (kontrak PHM-SCI), urutan KANONIK BUDGET_PARAM_ORDER ---------- */
 function budgetConfigModalHtml(){
   const up = DB.budgetConfig.unitPrices;
-  const rows = Object.keys(up).map(k=>`<tr>
+  const rows = BUDGET_PARAM_ORDER.map(k=>`<tr>
     <td style="padding:5px 8px;">${escHtml(budgetTokenLabel(k))}</td>
-    <td style="padding:5px 8px;text-align:right;"><input type="number" class="bcfg-price" data-token="${escHtml(k)}" value="${up[k]}" min="0" step="1000" style="width:130px;text-align:right;"></td>
+    <td style="padding:5px 8px;text-align:right;"><input type="number" class="bcfg-price" data-token="${escHtml(k)}" value="${up[k]||0}" min="0" step="1000" style="width:130px;text-align:right;"></td>
   </tr>`).join("");
   return `<h3>Pengaturan Harga Satuan Budget</h3>
     <div class="hint" style="margin-top:-6px;">${escHtml(DB.budgetConfig.contractNote)} Harga bisa diubah kapan saja kalau ada kontrak/adendum baru.</div>
@@ -207,9 +376,9 @@ function budgetConfigModalHtml(){
       </table>
     </div>
     <div class="grid cols-2" style="margin-top:12px;">
-      <div class="field"><label>Mobilisasi &amp; Demobilisasi Paket / Semester (Rp)</label><input type="number" id="bcfg_mobpaket" value="${DB.budgetConfig.mobilisasiPaketPerSemester}" min="0" step="100000"></div>
+      <div class="field"><label>Mobilization and Demobilization — Emission and Ambient Monitoring per Semester (Rp)</label><input type="number" id="bcfg_mobpaket" value="${DB.budgetConfig.mobilisasiPaketPerSemester}" min="0" step="100000"></div>
     </div>
-    <div class="hint" style="margin-top:6px;">Mobilisasi paket ini otomatis dihitung SEKALI tiap semester yang ada aktivitas sampling (aktual maupun proyeksi) — utk mobilisasi tambahan yang sifatnya provisional, tambahkan lewat "Tambah Biaya Manual" di halaman Budget.</div>
+    <div class="hint" style="margin-top:6px;">Mobilisasi paket ini otomatis dihitung SEKALI tiap semester yang ada aktivitas sampling (aktual maupun proyeksi) — utk mobilisasi/teknisi tambahan yang sifatnya provisional, tambahkan lewat "Tambah Biaya Manual" di halaman Budget.</div>
     <div class="actions">
       <button class="btn ghost" data-action="closeModal">Batal</button>
       <button class="btn primary" data-action="saveBudgetConfig">Simpan</button>
@@ -221,47 +390,311 @@ function saveBudgetConfig(){
     DB.budgetConfig.unitPrices[inp.dataset.token] = Math.max(0, Number(inp.value)||0);
   });
   DB.budgetConfig.mobilisasiPaketPerSemester = Math.max(0, Number(document.getElementById("bcfg_mobpaket").value)||0);
-  save(); closeModal(); renderBudgetPage();
+  save(); closeModal(); renderBudgetPageContent();
   toast("Pengaturan harga satuan disimpan.", "ok");
+}
+
+/* ---------- Tabel detail per jenis sampling & peralatan (spt spreadsheet manual user) ----------
+   Dikelompokkan: "EMISI <kombinasi parameter>" (mis. "EMISI NOx & CO") -> baris per KATEGORI SUMBER
+   (jenis peralatan, p.kategoriSumber — SATU baris bisa mewakili banyak titik sejenis, sama spt
+   contoh user), dan kategori non-emisi masing2 jadi grup sendiri (Ambient/Noise/Odor/Vibration) ->
+   baris per SITE. Kolom = tiap periode yg lagi ditampilkan (sama dgn tabel Ringkasan). Item manual
+   "samplingTambahan" masuk sbg baris tambahan di grup yg sesuai, ditandai "(+manual)". */
+function budgetGroupKeyForPoint(p){
+  if(p.kategori==="emisi") return "EMISI " + budgetParamTokensForPoint(p).map(t=>budgetTokenLabel(t,true)).join(" & ");
+  return {ambient:"AMBIENT MONITORING", kebisingan:"NOISE MONITORING", kebauan:"ODOR MONITORING", getaran:"VIBRATION MONITORING"}[p.kategori] || p.kategori.toUpperCase();
+}
+function budgetSubRowKeyForPoint(p){
+  return p.kategori==="emisi" ? (p.kategoriSumber||"Lainnya") : p.site;
+}
+function budgetBuildDetailGroups(periods, rows){
+  const groups = {}; // groupKey -> { order, subKey -> {periode:cost} }
+  let groupOrderCounter = 0;
+  const groupOrder = {};
+  const ensure = (g,s) => {
+    if(!groups[g]){ groups[g] = {}; groupOrder[g] = groupOrderCounter++; }
+    if(!groups[g][s]) groups[g][s] = {};
+    return groups[g][s];
+  };
+  rows.forEach(row=>{
+    [...row.actualPts, ...row.projectedPts].forEach(p=>{
+      const g = budgetGroupKeyForPoint(p), s = budgetSubRowKeyForPoint(p);
+      const cell = ensure(g,s);
+      cell[row.periode] = (cell[row.periode]||0) + budgetPointCost(p);
+    });
+  });
+  const periodSet = new Set(periods);
+  DB.budgetManualItems.forEach(m=>{
+    if(m.jenis!=="samplingTambahan" || !periodSet.has(m.periode)) return;
+    const p = DB.points.find(x=>x.id===m.titikId);
+    if(!p) return;
+    const g = budgetGroupKeyForPoint(p);
+    const s = budgetSubRowKeyForPoint(p) + " (+ manual: " + p.nama + ")";
+    const cell = ensure(g, s);
+    cell[m.periode] = (cell[m.periode]||0) + budgetManualItemCost(m);
+  });
+  return {groups, groupOrder};
+}
+function buildBudgetDetailTableHtml(periods, rows, costs){
+  const {groups, groupOrder} = budgetBuildDetailGroups(periods, rows);
+  const groupKeys = Object.keys(groups).sort((a,b)=>groupOrder[a]-groupOrder[b]);
+  let html = `<table style="width:100%;border-collapse:collapse;font-size:11.5px;">
+    <thead><tr style="background:var(--navy-900,#1a2942);color:#fff;">
+      <th style="text-align:left;padding:6px 8px;min-width:170px;">Jenis Sampling</th>
+      <th style="text-align:left;padding:6px 8px;min-width:170px;">Ketentuan Teknis</th>
+      ${periods.map(p=>`<th style="text-align:right;padding:6px 8px;">${escHtml(p)}</th>`).join("")}
+    </tr></thead><tbody>`;
+  if(!groupKeys.length){
+    html += `<tr><td colspan="${2+periods.length}" class="hint" style="text-align:center;padding:20px;">Tidak ada titik aktual/proyeksi pada rentang periode ini.</td></tr>`;
+  }
+  groupKeys.forEach(g=>{
+    const subKeys = Object.keys(groups[g]).sort();
+    subKeys.forEach(s=>{
+      const cellMap = groups[g][s];
+      html += `<tr><td style="padding:4px 8px;" class="muted">${escHtml(g)}</td><td style="padding:4px 8px;">${escHtml(s)}</td>
+        ${periods.map(p=>`<td style="text-align:right;padding:4px 8px;font-variant-numeric:tabular-nums;">${fmtRupiah(cellMap[p]||0)}</td>`).join("")}</tr>`;
+    });
+    const groupTotal = periods.map(p=> subKeys.reduce((s,sk)=>s+(groups[g][sk][p]||0), 0));
+    html += `<tr style="background:var(--gray-100);font-weight:700;"><td colspan="2" style="padding:4px 8px;">${escHtml(g)} Total</td>
+      ${groupTotal.map(v=>`<td style="text-align:right;padding:4px 8px;font-variant-numeric:tabular-nums;">${fmtRupiah(v)}</td>`).join("")}</tr>`;
+  });
+  // Mobilisasi paket per periode
+  html += `<tr><td colspan="2" style="padding:4px 8px;font-weight:700;">Mobilization and Demobilization (Package, per Semester)</td>
+    ${costs.map(c=>`<td style="text-align:right;padding:4px 8px;font-variant-numeric:tabular-nums;">${fmtRupiah(c.mobilisasi)}</td>`).join("")}</tr>`;
+  // Item manual generik (mobilisasi tambahan/teknisi/lainnya), dikelompokkan per jenis
+  ["mobilisasi","teknisi","lainnya"].forEach(jenis=>{
+    const anyThisJenis = costs.some(c=>c.genericItems.some(m=>m.jenis===jenis));
+    if(!anyThisJenis) return;
+    html += `<tr><td colspan="2" style="padding:4px 8px;font-weight:700;">${escHtml(BUDGET_MANUAL_JENIS_LABEL[jenis])}</td>
+      ${costs.map(c=>`<td style="text-align:right;padding:4px 8px;font-variant-numeric:tabular-nums;">${fmtRupiah(c.genericItems.filter(m=>m.jenis===jenis).reduce((s,m)=>s+budgetManualItemCost(m),0))}</td>`).join("")}</tr>`;
+  });
+  const grandTotal = costs.map(c=>c.base);
+  html += `<tr style="border-top:2px solid var(--gray-400);font-weight:800;background:#fff7cc;"><td colspan="2" style="padding:6px 8px;">Grand Total</td>
+    ${grandTotal.map(v=>`<td style="text-align:right;padding:6px 8px;font-variant-numeric:tabular-nums;">${fmtRupiah(v)}</td>`).join("")}</tr></tbody></table>`;
+  return html;
+}
+
+/* ---------- Budget Tahunan: alokasi vs terserap vs pengeluaran lain ----------
+   "Terserap" = biaya AKTUAL SAJA (titik yg beneran sudah ada hasil + mobilisasi periode itu + item
+   manual periode itu) — proyeksi TIDAK dihitung sbg sudah terserap (masih estimasi, belum tentu
+   kejadian), konsisten dgn prinsip Aktual/Proyeksi yg dipakai di seluruh halaman ini. */
+function budgetYearActualSpend(year){
+  const periods = [periodLabel(1,year), periodLabel(2,year)];
+  let samplingCost = 0, mobilisasi = 0, manualGeneric = 0, manualSampling = 0;
+  periods.forEach(per=>{
+    const actualPts = budgetActualPointsForPeriod(per);
+    samplingCost += actualPts.reduce((s,p)=>s+budgetPointCost(p), 0);
+    if(actualPts.length) mobilisasi += Number(DB.budgetConfig.mobilisasiPaketPerSemester)||0;
+    DB.budgetManualItems.filter(m=>m.periode===per).forEach(m=>{
+      if(m.jenis==="samplingTambahan") manualSampling += budgetManualItemCost(m);
+      else manualGeneric += budgetManualItemCost(m);
+    });
+  });
+  const expenses = DB.budgetExpenses.filter(e=>Number(e.tahun)===year).reduce((s,e)=>s+(Number(e.jumlah)||0), 0);
+  const total = samplingCost + mobilisasi + manualGeneric + manualSampling + expenses;
+  return {samplingCost, mobilisasi, manualGeneric, manualSampling, expenses, total};
+}
+function budgetExpenseFormHtml(rec){
+  rec = rec || {id:"", tahun: new Date().getFullYear(), deskripsi:"", jumlah:0, tanggal: todayStr(), kategori:"Peralatan"};
+  return `<h3>${rec.id?"Edit":"Tambah"} Pengeluaran Lain</h3>
+    <div class="hint" style="margin-top:-6px;">Pengeluaran di luar biaya sampling (mis. beli kamera anti-ATEX, alat pelindung, dll) yang ikut mengurangi budget tahunan.</div>
+    <div class="grid cols-2" style="margin-top:10px;">
+      <div class="field"><label>Tahun</label><input type="number" id="be_tahun" value="${rec.tahun}" min="2020" max="2100" step="1"></div>
+      <div class="field"><label>Tanggal</label><input type="date" id="be_tanggal" value="${escHtml(rec.tanggal)}"></div>
+    </div>
+    <div class="field" style="margin-top:10px;"><label>Deskripsi</label><input type="text" id="be_deskripsi" value="${escHtml(rec.deskripsi)}" placeholder="mis. Kamera anti-ATEX untuk area Flare"></div>
+    <div class="grid cols-2" style="margin-top:10px;">
+      <div class="field"><label>Kategori</label><input type="text" id="be_kategori" value="${escHtml(rec.kategori)}" placeholder="mis. Peralatan, APD, Pelatihan"></div>
+      <div class="field"><label>Jumlah (Rp)</label><input type="number" id="be_jumlah" value="${rec.jumlah}" min="0" step="10000"></div>
+    </div>
+    <div class="actions">
+      <button class="btn ghost" data-action="closeModal">Batal</button>
+      <button class="btn primary" data-action="saveBudgetExpense" data-id="${rec.id}">Simpan</button>
+    </div>`;
+}
+function addBudgetExpense(){ openModal(budgetExpenseFormHtml(null)); }
+function editBudgetExpense(id){ const r = DB.budgetExpenses.find(x=>x.id===id); if(r) openModal(budgetExpenseFormHtml(r)); }
+function saveBudgetExpense(id){
+  const val = {
+    tahun: Number(document.getElementById("be_tahun").value)||new Date().getFullYear(),
+    tanggal: document.getElementById("be_tanggal").value,
+    deskripsi: document.getElementById("be_deskripsi").value.trim(),
+    kategori: document.getElementById("be_kategori").value.trim()||"Lainnya",
+    jumlah: Math.max(0, Number(document.getElementById("be_jumlah").value)||0)
+  };
+  if(!val.deskripsi){ toast("Deskripsi wajib diisi.", "err"); return; }
+  if(id){ Object.assign(DB.budgetExpenses.find(x=>x.id===id), val); }
+  else { DB.budgetExpenses.push({id:uid("BGE"), ...val}); }
+  save(); closeModal(); renderBudgetAnnualSection();
+  toast(id?"Pengeluaran diperbarui.":"Pengeluaran ditambahkan.", "ok");
+}
+function deleteBudgetExpense(id){
+  askConfirm("Hapus catatan pengeluaran ini?", ()=>{
+    DB.budgetExpenses = DB.budgetExpenses.filter(x=>x.id!==id);
+    save(); renderBudgetAnnualSection(); toast("Pengeluaran dihapus.", "ok");
+  });
+}
+function budgetAllocFormHtml(year){
+  const cur = DB.budgetAnnual[year] || {allocated:0, catatan:""};
+  return `<h3>Atur Alokasi Budget Tahun ${year}</h3>
+    <div class="field" style="margin-top:10px;"><label>Alokasi Budget (Rp)</label><input type="number" id="ba_allocated" value="${cur.allocated}" min="0" step="1000000"></div>
+    <div class="field" style="margin-top:10px;"><label>Catatan (opsional)</label><textarea id="ba_catatan" rows="2" style="width:100%;padding:7px 9px;border:1px solid var(--gray-300);border-radius:6px;">${escHtml(cur.catatan||"")}</textarea></div>
+    <div class="actions">
+      <button class="btn ghost" data-action="closeModal">Batal</button>
+      <button class="btn primary" data-action="saveBudgetAlloc" data-year="${year}">Simpan</button>
+    </div>`;
+}
+function openBudgetAllocModal(year){ openModal(budgetAllocFormHtml(year)); }
+function saveBudgetAlloc(year){
+  year = Number(year);
+  DB.budgetAnnual[year] = {
+    allocated: Math.max(0, Number(document.getElementById("ba_allocated").value)||0),
+    catatan: document.getElementById("ba_catatan").value.trim()
+  };
+  save(); closeModal(); renderBudgetAnnualSection();
+  toast(`Alokasi budget ${year} disimpan.`, "ok");
+}
+function budgetYearGaugeHtml(year){
+  const alloc = (DB.budgetAnnual[year]||{}).allocated||0;
+  const spend = budgetYearActualSpend(year);
+  const pct = alloc>0 ? Math.min(999, Math.round(spend.total/alloc*100)) : 0;
+  const barColor = pct>100 ? "#a02a24" : pct>85 ? "#e8a33d" : "#0ea5a0";
+  const sisa = alloc - spend.total;
+  return `<div class="card" style="padding:14px 16px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;">
+      <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;">Tahun ${year}${year===new Date().getFullYear()?' <span class="badge b-teal" style="font-size:9px;">AKTIF</span>':""}</div>
+      <button class="btn small ghost" data-action="openBudgetAllocModalBtn" data-year="${year}">Atur Alokasi</button>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:6px;">
+      <div><span class="muted" style="font-size:11px;">Alokasi</span><div style="font-size:18px;font-weight:800;">${fmtRupiahRingkas(alloc)}</div></div>
+      <div style="text-align:right;"><span class="muted" style="font-size:11px;">Terserap</span><div style="font-size:18px;font-weight:800;color:${barColor};">${fmtRupiahRingkas(spend.total)}</div></div>
+    </div>
+    <div class="progressbar" style="margin-top:8px;"><div style="width:${Math.min(100,pct)}%;background:${barColor};"></div></div>
+    <div class="hint" style="margin-top:6px;display:flex;justify-content:space-between;">
+      <span>${pct}% terpakai</span><span>Sisa: ${fmtRupiahRingkas(sisa)}</span>
+    </div>
+    <div class="hint" style="margin-top:8px;font-size:10.5px;">Sampling: ${fmtRupiah(spend.samplingCost)} &middot; Mobilisasi: ${fmtRupiah(spend.mobilisasi)} &middot; Manual: ${fmtRupiah(spend.manualGeneric+spend.manualSampling)} &middot; Pengeluaran Lain: ${fmtRupiah(spend.expenses)}</div>
+  </div>`;
+}
+function renderBudgetAnnualSection(){
+  const host = document.getElementById("bgtAnnualCards");
+  if(!host) return;
+  const curYear = new Date().getFullYear();
+  const years = [...new Set([curYear, curYear+1, ...Object.keys(DB.budgetAnnual).map(Number)])].sort((a,b)=>a-b).filter(y=>y>=curYear-1 && y<=curYear+2);
+  host.innerHTML = years.map(budgetYearGaugeHtml).join("");
+  const expenses = DB.budgetExpenses.slice().sort((a,b)=>(b.tanggal||"").localeCompare(a.tanggal||""));
+  document.getElementById("bgtExpenseTable").innerHTML = expenses.length ? `
+    <thead><tr><th>Tahun</th><th>Tanggal</th><th>Kategori</th><th>Deskripsi</th><th style="text-align:right;">Jumlah</th><th></th></tr></thead>
+    <tbody>${expenses.map(e=>`<tr>
+      <td>${e.tahun}</td><td class="muted">${escHtml(e.tanggal||"-")}</td><td>${escHtml(e.kategori)}</td><td>${escHtml(e.deskripsi)}</td>
+      <td style="text-align:right;font-weight:700;">${fmtRupiah(e.jumlah)}</td>
+      <td style="white-space:nowrap;"><button class="btn small ghost" data-action="editBudgetExpenseBtn" data-id="${e.id}">Edit</button> <button class="btn small danger" data-action="deleteBudgetExpenseBtn" data-id="${e.id}">Hapus</button></td>
+    </tr>`).join("")}</tbody>` : `<tbody><tr><td class="hint" style="padding:16px;text-align:center;">Belum ada catatan pengeluaran lain. Klik "Tambah Pengeluaran" utk peralatan/APD/dll yang ikut mengurangi budget tahunan.</td></tr></tbody>`;
 }
 
 /* ---------- Export Excel ---------- */
 function exportBudgetXlsx(){
   const {periods, rows, costs} = budgetComputeCurrentView();
+  const mk = budgetState.markupPct;
   const sheetRingkasan = xlsxSheetFromRows(
-    ["Periode","Titik Aktual","Titik Proyeksi","Biaya Aktual (Rp)","Biaya Proyeksi (Rp)","Mobilisasi (Rp)","Item Manual (Rp)","Total (Rp)","Total +10% (Rp)","Total +15% (Rp)"],
+    ["Periode","Titik Aktual","Titik Proyeksi","Biaya Aktual (Rp)","Biaya Proyeksi (Rp)","Mobilisasi (Rp)","Sampling Tambahan (Rp)","Item Manual Lain (Rp)","Total (Rp)",`Total +${mk}% (Rp)`],
     rows.map((row,i)=>{
       const c = costs[i];
       return {
         "Periode": row.periode, "Titik Aktual": row.actualPts.length, "Titik Proyeksi": row.projectedPts.length,
         "Biaya Aktual (Rp)": Math.round(c.actualCost), "Biaya Proyeksi (Rp)": Math.round(c.projectedCost),
-        "Mobilisasi (Rp)": Math.round(c.mobilisasi), "Item Manual (Rp)": Math.round(c.manual),
-        "Total (Rp)": Math.round(c.base), "Total +10% (Rp)": Math.round(budgetApplyMarkup(c.base,10)), "Total +15% (Rp)": Math.round(budgetApplyMarkup(c.base,15))
+        "Mobilisasi (Rp)": Math.round(c.mobilisasi), "Sampling Tambahan (Rp)": Math.round(c.manualSampling), "Item Manual Lain (Rp)": Math.round(c.manualGeneric),
+        "Total (Rp)": Math.round(c.base), [`Total +${mk}% (Rp)`]: Math.round(budgetApplyMarkup(c.base,mk))
       };
     })
   );
   const paramTotals = budgetParamTotals(rows);
   const sheetRincian = xlsxSheetFromRows(
     ["Parameter","Jumlah Titik x Kunjungan","Harga Satuan (Rp)","Total Biaya (Rp)"],
-    Object.keys(paramTotals).sort((a,b)=>paramTotals[b].cost-paramTotals[a].cost).map(tok=>({
+    BUDGET_PARAM_ORDER.filter(tok=>paramTotals[tok]).map(tok=>({
       "Parameter": budgetTokenLabel(tok), "Jumlah Titik x Kunjungan": paramTotals[tok].count,
       "Harga Satuan (Rp)": budgetUnitPrice(tok), "Total Biaya (Rp)": Math.round(paramTotals[tok].cost)
     }))
   );
+  const {groups, groupOrder} = budgetBuildDetailGroups(periods, rows);
+  const detailRows = [];
+  Object.keys(groups).sort((a,b)=>groupOrder[a]-groupOrder[b]).forEach(g=>{
+    Object.keys(groups[g]).sort().forEach(s=>{
+      const r = {"Jenis Sampling": g, "Ketentuan Teknis": s};
+      periods.forEach(p=>{ r[p] = Math.round(groups[g][s][p]||0); });
+      detailRows.push(r);
+    });
+  });
+  const sheetDetail = xlsxSheetFromRows(["Jenis Sampling","Ketentuan Teknis",...periods], detailRows);
   const manualInRange = DB.budgetManualItems.filter(m=>periods.includes(m.periode));
   const sheetManual = xlsxSheetFromRows(
     ["Periode","Jenis","Deskripsi","Jumlah","Biaya Satuan (Rp)","Total (Rp)","Catatan"],
     manualInRange.map(m=>({
       "Periode": m.periode, "Jenis": BUDGET_MANUAL_JENIS_LABEL[m.jenis]||m.jenis, "Deskripsi": m.deskripsi,
-      "Jumlah": m.jumlah, "Biaya Satuan (Rp)": m.biayaSatuan, "Total (Rp)": m.jumlah*m.biayaSatuan, "Catatan": m.catatan
+      "Jumlah": m.jumlah, "Biaya Satuan (Rp)": m.jenis==="samplingTambahan"?budgetUnitPrice(m.parameterToken):m.biayaSatuan,
+      "Total (Rp)": Math.round(budgetManualItemCost(m)), "Catatan": m.catatan
     }))
   );
-  const wb = xlsxWorkbookFromSheets([["Ringkasan per Semester",sheetRingkasan],["Rincian per Parameter",sheetRincian],["Item Biaya Manual",sheetManual]]);
+  const sheetAnnual = xlsxSheetFromRows(
+    ["Tahun","Alokasi (Rp)","Terserap (Rp)","Sisa (Rp)","Catatan"],
+    Object.keys(DB.budgetAnnual).map(Number).sort().map(year=>{
+      const spend = budgetYearActualSpend(year);
+      return { "Tahun": year, "Alokasi (Rp)": DB.budgetAnnual[year].allocated, "Terserap (Rp)": Math.round(spend.total), "Sisa (Rp)": Math.round(DB.budgetAnnual[year].allocated-spend.total), "Catatan": DB.budgetAnnual[year].catatan||"" };
+    })
+  );
+  const wb = xlsxWorkbookFromSheets([["Ringkasan per Semester",sheetRingkasan],["Rincian per Parameter",sheetRincian],["Detail per Jenis & Peralatan",sheetDetail],["Item Biaya Manual",sheetManual],["Budget Tahunan",sheetAnnual]]);
   xlsxDownload(wb, `Budget Proyeksi Biaya_${currentPeriodStr().replace(" ","")}_${todayStr()}.xlsx`);
   toast("Export Excel budget berhasil.", "ok");
 }
 
-/* ---------- Render halaman ---------- */
+/* ---------- Export PDF (print) — reuse pola cetak yg sama dgn laporan lain (setPrintOrientation +
+   #printGuideArea + window.print(), lihat printBeritaAcara/doPrintDispersiReport). ---------- */
+function buildBudgetReportHtml(){
+  const {periods, rows, costs} = budgetComputeCurrentView();
+  const mk = budgetState.markupPct;
+  const grandBase = costs.reduce((s,c)=>s+c.base,0);
+  return `<div class="pg-batch">
+    <div style="text-align:center;margin-bottom:14px;padding-bottom:8px;border-bottom:1.5px solid #333;">
+      <h1 style="font-size:15px;margin:0 0 3px;letter-spacing:.03em;">LAPORAN BUDGET &amp; PROYEKSI BIAYA SAMPLING</h1>
+      <div style="font-size:11px;font-weight:700;">PT Pertamina Hulu Mahakam &mdash; Periode ${periods[0]} s/d ${periods[periods.length-1]}</div>
+      <div style="font-size:10px;margin-top:2px;">${escHtml(DB.budgetConfig.contractNote)}</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:10px;margin-bottom:16px;">
+      <thead><tr style="background:#1a2942;color:#fff;">
+        <th style="border:1px solid #999;padding:5px 6px;">Periode</th><th style="border:1px solid #999;padding:5px 6px;">Titik Aktual</th><th style="border:1px solid #999;padding:5px 6px;">Titik Proyeksi</th>
+        <th style="border:1px solid #999;padding:5px 6px;">Biaya Sampling</th><th style="border:1px solid #999;padding:5px 6px;">Mobilisasi</th><th style="border:1px solid #999;padding:5px 6px;">Item Manual</th>
+        <th style="border:1px solid #999;padding:5px 6px;">Total</th>${mk?`<th style="border:1px solid #999;padding:5px 6px;">Total +${mk}%</th>`:""}
+      </tr></thead>
+      <tbody>${rows.map((row,i)=>{ const c=costs[i]; return `<tr>
+        <td style="border:1px solid #999;padding:4px 6px;text-align:center;">${row.periode}</td>
+        <td style="border:1px solid #999;padding:4px 6px;text-align:center;">${row.actualPts.length}</td>
+        <td style="border:1px solid #999;padding:4px 6px;text-align:center;">${row.projectedPts.length}</td>
+        <td style="border:1px solid #999;padding:4px 6px;text-align:right;">${fmtRupiah(c.actualCost+c.projectedCost)}</td>
+        <td style="border:1px solid #999;padding:4px 6px;text-align:right;">${fmtRupiah(c.mobilisasi)}</td>
+        <td style="border:1px solid #999;padding:4px 6px;text-align:right;">${fmtRupiah(c.manual)}</td>
+        <td style="border:1px solid #999;padding:4px 6px;text-align:right;font-weight:700;">${fmtRupiah(c.base)}</td>
+        ${mk?`<td style="border:1px solid #999;padding:4px 6px;text-align:right;font-weight:700;">${fmtRupiah(budgetApplyMarkup(c.base,mk))}</td>`:""}
+      </tr>`; }).join("")}
+      <tr style="font-weight:800;"><td colspan="6" style="border:1px solid #999;padding:5px 6px;text-align:right;">GRAND TOTAL</td>
+        <td style="border:1px solid #999;padding:5px 6px;text-align:right;">${fmtRupiah(grandBase)}</td>
+        ${mk?`<td style="border:1px solid #999;padding:5px 6px;text-align:right;">${fmtRupiah(budgetApplyMarkup(grandBase,mk))}</td>`:""}
+      </tr></tbody>
+    </table>
+    <div style="font-size:11px;font-weight:700;margin-bottom:6px;">Rincian Detail per Jenis Sampling &amp; Peralatan</div>
+    ${buildBudgetDetailTableHtml(periods, rows, costs).replace(/font-size:11.5px;/,"font-size:9.5px;").replace(/padding:6px 8px;/g,"padding:4px 5px;").replace(/<table /,'<table style="border:1px solid #999;" ')}
+  </div>`;
+}
+function printBudgetReport(){
+  const html = buildBudgetReportHtml();
+  setPrintOrientation("landscape", 12);
+  document.getElementById("printGuideArea").innerHTML = html;
+  const originalTitle = document.title;
+  document.title = `Budget Proyeksi Biaya_${currentPeriodStr().replace(" ","")}`;
+  window.print();
+  document.title = originalTitle;
+}
+
+/* ---------- Render halaman + gerbang password ---------- */
 function budgetComputeCurrentView(){
   const semAhead = budgetState.yearsAhead*2;
   const semBack = budgetState.yearsBack*2;
@@ -273,15 +706,63 @@ function budgetComputeCurrentView(){
   const costs = rows.map(budgetRowCost);
   return {periods, rows, costs};
 }
-function budgetApplyYearsBack(years){ budgetState.yearsBack = years; renderBudgetPage(); }
-function budgetApplyYearsAhead(years){ budgetState.yearsAhead = years; renderBudgetPage(); }
-function budgetSetMarkup(pct){ budgetState.markupPct = pct; renderBudgetPage(); }
+function budgetApplyYearsBack(years){ budgetState.yearsBack = years; renderBudgetPageContent(); }
+function budgetApplyYearsAhead(years){ budgetState.yearsAhead = years; renderBudgetPageContent(); }
+function budgetSetMarkup(pct){ budgetState.markupPct = pct; renderBudgetPageContent(); }
+function budgetApplyCustomMarkup(){
+  const v = Number(document.getElementById("bgtCustomMarkup").value);
+  if(!isFinite(v) || v<0){ toast("Markup harus angka ≥ 0.", "err"); return; }
+  budgetState.markupPct = v;
+  renderBudgetPageContent();
+}
+function budgetSetColorBy(dim){
+  budgetState.colorBy = dim;
+  budgetState.hiddenSeries = new Set();
+  renderBudgetPageContent();
+}
+function budgetToggleSeries(key){
+  if(budgetState.hiddenSeries.has(key)) budgetState.hiddenSeries.delete(key);
+  else budgetState.hiddenSeries.add(key);
+  renderBudgetPageContent();
+}
 function renderBudgetPage(){
+  const lock = document.getElementById("bgtLockScreen"), content = document.getElementById("bgtContent");
+  if(!lock || !content) return;
+  if(!budgetUnlocked){
+    lock.style.display = "";
+    content.style.display = "none";
+    const pwInput = document.getElementById("bgtPasswordInput");
+    if(pwInput){ pwInput.value = ""; setTimeout(()=>pwInput.focus(), 50); }
+    return;
+  }
+  lock.style.display = "none";
+  content.style.display = "";
+  renderBudgetPageContent();
+}
+function budgetTryUnlock(){
+  const val = document.getElementById("bgtPasswordInput").value;
+  if(val === BUDGET_PASSWORD){
+    budgetUnlocked = true;
+    document.getElementById("bgtLockScreen").style.display = "none";
+    document.getElementById("bgtContent").style.display = "";
+    renderBudgetPageContent();
+  } else {
+    toast("Password salah.", "err");
+    const pwInput = document.getElementById("bgtPasswordInput");
+    if(pwInput){ pwInput.value = ""; pwInput.focus(); }
+  }
+}
+document.addEventListener("keydown", e=>{
+  if(e.key==="Enter" && e.target && e.target.id==="bgtPasswordInput") budgetTryUnlock();
+});
+function renderBudgetPageContent(){
+  if(!budgetUnlocked) return;
   const noteEl = document.getElementById("bgtContractNote");
   if(noteEl) noteEl.textContent = DB.budgetConfig.contractNote;
   document.querySelectorAll("[data-action='budgetSetYearsBack']").forEach(b=>b.classList.toggle("active", Number(b.dataset.yearsBack)===budgetState.yearsBack));
   document.querySelectorAll("[data-action='budgetSetYearsAhead']").forEach(b=>b.classList.toggle("active", Number(b.dataset.yearsAhead)===budgetState.yearsAhead));
   document.querySelectorAll("[data-action='budgetSetMarkup']").forEach(b=>b.classList.toggle("active", Number(b.dataset.markup)===budgetState.markupPct));
+  document.querySelectorAll("[data-action='budgetSetColorBy']").forEach(b=>b.classList.toggle("active", b.dataset.colorBy===budgetState.colorBy));
 
   const {periods, rows, costs} = budgetComputeCurrentView();
   const nowP = currentPeriodStr();
@@ -304,7 +785,7 @@ function renderBudgetPage(){
   ].join("");
 
   document.getElementById("bgtChart").innerHTML = buildBudgetChart(rows, costs);
-  document.getElementById("bgtChartLegend").innerHTML = budgetChartLegendHtml();
+  document.getElementById("bgtChartLegend").innerHTML = budgetChartLegendHtml(rows, costs);
 
   document.getElementById("bgtTable").innerHTML = `
     <thead><tr>
@@ -345,21 +826,37 @@ function renderBudgetPage(){
   document.getElementById("bgtManualTable").innerHTML = manualInRange.length ? `
     <thead><tr><th>Periode</th><th>Jenis</th><th>Deskripsi</th><th style="text-align:center;">Jumlah</th><th style="text-align:right;">Satuan</th><th style="text-align:right;">Total</th><th></th></tr></thead>
     <tbody>${manualInRange.map(m=>`<tr>
-      <td>${escHtml(m.periode)}</td><td class="muted">${escHtml(BUDGET_MANUAL_JENIS_LABEL[m.jenis]||m.jenis)}</td>
+      <td>${escHtml(m.periode)}</td><td class="muted" style="font-size:10.5px;">${escHtml(BUDGET_MANUAL_JENIS_LABEL[m.jenis]||m.jenis)}</td>
       <td>${escHtml(m.deskripsi||"-")}${m.catatan?`<div class="hint" style="font-size:10.5px;">${escHtml(m.catatan)}</div>`:""}</td>
-      <td style="text-align:center;">${m.jumlah}</td><td style="text-align:right;" class="muted">${fmtRupiah(m.biayaSatuan)}</td>
-      <td style="text-align:right;font-weight:700;">${fmtRupiah(m.jumlah*m.biayaSatuan)}</td>
+      <td style="text-align:center;">${m.jumlah}</td><td style="text-align:right;" class="muted">${fmtRupiah(m.jenis==="samplingTambahan"?budgetUnitPrice(m.parameterToken):m.biayaSatuan)}</td>
+      <td style="text-align:right;font-weight:700;">${fmtRupiah(budgetManualItemCost(m))}</td>
       <td style="white-space:nowrap;"><button class="btn small ghost" data-action="editBudgetManualBtn" data-id="${m.id}">Edit</button> <button class="btn small danger" data-action="deleteBudgetManualBtn" data-id="${m.id}">Hapus</button></td>
-    </tr>`).join("")}</tbody>` : `<tbody><tr><td class="hint" style="padding:16px;text-align:center;">Belum ada item biaya manual pada rentang periode ini. Klik "Tambah Biaya Manual" utk mobilisasi/teknisi tambahan yang provisional.</td></tr></tbody>`;
+    </tr>`).join("")}</tbody>` : `<tbody><tr><td class="hint" style="padding:16px;text-align:center;">Belum ada item biaya manual pada rentang periode ini. Klik "Tambah Biaya Manual" utk mobilisasi/teknisi/sampling tambahan yang provisional.</td></tr></tbody>`;
+
+  const detailHost = document.getElementById("bgtDetailTable");
+  if(detailHost) detailHost.innerHTML = buildBudgetDetailTableHtml(periods, rows, costs);
+
+  renderBudgetAnnualSection();
 }
 Object.assign(ACTIONS, {
+  budgetTryUnlock,
   budgetSetYearsBack:(t)=>budgetApplyYearsBack(Number(t.dataset.yearsBack)),
   budgetSetYearsAhead:(t)=>budgetApplyYearsAhead(Number(t.dataset.yearsAhead)),
   budgetSetMarkup:(t)=>budgetSetMarkup(Number(t.dataset.markup)),
+  budgetApplyCustomMarkup,
+  budgetSetColorBy:(t)=>budgetSetColorBy(t.dataset.colorBy),
+  budgetToggleSeries:(t)=>budgetToggleSeries(t.dataset.key),
   openBudgetConfigModal, saveBudgetConfig,
   addBudgetManual,
   editBudgetManualBtn:(t)=>editBudgetManual(t.dataset.id),
   deleteBudgetManualBtn:(t)=>deleteBudgetManual(t.dataset.id),
   saveBudgetManual:(t)=>saveBudgetManual(t.dataset.id),
-  exportBudgetXlsx
+  addBudgetExpense,
+  editBudgetExpenseBtn:(t)=>editBudgetExpense(t.dataset.id),
+  deleteBudgetExpenseBtn:(t)=>deleteBudgetExpense(t.dataset.id),
+  saveBudgetExpense:(t)=>saveBudgetExpense(t.dataset.id),
+  openBudgetAllocModalBtn:(t)=>openBudgetAllocModal(t.dataset.year),
+  saveBudgetAlloc:(t)=>saveBudgetAlloc(t.dataset.year),
+  exportBudgetXlsx,
+  printBudgetReport
 });

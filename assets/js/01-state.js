@@ -26,7 +26,9 @@ function freshDB(){
     hasilAmbien: {ambien:[...DEFAULT_HASIL_AMBIEN.ambien], kebisingan:[...DEFAULT_HASIL_AMBIEN.kebisingan], kebauan:[...DEFAULT_HASIL_AMBIEN.kebauan], getaran:[...DEFAULT_HASIL_AMBIEN.getaran]},
     dokumentasiFoto: {},
     budgetConfig: JSON.parse(JSON.stringify(DEFAULT_BUDGET_CONFIG)),
-    budgetManualItems: []
+    budgetManualItems: [],
+    budgetAnnual: {},
+    budgetExpenses: []
   };
 }
 function uid(pfx){ return pfx+"_"+Math.random().toString(36).slice(2,9); }
@@ -71,6 +73,8 @@ function migrateDB(){
     if(!DB.budgetConfig.contractNote) DB.budgetConfig.contractNote = DEFAULT_BUDGET_CONFIG.contractNote;
   }
   if(!Array.isArray(DB.budgetManualItems)) DB.budgetManualItems = [];
+  if(!DB.budgetAnnual || typeof DB.budgetAnnual!=="object") DB.budgetAnnual = {};
+  if(!Array.isArray(DB.budgetExpenses)) DB.budgetExpenses = [];
   if(!DB.meta) DB.meta = {semester:"S1", tahun:new Date().getFullYear(), lastBatchIdEmisi:0, lastBatchIdAmbient:0};
   if(DB.meta.currentPeriod!==undefined) delete DB.meta.currentPeriod; // field lama, tidak dipakai lagi — diganti meta.semester+meta.tahun
   // Backfill koordinat 12 titik Udara Ambien/Kebisingan/Kebauan/Getaran (Akomodasi/Camp/Office/
