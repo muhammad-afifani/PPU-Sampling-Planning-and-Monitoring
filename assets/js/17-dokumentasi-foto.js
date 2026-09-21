@@ -144,6 +144,11 @@ const DOKFOTO_CATEGORIES = [
   {key:"baSigned", label:"Bukti BA Sudah Ditandatangani", noTeknis:4, ketentuan:"BA Sampling", format:"png"}
 ];
 function dokFotoCatMeta(key){ return DOKFOTO_CATEGORIES.find(c=>c.key===key); }
+// Label super-ringkas per kategori, KHUSUS kolom sempit (tabel rekap) — nama lengkapnya tetap ada
+// lewat title="" tooltip di <th>, jadi tidak hilang informasinya, cuma tidak menuh-menuhin kolom.
+function dokFotoCatShortLabel(key){
+  return {personil:"Petugas", alat:"Alat", aktivitas:"Aktivitas", baSigned:"BA"}[key] || key;
+}
 function ensureDokFoto(pointId){
   if(!DB.dokumentasiFoto) DB.dokumentasiFoto = {};
   if(!DB.dokumentasiFoto[pointId]) DB.dokumentasiFoto[pointId] = {};
@@ -636,7 +641,61 @@ function renderDokFotoRecap(){
     ${chip("final", "Sudah Final", counts.final, "ok")}
     ${chip("notfinal", "Ada Foto, Belum Final", counts.notfinal, "warn")}
     ${chip("empty", "Belum Ada Foto", counts.empty, "err")}
+    <button type="button" class="btn small ghost" style="margin-left:auto;" data-action="dokFotoSampledRecapModal">Tabel Rekap vs Status Sampling</button>
   `;
+}
+/* ---------- Tabel rekap: titik yang SUDAH DISAMPLING (Tracking BA/CoA) apakah fotonya sudah lengkap
+   per kategori atau belum ---------- jawaban atas permintaan "recap semacam tabel utk semua engine
+   yg sudah disampling apakah sudah ada fotonya atau belum, yg kurang mana saja". Beda dari chip rekap
+   final di atas (itu berbasis status TANDA FINAL user, ini berbasis status SAMPLING dari Tracking —
+   dua sudut pandang yang saling melengkapi, bukan pengganti satu sama lain). */
+function dokFotoSampledRecapRows(onlySampled){
+  let pts = getFilteredDokFotoPointsBase();
+  if(onlySampled) pts = pts.filter(p=> ensureTracking(p.id).samplingStatus==="sampled");
+  return pts.map(p=>{
+    const d = ensureDokFoto(p.id);
+    const t = ensureTracking(p.id);
+    const catStatus = DOKFOTO_CATEGORIES.map(cat=>({label: cat.label, has: (d[cat.key]||[]).length>0}));
+    return { p, t, catStatus, allComplete: catStatus.every(c=>c.has), final: !!d.final };
+  });
+}
+let dokFotoRecapOnlySampled = true;
+function renderDokFotoSampledRecapModal(onlySampled){
+  dokFotoRecapOnlySampled = onlySampled;
+  const rows = dokFotoSampledRecapRows(onlySampled);
+  const doneCount = rows.filter(r=>r.allComplete).length;
+  openModal(`
+    <h3>Rekap Foto vs Status Sampling</h3>
+    <div class="hint" style="margin-top:-6px;">${onlySampled?"Titik yang statusnya <b>sudah disampling</b>":"Semua titik"} (mengikuti filter Tim/Batch/Site di halaman) &mdash; ${rows.length} titik, <span style="color:var(--green-600,#0d8a4f);font-weight:700;">${doneCount} sudah lengkap 4 kategori foto</span>, <span style="color:#a02a24;font-weight:700;">${rows.length-doneCount} masih kurang</span>.</div>
+    <div class="actions" style="margin:10px 0;">
+      <button class="btn small ${onlySampled?"":"ghost"}" data-action="dokFotoRecapToggleScope" data-only-sampled="1">Sudah Disampling Saja</button>
+      <button class="btn small ${onlySampled?"ghost":""}" data-action="dokFotoRecapToggleScope" data-only-sampled="0">Semua Titik</button>
+    </div>
+    <div class="tablewrap" style="max-height:58vh;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr style="border-bottom:1.5px solid var(--gray-300);position:sticky;top:0;background:#fff;">
+        <th style="text-align:left;padding:5px 6px;">Titik</th><th style="text-align:left;padding:5px 6px;">Site</th>
+        <th style="text-align:center;padding:5px 6px;min-width:64px;">Status</th>
+        ${DOKFOTO_CATEGORIES.map(c=>`<th style="text-align:center;padding:5px 4px;min-width:40px;" title="${escHtml(c.label)}">${escHtml(dokFotoCatShortLabel(c.key))}</th>`).join("")}
+        <th style="text-align:center;padding:5px 6px;">Final</th>
+      </tr></thead>
+      <tbody>${rows.length ? rows.map(r=>{
+        const statusLabel = r.t.samplingStatus ? (SAMPLING_STATUS_LABELS[r.t.samplingStatus]||r.t.samplingStatus) : "Belum diisi";
+        return `<tr style="border-bottom:1px solid var(--gray-200);${r.allComplete?"":"background:#fff8f0;"}">
+          <td style="padding:5px 6px;">${escHtml(r.p.nama)}</td>
+          <td style="padding:5px 6px;" class="muted">${escHtml(r.p.site)}</td>
+          <td style="text-align:center;padding:5px 6px;"><span class="badge ${r.t.samplingStatus==="sampled"?"b-green":"b-teal"}" style="font-size:9.5px;white-space:nowrap;" title="${escHtml(statusLabel)}">${r.t.samplingStatus==="sampled"?"Sudah":"Belum"}</span></td>
+          ${r.catStatus.map(c=>`<td style="text-align:center;padding:5px 4px;">${c.has?'<span style="color:var(--green-600,#0d8a4f);font-weight:800;">&#10003;</span>':'<span style="color:#a02a24;font-weight:800;">&#10007;</span>'}</td>`).join("")}
+          <td style="text-align:center;padding:5px 6px;">${r.final?'<span style="color:var(--green-600,#0d8a4f);font-weight:800;">&#10003;</span>':""}</td>
+        </tr>`;
+      }).join("") : `<tr><td colspan="${4+DOKFOTO_CATEGORIES.length}" class="hint" style="text-align:center;padding:20px;">Tidak ada titik yang cocok (coba "Semua Titik" atau ubah filter Tim/Batch/Site).</td></tr>`}</tbody>
+    </table>
+    </div>
+    <div class="actions">
+      <span class="spacer"></span>
+      <button class="btn ghost" data-action="closeModal">Tutup</button>
+    </div>
+  `, {wide:true});
 }
 
 /* ---------- Export/Import "Foto Saja" (terpisah dari backup JSON lengkap) ----------
@@ -938,6 +997,8 @@ Object.assign(ACTIONS, {
   exportDokFotoOnly,
   triggerImportDokFotoOnly:()=>document.getElementById("importDokFotoFile").click(),
   applyDokFotoImport,
+  dokFotoSampledRecapModal:()=>renderDokFotoSampledRecapModal(true),
+  dokFotoRecapToggleScope:(t)=>renderDokFotoSampledRecapModal(t.dataset.onlySampled==="1"),
   printSingleDokFotoLampiran:(t)=>printSingleDokFotoLampiran(t.dataset.point),
   printAllVisibleDokFotoLampiran,
   expandAllDokFoto:()=>{

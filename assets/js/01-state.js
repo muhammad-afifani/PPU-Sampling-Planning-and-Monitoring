@@ -24,7 +24,9 @@ function freshDB(){
     rhMonthly: JSON.parse(JSON.stringify(RH_MONTHLY_DEFAULT)),
     hasilPemantauan: [...DEFAULT_HASIL_PEMANTAUAN],
     hasilAmbien: {ambien:[...DEFAULT_HASIL_AMBIEN.ambien], kebisingan:[...DEFAULT_HASIL_AMBIEN.kebisingan], kebauan:[...DEFAULT_HASIL_AMBIEN.kebauan], getaran:[...DEFAULT_HASIL_AMBIEN.getaran]},
-    dokumentasiFoto: {}
+    dokumentasiFoto: {},
+    budgetConfig: JSON.parse(JSON.stringify(DEFAULT_BUDGET_CONFIG)),
+    budgetManualItems: []
   };
 }
 function uid(pfx){ return pfx+"_"+Math.random().toString(36).slice(2,9); }
@@ -56,6 +58,19 @@ function migrateDB(){
   if(DB._dokFotoExcluded !== undefined) delete DB._dokFotoExcluded;
   if(!DB.rhMonths) DB.rhMonths = [...RH_MONTHS_DEFAULT];
   if(!DB.rhMonthly) DB.rhMonthly = JSON.parse(JSON.stringify(RH_MONTHLY_DEFAULT));
+  // Budget & Proyeksi Biaya — backfill per sub-field (bukan cuma "kalau belum ada sama sekali") supaya
+  // sesi yg sudah pernah punya budgetConfig SEBAGIAN (mis. baru sempat ubah unitPrices sebelum ada
+  // field markupPercents ditambahkan versi berikutnya) tetap dapat default field yg belum ada, tanpa
+  // menimpa/mereset field yg SUDAH diedit user.
+  if(!DB.budgetConfig) DB.budgetConfig = JSON.parse(JSON.stringify(DEFAULT_BUDGET_CONFIG));
+  else{
+    if(!DB.budgetConfig.unitPrices) DB.budgetConfig.unitPrices = {...DEFAULT_BUDGET_CONFIG.unitPrices};
+    else Object.keys(DEFAULT_BUDGET_CONFIG.unitPrices).forEach(k=>{ if(DB.budgetConfig.unitPrices[k]==null) DB.budgetConfig.unitPrices[k] = DEFAULT_BUDGET_CONFIG.unitPrices[k]; });
+    if(DB.budgetConfig.mobilisasiPaketPerSemester==null) DB.budgetConfig.mobilisasiPaketPerSemester = DEFAULT_BUDGET_CONFIG.mobilisasiPaketPerSemester;
+    if(!Array.isArray(DB.budgetConfig.markupPercents)) DB.budgetConfig.markupPercents = [...DEFAULT_BUDGET_CONFIG.markupPercents];
+    if(!DB.budgetConfig.contractNote) DB.budgetConfig.contractNote = DEFAULT_BUDGET_CONFIG.contractNote;
+  }
+  if(!Array.isArray(DB.budgetManualItems)) DB.budgetManualItems = [];
   if(!DB.meta) DB.meta = {semester:"S1", tahun:new Date().getFullYear(), lastBatchIdEmisi:0, lastBatchIdAmbient:0};
   if(DB.meta.currentPeriod!==undefined) delete DB.meta.currentPeriod; // field lama, tidak dipakai lagi — diganti meta.semester+meta.tahun
   // Backfill koordinat 12 titik Udara Ambien/Kebisingan/Kebauan/Getaran (Akomodasi/Camp/Office/

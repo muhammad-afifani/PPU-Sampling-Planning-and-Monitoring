@@ -176,5 +176,26 @@ const PERSONIL_DATED = {ktp:false,mcu:true,spk:true,medpass:true,clsr:true,ppc:t
 // PTS ID isinya nomor id, bukan tanggal kedaluwarsa maupun status ada/tidak — jadi diberi tipe
 // input sendiri (nomor/teks bebas) di luar dua tipe PERSONIL_DATED yang sudah ada.
 const PERSONIL_NUMBER_FIELD = "ptsid";
+/* ---------- Budget & Proyeksi Biaya — harga satuan per parameter sampling ----------
+   Sumber: kontrak PHM dgn Mitra Lab SCI (Sucofindo), No. Kontrak 4710009303 (data S1 2026, angka user).
+   Key-nya SENGAJA dicocokkan persis dgn 2 sumber lain yg SUDAH ADA di app ini (bukan bikin kosakata
+   parameter baru): token emisi (NOx/CO/SO2/Total Partikulat/Opasitas/H2S) persis ejaan p.parameter
+   (lihat DEFAULT_ENGINES di atas — CSV/Excel asal titik, "SO2" TANPA subscript, beda dgn DISPERSI_
+   MASS_PARAMS "SO₂" yg dipakai di Model Dispersi Emisi/23-budget.js sengaja translate keduanya), dan
+   4 kategori non-emisi (ambient/kebisingan/kebauan/getaran) persis p.kategori (bukan hasilAmbien-key
+   "ambien" tanpa 't' — lihat HASIL_AMBIEN_KATEGORI_KEY, 13-hasil-db.js) krn resolusi biaya per titik
+   memang jalan dari p.kategori/p.parameter, bukan dari record hasil. 4 kategori non-emisi itu FLAT
+   per titik per kunjungan (bukan per parameter individual di dalamnya, spt PM10/O3/dst yg diukur
+   sekaligus dlm 1 kunjungan) — sesuai baris "Ambient/Noise/Odor/Vibration monitoring" di kontrak yg
+   masing2 1 baris harga per titik, bukan per parameter. */
+const DEFAULT_BUDGET_CONFIG = {
+  contractNote: "Harga mengikuti Kontrak PHM dengan Mitra Laboratorium SCI (Sucofindo), No. Kontrak 4710009303.",
+  unitPrices: {
+    NOx: 250000, CO: 207000, SO2: 207000, "Total Partikulat": 4500000, Opasitas: 370000, H2S: 207000, BTEX: 620000,
+    ambient: 1245450, kebisingan: 200000, kebauan: 620000, getaran: 410000
+  },
+  mobilisasiPaketPerSemester: 12500000,
+  markupPercents: [10, 15]
+};
 const STORAGE_KEY = "phmEmisiTool_v2";
 
