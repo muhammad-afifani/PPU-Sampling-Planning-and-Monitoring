@@ -1135,6 +1135,13 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 .bgt-legend-chip:hover{border-color:var(--teal-400);}
 .bgt-legend-chip.off{opacity:.4;text-decoration:line-through;}
 .bgt-legend-chip .sw{width:10px;height:10px;border-radius:3px;display:inline-block;flex-shrink:0;}
+.bgt-chart-seg{cursor:pointer;transition:opacity .1s;}
+.bgt-chart-seg:hover{opacity:.82;stroke:#fff;stroke-width:1.5;}
+.bgt-chart-tooltip{position:fixed;z-index:9999;display:none;pointer-events:none;background:rgba(18,24,36,.95);color:#fff;padding:6px 10px;border-radius:6px;font-size:11.5px;line-height:1.45;box-shadow:0 4px 14px rgba(0,0,0,.28);max-width:230px;}
+.bgt-chart-tooltip b{font-weight:700;}
+.bgt-detail-subrow:hover{background:var(--gray-100);}
+.bgt-detail-pointrow{background:#fafbfc;}
+.bgt-detail-pointrow:hover{background:#f2f4f6;}
 /* Rekap Kelengkapan Foto — chip klik-utk-filter (bukan cuma angka statis), imbang dgn pola chip
    filter status yg dipakai di tempat lain (mis. .navbtn/site pill). Warna per status: abu (semua),
    hijau (final), kuning (ada foto tp belum final), merah (belum ada foto sama sekali). */
