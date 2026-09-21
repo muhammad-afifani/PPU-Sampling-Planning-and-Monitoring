@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202609212345">
+<link rel="stylesheet" href="assets/css/style.css?v=202609220130">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -430,6 +430,22 @@
       <div class="alert-box alert-info"><span class="ms-icon" data-icon="info" data-size="16"></span><div>Kelengkapan dihitung dari 10 item: KTP, MCU, SPK, Medpass, CLSR, Sertifikat PPC Udara, Foto Background Biru, BOSIET/BST, Vaksin Booster 3, PTS ID. Item bertanggal dianggap tidak valid jika sudah lewat tanggal expired.</div></div>
       <div class="tablewrap"><table id="personilTable"></table></div>
       <div class="hint" id="personilCount" style="margin-bottom:16px;"></div>
+      <div class="card">
+        <div class="toolbar" style="padding:0;margin-bottom:10px;"><h3 style="margin:0;">Personil Kompetensi PPU (Manager Energi / Penanggung Jawab PPU / Operator PPU)</h3><span class="spacer"></span>
+          <button class="btn small primary" data-action="addPersonilPpu">+ Tambah Personil PPU</button>
+          <button class="btn small ghost" data-action="importPersonilPpuXlsx">Import Excel</button>
+          <button class="btn small ghost" data-action="exportPersonilPpuXlsx">Export Excel</button>
+        </div>
+        <div class="hint" style="margin-bottom:10px;">Registri sertifikasi kompetensi PPU per personil (terpisah dari roster PPC &amp; Observer di atas) — nomor sertifikat, masa berlaku, LSP penerbit, site penugasan, dan lampiran scan sertifikat (PDF/gambar).</div>
+        <div class="toolbar" style="padding:8px 0;">
+          <div class="field"><label>Kualifikasi</label><select id="ppuFltKualifikasi"><option value="">Semua</option><option>Manager Energi</option><option>Penanggung Jawab PPU</option><option>Operator PPU</option></select></div>
+          <div class="field"><label>Site</label><select id="ppuFltSite"><option value="">Semua Site</option></select></div>
+          <div class="spacer"></div>
+          <div class="field"><label>Cari Personil</label><div class="search-wrap"><span class="search-ico">&#128269;</span><input type="text" id="ppuFltSearch" placeholder="nama..."></div></div>
+        </div>
+        <div class="tablewrap"><table id="ppuTable"></table></div>
+        <div class="hint" id="ppuCount" style="margin-top:6px;"></div>
+      </div>
       <div class="card">
         <h3>Alokasi Site &amp; Jadwal Pindah per Personil</h3>
         <div class="hint" style="margin-bottom:10px;">Site mana saja tiap personil ditugaskan (dari Perencanaan Batch) beserta tanggal-tanggal perpindahannya, diurut dari yang paling awal.</div>
@@ -1612,35 +1628,36 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202609212345"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202609212345"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202609220130"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202609220130"></script>
 
-<script src="assets/data/default-data.js?v=202609212345"></script>
-<script src="assets/data/brand-assets.js?v=202609212345"></script>
-<script src="assets/data/travel-routes.js?v=202609212345"></script>
-<script src="assets/js/00-icons.js?v=202609212345"></script>
-<script src="assets/js/01-state.js?v=202609212345"></script>
-<script src="assets/js/02-nav-util.js?v=202609212345"></script>
-<script src="assets/js/03-period-logic.js?v=202609212345"></script>
-<script src="assets/js/04-dashboard.js?v=202609212345"></script>
-<script src="assets/js/05-master-data.js?v=202609212345"></script>
-<script src="assets/js/06-plan-personil.js?v=202609212345"></script>
-<script src="assets/js/07-rules-planner.js?v=202609212345"></script>
-<script src="assets/js/08-gantt-print.js?v=202609212345"></script>
-<script src="assets/js/09-tracking-map.js?v=202609212345"></script>
-<script src="assets/js/10-running-hour.js?v=202609212345"></script>
-<script src="assets/js/11-berita-acara.js?v=202609212345"></script>
-<script src="assets/js/12-data-page.js?v=202609212345"></script>
-<script src="assets/js/13-hasil-db.js?v=202609212345"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202609212345"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202609212345"></script>
-<script src="assets/js/16-actions-init.js?v=202609212345"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202609212345"></script>
-<script src="assets/js/18-model-dispersi.js?v=202609212345"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202609212345"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202609212345"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202609212345"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202609212345"></script>
-<script src="assets/js/23-budget-proyeksi.js?v=202609212345"></script>
+<script src="assets/data/default-data.js?v=202609220130"></script>
+<script src="assets/data/brand-assets.js?v=202609220130"></script>
+<script src="assets/data/travel-routes.js?v=202609220130"></script>
+<script src="assets/js/00-icons.js?v=202609220130"></script>
+<script src="assets/js/01-state.js?v=202609220130"></script>
+<script src="assets/js/02-nav-util.js?v=202609220130"></script>
+<script src="assets/js/03-period-logic.js?v=202609220130"></script>
+<script src="assets/js/04-dashboard.js?v=202609220130"></script>
+<script src="assets/js/05-master-data.js?v=202609220130"></script>
+<script src="assets/js/06-plan-personil.js?v=202609220130"></script>
+<script src="assets/js/07-rules-planner.js?v=202609220130"></script>
+<script src="assets/js/08-gantt-print.js?v=202609220130"></script>
+<script src="assets/js/09-tracking-map.js?v=202609220130"></script>
+<script src="assets/js/10-running-hour.js?v=202609220130"></script>
+<script src="assets/js/11-berita-acara.js?v=202609220130"></script>
+<script src="assets/js/12-data-page.js?v=202609220130"></script>
+<script src="assets/js/13-hasil-db.js?v=202609220130"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202609220130"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202609220130"></script>
+<script src="assets/js/16-actions-init.js?v=202609220130"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202609220130"></script>
+<script src="assets/js/18-model-dispersi.js?v=202609220130"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202609220130"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202609220130"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202609220130"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202609220130"></script>
+<script src="assets/js/23-budget-proyeksi.js?v=202609220130"></script>
+<script src="assets/js/24-personil-ppu.js?v=202609220130"></script>
 </body>
 </html>

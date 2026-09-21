@@ -556,7 +556,13 @@ function buildBudgetDetailTableHtml(periods, rows, costs, forceExpand){
     html += `<tr><td colspan="${2+periods.length}" class="hint" style="text-align:center;padding:20px;">Tidak ada titik aktual/proyeksi pada rentang periode ini.</td></tr>`;
   }
   const tagDot = {Aktual:"#0ea5a0", Proyeksi:"#e8a33d", "Sampling Tambahan":"#8a5c11"};
+  // Odor (kebauan) & Getaran: TETAP masuk hitungan/Grand Total spt kategori lain (dibayar ke SCI),
+  // cuma dikasih tint kuning redup di baris tabel supaya kelihatan jelas ini golongan "internal, tidak
+  // dilaporkan ke eksternal" — bukan exclude biaya, MURNI penanda visual (permintaan user).
+  const isInternalGroup = g => g.startsWith("ODOR MONITORING") || g.startsWith("VIBRATION MONITORING");
+  const INTERNAL_TINT = "#faf1cf", INTERNAL_ACCENT = "#b8912a";
   groupKeys.forEach(g=>{
+    const internal = isInternalGroup(g);
     const subKeys = Object.keys(groups[g]).sort();
     subKeys.forEach(s=>{
       const cellsByPeriode = groups[g][s];
@@ -565,13 +571,14 @@ function buildBudgetDetailTableHtml(periods, rows, costs, forceExpand){
       const expanded = forceExpand || !!budgetDetailExpanded[rowKey];
       const namesList = pointRows.map(r=>r.nama).join(", ") || "-";
       const qtyLabel = ` <span class="muted" style="font-weight:400;">(${pointRows.length} titik)</span>`;
-      html += `<tr class="bgt-detail-subrow"${forceExpand?"":` data-action="budgetToggleDetailRow" data-key="${escHtml(rowKey)}" style="cursor:pointer;"`} title="Titik: ${escHtml(namesList)}">
-        <td style="padding:4px 8px;" class="muted">${forceExpand?"":`<span style="display:inline-block;width:12px;">${expanded?"&#9662;":"&#9656;"}</span>`}${escHtml(g)}</td>
+      const subrowStyle = (internal?`background:${INTERNAL_TINT};`:"") + (forceExpand?"":"cursor:pointer;");
+      html += `<tr class="bgt-detail-subrow"${forceExpand?"":` data-action="budgetToggleDetailRow" data-key="${escHtml(rowKey)}"`}${subrowStyle?` style="${subrowStyle}"`:""} title="Titik: ${escHtml(namesList)}">
+        <td style="padding:4px 8px;border-left:${internal?`3px solid ${INTERNAL_ACCENT}`:"3px solid transparent"};" class="muted">${forceExpand?"":`<span style="display:inline-block;width:12px;">${expanded?"&#9662;":"&#9656;"}</span>`}${escHtml(g)}</td>
         <td style="padding:4px 8px;">${escHtml(s)}${qtyLabel}</td>
         ${periods.map(p=>`<td style="text-align:right;padding:4px 8px;font-variant-numeric:tabular-nums;">${fmtRupiah(budgetCellTotal(cellsByPeriode,p))}</td>`).join("")}</tr>`;
       if(expanded){
         pointRows.forEach(pr=>{
-          html += `<tr class="bgt-detail-pointrow"><td></td><td style="padding:3px 8px 3px 22px;font-size:10.5px;" class="muted">${escHtml(pr.nama)} <span style="opacity:.7;">&middot; ${escHtml(pr.site)}</span></td>
+          html += `<tr class="bgt-detail-pointrow"${internal?` style="background:${INTERNAL_TINT};"`:""}><td style="border-left:${internal?`3px solid ${INTERNAL_ACCENT}`:"3px solid transparent"};"></td><td style="padding:3px 8px 3px 22px;font-size:10.5px;" class="muted">${escHtml(pr.nama)} <span style="opacity:.7;">&middot; ${escHtml(pr.site)}</span></td>
             ${periods.map(p=>{
               const c = pr.cells[p];
               if(!c) return `<td style="text-align:right;padding:3px 8px;color:var(--gray-400);">&middot;</td>`;
@@ -581,9 +588,20 @@ function buildBudgetDetailTableHtml(periods, rows, costs, forceExpand){
       }
     });
     const groupTotal = periods.map(p=> subKeys.reduce((s,sk)=>s+budgetCellTotal(groups[g][sk],p), 0));
-    html += `<tr style="background:var(--gray-100);font-weight:700;"><td colspan="2" style="padding:4px 8px;">${escHtml(g)} Total</td>
+    html += `<tr style="background:${internal?"#f3e6ad":"var(--gray-100)"};font-weight:700;"><td colspan="2" style="padding:4px 8px;border-left:${internal?`3px solid ${INTERNAL_ACCENT}`:"3px solid transparent"};">${escHtml(g)} Total${internal?' <span class="muted" style="font-weight:400;font-size:10px;">(internal, tidak dilaporkan ke eksternal)</span>':""}</td>
       ${groupTotal.map(v=>`<td style="text-align:right;padding:4px 8px;font-variant-numeric:tabular-nums;">${fmtRupiah(v)}</td>`).join("")}</tr>`;
   });
+  // Baris ringkasan "Kebauan + Getaran" (internal) — angka ini SUDAH termasuk di dalam Grand Total di
+  // bawah (bukan tambahan di luar itu), cuma di-breakout biar user langsung lihat besarannya tanpa
+  // harus jumlahin manual dari baris2 grup ODOR/VIBRATION di atas.
+  const internalGroupKeys = groupKeys.filter(isInternalGroup);
+  if(internalGroupKeys.length){
+    const internalPeriodTotal = periods.map(p=> internalGroupKeys.reduce((s,g)=> s + Object.keys(groups[g]).reduce((s2,sk)=>s2+budgetCellTotal(groups[g][sk],p),0), 0));
+    html += `<tr style="background:${INTERNAL_TINT};font-weight:700;border-top:1.5px solid ${INTERNAL_ACCENT};border-bottom:1.5px solid ${INTERNAL_ACCENT};"><td colspan="2" style="padding:5px 8px;">
+      <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${INTERNAL_ACCENT};margin-right:6px;"></span>
+      Sudah Termasuk di Grand Total: Kebauan (Odor) + Getaran <span class="muted" style="font-weight:400;font-size:10px;">&mdash; internal, tidak dilaporkan ke eksternal</span></td>
+      ${internalPeriodTotal.map(v=>`<td style="text-align:right;padding:5px 8px;font-variant-numeric:tabular-nums;">${fmtRupiah(v)}</td>`).join("")}</tr>`;
+  }
   // Mobilisasi paket per periode
   html += `<tr><td colspan="2" style="padding:4px 8px;font-weight:700;">Mobilization and Demobilization (Package, per Semester)</td>
     ${costs.map(c=>`<td style="text-align:right;padding:4px 8px;font-variant-numeric:tabular-nums;">${fmtRupiah(c.mobilisasi)}</td>`).join("")}</tr>`;
@@ -951,12 +969,15 @@ function renderBudgetPageContent(){
   const paramTokensSorted = Object.keys(paramTotals).sort((a,b)=>paramTotals[b].cost-paramTotals[a].cost);
   document.getElementById("bgtParamTable").innerHTML = paramTokensSorted.length ? `
     <thead><tr><th>Parameter</th><th style="text-align:center;">Titik &times; Kunjungan</th><th style="text-align:right;">Harga Satuan</th><th style="text-align:right;">Total Biaya</th></tr></thead>
-    <tbody>${paramTokensSorted.map(tok=>`<tr>
-      <td>${escHtml(budgetTokenLabel(tok))}</td>
+    <tbody>${paramTokensSorted.map(tok=>{
+      const internal = tok==="kebauan" || tok==="getaran";
+      return `<tr${internal?' style="background:#faf1cf;"':""}>
+      <td style="${internal?"border-left:3px solid #b8912a;":""}">${escHtml(budgetTokenLabel(tok))}</td>
       <td style="text-align:center;">${paramTotals[tok].count}</td>
       <td style="text-align:right;" class="muted">${fmtRupiah(budgetUnitPrice(tok))}</td>
       <td style="text-align:right;font-weight:700;">${fmtRupiah(paramTotals[tok].cost)}</td>
-    </tr>`).join("")}</tbody>` : `<tbody><tr><td class="hint" style="padding:16px;text-align:center;">Tidak ada titik aktual/proyeksi pada rentang periode ini.</td></tr></tbody>`;
+    </tr>`;
+    }).join("")}</tbody>` : `<tbody><tr><td class="hint" style="padding:16px;text-align:center;">Tidak ada titik aktual/proyeksi pada rentang periode ini.</td></tr></tbody>`;
 
   const manualInRange = DB.budgetManualItems.filter(m=>periods.includes(m.periode)).sort((a,b)=>hasilPeriodParts(a.periode).order-hasilPeriodParts(b.periode).order);
   document.getElementById("bgtManualTable").innerHTML = manualInRange.length ? `
