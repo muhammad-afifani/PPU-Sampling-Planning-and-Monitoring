@@ -1129,6 +1129,20 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 
 /* Dokumentasi Foto Sampling */
 .dokfoto-storage-hint{margin-bottom:14px;}
+/* Rekap Kelengkapan Foto — chip klik-utk-filter (bukan cuma angka statis), imbang dgn pola chip
+   filter status yg dipakai di tempat lain (mis. .navbtn/site pill). Warna per status: abu (semua),
+   hijau (final), kuning (ada foto tp belum final), merah (belum ada foto sama sekali). */
+.dokfoto-recap{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px 0;}
+.dokfoto-recap-chip{border:1.5px solid var(--gray-300);border-radius:20px;background:#fff;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--gray-600);}
+.dokfoto-recap-chip b{font-weight:800;}
+.dokfoto-recap-chip.active{border-color:currentColor;}
+.dokfoto-recap-chip.all.active{background:var(--gray-100);color:var(--gray-800);}
+.dokfoto-recap-chip.ok{color:#0d8a4f;}
+.dokfoto-recap-chip.ok.active{background:#e6f7ee;}
+.dokfoto-recap-chip.warn{color:#b8860b;}
+.dokfoto-recap-chip.warn.active{background:#fdf3d9;}
+.dokfoto-recap-chip.err{color:#a02a24;}
+.dokfoto-recap-chip.err.active{background:#fbe7e5;}
 /* Sub-kelompok per jenis sumber emisi/ambient (mis. Flare terpisah dari Turbin) — pola divider yang
    sama dgn "Tahap 1, Sampling Emisi di Lapangan" di Tracking BA/CoA. */
 .dokfoto-list .reg-divider:first-child{margin-top:0;}

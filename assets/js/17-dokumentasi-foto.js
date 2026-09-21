@@ -580,7 +580,7 @@ function refreshDokSiteSelect(){
 // Semesta titiknya SAMA dgn Tracking BA/CoA (p.batchId terisi) — dokumentasi foto memang cuma
 // relevan utk titik yang benar-benar masuk sebuah batch eksekusi, titik yang tidak wajib/belum
 // pernah dijadwalkan tidak perlu foto apapun.
-function getFilteredDokFotoPoints(){
+function getFilteredDokFotoPointsBase(){
   const team = document.getElementById("dokTeam").value;
   const batchId = document.getElementById("dokBatch").value;
   const site = document.getElementById("dokSite").value;
@@ -589,6 +589,54 @@ function getFilteredDokFotoPoints(){
   if(batchId) pts = pts.filter(p=>p.batchId===batchId);
   if(site) pts = pts.filter(p=>p.site===site);
   return pts.sort((a,b)=> a.site.localeCompare(b.site) || a.nama.localeCompare(b.nama));
+}
+// Filter Status (final/ada foto belum final/belum ada foto) dipisah dari filter dasar Tim/Batch/Site
+// supaya rekap (dokFotoRecapCounts) bisa hitung total PER STATUS dari filter dasar yang sama, tanpa
+// filter status itu sendiri ikut memotong angkanya (baru diterapkan belakangan di sini).
+function getFilteredDokFotoPoints(){
+  const statusEl = document.getElementById("dokStatus");
+  const status = statusEl ? statusEl.value : "";
+  const pts = getFilteredDokFotoPointsBase();
+  return status ? pts.filter(p=>dokFotoStatusOf(p.id)===status) : pts;
+}
+function dokFotoIsFinal(pointId){ return !!ensureDokFoto(pointId).final; }
+function dokFotoStatusOf(pointId){
+  if(dokFotoIsFinal(pointId)) return "final";
+  return dokFotoHasAnyPhoto(pointId) ? "notfinal" : "empty";
+}
+// Tandai/batalkan "final" per TITIK (bukan per foto) — dipakai user utk merekap mana yg fotonya
+// sudah lengkap & oke, mana yg masih perlu direvisi, terutama saat pekerjaan dibagi ke banyak orang.
+function toggleDokFotoFinal(pointId){
+  const d = ensureDokFoto(pointId);
+  if(!d.final && !dokFotoHasAnyPhoto(pointId)){
+    toast("Titik ini belum ada foto sama sekali — tambahkan foto dulu sebelum ditandai final.", "err");
+    return;
+  }
+  d.final = !d.final;
+  d.finalAt = d.final ? new Date().toISOString() : null;
+  save();
+  renderDokumentasiFoto();
+  toast(d.final ? "Foto titik ini ditandai FINAL." : "Tanda final dibatalkan — foto boleh diubah lagi.", "ok");
+}
+function dokFotoRecapCounts(){
+  const pts = getFilteredDokFotoPointsBase();
+  const counts = {total: pts.length, final: 0, notfinal: 0, empty: 0};
+  pts.forEach(p=>{ counts[dokFotoStatusOf(p.id)]++; });
+  return counts;
+}
+function renderDokFotoRecap(){
+  const host = document.getElementById("dokFotoRecap");
+  if(!host) return;
+  const counts = dokFotoRecapCounts();
+  const curStatus = document.getElementById("dokStatus").value;
+  const chip = (status,label,n,cls)=>`<button type="button" class="dokfoto-recap-chip ${cls}${curStatus===status?" active":""}" data-action="dokFotoFilterStatus" data-status="${status}">${escHtml(label)} <b>${n}</b></button>`;
+  host.innerHTML = `
+    <span class="muted" style="font-size:11.5px;font-weight:700;">Rekap Kelengkapan Foto (mengikuti filter Tim/Batch/Site):</span>
+    ${chip("", "Semua Titik", counts.total, "all")}
+    ${chip("final", "Sudah Final", counts.final, "ok")}
+    ${chip("notfinal", "Ada Foto, Belum Final", counts.notfinal, "warn")}
+    ${chip("empty", "Belum Ada Foto", counts.empty, "err")}
+  `;
 }
 // Sub-kelompok per jenis sumber emisi/ambient (mis. "Turbine Engine Generator" terpisah dari
 // "Flare") supaya daftar titik yang panjang lebih gampang dipindai — dgn urutan prioritas yang
@@ -658,6 +706,10 @@ function dokFotoPointCardHtml(p){
   const statusLabel = t.samplingStatus ? (SAMPLING_STATUS_LABELS[t.samplingStatus]||t.samplingStatus) : "Belum diisi statusnya";
   const cap = dokFotoPointCaptionHtml(p.id);
   const isOpen = dokFotoExpanded[p.id]!==false; // default terbuka
+  const isFinal = dokFotoIsFinal(p.id);
+  const finalBtn = isFinal
+    ? `<button class="btn small" style="background:var(--green-500,#1a9e5c);border-color:var(--green-500,#1a9e5c);color:#fff;" data-action="toggleDokFotoFinal" data-point="${p.id}" title="Klik utk batalkan tanda final">&#10003; Final</button>`
+    : `<button class="btn small ghost" data-action="toggleDokFotoFinal" data-point="${p.id}" title="Tandai foto titik ini sudah lengkap/oke">Tandai Final</button>`;
   return `<details class="card dokfoto-point-card" data-point-id="${p.id}" ${isOpen?"open":""}>
     <summary class="dokfoto-point-summary">
       <div>
@@ -665,6 +717,7 @@ function dokFotoPointCardHtml(p){
         <div class="dokfoto-point-sub">${cap.sub}</div>
       </div>
       <div class="dokfoto-point-actions">
+        ${finalBtn}
         <button class="btn small ghost" data-action="downloadDokFotoAll" data-point="${p.id}" title="Download semua foto titik ini">Download Foto</button>
         <button class="btn small" data-action="printSingleDokFotoLampiran" data-point="${p.id}" title="Cetak lampiran SIMPEL PPU titik ini">Cetak PDF</button>
         <span class="badge ${t.samplingStatus==="sampled"?"b-green":"b-teal"}">${escHtml(statusLabel)}</span>
@@ -678,6 +731,7 @@ function dokFotoPointCardHtml(p){
 async function renderDokumentasiFoto(){
   refreshDokBatchSelect();
   refreshDokSiteSelect();
+  renderDokFotoRecap();
   const el = document.getElementById("dokFotoList");
   const sizeEl = document.getElementById("dokFotoStorageSize");
   const pts = getFilteredDokFotoPoints();
@@ -700,6 +754,7 @@ async function renderDokumentasiFoto(){
 document.getElementById("dokTeam").addEventListener("change", ()=>{ refreshDokBatchSelect(); renderDokumentasiFoto(); });
 document.getElementById("dokBatch").addEventListener("change", ()=>renderDokumentasiFoto());
 document.getElementById("dokSite").addEventListener("change", ()=>renderDokumentasiFoto());
+document.getElementById("dokStatus").addEventListener("change", ()=>renderDokumentasiFoto());
 
 Object.assign(ACTIONS, {
   triggerAddDokFoto:(t)=>{
@@ -736,6 +791,11 @@ Object.assign(ACTIONS, {
   deleteDokFoto:(t)=>deleteDokFoto(t.dataset.point, t.dataset.cat, t.dataset.id),
   downloadSingleDokFoto:(t)=>downloadSingleDokFoto(t.dataset.point, t.dataset.cat, t.dataset.id),
   downloadDokFotoAll:(t)=>downloadDokFotoAll(t.dataset.point),
+  toggleDokFotoFinal:(t)=>toggleDokFotoFinal(t.dataset.point),
+  dokFotoFilterStatus:(t)=>{
+    document.getElementById("dokStatus").value = t.dataset.status;
+    renderDokumentasiFoto();
+  },
   printSingleDokFotoLampiran:(t)=>printSingleDokFotoLampiran(t.dataset.point),
   printAllVisibleDokFotoLampiran,
   expandAllDokFoto:()=>{
