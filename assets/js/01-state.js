@@ -299,10 +299,16 @@ function migrateDB(){
   // Gerbang akses visitor/PHM (25-access-gate.js, dimuat PALING TERAKHIR) — referensi maju yg AMAN
   // krn baris ini baru benar2 DIEKSEKUSI setelah SEMUA script (00-25) selesai di-parse (dipanggil dari
   // load()/applyFullBackupImport(), bukan di top-level file ini), jadi gateState & applyVisitorDataMask
-  // sudah pasti terdefinisi saat migrateDB() ini berjalan. Kalau mode-nya visitor, kode/koordinat titik
-  // disamarkan DI SINI (satu titik, bukan ditempel manual di puluhan file render) supaya OTOMATIS
-  // konsisten ke SELURUH tabel/chart/PDF/peta yg baca DB.points/DB.pointCoords apa adanya.
-  if(typeof gateState!=="undefined" && gateState && gateState.mode==="visitor" && typeof applyVisitorDataMask==="function"){
+  // sudah pasti terdefinisi saat migrateDB() ini berjalan. Kode/koordinat titik disamarkan DI SINI
+  // (satu titik, bukan ditempel manual di puluhan file render) supaya OTOMATIS konsisten ke SELURUH
+  // tabel/chart/PDF/peta yg baca DB.points/DB.pointCoords apa adanya.
+  // DEFAULT AMAN = disamarkan KECUALI sudah pasti PHM (gateState.mode==="phm") — bukan cuma kalau
+  // mode-nya eksplisit "visitor". Ini PENTING krn app sekarang boot LANGSUNG (bootApp() dipanggil
+  // tanpa nunggu gerbang resolve dulu, supaya dashboard redup kelihatan di belakang gerbang
+  // transparan) — pas gateState masih null (belum pernah pilih apa2), data yg baru dimuat itu HARUS
+  // tetap tersamar, bukan diam2 nampilin data asli sebelum user membuktikan diri staf PHM.
+  const gateKnownPhm = typeof gateState!=="undefined" && gateState && gateState.mode==="phm";
+  if(!gateKnownPhm && typeof applyVisitorDataMask==="function"){
     applyVisitorDataMask();
   }
 }
@@ -342,11 +348,12 @@ function save(){
       redoStack = [];
       lastUndoPushTime = nowTs;
     }
-    // Mode visitor: JANGAN PERNAH tulis ke localStorage (STORAGE_KEY yg SAMA dipakai data PHM asli
-    // di perangkat ini kalau device-nya dipakai bersama-sama) — data visitor cukup hidup di memori
-    // sepanjang sesi tab ini, hilang begitu reload, tidak pernah menimpa/campur data asli sama sekali.
-    const isVisitorSession = typeof gateState!=="undefined" && gateState && gateState.mode==="visitor";
-    if(!isVisitorSession) localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
+    // JANGAN PERNAH tulis ke localStorage (STORAGE_KEY yg SAMA dipakai data PHM asli di perangkat
+    // ini kalau device-nya dipakai bersama-sama) KECUALI sudah pasti sesi staf PHM (gateState.mode
+    // ==="phm") — default AMAN (diblokir) juga selama gateState masih null (app boot duluan sblm
+    // gerbang di-resolve, lihat catatan di migrateDB()), bukan cuma pas mode-nya eksplisit visitor.
+    const isRealPhmSession = typeof gateState!=="undefined" && gateState && gateState.mode==="phm";
+    if(isRealPhmSession) localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
     lastSavedSnapshot = snapshotForUndo(DB);
     updateStorageUsageBadge();
     updateUndoRedoButtons();
@@ -587,8 +594,9 @@ function applyUndoRedoState(snapshotData){
   // TIDAK ikut mendorong entry baru ke undoStack — kalau lewat save(), undo akan "mengunci diri
   // sendiri" (redo jadi tidak pernah bisa balik ke keadaan semula krn undoStack ikut berubah
   // tiap kali di-undo). Dua stack terpisah (undo/redo) sudah menangani riwayat maju-mundurnya.
-  const isVisitorSessionUR = typeof gateState!=="undefined" && gateState && gateState.mode==="visitor";
-  if(!isVisitorSessionUR){
+  // Default AMAN (diblokir) kecuali sudah pasti staf PHM — sama alasannya dgn guard di save().
+  const isRealPhmSessionUR = typeof gateState!=="undefined" && gateState && gateState.mode==="phm";
+  if(isRealPhmSessionUR){
     try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }catch(err){ /* quota — Undo/Redo tetap jalan di memori, tanpa alur recovery penuh spt save() */ }
   }
   updateStorageUsageBadge();
