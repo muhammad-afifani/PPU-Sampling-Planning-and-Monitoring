@@ -90,13 +90,21 @@ function renderGateChoice(){
 }
 function renderGatePhmForm(){
   const host = document.getElementById("accessGate"); if(!host) return;
+  // Field login ini SENGAJA dibikin "tidak menarik" utk password manager browser/ekstensi (Chrome,
+  // LastPass, 1Password, dll) — autocomplete="off"/"new-password" + name acak tiap render + atribut
+  // data-lpignore/data-1p-ignore. Alasan: field username/password yg jelas gampang KEBACA/dipicu
+  // autofill/dropdown "saran password tersimpan", dan dropdown NATIF browser itu suka nongol nutupin
+  // elemen lain di halaman (mis. kotak Cari Menu di sidebar) krn posisinya tidak bisa dikontrol CSS.
+  // Kredensial di sini memang bukan akun pribadi per-user (shared team credential), jadi tidak perlu
+  // & tidak baiknya diam-diam ditawarkan disimpan per-browser.
+  const nameSuffix = Date.now().toString(36);
   host.innerHTML = `
     <div class="gate-card">
       <button class="gate-back" data-action="gateBack" type="button">&larr; Kembali</button>
       <h2>Login Staf PHM</h2>
       <div class="gate-sub">Masuk dengan akun yang diberikan untuk melihat seluruh data apa adanya.</div>
-      <div class="field" style="margin-top:12px;"><label>Username</label><input type="text" id="gatePhmUser" autocomplete="username" placeholder="username"></div>
-      <div class="field" style="margin-top:10px;"><label>Password</label><input type="password" id="gatePhmPass" autocomplete="current-password" placeholder="password"></div>
+      <div class="field" style="margin-top:12px;"><label>Username</label><input type="text" id="gatePhmUser" name="gu_${nameSuffix}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-form-type="other" placeholder="username"></div>
+      <div class="field" style="margin-top:10px;"><label>Password</label><input type="password" id="gatePhmPass" name="gp_${nameSuffix}" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other" placeholder="password"></div>
       <div class="gate-error" id="gatePhmError" style="display:none;"></div>
       <button class="btn primary btn-block" style="margin-top:14px;" data-action="gateSubmitPhm">Login</button>
       ${gateContactNoteHtml()}
