@@ -397,7 +397,7 @@ tbody tr:hover{background:var(--gray-100);}
    sebelum body sempat dicat browser. JS cuma bertugas MENYEMBUNYIKAN (display:none) setelah
    gerbang resolve, bukan menampilkannya. z-index sengaja jauh di atas .overlay modal biasa (5000)
    supaya gerbang ini benar2 menutupi apapun.*/
-.access-gate{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(160deg,var(--navy-950),var(--navy-800));overflow:auto;}
+.access-gate{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(6,14,26,.78);overflow:auto;}
 .gate-card{background:var(--surface-card);color:var(--ms-text);border-radius:16px;width:100%;max-width:440px;padding:28px 26px;box-shadow:0 24px 70px rgba(0,0,0,.4);position:relative;text-align:center;}
 .gate-logo{margin-bottom:10px;}
 .gate-logo img{height:46px;width:auto;margin:0 auto;}
