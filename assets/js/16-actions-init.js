@@ -392,9 +392,20 @@ document.addEventListener("change", e=>{
 /* =========================================================
    INIT
 ========================================================= */
-load();
-showPage("dashboard");
-// TIDAK auto-popup lagi (lihat catatan di renderOnboardingModal) — tools ini dibuka via file://
+// load()+showPage() DIBUNGKUS jadi fungsi (bukan langsung dipanggil di sini) — gerbang akses
+// (25-access-gate.js, dimuat PALING TERAKHIR) yang menentukan KAPAN aplikasi beneran di-boot:
+// begitu visitor/PHM sudah pilih jalur & submit, atau langsung kalau sesi sebelumnya di browser
+// ini sudah pernah resolve gerbangnya. Logo brand tetap diisi dari sini (elemen ini ada di
+// BELAKANG overlay gerbang, tidak masalah kalau keisi lebih dulu).
+function bootApp(){
+  load();
+  showPage("dashboard");
+  // Migrasi foto lama ke IndexedDB (17-dokumentasi-foto.js) — dulu top-level di file itu sendiri,
+  // sekarang dipanggil eksplisit DI SINI (sesudah load(), jadi DB pasti sudah terisi) krn gerbang
+  // akses bisa menunda load() sampai visitor/PHM resolve dulu.
+  if(typeof dokFotoMigrateLegacyPhotos==="function") dokFotoMigrateLegacyPhotos();
+}
+// TIDAK auto-popup Info & Panduan lagi (lihat catatan di renderOnboardingModal) — tools ini dibuka via file://
 // yang di-save-ulang berkala dgn nama baru (tanggal berubah tiap kali), dan localStorage file://
 // terikat ke PATH FILE PERSIS, bukan ke folder — jadi tiap file baru = origin kosong = "keliatan"
 // spt pertama kali buka terus-menerus walau sebenarnya bukan. Entry point-nya sekarang tombol

@@ -1053,4 +1053,7 @@ async function dokFotoMigrateLegacyPhotos(){
     console.error("Migrasi foto ke IndexedDB gagal, akan dicoba lagi di load berikutnya:", err);
   }
 }
-dokFotoMigrateLegacyPhotos();
+// TIDAK dipanggil langsung di sini lagi (dulu top-level, mengandalkan load() di 16-actions-init.js
+// sudah jalan duluan krn urutan <script>) — sejak gerbang akses (25-access-gate.js) menunda load()
+// sampai visitor/PHM resolve dulu, DB bisa masih null persis di titik file ini di-parse. Dipanggil
+// dari bootApp() (16-actions-init.js) sesudah load(), lihat di sana.
