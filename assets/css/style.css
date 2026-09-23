@@ -391,6 +391,39 @@ tbody tr:hover{background:var(--gray-100);}
 .modal .actions{display:flex;justify-content:flex-end;gap:8px;margin:16px -22px -20px;padding:12px 22px;position:sticky;bottom:0;background:var(--surface-card);border-top:1px solid var(--gray-200);border-radius:0 0 12px 12px;}
 .modal.wide{max-width:900px;}
 
+/* Gerbang akses visitor/PHM — TAMPIL BY DEFAULT (display:flex di sini, bukan lewat JS) supaya
+   tidak ada celah "flash" konten aplikasi kelihatan sebelum 25-access-gate.js sempat jalan;
+   <link rel=stylesheet> menahan render sampai CSS ini termuat, jadi aturan ini SUDAH aktif
+   sebelum body sempat dicat browser. JS cuma bertugas MENYEMBUNYIKAN (display:none) setelah
+   gerbang resolve, bukan menampilkannya. z-index sengaja jauh di atas .overlay modal biasa (5000)
+   supaya gerbang ini benar2 menutupi apapun.*/
+.access-gate{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(160deg,var(--navy-950),var(--navy-800));overflow:auto;}
+.gate-card{background:var(--surface-card);color:var(--ms-text);border-radius:16px;width:100%;max-width:440px;padding:28px 26px;box-shadow:0 24px 70px rgba(0,0,0,.4);position:relative;text-align:center;}
+.gate-logo{margin-bottom:10px;}
+.gate-logo img{height:46px;width:auto;margin:0 auto;}
+.gate-card h2{margin:4px 0 8px;font-size:17px;color:var(--heading);}
+.gate-sub{font-size:12.5px;color:var(--gray-500);line-height:1.5;}
+.gate-card .field{text-align:left;}
+.gate-card .field label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--gray-500);display:block;margin-bottom:4px;}
+.gate-card .field input{width:100%;padding:9px 11px;border:1px solid var(--gray-300);border-radius:8px;font:inherit;background:var(--surface-card);color:var(--ms-text);}
+.gate-card .field input:focus{outline:2px solid var(--teal-400);outline-offset:0;border-color:var(--teal-500);}
+.gate-choice-row{display:flex;flex-direction:column;gap:10px;margin-top:18px;}
+.gate-choice-btn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:14px 16px;border-radius:12px;border:1.5px solid var(--teal-500);background:var(--teal-500);color:#fff;cursor:pointer;font:inherit;text-align:left;transition:transform .1s ease,box-shadow .1s ease;}
+.gate-choice-btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px -6px rgba(14,165,160,.5);}
+.gate-choice-btn.alt{background:transparent;color:var(--ms-text);border-color:var(--gray-300);}
+.gate-choice-btn.alt:hover{border-color:var(--teal-500);}
+.gate-choice-title{font-size:13.5px;font-weight:800;}
+.gate-choice-desc{font-size:11px;opacity:.85;font-weight:400;}
+.gate-back{background:none;border:none;color:var(--gray-500);font-size:11.5px;font-weight:700;cursor:pointer;padding:0;margin-bottom:8px;text-align:left;}
+.gate-back:hover{color:var(--teal-500);}
+.gate-error{margin-top:8px;padding:7px 10px;border-radius:8px;background:#fbdcda;color:#a02a24;font-size:11.5px;font-weight:700;text-align:left;}
+.gate-contact-note{margin-top:18px;padding-top:14px;border-top:1px solid var(--gray-200);font-size:11px;color:var(--gray-500);line-height:1.6;}
+.gate-contact-note a{color:var(--teal-500);font-weight:700;text-decoration:none;}
+.gate-contact-note a:hover{text-decoration:underline;}
+.gate-status-badge{display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+.gate-status-badge .btn{padding:2px 8px;font-size:10.5px;}
+.sidebar.collapsed .gate-status-badge{display:none;}
+
 .tag-pill{padding:1px 7px;border-radius:5px;background:var(--navy-900);color:#fff;font-size:10px;font-weight:700;}
 .muted{color:var(--gray-500);}
 .hint{font-size:11.5px;color:var(--gray-500);margin-top:6px;line-height:1.5;}

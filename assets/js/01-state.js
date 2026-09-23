@@ -296,6 +296,15 @@ function migrateDB(){
     if(newPoints.length || newHasil.length) logChange(`Menggabungkan referensi baru: ${newPoints.length} titik & ${newHasil.length} data hasil pemantauan Kandungan Sulfur (H2S), sesuai Pasal 12 ayat (2) huruf b Permen LH 13/2009`);
     DB.meta.h2sDataMerged = true;
   }
+  // Gerbang akses visitor/PHM (25-access-gate.js, dimuat PALING TERAKHIR) — referensi maju yg AMAN
+  // krn baris ini baru benar2 DIEKSEKUSI setelah SEMUA script (00-25) selesai di-parse (dipanggil dari
+  // load()/applyFullBackupImport(), bukan di top-level file ini), jadi gateState & applyVisitorDataMask
+  // sudah pasti terdefinisi saat migrateDB() ini berjalan. Kalau mode-nya visitor, kode/koordinat titik
+  // disamarkan DI SINI (satu titik, bukan ditempel manual di puluhan file render) supaya OTOMATIS
+  // konsisten ke SELURUH tabel/chart/PDF/peta yg baca DB.points/DB.pointCoords apa adanya.
+  if(typeof gateState!=="undefined" && gateState && gateState.mode==="visitor" && typeof applyVisitorDataMask==="function"){
+    applyVisitorDataMask();
+  }
 }
 function load(){
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -333,7 +342,11 @@ function save(){
       redoStack = [];
       lastUndoPushTime = nowTs;
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
+    // Mode visitor: JANGAN PERNAH tulis ke localStorage (STORAGE_KEY yg SAMA dipakai data PHM asli
+    // di perangkat ini kalau device-nya dipakai bersama-sama) — data visitor cukup hidup di memori
+    // sepanjang sesi tab ini, hilang begitu reload, tidak pernah menimpa/campur data asli sama sekali.
+    const isVisitorSession = typeof gateState!=="undefined" && gateState && gateState.mode==="visitor";
+    if(!isVisitorSession) localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
     lastSavedSnapshot = snapshotForUndo(DB);
     updateStorageUsageBadge();
     updateUndoRedoButtons();
@@ -574,7 +587,10 @@ function applyUndoRedoState(snapshotData){
   // TIDAK ikut mendorong entry baru ke undoStack — kalau lewat save(), undo akan "mengunci diri
   // sendiri" (redo jadi tidak pernah bisa balik ke keadaan semula krn undoStack ikut berubah
   // tiap kali di-undo). Dua stack terpisah (undo/redo) sudah menangani riwayat maju-mundurnya.
-  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }catch(err){ /* quota — Undo/Redo tetap jalan di memori, tanpa alur recovery penuh spt save() */ }
+  const isVisitorSessionUR = typeof gateState!=="undefined" && gateState && gateState.mode==="visitor";
+  if(!isVisitorSessionUR){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }catch(err){ /* quota — Undo/Redo tetap jalan di memori, tanpa alur recovery penuh spt save() */ }
+  }
   updateStorageUsageBadge();
   updateUndoRedoButtons();
   renderPage(document.querySelector(".navbtn.active")?.dataset.page || "dashboard");
