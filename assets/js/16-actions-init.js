@@ -27,6 +27,7 @@ const ACTIONS = {
   newBatch, deleteBatch, generateSchedule, recalcSchedule, carryOverBatch, printSamplingGuide, doPrintSamplingGuide, printBeritaAcara, exportTrackingXlsx, importTrackingXlsx, downloadTemplateTrackingXlsx,
   finalizeBatchSchedule, unfinalizeBatchSchedule,
   expandAllSitePreview:()=>spToggleAll(true), collapseAllSitePreview:()=>spToggleAll(false),
+  editDepartureNote, saveDepartureNote, useEnvSupervisorName,
   spSetFilterAll:()=>spSetFilter(false), spSetFilterIssues:()=>spSetFilter(true),
   togglePlSticky:(t)=>{
     const el = document.getElementById("plStickyBody");
@@ -386,6 +387,8 @@ document.addEventListener("change", e=>{
   if(e.target.dataset.action==="setRatio"){ ensureSiteRule(e.target.dataset.site)[e.target.dataset.field] = Number(e.target.value)||1; save(); }
   if(e.target.dataset.action==="setPermitLeadDays"){ ensureSiteRule(e.target.dataset.site).permitLeadDays = Math.max(0, Number(e.target.value)||0); save(); }
   if(e.target.dataset.action==="setTransport"){ ensureSiteRule(e.target.dataset.site).transport = e.target.value; save(); }
+  if(e.target.dataset.action==="setEnvSupervisorNama"){ ensureEnvSupervisor(e.target.dataset.site).nama = e.target.value.trim(); save(); }
+  if(e.target.dataset.action==="setEnvSupervisorTelepon"){ ensureEnvSupervisor(e.target.dataset.site).telepon = e.target.value.trim(); save(); }
   if(e.target.dataset.action==="setFlareOneDay"){ ensureSiteRule(e.target.dataset.site).flareOneDay = e.target.checked; save(); toast("Perubahan berlaku ke jadwal Emisi berikutnya yang di-generate/dihitung ulang di site ini — jadwal yang sudah ada tidak berubah otomatis.","ok"); }
 });
 

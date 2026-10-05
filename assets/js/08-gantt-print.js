@@ -407,16 +407,20 @@ function buildPrintGuideHtml(includeGantt){
       // ini" yang sudah tercetak di atas tabel titik. Cukup 1 baris pengingat merujuk balik ke sana,
       // sama spt fix di panel layarnya (lihat komentar personilStatusRow di bawah).
       const ptsLineHtml = `<div class="pg-transition-line">${showPts ? "Pastikan <b>PTS</b> personil yang bertugas di site ini (lihat kotak di atas) sudah dicek sebelum naik ke moda transport ini." : "Transport darat — diurus langsung oleh personil PPC ke kantor masing-masing; site tidak perlu koordinasi PTS."}</div>`;
+      // Override manual (departureNoteOverrideFor) GANTI SELURUH badan di bawah judul kalau diisi —
+      // sama persis dgn cabang override di buildSiteBriefingHtml (panel layar), supaya versi cetak &
+      // versi layar tidak pernah beda kata/konten.
+      const override = departureNoteOverrideFor(row.site);
+      const transitionBodyHtml = override
+        ? `<div class="pg-transition-line">${escHtml(override).replace(/\n/g,"<br>")}</div>`
+        : `<div class="pg-transition-line">${travelInfoHtml}</div>${equipmentLineHtml}${bookingLineHtml}${ptsLineHtml}`;
       // SATU box .pg-transition-box (dulu 4 box .pg-transition-note terpisah bertumpuk) — samakan
       // dgn .sp-departure-box di panel layar: judul lalu baris-baris polos di dalam 1 bingkai,
       // bukan tiap butir py border/margin sendiri2 yg bikin kesan berantakan.
       const transitionNote = nextPrintedRow ? `<tr><td>
         <div class="pg-transition-box">
           <div class="pg-transition-title">&#8594; Pindah ke Site ${escHtml(nextPrintedRow.site)} &mdash; ${escHtml(fmtHariTanggalIndo(nextPrintedRow.start))}</div>
-          <div class="pg-transition-line">${travelInfoHtml}</div>
-          ${equipmentLineHtml}
-          ${bookingLineHtml}
-          ${ptsLineHtml}
+          ${transitionBodyHtml}
         </div>
       </td></tr>` : "";
       const rangeLabel = row.start===row.end ? row.start : `${row.start} s.d. ${row.end}`;
@@ -847,7 +851,13 @@ function bookingResponsibilityText(fromSite, toSite){
   if(route && route.bookingOverride){
     return `Booking transport dilakukan oleh <b>${escHtml(route.bookingOverride)}</b> (rute khusus ke/dari ${escHtml(route.bookingOverride)} — bukan site asal).`;
   }
-  return `Booking transport dilakukan oleh ENV Site/Site Reps. asal (<b>${escHtml(fromSite)}</b>).`;
+  return `Booking transport dilakukan oleh ENV Site/Site Reps. asal (<b>${escHtml(fromSite)}</b>) / dari Koordinator Sampling ENV BPN.`;
+}
+// Catatan manual per site (DB.siteRules[site].departureNoteOverride) — baca-saja, TIDAK memanggil
+// ensureSiteRule (yang punya efek samping menulis ke DB) krn fungsi ini dipanggil tiap render/cetak,
+// bukan cuma saat user menyimpan override-nya lewat editDepartureNote/saveDepartureNote di bawah.
+function departureNoteOverrideFor(site){
+  return (DB.siteRules[site] && DB.siteRules[site].departureNoteOverride) || "";
 }
 // Preview "apa yang perlu disiapkan" per site, dari jadwal batch yang lagi tampil di filter Gantt
 // saat ini (sama persis dgn batches yg dipakai buildDayGridView/S-Curve) — utk site ENV yang perlu
@@ -988,7 +998,8 @@ function buildSitePreviewData(batches){
           noTravelInfo: !route,
           hasEquipmentNote: !!(route && route.equipmentNote), equipmentNote: route?(route.equipmentNote||""):"",
           bookingHtml: bookingResponsibilityText(site, nextRow.site),
-          showPts, showDaratNote: !showPts
+          showPts, showDaratNote: !showPts,
+          override: departureNoteOverrideFor(site)
         };
       }
       return {batchName: b.name, rangeLabel, personnel, permitHtml: permitReminderText(site, row.start), departure};
@@ -1063,11 +1074,13 @@ function buildSiteBriefingHtml(batches){
         ${spPersonilRowsHtml(v.personnel)}
         <div class="sp-permit-box">${msIcon("calendar-clock",15)}<div>${v.permitHtml} Pastikan akomodasi sudah dipesan sebelum kedatangan.</div></div>
         ${v.departure ? `<div class="sp-departure-box">
-          <div class="sp-departure-title">${msIcon("arrow-right",16)}Persiapan Keberangkatan ke ${escHtml(v.departure.toSite)} &mdash; ${escHtml(v.departure.dateLabel)}</div>
+          <div class="sp-departure-title"><span class="sp-departure-title-text">${msIcon("arrow-right",16)}Persiapan Keberangkatan ke ${escHtml(v.departure.toSite)} &mdash; ${escHtml(v.departure.dateLabel)}</span><button type="button" class="sp-departure-edit-btn" data-action="editDepartureNote" data-site="${escHtml(s.site)}" title="Edit catatan manual utk site ini">${msIcon("pencil",13)}</button></div>
+          ${v.departure.override ? `<div class="sp-departure-line">${escHtml(v.departure.override).replace(/\n/g,"<br>")}</div>` : `
           ${v.departure.hasTravelInfo ? `<div class="sp-departure-line"><b>${escHtml(v.departure.travelLabel)}</b>${v.departure.travelNote?" &mdash; "+escHtml(v.departure.travelNote):""}</div>` : `<div class="sp-departure-line muted">Moda transport belum terdata utk rute ini — cek manual ke tim terkait.</div>`}
           ${v.departure.hasEquipmentNote ? `<div class="sp-departure-line sp-departure-equipment">${msIcon("package",14)}<span>${escHtml(v.departure.equipmentNote)}</span></div>` : ""}
           <div class="sp-departure-line">${v.departure.bookingHtml}</div>
           ${v.departure.showPts ? `<div class="sp-departure-line">Pastikan <b>PTS</b> personil di atas sudah dicek sebelum naik ke moda transport ini.</div>` : `<div class="sp-departure-line muted">Transport darat — diurus langsung oleh personil PPC ke kantor masing-masing; site tidak perlu koordinasi PTS.</div>`}
+          `}
         </div>` : (vi===s.visits.length-1 ? `<div class="hint" style="margin-top:12px;font-style:italic;">Site akhir dalam rute batch ini — tidak ada keberangkatan lanjutan yang perlu disiapkan.</div>` : "")}
       </div>`).join("");
 
@@ -1085,6 +1098,33 @@ function buildSiteBriefingHtml(batches){
   }).join("");
 
   return {statsHtml, bodyHtml};
+}
+// Modal edit catatan manual "Persiapan Keberangkatan" per site (DB.siteRules[site].departureNoteOverride).
+// Kosong = tetap pakai catatan otomatis (info transport/peralatan/booking/PTS dari TRAVEL_ROUTES);
+// diisi = GANTI SELURUH badan catatan itu dgn teks ini, di panel layar ini MAUPUN di cetak Panduan
+// Sampling (A4) — lihat departureNoteOverrideFor, dipakai bareng oleh buildSiteBriefingHtml & buildPrintGuideHtml.
+function editDepartureNote(t){
+  const site = t.dataset.site;
+  const current = departureNoteOverrideFor(site);
+  openModal(`
+    <h3>Edit Catatan Persiapan Keberangkatan &mdash; ${escHtml(site)}</h3>
+    <div class="hint" style="margin-bottom:10px;">Kosongkan &amp; simpan utk balik ke catatan otomatis (info moda transport, peralatan, booking, PTS, dst). Kalau diisi, teks ini MENGGANTI SELURUH badan catatan kuning site ini &mdash; baik di panel preview ini maupun di cetak <b>Panduan Sampling (A4)</b>, supaya kedua versi tidak pernah beda isi.</div>
+    <div class="field">
+      <label>Catatan Manual (opsional)</label>
+      <textarea id="departureNoteOverrideInput" rows="6" style="width:100%;padding:8px 10px;border:1px solid var(--gray-300);border-radius:6px;font:inherit;" placeholder="Kosongkan utk pakai catatan otomatis bawaan sistem...">${escHtml(current)}</textarea>
+    </div>
+    <div class="actions"><button class="btn ghost" data-action="closeModal">Batal</button><button class="btn primary" data-action="saveDepartureNote" data-site="${escHtml(site)}">Simpan</button></div>
+  `);
+}
+function saveDepartureNote(t){
+  const site = t.dataset.site;
+  const val = document.getElementById("departureNoteOverrideInput").value.trim();
+  ensureSiteRule(site).departureNoteOverride = val;
+  logChange(`Catatan persiapan keberangkatan site ${site} ${val?"diubah manual":"dikembalikan ke otomatis"}`);
+  save();
+  closeModal();
+  renderGantt();
+  toast("Catatan tersimpan.","ok");
 }
 // Ringkasan "hari crew change" per site yang lagi tampil di filter Gantt saat ini — pembanding
 // cepat tanpa harus buka halaman Aturan Site & Rute, sumber datanya tetap dari sana (DB.siteRules).

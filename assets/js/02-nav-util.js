@@ -108,8 +108,9 @@ function renderPage(p){
   if(p==="dashboard") renderDashboard();
   if(p==="master") renderMaster();
   if(p==="rencana") renderRencana();
-  if(p==="personil"){ renderPersonil(); renderPersonilPPU(); }
+  if(p==="personil"){ renderPersonil(); renderPersonilPPU(); renderEnvSupervisor(); }
   if(p==="rules") renderRules();
+  if(p==="laboratorium") renderLaboratorium();
   if(p==="planner") renderPlanner();
   if(p==="gantt") renderGantt();
   if(p==="tracking") renderTracking();

@@ -129,6 +129,43 @@ function baStatusFor(p, selectedBatchId){
   }
   return "";
 }
+// Ketua Tim Sampling lapangan — DIAMBIL (bukan diisi ulang) dari penunjukan radio "Ketua" di
+// Perencanaan Batch (batch.assignedPersonil[].lead), supaya BA/CoA selalu konsisten dgn siapa yang
+// benar2 ditunjuk jadi ketua tim utk batch itu (dari roster PPC & Observer di menu Personil),
+// bukan diketik manual terpisah lagi di sini.
+function ketuaTimInfo(batchId){
+  const b = DB.batches.find(x=>x.id===batchId);
+  if(!b) return null;
+  const lead = (b.assignedPersonil||[]).find(a=>a.lead);
+  if(!lead) return null;
+  const p = DB.personil.find(x=>x.id===lead.id);
+  if(!p) return null;
+  return {nama:p.nama, role:p.role||"-"};
+}
+// Tombol "Pakai nama ini" di hint ENV Site Supervisor — SENGAJA tidak auto-isi field Nama/Jabatan
+// Penandatangan PHM begitu site diganti (field itu "touched" persisten lintas ganti site/batch,
+// lihat listener input di bawah), supaya nama yang sudah diisi manual sebelumnya (mis. krn orang
+// yang bertugas hari itu beda dari supervisor nominal site tsb) tidak tiba-tiba hilang tanpa sadar.
+// User klik tombol ini kalau memang mau pakai nama supervisor terdaftar sbg penandatangan.
+function useEnvSupervisorName(t){
+  const site = t.dataset.site;
+  const sup = DB.envSupervisor && DB.envSupervisor[site];
+  if(!sup || !sup.nama) return;
+  const team = document.getElementById("baTeam").value;
+  const cfg = ensureBaConfig();
+  const namaInput = document.getElementById("baNamaPhm");
+  namaInput.value = sup.nama;
+  namaInput.dataset.touched = "1";
+  cfg[team].namaPhm = sup.nama;
+  const jabatanInput = document.getElementById("baJabatanPhm");
+  if(!jabatanInput.value.trim()){
+    jabatanInput.value = `Environment Supervisor ${site}`;
+    jabatanInput.dataset.touched = "1";
+    cfg[team].jabatanPhm = jabatanInput.value;
+  }
+  save();
+  toast("Nama ENV Site Supervisor dipakai sbg penandatangan PHM.","ok");
+}
 function refreshBaBatchSelect(){
   const team = document.getElementById("baTeam").value;
   const sel = document.getElementById("baBatch");
@@ -209,6 +246,20 @@ function renderBeritaAcara(){
     const signDate = addDays(row.end,1);
     document.getElementById("baTempatTanggal").value = `Lapangan ${site} PHM, ${fmtTanggalIndo(signDate)}`;
   }
+  const supEl = document.getElementById("baEnvSupervisorHint");
+  const sup = site ? DB.envSupervisor && DB.envSupervisor[site] : null;
+  if(supEl){
+    supEl.innerHTML = sup && sup.nama
+      ? `ENV Site Supervisor site <b>${escHtml(site)}</b>: <b>${escHtml(sup.nama)}</b>${sup.telepon?" &middot; "+escHtml(sup.telepon):""} &mdash; <button type="button" class="btn small ghost" data-action="useEnvSupervisorName" data-site="${escHtml(site)}">Pakai nama ini</button>`
+      : site ? `ENV Site Supervisor site <b>${escHtml(site)}</b> belum diisi — isi di menu Personil &rarr; ENV Site Supervisor.` : "";
+  }
+  const ktEl = document.getElementById("baKetuaTimHint");
+  if(ktEl){
+    const kt = ketuaTimInfo(batchId);
+    ktEl.innerHTML = kt
+      ? `Ketua Tim Sampling (dari Perencanaan Batch): <b>${escHtml(kt.nama)}</b> <span class="muted">(${escHtml(kt.role)})</span>`
+      : `Ketua Tim Sampling belum ditunjuk utk batch ini — tunjuk di Perencanaan Batch.`;
+  }
   const pts = site ? baFilteredPoints(site, team, includeKebauan) : [];
   const titikHeader = team==="emisi" ? "Sumber Emisi (Titik Sampling)" : "Titik Sampling";
   document.getElementById("baPreviewTable").innerHTML = pts.length ? `
@@ -276,6 +327,7 @@ function buildBeritaAcaraHtml(){
   const labPerusahaan = document.getElementById("baNamaLabPerusahaan").value;
   const namaLab = document.getElementById("baNamaLab").value;
   const jabatanLab = document.getElementById("baJabatanLab").value;
+  const kt = ketuaTimInfo(batchId);
   const titikHeader = team==="emisi" ? "Sumber Emisi (Titik Sampling)" : "Titik Sampling";
 
   // Dikelompokkan per Kategori (jenis sumber emisi/ambient) — baris judul kelompok memisahkan
@@ -332,7 +384,8 @@ function buildBeritaAcaraHtml(){
       </div>
       <div class="pg-ba-intro">Dengan ini menyatakan, bahwa telah dilakukan pengukuran ${team==="emisi"?"emisi dari sumber tidak bergerak":"kualitas lingkungan"} dalam rangka Kegiatan Pengendalian Pencemaran ${team==="emisi"?"Udara":"Lingkungan"}, pada:</div>
       <table class="pg-ba-meta"><tr><td style="width:150px;">Hari / Tanggal</td><td style="width:14px;">:</td><td>${escHtml(tanggalPelaksanaan)}</td></tr>
-      <tr><td>Lokasi</td><td>:</td><td>Lapangan ${escHtml(site)} PT Pertamina Hulu Mahakam</td></tr></table>
+      <tr><td>Lokasi</td><td>:</td><td>Lapangan ${escHtml(site)} PT Pertamina Hulu Mahakam</td></tr>
+      ${kt ? `<tr><td>Ketua Tim Sampling</td><td>:</td><td>${escHtml(kt.nama)} (${escHtml(kt.role)})</td></tr>` : ""}</table>
       <div class="pg-ba-intro">Adapun titik lokasi yang dilakukan pengukuran adalah sebagai berikut:</div>
     </div>
     <table class="pg-ba-page">

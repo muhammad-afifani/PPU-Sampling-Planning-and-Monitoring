@@ -998,6 +998,9 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 
 .sp-departure-box{border:1px solid #e0c07a;background:#fdf3e3;border-radius:7px;padding:14px 16px;margin-top:14px;}
 .sp-departure-title{display:flex;align-items:center;gap:7px;font-weight:700;font-size:14px;color:#8a5c11;margin-bottom:8px;}
+.sp-departure-title-text{display:flex;align-items:center;gap:7px;}
+.sp-departure-edit-btn{margin-left:auto;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;border:1px solid transparent;background:transparent;color:#8a5c11;cursor:pointer;padding:0;}
+.sp-departure-edit-btn:hover{background:rgba(138,92,17,.12);border-color:#e0c07a;}
 .sp-departure-line{font-size:12.5px;margin-bottom:6px;}
 .sp-departure-line:last-child{margin-bottom:0;}
 .sp-departure-equipment{display:flex;gap:6px;color:#8a5c11;}
@@ -1006,6 +1009,8 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 .sp-departure-box .sp-person{border-bottom-color:color-mix(in srgb, #c98a1a 22%, transparent);}
 :root[data-theme="dark"] .sp-departure-box{background:color-mix(in srgb, #c98a1a 16%, var(--surface-card));border-color:color-mix(in srgb, #c98a1a 45%, var(--surface-card));}
 :root[data-theme="dark"] .sp-departure-title{color:color-mix(in srgb, #c98a1a 60%, white);}
+:root[data-theme="dark"] .sp-departure-edit-btn{color:color-mix(in srgb, #c98a1a 60%, white);}
+:root[data-theme="dark"] .sp-departure-edit-btn:hover{background:color-mix(in srgb, #c98a1a 22%, transparent);}
 :root[data-theme="dark"] .sp-departure-equipment{color:color-mix(in srgb, #c98a1a 60%, white);}
 :root[data-theme="dark"] .sp-departure-box .sp-section-label{color:color-mix(in srgb, #c98a1a 60%, white);}
 :root[data-theme="dark"] .sp-issue-badge{color:color-mix(in srgb, #c98a1a 60%, white);}

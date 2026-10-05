@@ -3,12 +3,18 @@
 ========================================================= */
 function allSites(){ return [...new Set(DB.points.map(p=>p.site))].sort(); }
 function ensureSiteRule(site){
-  if(!DB.siteRules[site]) DB.siteRules[site] = {crewChangeDay:"", blocked:[], ratioEmisi:4, ratioAmbient:2, transport:"", flareOneDay:false, permitLeadDays:2};
+  if(!DB.siteRules[site]) DB.siteRules[site] = {crewChangeDay:"", blocked:[], ratioEmisi:4, ratioAmbient:2, transport:"", flareOneDay:false, permitLeadDays:2, departureNoteOverride:""};
   else if(DB.siteRules[site].flareOneDay===undefined) DB.siteRules[site].flareOneDay = false;
   // permitLeadDays: H-berapa entry permit site ini sebaiknya diajukan sebelum jadwal kedatangan
   // tim (lihat catatan di print guide) — default H-2, override per site kalau butuh beda (mis.
   // site yang prosesnya lebih lama butuh H-3, atau site yang lebih longgar cukup H-1).
   else if(DB.siteRules[site].permitLeadDays===undefined) DB.siteRules[site].permitLeadDays = 2;
+  // departureNoteOverride: catatan manual persiapan keberangkatan — kalau diisi, GANTI SELURUH
+  // badan catatan kuning "Persiapan Keberangkatan ke X" (info transport/peralatan/booking/PTS
+  // otomatis) dgn teks ini, dipakai bareng oleh preview layar & cetak Panduan Sampling (A4) supaya
+  // 2 versi itu tidak pernah beda (lihat bookingResponsibilityText/buildSiteBriefingHtml/
+  // buildPrintGuideHtml di 08-gantt-print.js). Kosong = pakai catatan otomatis spt biasa.
+  else if(DB.siteRules[site].departureNoteOverride===undefined) DB.siteRules[site].departureNoteOverride = "";
   return DB.siteRules[site];
 }
 // Dipakai di halaman Aturan Site & Rute DAN widget ringkas di Perencanaan Batch — supaya
