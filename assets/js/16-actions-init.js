@@ -27,6 +27,7 @@ const ACTIONS = {
   newBatch, deleteBatch, generateSchedule, recalcSchedule, carryOverBatch, printSamplingGuide, doPrintSamplingGuide, printBeritaAcara, exportTrackingXlsx, importTrackingXlsx, downloadTemplateTrackingXlsx,
   finalizeBatchSchedule, unfinalizeBatchSchedule,
   expandAllSitePreview:()=>spToggleAll(true), collapseAllSitePreview:()=>spToggleAll(false),
+  editDepartureNote, saveDepartureNote,
   spSetFilterAll:()=>spSetFilter(false), spSetFilterIssues:()=>spSetFilter(true),
   togglePlSticky:(t)=>{
     const el = document.getElementById("plStickyBody");
