@@ -29,7 +29,8 @@ function freshDB(){
     budgetManualItems: [],
     budgetAnnual: {},
     budgetExpenses: [],
-    personilPPU: []
+    personilPPU: [],
+    envSupervisor: {}
   };
 }
 function uid(pfx){ return pfx+"_"+Math.random().toString(36).slice(2,9); }
@@ -81,6 +82,11 @@ function migrateDB(){
   // byte lampiran PDF/gambarnya di IndexedDB terpisah (personilPpuLampiranIdb*), bukan di sini.
   if(!Array.isArray(DB.personilPPU)) DB.personilPPU = [];
   DB.personilPPU.forEach(p=>{ if(!Array.isArray(p.sites)) p.sites = []; });
+  // ENV Site Supervisor — satu orang per site (object dikunci per kode site, sama pola dgn
+  // DB.siteRules), dipakai utk auto-isi nama penandatangan PHM di draft Berita Acara/CoA saat site
+  // itu dipilih (lihat ensureEnvSupervisor/renderEnvSupervisor di 06-plan-personil.js, dan
+  // useEnvSupervisorName di 11-berita-acara.js).
+  if(!DB.envSupervisor || typeof DB.envSupervisor!=="object" || Array.isArray(DB.envSupervisor)) DB.envSupervisor = {};
   if(!DB.meta) DB.meta = {semester:"S1", tahun:new Date().getFullYear(), lastBatchIdEmisi:0, lastBatchIdAmbient:0};
   if(DB.meta.currentPeriod!==undefined) delete DB.meta.currentPeriod; // field lama, tidak dipakai lagi — diganti meta.semester+meta.tahun
   // Backfill koordinat 12 titik Udara Ambien/Kebisingan/Kebauan/Getaran (Akomodasi/Camp/Office/

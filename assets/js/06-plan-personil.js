@@ -634,4 +634,29 @@ function printPersonilRoster(){
   window.print();
   document.title = originalTitle;
 }
+// ENV Site Supervisor — satu supervisor per site (object dikunci per kode site, pola sama dgn
+// DB.siteRules di 07-rules-planner.js — bukan array beridentitas sendiri krn memang maksudnya
+// "untuk tiap site, siapa 1 orang ini", bukan daftar riwayat bebas). Dipakai Berita Acara/CoA utk
+// menawarkan auto-isi nama penandatangan PHM saat site tertentu dipilih (lihat tombol "Pakai nama
+// ini" & useEnvSupervisorName di 11-berita-acara.js) — TIDAK menimpa field itu sendiri secara diam2.
+function ensureEnvSupervisor(site){
+  if(!DB.envSupervisor) DB.envSupervisor = {};
+  if(!DB.envSupervisor[site]) DB.envSupervisor[site] = {nama:"", telepon:""};
+  return DB.envSupervisor[site];
+}
+function renderEnvSupervisor(){
+  const el = document.getElementById("envSupervisorTable");
+  if(!el) return;
+  const sites = allSites();
+  el.innerHTML = sites.length ? `
+    <thead><tr><th style="width:90px;">Site</th><th>Nama ENV Site Supervisor</th><th style="width:200px;">Telepon</th></tr></thead>
+    <tbody>${sites.map(s=>{
+      const sup = ensureEnvSupervisor(s);
+      return `<tr>
+        <td><span class="pal-site-pill" style="--site-c:${HASIL_SITE_COLORS[s]||"#7f8fa0"};">${escHtml(s)}</span></td>
+        <td><input type="text" data-action="setEnvSupervisorNama" data-site="${escHtml(s)}" value="${escHtml(sup.nama)}" placeholder="Nama supervisor..." style="width:100%;border:1px solid var(--gray-300);border-radius:6px;padding:6px 8px;font:inherit;"></td>
+        <td><input type="text" data-action="setEnvSupervisorTelepon" data-site="${escHtml(s)}" value="${escHtml(sup.telepon)}" placeholder="08xx..." style="width:100%;border:1px solid var(--gray-300);border-radius:6px;padding:6px 8px;font:inherit;"></td>
+      </tr>`;
+    }).join("")}</tbody>` : "<div class='hint' style='padding:10px;'>Belum ada site terdaftar di Database Titik Pantau.</div>";
+}
 
