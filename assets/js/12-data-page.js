@@ -94,6 +94,21 @@ async function exportAll(){
     const ppuIdbMap = new Map(ppuIdbEntries.map(e=>[e.id, e.dataUrl]));
     data.personilPPU = data.personilPPU.map(p=> p.lampiranId ? {...p, lampiranDataUrl: ppuIdbMap.get(p.lampiranId)||""} : {...p});
   }
+  // Lampiran Laboratorium (sertifikat KAN, surat registrasi KLH, rujukan gubernur) — 1 record bisa
+  // punya SAMPAI 3 lampiran, jadi di-loop lewat LAB_LAMPIRAN_KINDS drpd ditulis 3x manual (sama
+  // alasan & pola dgn personilPPU di atas, cuma field lampirannya lebih dari 1).
+  if(Array.isArray(data.laboratorium) && data.laboratorium.length){
+    const labIdbEntries = await labLampiranIdbGetAll();
+    const labIdbMap = new Map(labIdbEntries.map(e=>[e.id, e.dataUrl]));
+    data.laboratorium = data.laboratorium.map(l=>{
+      const copy = {...l};
+      LAB_LAMPIRAN_KINDS.forEach(kind=>{
+        const idKey = kind.key+"Id";
+        if(copy[idKey]) copy[kind.key+"DataUrl"] = labIdbMap.get(copy[idKey])||"";
+      });
+      return copy;
+    });
+  }
   const fotoNote = includePhotos
     ? ` Foto Dokumentasi Sampling ${fmtBytes(fotoBytes)} ikut disertakan.`
     : ` Foto Dokumentasi Sampling TIDAK disertakan (centang opsinya kalau perlu pindah foto ke perangkat lain).`;
@@ -293,6 +308,24 @@ async function applyFullBackupImport(){
       }
     }
     data.personilPPU.forEach(p=>{ delete p.lampiranDataUrl; });
+  }
+  // Lampiran Laboratorium — sama pola, 3 kemungkinan lampiran per record (lihat exportAll di atas).
+  if(Array.isArray(data.laboratorium) && data.laboratorium.length){
+    const toPutLab = [];
+    data.laboratorium.forEach(l=>{
+      LAB_LAMPIRAN_KINDS.forEach(kind=>{
+        const idKey = kind.key+"Id", dataKey = kind.key+"DataUrl";
+        if(l[dataKey] && l[idKey]) toPutLab.push({id:l[idKey], dataUrl:l[dataKey]});
+      });
+    });
+    if(toPutLab.length){
+      try{
+        await labLampiranIdbBulkPut(toPutLab);
+      }catch(err){
+        toast("Sebagian/seluruh lampiran Laboratorium gagal ditulis ke penyimpanan IndexedDB saat restore.","err");
+      }
+    }
+    data.laboratorium.forEach(l=>{ LAB_LAMPIRAN_KINDS.forEach(kind=>{ delete l[kind.key+"DataUrl"]; }); });
   }
   DB = data;
   migrateDB();

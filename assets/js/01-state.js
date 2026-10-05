@@ -30,7 +30,8 @@ function freshDB(){
     budgetAnnual: {},
     budgetExpenses: [],
     personilPPU: [],
-    envSupervisor: {}
+    envSupervisor: {},
+    laboratorium: []
   };
 }
 function uid(pfx){ return pfx+"_"+Math.random().toString(36).slice(2,9); }
@@ -87,6 +88,9 @@ function migrateDB(){
   // itu dipilih (lihat ensureEnvSupervisor/renderEnvSupervisor di 06-plan-personil.js, dan
   // useEnvSupervisorName di 11-berita-acara.js).
   if(!DB.envSupervisor || typeof DB.envSupervisor!=="object" || Array.isArray(DB.envSupervisor)) DB.envSupervisor = {};
+  // Laboratorium jasa kontraktor (akreditasi KAN + registrasi KLH, parameter pengukuran) — lampiran
+  // PDF-nya di IndexedDB terpisah (labLampiranIdb*, 26-laboratorium.js), bukan di sini.
+  if(!Array.isArray(DB.laboratorium)) DB.laboratorium = [];
   if(!DB.meta) DB.meta = {semester:"S1", tahun:new Date().getFullYear(), lastBatchIdEmisi:0, lastBatchIdAmbient:0};
   if(DB.meta.currentPeriod!==undefined) delete DB.meta.currentPeriod; // field lama, tidak dipakai lagi — diganti meta.semester+meta.tahun
   // Backfill koordinat 12 titik Udara Ambien/Kebisingan/Kebauan/Getaran (Akomodasi/Camp/Office/

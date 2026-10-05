@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202610051600">
+<link rel="stylesheet" href="assets/css/style.css?v=202610051800">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -61,6 +61,7 @@
           <button class="navbtn" data-page="master" data-group="setup" data-label="Database Titik Pantau" title="Database Titik Pantau"><span class="navbtn-icon ms-icon" data-icon="folder"></span><span class="label">Database Titik Pantau</span></button>
           <button class="navbtn" data-page="rules" data-group="setup" data-label="Aturan Site &amp; Rute" title="Aturan Site &amp; Rute"><span class="navbtn-icon ms-icon" data-icon="route"></span><span class="label">Aturan Site &amp; Rute</span></button>
           <button class="navbtn" data-page="personil" data-group="setup" data-label="Personil" title="Personil"><span class="navbtn-icon ms-icon" data-icon="users"></span><span class="label">Personil</span></button>
+          <button class="navbtn" data-page="laboratorium" data-group="setup" data-label="Laboratorium" title="Laboratorium"><span class="navbtn-icon ms-icon" data-icon="shield-check"></span><span class="label">Laboratorium</span></button>
         </div>
       </div>
       <div class="navgroup" data-navgroup="plan">
@@ -467,6 +468,22 @@
           <button class="btn" data-action="exportPersonilXlsx">Export Excel</button>
         </div>
       </div>
+    </div>
+
+    <!-- LABORATORIUM -->
+    <div class="page" id="page-laboratorium">
+      <div class="stickytop">
+      <div class="pagehead"><div><h2>Laboratorium</h2><div class="desc">Registri laboratorium jasa kontraktor (akreditasi KAN &amp; registrasi Laboratorium Lingkungan KLH) yang dipakai utk sampling emisi dan/atau ambien, beserta parameter pengukuran yang dicakup tiap lab.</div></div>
+        <div class="toolbar"><button class="btn primary" data-action="addLaboratorium">+ Tambah Laboratorium</button></div>
+      </div>
+      <div class="toolbar card" style="padding:12px 14px;">
+        <div class="field"><label>Lingkup</label><select id="labFltScope"><option value="">Semua</option><option value="emisi">Emisi</option><option value="ambien">Ambien</option></select></div>
+        <div class="spacer"></div>
+        <div class="field"><label>Cari Laboratorium</label><div class="search-wrap"><span class="search-ico">&#128269;</span><input type="text" id="labFltSearch" placeholder="nama laboratorium..."></div></div>
+      </div>
+      </div>
+      <div class="tablewrap"><table id="labTable"></table></div>
+      <div class="hint" id="labCount" style="margin-bottom:16px;"></div>
     </div>
 
     <!-- RULES -->
@@ -1638,37 +1655,38 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202610051600"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202610051600"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202610051800"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202610051800"></script>
 
-<script src="assets/data/default-data.js?v=202610051600"></script>
-<script src="assets/data/brand-assets.js?v=202610051600"></script>
-<script src="assets/data/travel-routes.js?v=202610051600"></script>
-<script src="assets/js/00-icons.js?v=202610051600"></script>
-<script src="assets/js/01-state.js?v=202610051600"></script>
-<script src="assets/js/02-nav-util.js?v=202610051600"></script>
-<script src="assets/js/03-period-logic.js?v=202610051600"></script>
-<script src="assets/js/04-dashboard.js?v=202610051600"></script>
-<script src="assets/js/05-master-data.js?v=202610051600"></script>
-<script src="assets/js/06-plan-personil.js?v=202610051600"></script>
-<script src="assets/js/07-rules-planner.js?v=202610051600"></script>
-<script src="assets/js/08-gantt-print.js?v=202610051600"></script>
-<script src="assets/js/09-tracking-map.js?v=202610051600"></script>
-<script src="assets/js/10-running-hour.js?v=202610051600"></script>
-<script src="assets/js/11-berita-acara.js?v=202610051600"></script>
-<script src="assets/js/12-data-page.js?v=202610051600"></script>
-<script src="assets/js/13-hasil-db.js?v=202610051600"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202610051600"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202610051600"></script>
-<script src="assets/js/16-actions-init.js?v=202610051600"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202610051600"></script>
-<script src="assets/js/18-model-dispersi.js?v=202610051600"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202610051600"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202610051600"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202610051600"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202610051600"></script>
-<script src="assets/js/23-budget-proyeksi.js?v=202610051600"></script>
-<script src="assets/js/24-personil-ppu.js?v=202610051600"></script>
-<script src="assets/js/25-access-gate.js?v=202610051600"></script>
+<script src="assets/data/default-data.js?v=202610051800"></script>
+<script src="assets/data/brand-assets.js?v=202610051800"></script>
+<script src="assets/data/travel-routes.js?v=202610051800"></script>
+<script src="assets/js/00-icons.js?v=202610051800"></script>
+<script src="assets/js/01-state.js?v=202610051800"></script>
+<script src="assets/js/02-nav-util.js?v=202610051800"></script>
+<script src="assets/js/03-period-logic.js?v=202610051800"></script>
+<script src="assets/js/04-dashboard.js?v=202610051800"></script>
+<script src="assets/js/05-master-data.js?v=202610051800"></script>
+<script src="assets/js/06-plan-personil.js?v=202610051800"></script>
+<script src="assets/js/07-rules-planner.js?v=202610051800"></script>
+<script src="assets/js/08-gantt-print.js?v=202610051800"></script>
+<script src="assets/js/09-tracking-map.js?v=202610051800"></script>
+<script src="assets/js/10-running-hour.js?v=202610051800"></script>
+<script src="assets/js/11-berita-acara.js?v=202610051800"></script>
+<script src="assets/js/12-data-page.js?v=202610051800"></script>
+<script src="assets/js/13-hasil-db.js?v=202610051800"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202610051800"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202610051800"></script>
+<script src="assets/js/16-actions-init.js?v=202610051800"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202610051800"></script>
+<script src="assets/js/18-model-dispersi.js?v=202610051800"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202610051800"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202610051800"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202610051800"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202610051800"></script>
+<script src="assets/js/23-budget-proyeksi.js?v=202610051800"></script>
+<script src="assets/js/24-personil-ppu.js?v=202610051800"></script>
+<script src="assets/js/25-access-gate.js?v=202610051800"></script>
+<script src="assets/js/26-laboratorium.js?v=202610051800"></script>
 </body>
 </html>
