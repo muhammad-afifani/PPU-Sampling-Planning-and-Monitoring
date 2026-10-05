@@ -112,7 +112,7 @@ function renderRoadmapPantau(){
   });
   const grandTotal = periods.map(per=> sites.reduce((a,s)=>a+((recap[s]&&recap[s][per])||0),0));
   document.getElementById("rmRecapTable").innerHTML = `
-    <thead><tr><th>Site</th>${periods.map(per=>`<th style="text-align:center;${per===nowPeriodStr?"background:var(--teal-50,#e6f7f5);":""}">${escHtml(per)}</th>`).join("")}<th style="text-align:center;">Total</th></tr></thead>
+    <thead><tr><th>Site</th>${periods.map(per=>`<th style="text-align:center;${per===nowPeriodStr?"background:var(--teal-100);color:#0b6b66;":""}">${escHtml(per)}</th>`).join("")}<th style="text-align:center;">Total</th></tr></thead>
     <tbody>${sites.map(s=>{
       const rowTotal = periods.reduce((a,per)=>a+((recap[s]&&recap[s][per])||0),0);
       return `<tr><td><span class="pal-site-pill" style="--site-c:${HASIL_SITE_COLORS[s]||"#7f8fa0"};">${escHtml(s)}</span></td>
@@ -132,7 +132,7 @@ function renderRoadmapPantau(){
   // sekarang/depan, lihat roadmapDuePeriods), kosong = tidak wajib periode itu & belum ada hasil.
   document.getElementById("rmDetailTable").innerHTML = `
     <thead><tr><th>Site</th><th style="min-width:170px;">Titik</th><th>Kategori</th><th>Keterangan</th><th>Pemantauan Terakhir</th>
-      ${periods.map(per=>`<th style="text-align:center;min-width:44px;${per===nowPeriodStr?"background:var(--teal-50,#e6f7f5);":""}">${escHtml(per)}</th>`).join("")}</tr></thead>
+      ${periods.map(per=>`<th style="text-align:center;min-width:44px;${per===nowPeriodStr?"background:var(--teal-100);color:#0b6b66;":""}">${escHtml(per)}</th>`).join("")}</tr></thead>
     <tbody>${pts.map(p=>{
       const due = dueMap.get(p.id)||new Set();
       const actual = actualMap.get(p.id)||new Set();
@@ -140,7 +140,7 @@ function renderRoadmapPantau(){
       return `<tr><td>${escHtml(p.site)}</td><td>${escHtml(p.nama)}</td><td class="muted" style="font-size:11px;">${escHtml(monitoringTypeLabel(p))}</td>
         <td style="font-size:11px;">${ket}</td><td class="muted" style="font-size:11px;">${escHtml(p.pemantauanTerakhir||"-")}</td>
         ${periods.map(per=>{
-          const cellBg = per===nowPeriodStr?"background:var(--teal-50,#e6f7f5);":"";
+          const cellBg = per===nowPeriodStr?"background:var(--teal-100);":"";
           if(actual.has(per)) return `<td style="text-align:center;${cellBg}" title="Sudah dipantau ${escHtml(per)} — parameter: ${escHtml(p.parameter||"-")}"><span style="color:var(--green-600,#0d8a4f);font-weight:800;">&#10003;</span></td>`;
           if(due.has(per)) return `<td style="text-align:center;${cellBg}" title="Wajib sampling ${escHtml(per)} — parameter: ${escHtml(p.parameter||"-")}"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--red-500);"></span></td>`;
           return `<td style="${cellBg}"></td>`;
