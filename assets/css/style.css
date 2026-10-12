@@ -480,10 +480,15 @@ tbody tr:hover{background:var(--gray-100);}
 /* Halaman Baku Mutu & Periode Pantau — jump-nav chip (ikut sticky bareng pagehead) dan kartu
    beraksen warna per regulasi supaya halaman referensi ini enak dipindai (tiap regulasi punya
    identitas visual sendiri) dibanding sebelumnya cuma tumpukan kartu putih polos berurutan. */
-.reg-jump{display:flex;flex-wrap:wrap;gap:7px;}
+/* Dibungkus per-grup (.reg-jump-group) + display:flex;flex-direction:column di induknya — dulu
+   SEMUA chip (Emisi+Ambient) ada di 1 baris flex-wrap datar, jadi batas antar grup cuma spasi
+   kecil tanpa jaminan baris baru (bisa kelihatan "bertumpuk" tergantung lebar viewport). Sekarang
+   tiap grup SELALU baris sendiri, lebih rapi & konsisten lepas dari lebar layar. */
+.reg-jump{display:flex;flex-direction:column;gap:8px;margin:12px 0 16px;}
+.reg-jump-group{display:flex;flex-wrap:wrap;align-items:center;gap:7px;}
 .reg-jump a{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:20px;font-size:11.5px;font-weight:700;text-decoration:none;color:#fff;opacity:.92;transition:transform .12s ease,opacity .12s ease;box-shadow:0 1px 4px rgba(0,0,0,.18);}
 .reg-jump a:hover{transform:translateY(-1.5px);opacity:1;}
-.reg-jump .grp-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--gray-500);align-self:center;margin-right:2px;}
+.reg-jump .grp-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--gray-500);align-self:center;margin-right:2px;min-width:50px;}
 .reg-divider{display:flex;align-items:center;gap:10px;margin:22px 0 12px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--gray-500);}
 .reg-divider::after{content:"";flex:1;height:1px;background:var(--gray-200);}
 .reg-card{border-top:4px solid var(--gray-300);transition:box-shadow .15s ease,transform .15s ease;}
@@ -892,6 +897,16 @@ thead .dg-col-sticky{z-index:3;}
 .pz-nama{position:sticky;left:0;z-index:2;min-width:280px;max-width:280px;width:280px;background:var(--surface-card);box-shadow:2px 0 3px -2px rgba(0,0,0,.15);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .pz-role{position:sticky;left:280px;z-index:2;min-width:100px;max-width:100px;width:100px;background:var(--surface-card);box-shadow:2px 0 3px -2px rgba(0,0,0,.15);}
 thead .pz-nama,thead .pz-role{z-index:3;background:var(--navy-900);box-shadow:none;}
+/* Baris sub-teks (telepon di kolom Nama, "s.d. tanggal" di kolom dokumen bertanggal) SELALU
+   dirender (walau kosong, lihat renderPersonil) dgn min-height tetap di sini — supaya tinggi baris
+   tabel Personil konsisten, tidak loncat2 cuma krn satu personil kebetulan punya telepon/tanggal
+   terisi dan yang lain tidak. */
+.pz-subline{font-size:10.5px;margin-top:2px;min-height:13px;line-height:13px;}
+/* Kolom "Ditugaskan di Batch" dulu bisa melar tak terbatas (tinggi & lebar) kalau 1 personil
+   ditugaskan ke banyak batch, atau nama batch-nya panjang — dibatasi di sini: tinggi maks ~3 baris
+   lalu scroll internal, tiap pill dipotong ellipsis (nama lengkapnya tetap ada di title/tooltip). */
+.pz-batch-cell{max-height:54px;overflow-y:auto;}
+.pz-batch-pill{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 /* Stepper alokasi site per personil (halaman Personil) — satu baris stepper horizontal per orang,
    satu step = satu penempatan site (sudah diurutkan naik dari tanggal mulai). Warna pill per site
    (--site-c, di-set inline dari JS) SENGAJA dipakai dari HASIL_SITE_COLORS yg sama dgn Dashboard
@@ -1177,6 +1192,12 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 .bgt-chart-seg:hover{opacity:.82;stroke:#fff;stroke-width:1.5;}
 .bgt-chart-tooltip{position:fixed;z-index:9999;display:none;pointer-events:none;background:rgba(18,24,36,.95);color:#fff;padding:6px 10px;border-radius:6px;font-size:11.5px;line-height:1.45;box-shadow:0 4px 14px rgba(0,0,0,.28);max-width:230px;}
 .bgt-chart-tooltip b{font-weight:700;}
+/* Dipakai bareng oleh SEMUA donut (ambBuildDonut, 20-ambien-dashboard.js) di app ini — 1 div saja
+   cukup krn position:fixed, tidak perlu 1 instance per donut. Gaya visual disamakan persis dgn
+   .bgt-chart-tooltip (chart Budget) biar konsisten. */
+.amb-donut-tooltip{position:fixed;z-index:9999;display:none;pointer-events:none;background:rgba(18,24,36,.95);color:#fff;padding:6px 10px;border-radius:6px;font-size:11.5px;line-height:1.45;box-shadow:0 4px 14px rgba(0,0,0,.28);max-width:230px;}
+.amb-donut-tooltip b{font-weight:700;}
+.amb-donut-seg{cursor:pointer;}
 .bgt-detail-subrow:hover{background:var(--gray-100);}
 .bgt-detail-pointrow{background:#fafbfc;}
 .bgt-detail-pointrow:hover{background:#f2f4f6;}

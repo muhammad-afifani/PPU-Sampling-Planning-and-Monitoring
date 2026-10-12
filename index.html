@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202610051800">
+<link rel="stylesheet" href="assets/css/style.css?v=202610121200">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -175,6 +175,7 @@
           <div class="dash-rank-subcard">
             <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px;">Kontribusi Site Terbesar</div>
             <div id="dashEmisiDonut"></div>
+            <div id="ambDonutTooltip" class="amb-donut-tooltip"></div>
             <div class="legend" id="dashEmisiDonutLegend" style="margin-top:10px;justify-content:center;"></div>
           </div>
         </div>
@@ -307,7 +308,7 @@
           <button type="button" class="chip-toggle" data-action="roadmapSetYears" data-years="10">10 Tahun</button>
         </div></div>
         <div class="spacer"></div>
-        <div class="hint" style="max-width:340px;align-self:center;">Centang hijau = sudah ada hasil pemantauan periode itu. Titik merah = wajib tapi belum ada hasil. Arahkan kursor ke tanda untuk lihat parameter.</div>
+        <div class="hint" style="max-width:380px;align-self:center;">Centang hijau = sudah ada hasil pemantauan periode itu. Titik merah = wajib tapi belum ada hasil. Titik kuning = Emergency Engine dgn RH 12 bulan terakhir di atas 200 jam/tahun (pemantauan internal, bukan kewajiban resmi). Arahkan kursor ke tanda untuk lihat detail.</div>
       </div>
       <div class="card">
         <h3>Rekap Jumlah Titik Wajib Sampling per Semester</h3>
@@ -1283,18 +1284,22 @@
       <div class="stickytop">
       <div class="pagehead"><div><h2>Baku Mutu &amp; Periode Pantau</h2><div class="desc">Referensi regulasi yang digunakan pada aplikasi ini — bukan data yang digunakan secara otomatis dalam perhitungan, melainkan acuan cepat agar tidak perlu membuka dokumen aslinya.</div></div></div>
       <div class="reg-jump">
-        <span class="grp-label">Emisi</span>
-        <a href="#regGenset" class="j-orange">Genset</a>
-        <a href="#regTurbin" class="j-blue">Turbin</a>
-        <a href="#regHeater" class="j-red">Heater/Reboiler</a>
-        <a href="#regFlare" class="j-crimson">Flare</a>
-        <a href="#regPeriode" class="j-navy">Periode Pantau</a>
-        <a href="#regSulfur" class="j-amber">Sulfur / H2S</a>
-        <span class="grp-label">Ambient</span>
-        <a href="#regAmbien" class="j-teal">Udara Ambien</a>
-        <a href="#regKebisingan" class="j-purple">Kebisingan</a>
-        <a href="#regKebauan" class="j-pink">Kebauan</a>
-        <a href="#regGetaran" class="j-slate">Getaran</a>
+        <div class="reg-jump-group">
+          <span class="grp-label">Emisi</span>
+          <a href="#regGenset" class="j-orange">Genset</a>
+          <a href="#regTurbin" class="j-blue">Turbin</a>
+          <a href="#regHeater" class="j-red">Heater/Reboiler</a>
+          <a href="#regFlare" class="j-crimson">Flare</a>
+          <a href="#regPeriode" class="j-navy">Periode Pantau</a>
+          <a href="#regSulfur" class="j-amber">Sulfur / H2S</a>
+        </div>
+        <div class="reg-jump-group">
+          <span class="grp-label">Ambient</span>
+          <a href="#regAmbien" class="j-teal">Udara Ambien</a>
+          <a href="#regKebisingan" class="j-purple">Kebisingan</a>
+          <a href="#regKebauan" class="j-pink">Kebauan</a>
+          <a href="#regGetaran" class="j-slate">Getaran</a>
+        </div>
       </div>
       <div class="section-note" style="margin-bottom:0;">Tabel di halaman ini statis (referensi), bukan sumber data live. Kalau ada revisi regulasi, kolom "Parameter Wajib" &amp; "Catatan Parameter" di Database Titik Pantau tetap yang jadi acuan sebenarnya untuk tiap titik — halaman ini cuma pembanding. Arahkan kursor ke baris kapasitas/bahan bakar/parameter utk melihat titik pantau PHM yang match kombinasi tersebut.</div>
       </div>
@@ -1655,38 +1660,38 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202610051800"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202610051800"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202610121200"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202610121200"></script>
 
-<script src="assets/data/default-data.js?v=202610051800"></script>
-<script src="assets/data/brand-assets.js?v=202610051800"></script>
-<script src="assets/data/travel-routes.js?v=202610051800"></script>
-<script src="assets/js/00-icons.js?v=202610051800"></script>
-<script src="assets/js/01-state.js?v=202610051800"></script>
-<script src="assets/js/02-nav-util.js?v=202610051800"></script>
-<script src="assets/js/03-period-logic.js?v=202610051800"></script>
-<script src="assets/js/04-dashboard.js?v=202610051800"></script>
-<script src="assets/js/05-master-data.js?v=202610051800"></script>
-<script src="assets/js/06-plan-personil.js?v=202610051800"></script>
-<script src="assets/js/07-rules-planner.js?v=202610051800"></script>
-<script src="assets/js/08-gantt-print.js?v=202610051800"></script>
-<script src="assets/js/09-tracking-map.js?v=202610051800"></script>
-<script src="assets/js/10-running-hour.js?v=202610051800"></script>
-<script src="assets/js/11-berita-acara.js?v=202610051800"></script>
-<script src="assets/js/12-data-page.js?v=202610051800"></script>
-<script src="assets/js/13-hasil-db.js?v=202610051800"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202610051800"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202610051800"></script>
-<script src="assets/js/16-actions-init.js?v=202610051800"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202610051800"></script>
-<script src="assets/js/18-model-dispersi.js?v=202610051800"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202610051800"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202610051800"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202610051800"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202610051800"></script>
-<script src="assets/js/23-budget-proyeksi.js?v=202610051800"></script>
-<script src="assets/js/24-personil-ppu.js?v=202610051800"></script>
-<script src="assets/js/25-access-gate.js?v=202610051800"></script>
-<script src="assets/js/26-laboratorium.js?v=202610051800"></script>
+<script src="assets/data/default-data.js?v=202610121200"></script>
+<script src="assets/data/brand-assets.js?v=202610121200"></script>
+<script src="assets/data/travel-routes.js?v=202610121200"></script>
+<script src="assets/js/00-icons.js?v=202610121200"></script>
+<script src="assets/js/01-state.js?v=202610121200"></script>
+<script src="assets/js/02-nav-util.js?v=202610121200"></script>
+<script src="assets/js/03-period-logic.js?v=202610121200"></script>
+<script src="assets/js/04-dashboard.js?v=202610121200"></script>
+<script src="assets/js/05-master-data.js?v=202610121200"></script>
+<script src="assets/js/06-plan-personil.js?v=202610121200"></script>
+<script src="assets/js/07-rules-planner.js?v=202610121200"></script>
+<script src="assets/js/08-gantt-print.js?v=202610121200"></script>
+<script src="assets/js/09-tracking-map.js?v=202610121200"></script>
+<script src="assets/js/10-running-hour.js?v=202610121200"></script>
+<script src="assets/js/11-berita-acara.js?v=202610121200"></script>
+<script src="assets/js/12-data-page.js?v=202610121200"></script>
+<script src="assets/js/13-hasil-db.js?v=202610121200"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202610121200"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202610121200"></script>
+<script src="assets/js/16-actions-init.js?v=202610121200"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202610121200"></script>
+<script src="assets/js/18-model-dispersi.js?v=202610121200"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202610121200"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202610121200"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202610121200"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202610121200"></script>
+<script src="assets/js/23-budget-proyeksi.js?v=202610121200"></script>
+<script src="assets/js/24-personil-ppu.js?v=202610121200"></script>
+<script src="assets/js/25-access-gate.js?v=202610121200"></script>
+<script src="assets/js/26-laboratorium.js?v=202610121200"></script>
 </body>
 </html>

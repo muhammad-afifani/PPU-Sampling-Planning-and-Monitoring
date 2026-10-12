@@ -372,30 +372,30 @@ function renderPersonil(){
   const rows = DB.personil.filter(personilMatchesFilter);
   const colCount = 6 + PERSONIL_ITEMS.length;
   document.getElementById("personilTable").innerHTML = `
-  <thead><tr><th class="pz-nama">Nama</th><th class="pz-role">Role</th>${PERSONIL_ITEMS.map(it=>`<th style="min-width:92px;white-space:nowrap;">${PERSONIL_LABELS[it]}</th>`).join("")}<th style="min-width:120px;">Kelengkapan</th><th style="min-width:100px;">Dokumentasi</th><th style="min-width:170px;">Ditugaskan di Batch</th><th style="min-width:130px;">Aksi</th></tr></thead>
+  <thead><tr><th class="pz-nama">Nama</th><th class="pz-role">Role</th>${PERSONIL_ITEMS.map(it=>`<th style="min-width:92px;white-space:nowrap;">${PERSONIL_LABELS[it]}</th>`).join("")}<th style="min-width:120px;">Kelengkapan</th><th style="min-width:100px;">Dokumentasi</th><th style="min-width:170px;max-width:220px;">Ditugaskan di Batch</th><th style="min-width:130px;">Aksi</th></tr></thead>
   <tbody>${rows.length ? rows.map(p=>{
     const pct = completenessPct(p);
     const assignments = batchesForPersonil(p.id);
-    return `<tr><td class="pz-nama" title="${escHtml(p.nama)}"><b>${escHtml(p.nama)}</b>${p.telepon?`<div class="muted" style="font-size:10.5px;margin-top:1px;">${escHtml(p.telepon)}</div>`:""}</td><td class="pz-role">${p.role}</td>
+    return `<tr><td class="pz-nama" title="${escHtml(p.nama)}"><b>${escHtml(p.nama)}</b><div class="muted pz-subline">${p.telepon?escHtml(p.telepon):""}</div></td><td class="pz-role">${p.role}</td>
       ${PERSONIL_ITEMS.map(it=>{
         const rec = p.items[it]||{};
         if(personilItemNA(p, it)){
-          return `<td style="white-space:nowrap;"><span class="badge b-gray" title="Tidak wajib untuk role ${escHtml(p.role)}">N/A</span></td>`;
+          return `<td style="white-space:nowrap;"><span class="badge b-gray" title="Tidak wajib untuk role ${escHtml(p.role)}">N/A</span><div class="pz-subline"></div></td>`;
         }
         if(it===PERSONIL_NUMBER_FIELD){
-          return rec.exp ? `<td style="white-space:nowrap;">${escHtml(rec.exp)}</td>` : `<td style="white-space:nowrap;"><span class="badge b-red">Kosong</span></td>`;
+          return rec.exp ? `<td style="white-space:nowrap;">${escHtml(rec.exp)}<div class="pz-subline"></div></td>` : `<td style="white-space:nowrap;"><span class="badge b-red">Kosong</span><div class="pz-subline"></div></td>`;
         } else if(PERSONIL_DATED[it]){
-          if(!rec.exp) return `<td style="white-space:nowrap;"><span class="badge b-red">Kosong</span></td>`;
+          if(!rec.exp) return `<td style="white-space:nowrap;"><span class="badge b-red">Kosong</span><div class="pz-subline"></div></td>`;
           const days = Math.round((new Date(rec.exp)-new Date())/86400000);
           const badge = days<0?'<span class="badge b-red">Expired</span>':(days<=30?`<span class="badge b-amber">${days} hr lagi</span>`:'<span class="badge b-green">Berlaku</span>');
-          return `<td style="white-space:nowrap;">${badge}<div class="muted" style="font-size:10.5px;margin-top:3px;">s.d. ${rec.exp}</div></td>`;
+          return `<td style="white-space:nowrap;">${badge}<div class="muted pz-subline">s.d. ${rec.exp}</div></td>`;
         } else {
-          return `<td style="white-space:nowrap;">${rec.ada?'<span class="badge b-green">Ada</span>':'<span class="badge b-red">Tdk Ada</span>'}</td>`;
+          return `<td style="white-space:nowrap;">${rec.ada?'<span class="badge b-green">Ada</span>':'<span class="badge b-red">Tdk Ada</span>'}<div class="pz-subline"></div></td>`;
         }
       }).join("")}
-      <td style="min-width:110px;"><div class="progressbar"><div style="width:${pct}%;background:${pct===100?'var(--green-500)':pct>=70?'var(--amber-500)':'var(--red-500)'}"></div></div><span class="muted" style="font-size:11px;">${pct}%</span></td>
+      <td style="min-width:120px;"><div class="progressbar"><div style="width:${pct}%;background:${pct===100?'var(--green-500)':pct>=70?'var(--amber-500)':'var(--red-500)'}"></div></div><span class="muted" style="font-size:11px;">${pct}%</span></td>
       <td>${p.dokumentasiLink ? `<a href="${escHtml(p.dokumentasiLink)}" target="_blank" rel="noopener noreferrer" class="btn small ghost">Buka Link</a>` : '<span class="muted" style="font-size:11px;">-</span>'}</td>
-      <td style="min-width:160px;font-size:11px;">${assignments.length ? assignments.map(a=>`<div class="badge ${a.lead?"b-teal":"b-gray"}" style="margin:1px 0;">${escHtml(a.batch.name)}${a.lead?" (Ketua)":""}</div>`).join("") : '<span class="muted">Belum ditugaskan</span>'}</td>
+      <td style="min-width:170px;max-width:220px;font-size:11px;"><div class="pz-batch-cell">${assignments.length ? assignments.map(a=>`<div class="badge ${a.lead?"b-teal":"b-gray"} pz-batch-pill" style="margin:1px 0;" title="${escHtml(a.batch.name)}${a.lead?" (Ketua)":""}">${escHtml(a.batch.name)}${a.lead?" (Ketua)":""}</div>`).join("") : '<span class="muted">Belum ditugaskan</span>'}</div></td>
       <td><button class="btn small" data-action="editPersonil" data-id="${p.id}">Edit</button>
           <button class="btn small danger" data-action="deletePersonil" data-id="${p.id}">Hapus</button></td>
     </tr>`;
