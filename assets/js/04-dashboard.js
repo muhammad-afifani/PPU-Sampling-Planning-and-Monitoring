@@ -128,11 +128,12 @@ function refreshDashScSelects(){
   else if(periods.includes(currentPeriodStr())) periodeSel.value = currentPeriodStr();
   else if(periods.length) periodeSel.value = periods[periods.length-1];
 
-  document.getElementById("dashScTeamChips").innerHTML = `
-    <button type="button" class="chip-toggle all ${dashScSel.team.size===0?'active':''}" data-action="dashScTeamChip" data-val="">Semua</button>
-    <button type="button" class="chip-toggle ${dashScSel.team.has('emisi')?'active':''}" data-action="dashScTeamChip" data-val="emisi">Emisi</button>
-    <button type="button" class="chip-toggle ${dashScSel.team.has('ambient')?'active':''}" data-action="dashScTeamChip" data-val="ambient">Ambient</button>
-  `;
+  // Tim: 2 kotak centang (bukan "Semua/Emisi/Ambient" spt radio) — dua-duanya tercentang = semua tim
+  // (disimpan sbg Set kosong), minimal 1 harus tetap tercentang (lihat dashScTeamChip di 16-actions-init.js).
+  const scChip = (on, action, val, label, extra)=>`<button type="button" class="sc-chip ${on?"on":""}" data-action="${action}" data-val="${escHtml(val)}" aria-pressed="${on}"><span class="sc-chk" aria-hidden="true"></span>${label}${extra||""}</button>`;
+  document.getElementById("dashScTeamChips").innerHTML =
+    scChip(dashScTeamMatches("emisi"), "dashScTeamChip", "emisi", "Emisi")
+    + scChip(dashScTeamMatches("ambient"), "dashScTeamChip", "ambient", "Ambient");
 
   const periode = periodeSel.value;
   const batchOpts = dashScAvailableBatches(periode);
@@ -141,10 +142,19 @@ function refreshDashScSelects(){
   // yang sudah tidak relevan/tidak kelihatan lagi chipnya.
   const batchOptIds = new Set(batchOpts.map(b=>b.id));
   [...dashScSel.batch].forEach(id=>{ if(!batchOptIds.has(id)) dashScSel.batch.delete(id); });
+  // Angka selesai/total di tiap chip batch — populasi sama dgn yang dihitung kurva (buildSCurveSVG).
+  const batchCount = b=>{
+    const ps = DB.points.filter(p=>p.batchId===b.id && p.planStart && p.planEnd && effectiveWajib(p) && !p.tidakBeroperasi);
+    return `<span class="sc-chip-count">${ps.filter(p=>p.status==="done").length}/${ps.length}</span>`;
+  };
   document.getElementById("dashScBatchChips").innerHTML = batchOpts.length
-    ? `<button type="button" class="chip-toggle all ${dashScSel.batch.size===0?'active':''}" data-action="dashScBatchChip" data-val="">Semua Batch</button>`
-      + batchOpts.map(b=>`<button type="button" class="chip-toggle ${dashScSel.batch.has(b.id)?'active':''}" data-action="dashScBatchChip" data-val="${b.id}">${escHtml(b.name)}</button>`).join("")
-    : `<span class="hint" style="margin:0;">(belum ada batch)</span>`;
+    ? scChip(dashScSel.batch.size===0, "dashScBatchChip", "", "Semua batch")
+      + batchOpts.map(b=>scChip(dashScSel.batch.has(b.id), "dashScBatchChip", b.id, escHtml(b.name), batchCount(b))).join("")
+    : `<span class="hint" style="margin:0;line-height:32px;">Belum ada batch di periode ini</span>`;
+
+  const defaultPeriode = periods.includes(currentPeriodStr()) ? currentPeriodStr() : periods[periods.length-1];
+  document.getElementById("dashScResetBtn").style.display =
+    (dashScSel.team.size || dashScSel.batch.size || (periods.length && periodeSel.value!==defaultPeriode)) ? "" : "none";
 }
 function renderDashboardSCurve(){
   refreshDashScSelects();

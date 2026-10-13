@@ -32,6 +32,12 @@
   --surface-card:#fff;
   --heading:#0d1f38;
   --heading-2:#12294a;
+
+  /* Warna seri S-Curve (Rencana/Aktual) — dipisah dari --navy-600 yang dulu dipakai krn navy itu
+     terbaca abu-abu & cuma 1.8:1 thd latar kartu gelap (garis Rencana nyaris hilang di dark mode).
+     Pasangan light & dark masing2 lolos cek lightness/chroma/beda-warna buta warna/kontras. */
+  --sc-plan:#2f6bd1;
+  --sc-act:#0ea5a0;
 }
 
 /* =========================================================
@@ -63,6 +69,8 @@
   --surface-card:#232529;
   --heading:#dbe6f0;
   --heading-2:#dbe6f0;
+  --sc-plan:#4f8be4;
+  --sc-act:#0fa79d;
 }
 @media (prefers-color-scheme: dark){
   /* Fallback murni-CSS kalau JS-nya entah kenapa belum sempat jalan (mis. sebelum 01-state.js
@@ -81,6 +89,8 @@
     --surface-card:#232529;
     --heading:#dbe6f0;
     --heading-2:#dbe6f0;
+    --sc-plan:#4f8be4;
+    --sc-act:#0fa79d;
   }
 }
 
@@ -293,6 +303,79 @@ details.collapse-section summary:hover{color:var(--teal-600,#0b6b66);}
 /* Sub-kartu chart (tren & donut) di dalam kartu Peringkat — border tipis tanpa shadow-nya sendiri
    (beda dari .card biasa) supaya tidak jadi "kotak di dalam kotak" yang menonjol dobel. */
 .dash-rank-subcard{border:1px solid var(--gray-200);border-radius:12px;padding:16px;background:var(--surface-card);}
+
+/* =========================================================
+   S-CURVE (Dashboard + Scheduling Tools — keduanya lewat buildSCurveSVG, 08-gantt-print.js)
+========================================================= */
+.sc-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+.sc-head .sc-sub{font-size:12.5px;color:var(--gray-500);margin-top:4px;}
+/* Filter bar: satu baris tersendiri di bawah judul (dulu nyempil di pojok kanan judul & batch chip-nya
+   kepotong jadi 2 baris) — label kecil di atas tiap grup, chip batch dapat sisa lebar penuh. */
+.sc-filterbar{display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap;padding:12px 14px;margin-bottom:16px;background:var(--gray-100);border-radius:12px;}
+.sc-fgroup{display:flex;flex-direction:column;gap:6px;min-width:0;}
+.sc-fgroup.grow{flex:1;}
+.sc-flabel{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--gray-500);}
+.sc-fgroup select{height:32px;}
+.sc-reset{align-self:flex-end;}
+/* Chip pilihan ganda — kotak centang kecil di kiri supaya jelas bisa dipilih lebih dari satu (beda dari
+   tombol biasa / radio). */
+.sc-chip{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:9px;border:1px solid var(--gray-300);background:var(--surface-card);color:var(--gray-700);font-size:12px;font-weight:600;cursor:pointer;transition:border-color .12s ease,background .12s ease,color .12s ease;white-space:nowrap;}
+.sc-chip:hover{border-color:var(--teal-500);color:var(--heading);}
+.sc-chip.on{border-color:var(--teal-500);background:color-mix(in srgb, var(--teal-500) 11%, var(--surface-card));color:var(--heading);}
+.sc-chk{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--gray-400,#a8b2bd);flex-shrink:0;position:relative;background:var(--surface-card);}
+.sc-chip.on .sc-chk{background:var(--teal-500);border-color:var(--teal-500);}
+.sc-chip.on .sc-chk::after{content:"";position:absolute;left:4px;top:1px;width:3px;height:7px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg);}
+.sc-chip-count{font-size:10.5px;font-weight:700;color:var(--gray-500);font-variant-numeric:tabular-nums;padding-left:2px;}
+.sc-chips{display:flex;gap:6px;flex-wrap:wrap;}
+
+/* KPI strip */
+.sc-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:16px;}
+.sc-kpi{padding:12px 14px;border:1px solid var(--gray-200);border-radius:12px;background:var(--surface-card);min-width:0;}
+.sc-kpi-lbl{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--gray-500);}
+.sc-kpi-num{font-size:22px;font-weight:800;color:var(--heading);font-variant-numeric:tabular-nums;line-height:1.15;margin-top:6px;}
+.sc-kpi-num small{font-size:13px;font-weight:700;color:var(--gray-500);margin-left:2px;}
+.sc-kpi-sub{font-size:11.5px;color:var(--gray-500);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sc-kpi .badge{margin-top:6px;}
+@media(max-width:1180px){.sc-kpis{grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media(max-width:700px){.sc-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}}
+
+/* Chart + panel status */
+.sc-body{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start;}
+@media(max-width:1100px){.sc-body{grid-template-columns:minmax(0,1fr);}}
+.sc-main{min-width:0;border:1px solid var(--gray-200);border-radius:12px;padding:14px 14px 10px;}
+.sc-legend{display:flex;align-items:center;gap:6px 16px;flex-wrap:wrap;font-size:11.5px;color:var(--gray-700);margin-bottom:6px;}
+.sc-legend .it{display:inline-flex;align-items:center;gap:6px;}
+.sc-legend .axis{margin-left:auto;color:var(--gray-500);font-size:11px;}
+.sc-sw{display:inline-block;flex-shrink:0;}
+.sc-sw.line{width:18px;height:0;border-top:2.5px solid currentColor;}
+.sc-sw.line.dash{border-top-style:dashed;}
+.sc-sw.bar{width:8px;height:11px;border-radius:2px;background:currentColor;}
+.sc-sw.act{color:var(--sc-act);}
+.sc-sw.plan{color:var(--sc-plan);}
+.sc-sw.today{width:0;height:13px;border-left:2px dashed var(--amber-500);}
+.sc-plot{position:relative;min-height:300px;}
+.sc-plot svg{display:block;font-family:var(--font-ui);}
+.sc-tip{position:absolute;top:0;left:0;pointer-events:none;opacity:0;transition:opacity .1s ease;z-index:5;min-width:208px;padding:10px 12px;border-radius:10px;background:var(--surface-card);border:1px solid var(--gray-200);box-shadow:0 10px 28px -8px rgba(10,22,40,.28);font-size:12px;color:var(--gray-700);}
+.sc-tip.show{opacity:1;}
+.sc-tip-date{font-weight:800;color:var(--heading);margin-bottom:7px;font-size:12.5px;}
+.sc-tip-row{display:flex;align-items:center;gap:8px;padding:2px 0;}
+.sc-tip-row b{margin-left:auto;color:var(--heading);font-variant-numeric:tabular-nums;}
+.sc-tip-row .pct{color:var(--gray-500);font-size:11px;min-width:34px;text-align:right;font-variant-numeric:tabular-nums;}
+.sc-tip-sep{height:1px;background:var(--gray-200);margin:6px 0;}
+.sc-tip-foot{margin-top:6px;padding-top:6px;border-top:1px solid var(--gray-200);font-weight:700;}
+details.sc-table{margin-top:6px;font-size:12px;}
+details.sc-table summary{cursor:pointer;color:var(--gray-500);font-weight:600;font-size:11.5px;padding:4px 0;user-select:none;}
+details.sc-table summary:hover{color:var(--heading);}
+details.sc-table .tablewrap{max-height:260px;margin-top:6px;}
+details.sc-table td,details.sc-table th{text-align:right;font-variant-numeric:tabular-nums;}
+details.sc-table td:first-child,details.sc-table th:first-child{text-align:left;}
+.sc-side{border:1px solid var(--gray-200);border-radius:12px;padding:16px;}
+.sc-side-title{font-size:13px;font-weight:800;color:var(--heading);}
+.sc-side-sub{font-size:11.5px;color:var(--gray-500);margin-top:2px;}
+.sc-donut{display:flex;justify-content:center;margin:14px 0 12px;}
+.sc-empty{border:1px dashed var(--gray-300);border-radius:12px;padding:36px 24px;text-align:center;color:var(--gray-500);font-size:12.5px;line-height:1.6;}
+.sc-empty b{color:var(--heading);}
+.sc-empty-title{font-size:14px;font-weight:800;color:var(--heading);margin-bottom:4px;}
 
 /* Kartu "Progress per Grup Sumber" di Dashboard — grid responsif, lebarnya menyesuaikan jumlah
    kartu yang muat (lihat dashGrpCardHtml di 04-dashboard.js). */
