@@ -82,10 +82,20 @@ const ACTIONS = {
     renderHasilDashboard();
   },
   dashScTeamChip:(t)=>{
+    // Kotak centang Emisi/Ambient: Set kosong = dua-duanya tercentang (semua tim). Centang terakhir
+    // tidak bisa dilepas — kurva tanpa tim sama sekali selalu kosong & tidak ada artinya.
     const val = t.dataset.val;
-    if(!val){ dashScSel.team.clear(); }
-    else if(dashScSel.team.has(val)){ dashScSel.team.delete(val); }
-    else{ dashScSel.team.add(val); }
+    const cur = dashScSel.team.size ? new Set(dashScSel.team) : new Set(["emisi","ambient"]);
+    if(cur.has(val)){
+      if(cur.size===1){ toast("Minimal satu tim harus dipilih."); return; }
+      cur.delete(val);
+    } else cur.add(val);
+    dashScSel.team = cur.size===2 ? new Set() : cur;
+    renderDashboardSCurve();
+  },
+  dashScReset:()=>{
+    dashScSel.team = new Set(); dashScSel.batch = new Set();
+    document.getElementById("dashScPeriode").value = ""; // refreshDashScSelects balik ke periode default
     renderDashboardSCurve();
   },
   dashScBatchChip:(t)=>{

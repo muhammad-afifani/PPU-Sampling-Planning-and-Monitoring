@@ -1543,217 +1543,367 @@ const SCURVE_STATUS_META = {
 // tidak pernah dua2nya sekaligus dlm SPA ini).
 let scurveStatusGroups = {};
 
+// Tanggal ringkas utk sumbu-X / tooltip S-Curve ("20 Agu", "Sen, 13 Okt 2026").
+function scFmtShortDate(dt){ return `${Number(dt.slice(8,10))} ${MONTH_SHORT_ID[Number(dt.slice(5,7))-1]}`; }
+function scFmtLongDate(dt){ return `${DOW_LABEL[dayOfWeek(dt)].slice(0,3)}, ${scFmtShortDate(dt)} ${dt.slice(0,4)}`; }
+
+// Plot S-Curve digambar SETELAH masuk DOM, pada lebar piksel kontainer yang sebenarnya (bukan viewBox
+// tetap yang lalu diskalakan) — dulu viewBox-nya 1200px lalu diciutkan ke kolom ~700px, jadi teks
+// sumbu ikut menyusut jadi ~6px. buildSCurveSVG cuma menitip data di scurvePlotData + placeholder
+// .sc-plot[data-sc-id]; scurveMountPlots (dipanggil di frame berikutnya, setelah caller memasang
+// innerHTML) menggambar & memasang ResizeObserver supaya digambar ulang kalau lebarnya berubah
+// (resize window, sidebar diciutkan, halaman yg tadinya tersembunyi jadi tampil).
+const scurvePlotData = new Map();
+let scurvePlotSeq = 0;
+const scurveObserved = new Set();
+const scurvePlotRO = window.ResizeObserver ? new ResizeObserver(entries=>entries.forEach(en=>scurveDrawPlot(en.target))) : null;
+function scurveMountPlots(){
+  // Bersihkan data/observer milik plot lama yang sudah dibuang dari DOM (tiap ganti filter = plot baru).
+  scurveObserved.forEach(el=>{ if(!el.isConnected){ if(scurvePlotRO) scurvePlotRO.unobserve(el); scurveObserved.delete(el); } });
+  const liveIds = new Set([...document.querySelectorAll(".sc-plot[data-sc-id]")].map(el=>el.dataset.scId));
+  [...scurvePlotData.keys()].forEach(id=>{ if(!liveIds.has(id)) scurvePlotData.delete(id); });
+  document.querySelectorAll(".sc-plot[data-sc-id]:not([data-sc-mounted])").forEach(el=>{
+    el.dataset.scMounted = "1";
+    el.addEventListener("pointermove", e=>scurveHover(el, e));
+    el.addEventListener("pointerdown", e=>scurveHover(el, e));
+    el.addEventListener("pointerleave", ()=>scurveHoverEnd(el));
+    if(scurvePlotRO){ scurvePlotRO.observe(el); scurveObserved.add(el); }
+    scurveDrawPlot(el);
+  });
+}
+function scurveDrawPlot(el){
+  const d = scurvePlotData.get(el.dataset.scId);
+  const W = Math.round(el.clientWidth);
+  if(!d || !W || el._scW===W) return; // halaman tersembunyi (lebar 0) — digambar nanti lewat ResizeObserver
+  el._scW = W;
+  const {svg, geo} = scurveBuildPlotSvg(d, W);
+  el.innerHTML = svg + `<div class="sc-tip" role="status" aria-live="polite"></div>`;
+  el._scGeo = geo;
+}
+function scurveBuildPlotSvg(d, W){
+  const n = d.totalDays;
+  const laneH = 18, laneGap = 4;
+  const laneBlock = d.laneRows ? d.laneRows*(laneH+laneGap)+8 : 0;
+  const padL = 44, padR = 40, padT = 14+laneBlock, padB = 30;
+  const H = 300+laneBlock;
+  const plotW = Math.max(60, W-padL-padR), plotH = H-padT-padB;
+  const xAt = i=>padL + (n<=1 ? plotW/2 : (i/(n-1))*plotW);
+  const yCum = v=>padT + plotH - (v/d.total)*plotH;
+  // Batang harian pakai "pita" bawah 28% tinggi plot dgn skala sendiri (sumbu kanan), supaya tetap
+  // menyatu di 1 chart (permintaan user, spt referensi S-Curve gabungan) tapi tidak menimpa bentuk
+  // kurva-S di atasnya. Sumbu kanan cuma diberi label di pita itu (0 & maksimum), bukan di semua
+  // grid — dulu grid 25/50/75/100% ikut diberi angka sumbu kanan (13/26/39/52) yang tidak pernah
+  // dicapai batang manapun & malah membingungkan.
+  const barZone = plotH*0.28;
+  const barMax = Math.max(1, ...d.plannedDaily, ...d.actualDaily);
+  const yBar = v=>padT + plotH - (v/barMax)*barZone;
+  const base = padT+plotH;
+  const step = n<=1 ? plotW : plotW/(n-1);
+  const bw = Math.max(1.5, Math.min(8, step*0.32));
+  const parts = [];
+
+  // Grid & sumbu kiri (% kumulatif)
+  for(let g=0; g<=4; g++){
+    const y = padT + plotH - (g/4)*plotH;
+    parts.push(`<line x1="${padL}" y1="${y}" x2="${padL+plotW}" y2="${y}" stroke="var(--gray-200)" ${g===0?'':'stroke-dasharray="2,4"'}/>`);
+    parts.push(`<text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="11" fill="var(--gray-500)">${g*25}%</text>`);
+  }
+  // Sumbu kanan (titik/hari) — hanya di pita batang
+  const midBar = barMax>=4 ? Math.round(barMax/2) : null;
+  [[0,0],[barMax,barMax]].concat(midBar!=null?[[midBar,midBar]]:[]).forEach(([v,lab])=>{
+    if(v===0) return;
+    const y = yBar(v);
+    parts.push(`<line x1="${padL+plotW}" y1="${y}" x2="${padL+plotW+4}" y2="${y}" stroke="var(--gray-300)"/>`);
+    parts.push(`<text x="${padL+plotW+8}" y="${y+4}" font-size="10.5" fill="var(--gray-500)">${lab}</text>`);
+  });
+  parts.push(`<text x="${padL+plotW+8}" y="${base+4}" font-size="10.5" fill="var(--gray-500)">0</text>`);
+
+  // Lajur jendela batch (di atas plot) — konteks kenapa kurva rencana naik/datar di rentang tertentu.
+  d.lanes.forEach(l=>{
+    const x1 = xAt(l.i1), x2 = Math.max(xAt(l.i2), x1+6);
+    const y = 8 + l.row*(laneH+laneGap);
+    const avail = Math.floor((x2-x1-12)/6.2);
+    const label = avail>=4 ? (l.name.length>avail ? l.name.slice(0,avail-1)+"…" : l.name) : "";
+    parts.push(`<g><title>${escSvg(l.name)}: ${l.start} s/d ${l.end}</title><rect x="${x1.toFixed(1)}" y="${y}" width="${(x2-x1).toFixed(1)}" height="${laneH}" rx="5" fill="var(--gray-100)" stroke="var(--gray-300)"/>${label?`<text x="${(x1+6).toFixed(1)}" y="${y+12.5}" font-size="10.5" font-weight="600" fill="var(--gray-700)">${escSvg(label)}</text>`:""}</g>`);
+  });
+
+  // Batang per hari (2px jarak antar pasangan batang)
+  for(let i=0;i<n;i++){
+    const cx = xAt(i), pv = d.plannedDaily[i], av = d.actualDaily[i];
+    if(pv>0){ const y = yBar(pv); parts.push(`<rect x="${(cx-bw-1).toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,base-y).toFixed(1)}" rx="1.5" fill="var(--sc-plan)" opacity=".45"/>`); }
+    if(av>0){ const y = yBar(av); parts.push(`<rect x="${(cx+1).toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,base-y).toFixed(1)}" rx="1.5" fill="var(--sc-act)" opacity=".85"/>`); }
+  }
+
+  // Garis "Hari ini"
+  if(d.todayIdx!=null){
+    const tx = xAt(d.todayIdx);
+    parts.push(`<line x1="${tx}" y1="${padT}" x2="${tx}" y2="${base}" stroke="var(--amber-500)" stroke-width="1.5" stroke-dasharray="4,3"/>`);
+    const pillW = 54, toLeft = tx+pillW+6 > padL+plotW;
+    const px = toLeft ? tx-pillW-4 : tx+4;
+    parts.push(`<rect x="${px}" y="${padT+2}" width="${pillW}" height="17" rx="8.5" fill="#fbeacb"/><text x="${px+pillW/2}" y="${padT+14}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#8a5c11">Hari ini</text>`);
+  }
+
+  // Kurva kumulatif. Aktual SENGAJA berhenti di "hari ini" — sesudahnya belum terjadi; dulu garisnya
+  // diteruskan datar sampai ujung jadwal, kebaca seolah progres ke depan mandek/nol.
+  const actEnd = d.actualEndIdx;
+  const linePath = (arr, last)=>arr.slice(0,last+1).map((v,i)=>(i?"L":"M")+xAt(i).toFixed(1)+","+yCum(v).toFixed(1)).join(" ");
+  if(actEnd>=0){
+    const pa = linePath(d.actualCum, actEnd);
+    parts.push(`<path d="${pa} L${xAt(actEnd).toFixed(1)},${base} L${xAt(0).toFixed(1)},${base} Z" fill="var(--sc-act)" opacity=".1"/>`);
+  }
+  parts.push(`<path d="${linePath(d.plannedCum, n-1)}" fill="none" stroke="var(--sc-plan)" stroke-width="2" stroke-dasharray="6,4" stroke-linejoin="round"/>`);
+  if(actEnd>=0) parts.push(`<path d="${linePath(d.actualCum, actEnd)}" fill="none" stroke="var(--sc-act)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`);
+
+  // Label langsung (cuma di ujung kurva, bukan di tiap titik)
+  const pct = v=>Math.round(v/d.total*100);
+  const halo = `paint-order="stroke" stroke="var(--surface-card)" stroke-width="3" stroke-linejoin="round"`;
+  const xp = xAt(n-1), yp = yCum(d.plannedCum[n-1]);
+  parts.push(`<circle cx="${xp}" cy="${yp}" r="3.5" fill="var(--sc-plan)" stroke="var(--surface-card)" stroke-width="2"/>`);
+  parts.push(`<text x="${xp-8}" y="${yp-9}" text-anchor="end" font-size="11" font-weight="700" fill="var(--heading)" ${halo}>Rencana ${pct(d.plannedCum[n-1])}%</text>`);
+  if(actEnd>=0){
+    const xa = xAt(actEnd), ya = yCum(d.actualCum[actEnd]);
+    parts.push(`<circle cx="${xa}" cy="${ya}" r="4.5" fill="var(--sc-act)" stroke="var(--surface-card)" stroke-width="2"/>`);
+    // Label ditaruh di BAWAH titik kalau di atasnya bentrok: label "Rencana" di ujung kanan, atau garis
+    // rencana yang lewat persis di atas titik aktual (kasus umum: aktual sedikit di bawah rencana).
+    const ypAtA = yCum(d.plannedCum[actEnd]);
+    const crowded = (Math.abs(xa-xp)<110 && Math.abs(ya-yp)<18) || (ya-ypAtA>=0 && ya-ypAtA<20);
+    const nearRight = xa > padL+plotW-90;
+    const lx = nearRight ? xa-8 : xa+8, anchor = nearRight ? "end" : "start";
+    const ly = crowded ? ya+19 : ya-9;
+    parts.push(`<text x="${lx}" y="${ly}" text-anchor="${anchor}" font-size="11" font-weight="700" fill="var(--heading)" ${halo}>Aktual ${pct(d.actualCum[actEnd])}%</text>`);
+  }
+
+  // Sumbu-X: jarak label dipilih dari lebar piksel nyata (± 1 label per 64px).
+  const maxLabels = Math.max(2, Math.floor(plotW/64));
+  const steps = [1,2,3,5,7,14,21,28,42,56,91];
+  const tickStep = steps.find(s=>Math.ceil((n-1)/s)+1<=maxLabels) || Math.ceil((n-1)/(maxLabels-1));
+  const ticks = [];
+  for(let i=0;i<n;i+=tickStep) ticks.push(i);
+  if(ticks[ticks.length-1]!==n-1){
+    if(n-1-ticks[ticks.length-1] < tickStep*0.6 && ticks.length>1) ticks.pop();
+    ticks.push(n-1);
+  }
+  ticks.forEach(i=>{
+    const x = xAt(i), dt = addDays(d.minDate, i);
+    const anchor = i===0 ? "start" : (i===n-1 ? "end" : "middle");
+    parts.push(`<line x1="${x}" y1="${base}" x2="${x}" y2="${base+4}" stroke="var(--gray-300)"/>`);
+    parts.push(`<text x="${x}" y="${base+18}" text-anchor="${anchor}" font-size="11" fill="var(--gray-500)">${scFmtShortDate(dt)}</text>`);
+  });
+
+  // Lapisan hover (disembunyikan sampai pointer masuk)
+  parts.push(`<line class="sc-guide" x1="0" y1="${padT}" x2="0" y2="${base}" stroke="var(--gray-500)" stroke-width="1" opacity="0"/>`);
+  parts.push(`<circle class="sc-hdot-p" r="5" fill="var(--sc-plan)" stroke="var(--surface-card)" stroke-width="2" opacity="0"/>`);
+  parts.push(`<circle class="sc-hdot-a" r="5.5" fill="var(--sc-act)" stroke="var(--surface-card)" stroke-width="2" opacity="0"/>`);
+  parts.push(`<rect x="${padL}" y="${padT}" width="${plotW}" height="${plotH}" fill="transparent" style="cursor:crosshair"/>`);
+
+  const svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="S-Curve rencana vs aktual kumulatif, ${d.minDate} sampai ${addDays(d.minDate,n-1)}">${parts.join("")}</svg>`;
+  return {svg, geo:{W, H, padL, padT, plotW, base, n, xAt, yCum}};
+}
+function scurveHover(el, e){
+  const d = scurvePlotData.get(el.dataset.scId), g = el._scGeo;
+  if(!d || !g) return;
+  const svg = el.querySelector("svg"); if(!svg) return;
+  const r = svg.getBoundingClientRect();
+  const x = (e.clientX - r.left) * (g.W / r.width), y = (e.clientY - r.top) * (g.H / r.height);
+  if(x<g.padL-6 || x>g.padL+g.plotW+6 || y<g.padT-4 || y>g.base+4){ scurveHoverEnd(el); return; }
+  const i = Math.max(0, Math.min(g.n-1, Math.round((x-g.padL)/(g.plotW||1)*(g.n-1))));
+  const gx = g.xAt(i);
+  const guide = svg.querySelector(".sc-guide"), dp = svg.querySelector(".sc-hdot-p"), da = svg.querySelector(".sc-hdot-a");
+  guide.setAttribute("x1", gx); guide.setAttribute("x2", gx); guide.setAttribute("opacity", ".55");
+  dp.setAttribute("cx", gx); dp.setAttribute("cy", g.yCum(d.plannedCum[i])); dp.setAttribute("opacity", "1");
+  const hasAct = i<=d.actualEndIdx;
+  if(hasAct){ da.setAttribute("cx", gx); da.setAttribute("cy", g.yCum(d.actualCum[i])); da.setAttribute("opacity", "1"); }
+  else da.setAttribute("opacity", "0");
+  const dt = addDays(d.minDate, i), pct = v=>Math.round(v/d.total*100)+"%";
+  const dev = hasAct ? d.actualCum[i]-d.plannedCum[i] : null;
+  const tip = el.querySelector(".sc-tip");
+  tip.innerHTML = `<div class="sc-tip-date">${scFmtLongDate(dt)}${i===d.todayIdx?' · hari ini':''}</div>
+    <div class="sc-tip-row"><span class="sc-sw line act"></span>Aktual kumulatif <b>${hasAct?d.actualCum[i]:"—"}</b><span class="pct">${hasAct?pct(d.actualCum[i]):""}</span></div>
+    <div class="sc-tip-row"><span class="sc-sw line dash plan"></span>Rencana kumulatif <b>${d.plannedCum[i]}</b><span class="pct">${pct(d.plannedCum[i])}</span></div>
+    <div class="sc-tip-sep"></div>
+    <div class="sc-tip-row"><span class="sc-sw bar act"></span>Selesai hari itu <b>${hasAct?d.actualDaily[i]:"—"}</b><span class="pct"></span></div>
+    <div class="sc-tip-row"><span class="sc-sw bar plan"></span>Target hari itu <b>${d.plannedDaily[i]}</b><span class="pct"></span></div>
+    ${dev!=null?`<div class="sc-tip-foot">${dev>0?`▲ ${dev} titik lebih cepat`:dev<0?`▼ ${-dev} titik lebih lambat`:"● Sesuai rencana"}</div>`:`<div class="sc-tip-foot" style="font-weight:600;color:var(--gray-500);">Belum terjadi</div>`}`;
+  tip.classList.add("show");
+  const elW = el.clientWidth, tipW = tip.offsetWidth, tipH = tip.offsetHeight;
+  const pxX = gx * (r.width / g.W);
+  let left = pxX + 14;
+  if(left + tipW > elW) left = pxX - tipW - 14;
+  tip.style.left = Math.max(0, left) + "px";
+  tip.style.top = Math.max(0, Math.min(g.padT, el.clientHeight - tipH)) + "px";
+}
+function scurveHoverEnd(el){
+  const svg = el.querySelector("svg");
+  if(svg) svg.querySelectorAll(".sc-guide,.sc-hdot-p,.sc-hdot-a").forEach(n=>n.setAttribute("opacity","0"));
+  const tip = el.querySelector(".sc-tip"); if(tip) tip.classList.remove("show");
+}
+
 function buildSCurveSVG(batches, points, view){
   // `view` menerima array kategori ("emisi"/"ambient", bisa dua-duanya sekaligus — lihat
   // dashScSel.team di 04-dashboard.js) ATAU string lama ("emisi"/"ambient"/"overlay"/"all", dipakai
-  // Scheduling Tools/08-gantt-print.js sendiri, lihat renderGantt) supaya kedua caller tetap jalan
-  // tanpa perlu ikut diubah semua.
+  // Scheduling Tools/08-gantt-print.js sendiri, lihat renderGantt) supaya kedua caller tetap jalan.
   const cats = Array.isArray(view) ? view : (view==="emisi"||view==="ambient" ? [view] : ["emisi","ambient"]);
   const hasEmisi = cats.includes("emisi"), hasAmbient = cats.includes("ambient");
-  // batchIds membatasi kurva ke titik yang MEMANG bagian dari batch yang dikirim caller (lihat
-  // p.batchId, diisi/di-update tiap applyScheduleToPoints jalan) — sebelumnya param `batches` ini
-  // tidak dipakai sama sekali di sini, jadi kurva SELALU menggabung titik dari SEMUA batch/periode
-  // yang pernah dibuat (rentang tanggal makin panjang tiap semester baru). Dashboard sekarang
-  // mengirim batch yang sudah difilter Periode/Tim/Batch (lihat renderDashboardSCurve di
-  // 04-dashboard.js) supaya kurva cuma menampilkan jendela jadwal yang koheren.
+  const byCat = arr=> hasEmisi && !hasAmbient ? arr.filter(p=>p.kategori==="emisi") : (hasAmbient && !hasEmisi ? arr.filter(p=>p.kategori!=="emisi") : arr);
+  // batchIds membatasi kurva ke titik yang MEMANG bagian dari batch yang dikirim caller (lewat
+  // p.batchId) — Dashboard mengirim batch yang sudah difilter Periode/Tim/Batch.
   const batchIds = new Set((batches||[]).map(b=>b.id));
-  let relevant = points.filter(p=>p.planStart && p.planEnd && effectiveWajib(p) && !p.tidakBeroperasi && batchIds.has(p.batchId));
-  if(hasEmisi && !hasAmbient) relevant = relevant.filter(p=>p.kategori==="emisi");
-  else if(hasAmbient && !hasEmisi) relevant = relevant.filter(p=>p.kategori!=="emisi");
-  if(!relevant.length) return "<div class='hint' style='padding:14px;'>Belum ada jadwal untuk kurva-S pada filter Periode/Tim/Batch yang dipilih. Coba ganti filter di atas, atau buka <b>Perencanaan Batch</b> → isi tanggal mulai → klik <b>Buat &amp; Terapkan Jadwal</b>.</div>";
+  const relevant = byCat(points.filter(p=>p.planStart && p.planEnd && effectiveWajib(p) && !p.tidakBeroperasi && batchIds.has(p.batchId)));
 
-  const allDates = relevant.flatMap(p=>[p.planStart,p.planEnd]);
-  const minDate = allDates.reduce((a,b)=>a<b?a:b);
-  const maxDate = allDates.reduce((a,b)=>a>b?a:b);
-  const totalDays = daysBetweenInclusive(minDate,maxDate);
-  const total = relevant.length;
-  const doneNow = relevant.filter(p=>p.status==="done").length;
-
-  const W = Math.max(600, Math.min(1200, totalDays*18)), H=320, padL=44,padB=34,padT=18,padR=40;
-  const plotW = W-padL-padR, plotH = H-padT-padB;
-
-  let plannedPts=[], actualPts=[];
-  let cum=0;
-  for(let i=0;i<totalDays;i++){
-    const dt = addDays(minDate,i);
-    cum = relevant.filter(p=>p.planEnd<=dt).length;
-    plannedPts.push([i,cum]);
-  }
-  let acum=0;
-  for(let i=0;i<totalDays;i++){
-    const dt = addDays(minDate,i);
-    acum = relevant.filter(p=>p.status==="done" && p.actualEnd && p.actualEnd<=dt).length;
-    actualPts.push([i,acum]);
-  }
-  // Hitungan HARIAN (bukan kumulatif) — digambar sbg batang di chart yang SAMA dgn garis kumulatif
-  // di bawah (dulu dipisah jadi chart kedua terpisah lewat buildSCurveDailyBars, sekarang disatukan
-  // spt referensi "S Curve" gabungan bar+line yang dikirim user) — bar ini bisa naik-turun per hari
-  // (beda dari garis kumulatif yang selalu naik/rata), jadi langsung kelihatan hari mana yang
-  // padat/kosong TANPA perlu scroll ke chart terpisah.
-  let plannedDaily=[], actualDaily=[];
-  for(let i=0;i<totalDays;i++){
-    const dt = addDays(minDate,i);
-    plannedDaily.push(relevant.filter(p=>p.planEnd===dt).length);
-    actualDaily.push(relevant.filter(p=>p.status==="done" && p.actualEnd===dt).length);
-  }
-  function toXY(i,v){ return [padL + (i/(totalDays-1||1))*plotW, padT + plotH - (v/total)*plotH]; }
-  const pathPlanned = plannedPts.map((pt,i)=>(i===0?"M":"L")+toXY(pt[0],pt[1]).join(",")).join(" ");
-  const pathActual = actualPts.map((pt,i)=>(i===0?"M":"L")+toXY(pt[0],pt[1]).join(",")).join(" ");
-  // Skala batang HARIAN pakai sumbu kanan sendiri (bukan 0..total spt garis kumulatif di sumbu kiri)
-  // krn rentangnya jauh lebih kecil (jumlah titik selesai PER HARI, bukan akumulasi s/d hari itu) —
-  // batang tertinggi sengaja dibatasi cuma sampai grid 25% (bukan 100%) spt referensi chart gabungan
-  // yang dikirim user, supaya batangnya tetap "di bawah" & tidak menutupi bentuk garis-S di atasnya.
-  const maxDaily = Math.max(1, ...plannedDaily, ...actualDaily);
-  const barUnitPx = (0.25*plotH)/maxDaily;
-  function barY(v){ return padT+plotH-v*barUnitPx; }
-  const barBaseY = barY(0);
-  const slotW = plotW/totalDays;
-  const barW = Math.max(1.5, Math.min(9, slotW/2-2));
-
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:12px;">`;
-  for(let g=0; g<=4; g++){
-    const frac = g/4, y = padT+plotH-frac*plotH;
-    svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--gray-200)"/>`;
-    svg += `<text x="2" y="${y+4}" fill="var(--gray-500)" font-size="11px">${Math.round(frac*100)}%</text>`;
-    svg += `<text x="${W-padR+7}" y="${y+4}" fill="var(--gray-500)" font-size="10.5px">${Math.round((frac*plotH)/barUnitPx)}</text>`;
-  }
-
-  // Batang target/aktual PER HARI — digambar sebelum garis kumulatif supaya garisnya tetap kelihatan
-  // jelas di atas batang (bukan ketutupan).
-  for(let i=0;i<totalDays;i++){
-    const dt = addDays(minDate,i);
-    const [cx] = toXY(i,0);
-    const pv = plannedDaily[i], av = actualDaily[i];
-    if(pv>0){
-      const y = barY(pv);
-      svg += `<rect x="${(cx-barW-1).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(1,barBaseY-y).toFixed(1)}" rx="2" fill="var(--navy-600)" opacity="0.8"><title>${dt} — target selesai: ${pv} titik</title></rect>`;
-    }
-    if(av>0){
-      const y = barY(av);
-      svg += `<rect x="${(cx+1).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(1,barBaseY-y).toFixed(1)}" rx="2" fill="var(--teal-500)" opacity="0.8"><title>${dt} — aktual selesai: ${av} titik</title></rect>`;
-    }
-  }
-
-  // Garis "Hari ini" — biar langsung kelihatan posisi sekarang relatif ke rencana.
-  const today = todayStr();
-  let deltaHtml = "";
-  if(today>=minDate && today<=maxDate){
-    const todayIdx = daysBetweenInclusive(minDate, today)-1;
-    const [tx] = toXY(todayIdx, 0);
-    svg += `<line x1="${tx}" y1="${padT}" x2="${tx}" y2="${padT+plotH}" stroke="var(--amber-500)" stroke-width="1.5" stroke-dasharray="3,3"/>`;
-    svg += `<text x="${tx+4}" y="${padT+11}" fill="#b5790f" font-size="10.5px" font-weight="700">Hari ini</text>`;
-    const plannedAtToday = plannedPts[todayIdx][1], actualAtToday = actualPts[todayIdx][1];
-    const delta = actualAtToday - plannedAtToday;
-    if(delta>0) deltaHtml = `<span class="badge b-green">${delta} titik lebih cepat dari rencana</span>`;
-    else if(delta<0) deltaHtml = `<span class="badge b-red">${Math.abs(delta)} titik lebih lambat dari rencana</span>`;
-    else deltaHtml = `<span class="badge b-blue">Tepat sesuai rencana</span>`;
-  }
-
-  // Area tipis di bawah garis aktual — cuma penekanan visual (bukan data baru), biar progres yang
-  // sudah tercapai kelihatan sebagai "wilayah terisi", bukan cuma garis tipis di atas grid kosong.
-  const [areaFirstX] = toXY(actualPts[0][0], 0);
-  const [areaLastX] = toXY(actualPts[actualPts.length-1][0], 0);
-  const areaPath = actualPts.map((pt,i)=>(i===0?"M":"L")+toXY(pt[0],pt[1]).join(",")).join(" ")
-    + ` L${areaLastX},${padT+plotH} L${areaFirstX},${padT+plotH} Z`;
-  svg += `<path d="${areaPath}" fill="var(--teal-500)" opacity="0.08"/>`;
-  svg += `<path d="${pathPlanned}" fill="none" stroke="var(--navy-600)" stroke-width="2.5" stroke-dasharray="6,4"/>`;
-  svg += `<path d="${pathActual}" fill="none" stroke="var(--teal-500)" stroke-width="3"/>`;
-  // Titik hover (native tooltip lewat <title>) tiap kelipatan minggu + hari terakhir, biar bisa
-  // cek angka pastinya tanpa bikin SVG kebanjiran node kalau rentangnya panjang.
-  const markEvery = Math.max(1, Math.round(totalDays/24));
-  plannedPts.forEach((pt,i)=>{
-    if(i%markEvery!==0 && i!==plannedPts.length-1) return;
-    const [x,y] = toXY(pt[0],pt[1]);
-    svg += `<circle cx="${x}" cy="${y}" r="3" fill="var(--navy-600)"><title>${addDays(minDate,i)} — rencana: ${pt[1]}/${total}</title></circle>`;
-  });
-  actualPts.forEach((pt,i)=>{
-    if(i%markEvery!==0 && i!==actualPts.length-1) return;
-    const [x,y] = toXY(pt[0],pt[1]);
-    svg += `<circle cx="${x}" cy="${y}" r="3.5" fill="var(--teal-500)" stroke="var(--surface-card)" stroke-width="1.5"><title>${addDays(minDate,i)} — aktual: ${pt[1]}/${total}</title></circle>`;
-  });
-  // Label tanggal sumbu-X per interval (bukan cuma dua ujung spt sebelumnya) — sekarang chart ini
-  // juga menampilkan batang harian, jadi pembaca butuh lebih banyak titik acuan tanggal di sepanjang
-  // sumbu, sama seperti bar chart harian yang dulu terpisah (buildSCurveDailyBars, sekarang disatukan
-  // ke sini). Ujung awal/akhir tetap ditulis lengkap (YYYY-MM-DD), titik tengah cukup MM-DD.
-  const labelEvery = Math.max(1, Math.ceil(totalDays/8));
-  let tickIdx = [];
-  for(let i=0;i<totalDays;i+=labelEvery) tickIdx.push(i);
-  if(tickIdx[tickIdx.length-1]!==totalDays-1){
-    // Tick terakhir SELALU dipaksa ada (biar batas kanan kelihatan) — tapi kalau jaraknya ke tick
-    // sebelumnya kurang dari separuh labelEvery, ganti tick sebelumnya itu (bukan ditambah di
-    // sampingnya) supaya dua label tidak numpuk berdempetan di ujung kanan.
-    if(totalDays-1-tickIdx[tickIdx.length-1] <= Math.max(1,Math.ceil(labelEvery/2))) tickIdx.pop();
-    tickIdx.push(totalDays-1);
-  }
-  tickIdx.forEach(i=>{
-    const [x] = toXY(i,0);
-    const dt = addDays(minDate,i);
-    const label = (i===0||i===totalDays-1) ? dt : dt.slice(5);
-    const anchor = i===0 ? "start" : (i===totalDays-1 ? "end" : "middle");
-    svg += `<text x="${x}" y="${H-10}" text-anchor="${anchor}" fill="var(--gray-500)" font-size="10.5px">${label}</text>`;
-  });
-  svg += `</svg>`;
-  svg = `<div class="hint" style="margin-bottom:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">${doneNow} dari ${total} titik selesai (${Math.round(doneNow/total*100)}%) ${deltaHtml}</div>` + svg;
-  svg += `<div class="legend"><span class="item"><span class="sw" style="background:var(--navy-600)"></span>Rencana (garis kumulatif &middot; batang per hari)</span><span class="item"><span class="sw" style="background:var(--teal-500)"></span>Aktual (garis kumulatif &middot; batang per hari)</span><span class="item"><span class="sw" style="background:var(--amber-500)"></span>Hari ini</span></div>`;
-  svg += `<div class="hint" style="margin-top:2px;">Sumbu kiri: % kumulatif titik selesai. Sumbu kanan: jumlah titik per hari (skala batang).</div>`;
-  // Panel status di sebelah kanan chart — supaya ruang di samping S-Curve tidak kosong, dan
-  // sekalian kasih sudut pandang lain (distribusi status) dari data yang sama. Titik per status
-  // disimpan di scurveStatusGroups (bukan cuma dihitung) supaya baris di bawah ini bisa diklik utk
-  // buka daftar lengkapnya (lihat distributionBarRow & openScurveStatusDrilldownModal).
-  // SENGAJA pakai populasi lebih LUAS drpd `relevant` (yang dipakai kurva itu sendiri, wajib py
-  // planStart/planEnd supaya bisa digambar di sumbu waktu) — titik yang dieliminasi dari batch aktif
-  // (Scheduling Tools) atau belum pernah dijadwalkan sama sekali TIDAK punya planStart/planEnd
-  // (lihat applyScheduleToPoints), padahal itu PERSIS definisi "Hold" (titik wajib yang sedang tidak
-  // aktif dijadwalkan). Kalau ikut disaring pakai syarat tanggal yang sama, titik2 itu jadi seolah
-  // tidak pernah ada sama sekali di panel ini (bukan cuma "tidak masuk Hold", tapi hilang total dari
-  // semua kategori TERMASUK totalnya) — padahal kartu "Titik Wajib Pantau" & "Rekap per Site" di
-  // Dashboard (04-dashboard.js, effectiveWajib doang tanpa syarat tanggal) tetap menghitungnya.
-  // Populasi di sini disamakan cakupannya dgn itu supaya jumlahnya konsisten & titik yang dieliminasi/
-  // ditunda ke batch berikutnya tetap kelihatan sebagai Hold, bukan hilang diam-diam.
-  let statusPts = points.filter(p=>effectiveWajib(p) && !p.tidakBeroperasi);
-  if(hasEmisi && !hasAmbient) statusPts = statusPts.filter(p=>p.kategori==="emisi");
-  else if(hasAmbient && !hasEmisi) statusPts = statusPts.filter(p=>p.kategori!=="emisi");
+  // Panel Distribusi Status — SENGAJA pakai populasi lebih LUAS drpd `relevant` (yang wajib punya
+  // planStart/planEnd supaya bisa digambar di sumbu waktu): titik yang dieliminasi dari batch aktif
+  // atau belum pernah dijadwalkan TIDAK punya planStart/planEnd, padahal itu PERSIS definisi "Hold".
+  // Disamakan cakupannya dgn kartu "Titik Wajib Pantau" & "Rekap per Site" di Dashboard supaya
+  // jumlahnya konsisten. Titik per status disimpan di scurveStatusGroups supaya baris legend-nya
+  // bisa diklik utk drilldown (openScurveStatusDrilldownModal).
+  const statusPts = byCat(points.filter(p=>effectiveWajib(p) && !p.tidakBeroperasi));
   const statusGroups = {done:[], scheduled:[], pending:[], failed:[]};
   statusPts.forEach(p=>{ (statusGroups[p.status]=statusGroups[p.status]||[]).push(p); });
   scurveStatusGroups = statusGroups;
   const statusTotal = statusPts.length;
-  // Donut ringkas di atas baris2 legend — dashoffset tiap segmen dihitung kumulatif dari segmen
-  // sebelumnya (bukan diulang dari 0) supaya potongan2nya nyambung tanpa celah/tumpang tindih,
-  // urutannya sama persis dgn urutan baris legend di bawahnya biar gampang dicocokkan.
-  const donutR = 42, donutC = 2*Math.PI*donutR;
+  const donutR = 50, donutC = 2*Math.PI*donutR;
+  const segKeys = ["done","scheduled","pending","failed"].filter(k=>statusGroups[k].length);
+  // Celah 2px antar potongan donut (warna latar kartu) supaya batas tiap status tetap kebaca walau
+  // dua warnanya bersebelahan mirip (teal Done vs teal Scheduled).
+  const gap = segKeys.length>1 ? 2 : 0;
   let donutOffset = 0;
-  const donutSegs = ["done","scheduled","pending","failed"].map(key=>{
-    const meta = SCURVE_STATUS_META[key];
-    const count = statusGroups[key].length;
-    if(!count) return "";
-    const len = statusTotal? (count/statusTotal)*donutC : 0;
-    const seg = `<circle cx="52" cy="52" r="${donutR}" fill="none" stroke="${meta.barColor}" stroke-width="14" stroke-dasharray="${len.toFixed(1)} ${(donutC-len).toFixed(1)}" stroke-dashoffset="${(-donutOffset).toFixed(1)}"/>`;
+  const donutSegs = segKeys.map(key=>{
+    const len = (statusGroups[key].length/statusTotal)*donutC;
+    const seg = `<circle cx="64" cy="64" r="${donutR}" fill="none" stroke="${SCURVE_STATUS_META[key].barColor}" stroke-width="16" stroke-dasharray="${Math.max(0.5,len-gap).toFixed(1)} ${(donutC-Math.max(0.5,len-gap)).toFixed(1)}" stroke-dashoffset="${(-donutOffset).toFixed(1)}"/>`;
     donutOffset += len;
     return seg;
   }).join("");
-  const statusPanel = `<div style="min-width:190px;flex-shrink:0;">
-    <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px;">Distribusi Status</div>
-    <div style="display:flex;justify-content:center;margin-bottom:14px;">
-      <svg width="104" height="104" viewBox="0 0 104 104">
-        <g transform="rotate(-90 52 52)">
-          <circle cx="52" cy="52" r="${donutR}" fill="none" stroke="var(--gray-200)" stroke-width="14"/>
-          ${donutSegs}
-        </g>
-        <text x="52" y="48" font-size="19" font-weight="800" fill="var(--heading)" text-anchor="middle">${statusTotal}</text>
-        <text x="52" y="64" font-size="9.5" fill="var(--gray-500)" text-anchor="middle">titik</text>
+
+  const total = relevant.length;
+  const statusPanel = `<aside class="sc-side">
+    <div class="sc-side-title">Distribusi Status</div>
+    <div class="sc-side-sub">Seluruh titik wajib pantau &middot; klik baris utk daftar titiknya</div>
+    <div class="sc-donut">
+      <svg width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Distribusi status ${statusTotal} titik wajib pantau">
+        <circle cx="64" cy="64" r="${donutR}" fill="none" stroke="var(--gray-200)" stroke-width="16"/>
+        <g transform="rotate(-90 64 64)">${donutSegs}</g>
+        <text x="64" y="62" font-size="24" font-weight="800" fill="var(--heading)" text-anchor="middle">${statusTotal}</text>
+        <text x="64" y="80" font-size="10.5" fill="var(--gray-500)" text-anchor="middle">titik wajib</text>
       </svg>
     </div>
     ${["done","scheduled","pending","failed"].map(key=>{
       const meta = SCURVE_STATUS_META[key];
       return distributionBarRow(meta.label, statusGroups[key].length, statusTotal, meta.barColor, key);
     }).join("")}
-    <div class="hint" style="margin-top:8px;">Mencakup SEMUA titik wajib pantau (${statusTotal}) — beda dari kurva di samping yang cuma menghitung titik yang sudah masuk jadwal aktif (${total}).</div>
+    <div class="hint" style="margin-top:10px;">${total ? `S-Curve hanya menghitung <b>${total}</b> titik yang sudah masuk jadwal batch terpilih; panel ini mencakup seluruh <b>${statusTotal}</b> titik wajib (termasuk Hold).` : `Mencakup seluruh ${statusTotal} titik wajib pantau, termasuk yang belum dijadwalkan (Hold).`}</div>
+  </aside>`;
+
+  if(!relevant.length){
+    return `<div class="sc-body">
+      <div class="sc-empty"><div class="sc-empty-title">Belum ada jadwal untuk kurva-S</div>Tidak ada titik terjadwal pada filter Periode/Tim/Batch yang dipilih. Coba ganti filter di atas, atau buka <b>Perencanaan Batch</b> &rarr; isi tanggal mulai &rarr; klik <b>Buat &amp; Terapkan Jadwal</b>.</div>
+      ${statusPanel}
+    </div>`;
+  }
+
+  const allDates = relevant.flatMap(p=>[p.planStart,p.planEnd]);
+  const minDate = allDates.reduce((a,b)=>a<b?a:b);
+  const planMax = allDates.reduce((a,b)=>a>b?a:b);
+  // Sumbu-X diperpanjang sampai tanggal selesai AKTUAL terakhir kalau ada titik yang selesai LEWAT
+  // dari tanggal rencana terakhir (mis. flare yg baru tuntas 5 hari setelah jadwal batch habis) —
+  // dulu rentangnya cuma ikut tanggal rencana, jadi titik telat itu tidak pernah masuk kurva aktual
+  // & ujung kurva mentok di 98% padahal semua titik sudah selesai.
+  const maxDate = relevant.reduce((m,p)=>p.status==="done" && p.actualEnd && p.actualEnd>m ? p.actualEnd : m, planMax);
+  const totalDays = daysBetweenInclusive(minDate,maxDate);
+  const doneNow = relevant.filter(p=>p.status==="done").length;
+
+  // Hitungan per tanggal sekali jalan (bukan filter ulang seluruh titik utk tiap hari spt dulu).
+  const planByDate = {}, actByDate = {};
+  let actBefore = 0;
+  relevant.forEach(p=>{
+    planByDate[p.planEnd] = (planByDate[p.planEnd]||0)+1;
+    if(p.status==="done" && p.actualEnd){
+      if(p.actualEnd<minDate) actBefore++;
+      else actByDate[p.actualEnd] = (actByDate[p.actualEnd]||0)+1;
+    }
+  });
+  const dates = [], plannedDaily = [], actualDaily = [], plannedCum = [], actualCum = [];
+  let cp = 0, ca = actBefore;
+  for(let i=0;i<totalDays;i++){
+    const dt = addDays(minDate,i);
+    dates.push(dt);
+    plannedDaily.push(planByDate[dt]||0); actualDaily.push(actByDate[dt]||0);
+    cp += plannedDaily[i]; ca += actualDaily[i];
+    plannedCum.push(cp); actualCum.push(ca);
+  }
+
+  const today = todayStr();
+  const todayIdx = (today>=minDate && today<=maxDate) ? daysBetweenInclusive(minDate,today)-1 : null;
+  const actualEndIdx = todayIdx!=null ? todayIdx : (today>maxDate ? totalDays-1 : -1);
+  const started = today>=minDate;
+  const plannedNow = relevant.filter(p=>p.planEnd<=today).length;
+  const dev = doneNow - plannedNow;
+  const pctOf = v=>Math.round(v/total*100);
+
+  // Lajur jendela tiap batch (rentang planStart..planEnd titik2-nya) — batch yang jendelanya tumpang
+  // tindih (mis. Emisi & Ambient jalan bareng) otomatis turun ke lajur berikutnya, maks 4 lajur.
+  const batchById = new Map((batches||[]).map(b=>[b.id,b]));
+  const win = new Map();
+  relevant.forEach(p=>{
+    const w = win.get(p.batchId) || {start:p.planStart, end:p.planEnd};
+    if(p.planStart<w.start) w.start = p.planStart;
+    if(p.planEnd>w.end) w.end = p.planEnd;
+    win.set(p.batchId, w);
+  });
+  const lanes = [...win.entries()].map(([id,w])=>({name:(batchById.get(id)||{}).name||id, start:w.start, end:w.end,
+    i1:daysBetweenInclusive(minDate,w.start)-1, i2:daysBetweenInclusive(minDate,w.end)-1}))
+    .sort((a,b)=>a.start.localeCompare(b.start));
+  const rowEnds = [];
+  lanes.forEach(l=>{
+    let r = rowEnds.findIndex(end=>end<l.start);
+    if(r<0 && rowEnds.length<4){ r = rowEnds.length; rowEnds.push(l.end); }
+    else if(r<0){ r = rowEnds.indexOf(rowEnds.reduce((a,b)=>a<b?a:b)); rowEnds[r] = l.end>rowEnds[r]?l.end:rowEnds[r]; }
+    else rowEnds[r] = l.end;
+    l.row = r;
+  });
+
+  const id = "sc"+(++scurvePlotSeq);
+  scurvePlotData.set(id, {minDate, totalDays, total, plannedDaily, actualDaily, plannedCum, actualCum, todayIdx, actualEndIdx, lanes, laneRows:rowEnds.length});
+  requestAnimationFrame(scurveMountPlots);
+
+  // KPI
+  const devBadge = !started ? `<span class="badge b-gray">Belum mulai</span>`
+    : dev>0 ? `<span class="badge b-green">&#9650; Lebih cepat</span>`
+    : dev<0 ? `<span class="badge b-red">&#9660; Terlambat</span>`
+    : `<span class="badge b-blue">&#9679; Sesuai rencana</span>`;
+  const kinerja = plannedNow ? Math.round(doneNow/plannedNow*100) : null;
+  const daysLeft = today<=planMax ? daysBetweenInclusive(today,planMax)-1 : null;
+  const targetSub = doneNow>=total ? "Semua titik selesai"
+    : daysLeft==null ? `Lewat ${daysBetweenInclusive(planMax,today)-1} hari`
+    : daysLeft===0 ? "Hari terakhir jadwal" : `Sisa ${daysLeft} hari`;
+  const kpi = (lbl, num, sub)=>`<div class="sc-kpi"><div class="sc-kpi-lbl">${lbl}</div><div class="sc-kpi-num">${num}</div>${sub}</div>`;
+  const kpis = `<div class="sc-kpis">
+    ${kpi("Aktual Selesai", `${doneNow}<small>/ ${total}</small>`, `<div class="sc-kpi-sub">${pctOf(doneNow)}% &middot; sisa ${total-doneNow} titik</div>`)}
+    ${kpi("Rencana s/d Hari Ini", `${plannedNow}<small>/ ${total}</small>`, `<div class="sc-kpi-sub">${started?`${pctOf(plannedNow)}% dari jadwal`:"Jadwal belum mulai"}</div>`)}
+    ${kpi("Deviasi", started?`${dev>0?"+":""}${dev}<small>titik</small>`:"—", devBadge)}
+    ${kpi("Kinerja Jadwal", kinerja!=null?`${kinerja}%`:"—", `<div class="sc-kpi-sub">aktual &divide; rencana</div>`)}
+    ${kpi("Target Selesai", scFmtShortDate(planMax)+`<small>${planMax.slice(0,4)}</small>`, `<div class="sc-kpi-sub">${targetSub}</div>`)}
   </div>`;
-  const combined = `<div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;">
-    <div style="flex:2;min-width:280px;">${svg}</div>
+
+  const legend = `<div class="sc-legend">
+    <span class="it"><span class="sc-sw line act"></span>Aktual kumulatif</span>
+    <span class="it"><span class="sc-sw line dash plan"></span>Rencana kumulatif</span>
+    <span class="it"><span class="sc-sw bar act"></span>Selesai / hari</span>
+    <span class="it"><span class="sc-sw bar plan" style="opacity:.55"></span>Target / hari</span>
+    ${todayIdx!=null?`<span class="it"><span class="sc-sw today"></span>Hari ini</span>`:""}
+    <span class="axis">Kiri: % kumulatif &middot; Kanan: titik/hari</span>
+  </div>`;
+
+  // Tampilan tabel (aksesibilitas & cek angka pasti) — cuma hari yang ada aktivitasnya.
+  const tableRows = dates.map((dt,i)=>({dt,i})).filter(({i})=>plannedDaily[i]||actualDaily[i]).map(({dt,i})=>
+    `<tr><td>${scFmtLongDate(dt)}</td><td>${plannedDaily[i]}</td><td>${i<=actualEndIdx?actualDaily[i]:"—"}</td><td>${plannedCum[i]} (${pctOf(plannedCum[i])}%)</td><td>${i<=actualEndIdx?`${actualCum[i]} (${pctOf(actualCum[i])}%)`:"—"}</td></tr>`).join("");
+  const table = `<details class="sc-table"><summary>Lihat data dalam tabel</summary>
+    <div class="tablewrap"><table><thead><tr><th>Tanggal</th><th>Target/hari</th><th>Selesai/hari</th><th>Rencana kumulatif</th><th>Aktual kumulatif</th></tr></thead><tbody>${tableRows}</tbody></table></div>
+  </details>`;
+
+  return `${kpis}<div class="sc-body">
+    <div class="sc-main">${legend}<div class="sc-plot" data-sc-id="${id}"></div>${table}</div>
     ${statusPanel}
   </div>`;
-  return combined;
 }
 // Info paling relevan per status utk ditampilkan di kolom kanan baris drilldown — beda2 krn
 // pertanyaan "kenapa/kapan" jawabannya beda tiap status (tanggal selesai vs jendela rencana vs

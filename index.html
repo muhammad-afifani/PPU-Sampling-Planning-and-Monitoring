@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202610121200">
+<link rel="stylesheet" href="assets/css/style.css?v=202610131200">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -134,12 +134,17 @@
       </details>
       <div class="dash-stats-row" id="dashStats"></div>
       <div class="card" style="margin-top:16px;">
-        <div class="toolbar" style="margin-bottom:4px;">
-          <h3 style="margin:0;">S-Curve Progress</h3>
-          <span class="spacer"></span>
-          <div class="field"><label>Periode</label><select id="dashScPeriode"></select></div>
-          <div class="field"><label>Tim</label><div class="chipbar" id="dashScTeamChips"></div></div>
-          <div class="field"><label>Batch</label><div class="chipbar" id="dashScBatchChips" style="max-width:420px;"></div></div>
+        <div class="sc-head">
+          <div>
+            <h3 style="margin:0;">S-Curve Progress</h3>
+            <div class="sc-sub">Rencana vs aktual kumulatif titik selesai disampling, per jadwal batch</div>
+          </div>
+        </div>
+        <div class="sc-filterbar">
+          <div class="sc-fgroup"><span class="sc-flabel">Periode</span><select id="dashScPeriode" aria-label="Periode"></select></div>
+          <div class="sc-fgroup"><span class="sc-flabel">Tim</span><div class="sc-chips" id="dashScTeamChips"></div></div>
+          <div class="sc-fgroup grow"><span class="sc-flabel">Batch</span><div class="sc-chips" id="dashScBatchChips"></div></div>
+          <button type="button" class="btn ghost small sc-reset" data-action="dashScReset" id="dashScResetBtn" style="display:none;">Reset filter</button>
         </div>
         <div id="dashSCurve"></div>
       </div>
@@ -1670,11 +1675,11 @@
 <script src="assets/js/01-state.js?v=202610121200"></script>
 <script src="assets/js/02-nav-util.js?v=202610121200"></script>
 <script src="assets/js/03-period-logic.js?v=202610121200"></script>
-<script src="assets/js/04-dashboard.js?v=202610121200"></script>
+<script src="assets/js/04-dashboard.js?v=202610131200"></script>
 <script src="assets/js/05-master-data.js?v=202610121200"></script>
 <script src="assets/js/06-plan-personil.js?v=202610121200"></script>
 <script src="assets/js/07-rules-planner.js?v=202610121200"></script>
-<script src="assets/js/08-gantt-print.js?v=202610121200"></script>
+<script src="assets/js/08-gantt-print.js?v=202610131200"></script>
 <script src="assets/js/09-tracking-map.js?v=202610121200"></script>
 <script src="assets/js/10-running-hour.js?v=202610121200"></script>
 <script src="assets/js/11-berita-acara.js?v=202610121200"></script>
@@ -1682,7 +1687,7 @@
 <script src="assets/js/13-hasil-db.js?v=202610121200"></script>
 <script src="assets/js/14-hasil-dashboard.js?v=202610121200"></script>
 <script src="assets/js/15-simulasi-h2s.js?v=202610121200"></script>
-<script src="assets/js/16-actions-init.js?v=202610121200"></script>
+<script src="assets/js/16-actions-init.js?v=202610131200"></script>
 <script src="assets/js/17-dokumentasi-foto.js?v=202610121200"></script>
 <script src="assets/js/18-model-dispersi.js?v=202610121200"></script>
 <script src="assets/js/19-hasil-ambien.js?v=202610121200"></script>
