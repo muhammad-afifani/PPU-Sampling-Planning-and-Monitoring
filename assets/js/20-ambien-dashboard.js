@@ -10,10 +10,16 @@ function ambBuildDonut(segments, centerVal, centerLabel){
   const total = segments.reduce((s,x)=>s+x[1],0);
   if(!total) return {svg:"<div class='hint' style='padding:14px;'>Tidak ada data pada filter ini.</div>", legend:""};
   const cx=110,cy=110,r=80,rInner=48;
+  // Font angka tengah MENGECIL kalau digitnya banyak (dulu font-size="24" tetap, jadi angka panjang
+  // spt "1.386.922" meluber keluar lubang donut yg cuma rInner*2=96px) — threshold panjang string
+  // dipilih supaya nilai pendek (persentase dkk, dipakai di 4 pemanggil lain fungsi ini) tetap 24px
+  // spt sebelumnya, tidak ada regresi.
+  const centerValStr = String(centerVal);
+  const centerFontSize = centerValStr.length<=4 ? 24 : centerValStr.length<=6 ? 20 : centerValStr.length<=8 ? 17 : 14;
   let paths = "";
   if(segments.length===1){
     const rMid=(r+rInner)/2, strokeW=r-rInner;
-    paths = `<circle cx="${cx}" cy="${cy}" r="${rMid}" fill="none" stroke="${segments[0][2]}" stroke-width="${strokeW}"/>`;
+    paths = `<circle class="amb-donut-seg" data-label="${escHtml(segments[0][0])}" data-value="${escHtml(String(segments[0][1]))}" cx="${cx}" cy="${cy}" r="${rMid}" fill="none" stroke="${segments[0][2]}" stroke-width="${strokeW}"/>`;
   } else {
     let angle=-90;
     segments.forEach(([label,val,color])=>{
@@ -24,18 +30,44 @@ function ambBuildDonut(segments, centerVal, centerLabel){
       const large=sweep>180?1:0;
       const xi1=cx+rInner*Math.cos(angle*Math.PI/180), yi1=cy+rInner*Math.sin(angle*Math.PI/180);
       const xi2=cx+rInner*Math.cos(endAngle*Math.PI/180), yi2=cy+rInner*Math.sin(endAngle*Math.PI/180);
-      paths += `<path d="M${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} L${xi2},${yi2} A${rInner},${rInner} 0 ${large} 0 ${xi1},${yi1} Z" fill="${color}"/>`;
+      paths += `<path class="amb-donut-seg" data-label="${escHtml(label)}" data-value="${escHtml(String(val))}" d="M${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} L${xi2},${yi2} A${rInner},${rInner} 0 ${large} 0 ${xi1},${yi1} Z" fill="${color}"/>`;
       angle = endAngle;
     });
   }
   const svg = `<svg viewBox="0 0 220 220" style="width:220px;height:220px;display:block;margin:0 auto;">
     ${paths}
-    <text x="110" y="104" text-anchor="middle" font-size="24" font-weight="800" fill="var(--heading)">${centerVal}</text>
+    <text x="110" y="104" text-anchor="middle" font-size="${centerFontSize}" font-weight="800" fill="var(--heading)">${centerVal}</text>
     <text x="110" y="124" text-anchor="middle" font-size="11" fill="var(--gray-500)">${escHtml(centerLabel)}</text>
   </svg>`;
   const legend = segments.map(([label,val,color])=>`<span class="item"><span class="sw" style="background:${color}"></span>${escHtml(label)}: ${val}</span>`).join("");
   return {svg, legend};
 }
+// Tooltip hover utk segmen donut (.amb-donut-seg) — 1 listener delegated dipakai bareng SEMUA donut
+// di app (Dashboard, AQI/ISPU, Ambien Dashboard, dst — semua lewat ambBuildDonut yg sama) krn
+// elemen SVG-nya diganti2 tiap render (innerHTML), pola & gaya visual sama persis dgn tooltip chart
+// Budget (.bgt-chart-tooltip, 23-budget-proyeksi.js) biar konsisten se-app.
+document.addEventListener("mousemove", e=>{
+  const tip = document.getElementById("ambDonutTooltip");
+  if(!tip) return;
+  const seg = e.target.closest && e.target.closest(".amb-donut-seg");
+  if(!seg){ tip.style.display = "none"; return; }
+  tip.innerHTML = `<b>${escHtml(seg.dataset.label)}</b>: ${escHtml(seg.dataset.value)}`;
+  tip.style.display = "block";
+  const pad = 14;
+  const tipW = tip.offsetWidth || 160;
+  let left = e.clientX + pad;
+  if(left + tipW > window.innerWidth - 8) left = e.clientX - tipW - pad;
+  let top = e.clientY + pad;
+  if(top + tip.offsetHeight > window.innerHeight - 8) top = e.clientY - tip.offsetHeight - pad;
+  tip.style.left = left + "px";
+  tip.style.top = top + "px";
+});
+document.addEventListener("mouseout", e=>{
+  if(!e.target.closest || !e.target.closest(".amb-donut-seg")) return;
+  if(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest(".amb-donut-seg")) return;
+  const tip = document.getElementById("ambDonutTooltip");
+  if(tip) tip.style.display = "none";
+});
 function ambBuildTrendChart(periodsInScope, seriesArr, opts){
   opts = opts||{};
   seriesArr = seriesArr.filter(s=>s.values.some(v=>v!=null));

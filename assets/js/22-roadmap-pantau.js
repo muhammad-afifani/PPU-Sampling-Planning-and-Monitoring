@@ -92,10 +92,16 @@ function renderRoadmapPantau(){
 
   // Cache due-periods (proyeksi sekarang+depan SAJA) & actual-periods (riwayat, bisa periode manapun)
   // per titik sekali — dipakai ulang di rekap & grid detail, hindari hitung berulang.
-  const dueMap = new Map(), actualMap = new Map();
+  const dueMap = new Map(), actualMap = new Map(), emergencyMap = new Map();
   pts.forEach(p=>{
     dueMap.set(p.id, new Set(roadmapDuePeriods(p, semestersAhead)));
     actualMap.set(p.id, new Set(periods.filter(per=>hasilAktualUntukPeriode(p, per))));
+    // Emergency Engine yg RH 12-bulan-terakhirnya SUDAH di atas ambang (RH_WAJIB_THRESHOLD, 200
+    // jam/tahun) utk periode tsb — pemantauan INTERNAL (bukan kewajiban resmi spt p.wajib, makanya
+    // tidak ikut roadmapDuePeriods/dueMap sama sekali — lihat wajibReason, 03-period-logic.js: tipe
+    // "emergency-triggered" cuma mungkin terjadi kalau p.wajib FALSE). Reuse wajibReason apa adanya
+    // (bukan logika baru) supaya tidak pernah beda hasil dgn cek wajib resmi di tempat lain.
+    if(isEmergencyEngine(p)) emergencyMap.set(p.id, new Set(periods.filter(per=>wajibReason(p, per).type==="emergency-triggered")));
   });
 
   // Rekap ringkas: jumlah titik jatuh tempo (proyeksi, BUKAN riwayat) per site x semester — jawaban
@@ -136,6 +142,7 @@ function renderRoadmapPantau(){
     <tbody>${pts.map(p=>{
       const due = dueMap.get(p.id)||new Set();
       const actual = actualMap.get(p.id)||new Set();
+      const emergency = emergencyMap.get(p.id)||new Set();
       const ket = !p.wajib ? `<span class="muted" style="font-style:italic;">Tidak wajib dipantau</span>` : frekuensiLabelShort(p.frekuensiBulan);
       return `<tr><td>${escHtml(p.site)}</td><td>${escHtml(p.nama)}</td><td class="muted" style="font-size:11px;">${escHtml(monitoringTypeLabel(p))}</td>
         <td style="font-size:11px;">${ket}</td><td class="muted" style="font-size:11px;">${escHtml(p.pemantauanTerakhir||"-")}</td>
@@ -143,6 +150,7 @@ function renderRoadmapPantau(){
           const cellBg = per===nowPeriodStr?"background:var(--teal-100);":"";
           if(actual.has(per)) return `<td style="text-align:center;${cellBg}" title="Sudah dipantau ${escHtml(per)} — parameter: ${escHtml(p.parameter||"-")}"><span style="color:var(--green-600,#0d8a4f);font-weight:800;">&#10003;</span></td>`;
           if(due.has(per)) return `<td style="text-align:center;${cellBg}" title="Wajib sampling ${escHtml(per)} — parameter: ${escHtml(p.parameter||"-")}"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--red-500);"></span></td>`;
+          if(emergency.has(per)) return `<td style="text-align:center;${cellBg}" title="Emergency Engine — RH 12 bulan terakhir di atas ${RH_WAJIB_THRESHOLD} jam/tahun (pemantauan internal, bukan kewajiban resmi)"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--amber-500);"></span></td>`;
           return `<td style="${cellBg}"></td>`;
         }).join("")}
       </tr>`;

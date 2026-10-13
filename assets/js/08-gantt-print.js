@@ -48,6 +48,15 @@ const EXCLUDE_REASON_LABELS = {
   notdue: "Belum Masuk Periode Sampling",
   tbc: "Tidak Beroperasi (TBC — belum pasti kapan tersedia)"
 };
+// Label "batch berikutnya" dihitung dari NOMOR di nama batch yang SEDANG DILIHAT, bukan angka tetap
+// — dulu di-hardcode "Batch 2" apa adanya (bug: selalu tampil "Batch 2" walau yg sedang dibuka itu
+// sendiri Batch 2, 5, dst). Pola parsing nomor dari batch.name via regex sama persis dgn
+// baExportFilename/baStatusFor di 11-berita-acara.js — tidak ada field "nomor urut batch" terpisah,
+// angkanya cuma ketempel di nama saat batch dibuat (lihat newBatch, 07-rules-planner.js).
+function nextBatchLabel(batch){
+  const m = batch && batch.name ? batch.name.match(/Batch\s*(\d+)/i) : null;
+  return m ? `Batch ${Number(m[1])+1}` : "Batch Berikutnya";
+}
 // Keluarkan/sertakan-lagi 1 titik (+ semua sibling separuh penjadwalan yg sama) dari batch ini —
 // dipanggil dari tombol "x" di kartu Detail Harian. BEDA dgn toggleExcludePoint (dipakai pill di
 // kolom "Titik Pantau" day-grid, yg langsung recompute+reschedule OTOMATIS tiap klik): di sini
@@ -154,7 +163,7 @@ function renderDayDetailModal(b, row){
             <option value="notdue" ${r.reason==="notdue"?"selected":""}>${EXCLUDE_REASON_LABELS.notdue}</option>
             <option value="tbc" ${r.reason==="tbc"?"selected":""}>${EXCLUDE_REASON_LABELS.tbc}</option>
           </select>
-          ${r.reason==="tbc" ? `<input type="text" data-action="setExcludeNote" data-batch-id="${b.id}" data-point-id="${p.id}" value="${escHtml(r.note||"")}" placeholder="Catatan / perkiraan tersedia kapan">` : ""}
+          <input type="text" data-action="setExcludeNote" data-batch-id="${b.id}" data-point-id="${p.id}" value="${escHtml(r.note||"")}" placeholder="${r.reason==="tbc"?"Catatan / perkiraan tersedia kapan":"Catatan (opsional)"}">
           <button class="btn small ghost" data-action="stageExcludePoint" data-batch-id="${b.id}" data-point-id="${p.id}">&#8635; Sertakan Lagi</button>
         </div>`;
       }).join("")}
@@ -771,7 +780,7 @@ function buildDayGridView(rows){
       let statusCls = "", reasonTag = "";
       if(excl){
         const reason = ((r.batch.excludeReasons||{})[p.id]||{}).reason;
-        if(reason==="batch2") reasonTag = ` <span class="pt-pill-tag tag-batch2">&rarr; Batch 2</span>`;
+        if(reason==="batch2") reasonTag = ` <span class="pt-pill-tag tag-batch2">&rarr; ${escHtml(nextBatchLabel(r.batch))}</span>`;
       } else if(p.status==="done"){
         statusCls = " done";
       } else if(p.status==="failed"){
