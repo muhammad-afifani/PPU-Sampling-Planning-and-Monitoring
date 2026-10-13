@@ -38,6 +38,15 @@
      Pasangan light & dark masing2 lolos cek lightness/chroma/beda-warna buta warna/kontras. */
   --sc-plan:#2f6bd1;
   --sc-act:#0ea5a0;
+
+  /* Warna identitas grup sumber (ikon engine + segmen batang "Beban per Site × Sumber" di Dashboard).
+     Dulu Turbin (biru) & Gas Engine (ungu) nyaris sama bagi buta warna merah-hijau (ΔE 4) padahal
+     bersebelahan di batang bertumpuk, & Engine kecil abu2 (terbaca "tanpa warna"). Hue tiap grup
+     dipertahankan (flare oranye, turbin biru, dst) tapi digeser ke step yang lolos cek kontras &
+     beda warna; urutan tumpukan di dashGrpStackOrder (04-dashboard.js) sengaja tidak menaruh biru
+     di sebelah ungu. */
+  --grp-turbin:#2a78d6; --grp-flare:#eb6834; --grp-gas:#6250d6; --grp-glycol:#1baf7a;
+  --grp-emergency:#eda100; --grp-heater:#e87ba4; --grp-kecil:#008300; --grp-ambient:#3fb27f;
 }
 
 /* =========================================================
@@ -71,6 +80,8 @@
   --heading-2:#dbe6f0;
   --sc-plan:#4f8be4;
   --sc-act:#0fa79d;
+  --grp-turbin:#3987e5; --grp-flare:#d95926; --grp-gas:#9085e9; --grp-glycol:#199e70;
+  --grp-emergency:#c98500; --grp-heater:#d55181; --grp-kecil:#008300; --grp-ambient:#3fb27f;
 }
 @media (prefers-color-scheme: dark){
   /* Fallback murni-CSS kalau JS-nya entah kenapa belum sempat jalan (mis. sebelum 01-state.js
@@ -91,6 +102,8 @@
     --heading-2:#dbe6f0;
     --sc-plan:#4f8be4;
     --sc-act:#0fa79d;
+    --grp-turbin:#3987e5; --grp-flare:#d95926; --grp-gas:#9085e9; --grp-glycol:#199e70;
+    --grp-emergency:#c98500; --grp-heater:#d55181; --grp-kecil:#008300; --grp-ambient:#3fb27f;
   }
 }
 
@@ -376,6 +389,131 @@ details.sc-table td:first-child,details.sc-table th:first-child{text-align:left;
 .sc-empty{border:1px dashed var(--gray-300);border-radius:12px;padding:36px 24px;text-align:center;color:var(--gray-500);font-size:12.5px;line-height:1.6;}
 .sc-empty b{color:var(--heading);}
 .sc-empty-title{font-size:14px;font-weight:800;color:var(--heading);margin-bottom:4px;}
+
+/* =========================================================
+   DASHBOARD — Rekap Site × Grup Sumber & Peringkat Beban/Ambien (04-dashboard.js)
+========================================================= */
+.grid.dash-recap-row{grid-template-columns:minmax(0,2.2fr) minmax(300px,1fr);align-items:start;}
+@media(max-width:1480px){.grid.dash-recap-row{grid-template-columns:minmax(0,1fr);}}
+.dash-cardhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+.dash-cardhead h3{margin:0;}
+.dash-cardhead .sub{font-size:12.5px;color:var(--gray-500);margin-top:4px;}
+/* Penanda "Live" — waktu render terakhir (kartu ini dirender ulang tiap data berubah). */
+.dash-live{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:color-mix(in srgb, var(--green-500) 12%, var(--surface-card));color:var(--heading-2);font-size:11px;font-weight:700;white-space:nowrap;}
+.dash-live .dot{width:7px;height:7px;border-radius:50%;background:var(--green-500);box-shadow:0 0 0 0 color-mix(in srgb, var(--green-500) 55%, transparent);animation:dashPulse 2s ease-out infinite;}
+@keyframes dashPulse{0%{box-shadow:0 0 0 0 color-mix(in srgb, var(--green-500) 55%, transparent);}70%{box-shadow:0 0 0 7px transparent;}100%{box-shadow:0 0 0 0 transparent;}}
+/* Gerak "hidup" saat render — batang tumbuh, cincin terisi, sel muncul berurutan. */
+@keyframes dashGrowX{from{transform:scaleX(0);}}
+@keyframes dashGrowY{from{transform:scaleY(0);}}
+@keyframes dashRingFill{from{stroke-dasharray:0 999;}}
+@keyframes dashFadeUp{from{opacity:0;transform:translateY(5px);}}
+.dash-grow-x{transform-origin:left center;animation:dashGrowX .8s cubic-bezier(.2,.75,.25,1) both;}
+.dash-grow-y{transform-box:fill-box;transform-origin:center bottom;animation:dashGrowY .7s cubic-bezier(.2,.75,.25,1) both;}
+.dash-ring-fill{animation:dashRingFill 1s cubic-bezier(.2,.75,.25,1) both;}
+.dash-fade-up{animation:dashFadeUp .45s ease-out both;}
+@media (prefers-reduced-motion: reduce){
+  .dash-grow-x,.dash-grow-y,.dash-ring-fill,.dash-fade-up{animation:none;}
+  .dash-live .dot{animation:none;}
+}
+/* Tooltip generik [data-tip] (1 elemen position:fixed di body) — gaya disamakan dgn
+   .bgt-chart-tooltip / .amb-donut-tooltip spy konsisten se-app. */
+.dash-tip{position:fixed;z-index:9999;display:none;pointer-events:none;background:rgba(18,24,36,.95);color:#fff;padding:7px 11px;border-radius:7px;font-size:11.5px;line-height:1.5;box-shadow:0 4px 14px rgba(0,0,0,.28);max-width:260px;}
+.dash-tip b{font-weight:700;}
+[data-tip]{cursor:default;}
+
+/* Ikon grup sumber */
+.dash-glyph{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:10px;}
+.dash-glyph svg{display:block;}
+
+/* Matriks site × grup */
+.dsm-wrap{overflow-x:auto;margin:0 -4px;padding:0 4px 2px;}
+table.dsm{width:100%;border-collapse:separate;border-spacing:0 6px;font-size:12px;}
+table.dsm thead th{position:static;background:none;color:var(--gray-500);font-weight:700;padding:0 4px 4px;vertical-align:bottom;white-space:normal;text-align:center;}
+table.dsm thead th.dsm-site-h,table.dsm thead th.dsm-prog-h{text-align:left;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;}
+.dsm-grp-h{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:78px;}
+.dsm-grp-h .nm{font-size:11px;font-weight:800;color:var(--heading-2);line-height:1.2;}
+.dsm-grp-h .fr{font-size:10.5px;color:var(--gray-500);font-variant-numeric:tabular-nums;font-weight:600;}
+table.dsm tbody tr{cursor:pointer;}
+table.dsm tbody td{background:var(--gray-100);padding:8px 6px;border:none;vertical-align:middle;}
+table.dsm tbody td:first-child{border-radius:10px 0 0 10px;padding-left:10px;}
+table.dsm tbody td:last-child{border-radius:0 10px 10px 0;padding-right:12px;}
+table.dsm tbody tr:hover td{background:color-mix(in srgb, var(--teal-500) 9%, var(--gray-100));}
+table.dsm tbody tr:focus-visible td{outline:none;background:color-mix(in srgb, var(--teal-500) 14%, var(--gray-100));}
+.dsm-site{display:flex;flex-direction:column;gap:4px;align-items:flex-start;}
+.dsm-site .cnt{font-size:10.5px;color:var(--gray-500);font-weight:600;}
+.dsm-cell{display:flex;align-items:center;justify-content:center;gap:4px;height:34px;min-width:64px;border-radius:8px;font-weight:800;font-size:12px;color:var(--heading);font-variant-numeric:tabular-nums;}
+.dsm-cell.empty{color:var(--gray-300);font-weight:600;background:transparent !important;}
+.dsm-cell .ok{color:var(--green-500);font-size:11px;}
+.dsm-stack{display:flex;gap:2px;height:10px;border-radius:5px;overflow:hidden;min-width:120px;background:var(--gray-200);}
+.dsm-stack > span{display:block;height:100%;}
+.dsm-prog{display:flex;align-items:center;gap:10px;min-width:190px;}
+.dsm-prog .pct{font-size:15px;font-weight:800;color:var(--heading);font-variant-numeric:tabular-nums;min-width:44px;text-align:right;}
+.dsm-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--gray-700);margin-top:8px;}
+.dsm-legend .it{display:inline-flex;align-items:center;gap:6px;}
+.dsm-legend .sw{width:10px;height:10px;border-radius:3px;display:inline-block;}
+.dsm-legend .heat{width:54px;height:10px;border-radius:3px;background:linear-gradient(90deg, color-mix(in srgb, var(--teal-500) 8%, var(--gray-100)), color-mix(in srgb, var(--teal-500) 58%, var(--gray-100)));}
+
+/* Kartu Peringkat */
+.dash-rank-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:14px;margin-bottom:14px;}
+@media(max-width:1100px){.dash-rank-grid{grid-template-columns:minmax(0,1fr);}}
+.dash-rank-subcard .ttl{font-size:13px;font-weight:800;color:var(--heading);}
+.dash-rank-subcard .ttl-sub{font-size:11.5px;color:var(--gray-500);margin-top:2px;margin-bottom:12px;}
+.dash-kpi4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px;}
+@media(max-width:1100px){.dash-kpi4{grid-template-columns:repeat(2,minmax(0,1fr));}}
+.dash-kpi4 .k{display:flex;gap:12px;align-items:flex-start;padding:13px 14px;border:1px solid var(--gray-200);border-radius:12px;min-width:0;}
+.dash-kpi4 .k-ico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.dash-kpi4 .k-body{min-width:0;}
+.dash-kpi4 .k-lbl{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--gray-500);}
+.dash-kpi4 .k-num{font-size:20px;font-weight:800;color:var(--heading);font-variant-numeric:tabular-nums;line-height:1.2;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dash-kpi4 .k-num small{font-size:11.5px;font-weight:700;color:var(--gray-500);margin-left:3px;}
+.dash-kpi4 .k-num .txt{font-size:17px;}
+.dash-kpi4 .k-sub{font-size:11.5px;color:var(--gray-500);margin-top:4px;line-height:1.35;}
+.dash-kpi4 .badge{margin-top:5px;}
+.dash-trend-plot{position:relative;min-height:230px;}
+.dash-trend-plot rect.bar{cursor:pointer;transition:opacity .15s ease;}
+.dash-trend-plot rect.bar:hover{opacity:1 !important;}
+.dash-donut-wrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:center;}
+.dash-donut-legend{flex:1;min-width:180px;display:flex;flex-direction:column;gap:2px;}
+.dash-donut-legend .row{display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;align-items:center;padding:5px 6px;border-radius:7px;font-size:12px;}
+.dash-donut-legend .row:hover{background:var(--gray-100);}
+.dash-donut-legend .sw{width:10px;height:10px;border-radius:3px;}
+.dash-donut-legend .nm{font-weight:700;color:var(--heading-2);}
+.dash-donut-legend .v{font-weight:700;color:var(--heading);font-variant-numeric:tabular-nums;}
+.dash-donut-legend .p{color:var(--gray-500);font-size:11px;min-width:40px;text-align:right;font-variant-numeric:tabular-nums;}
+.dash-sxg-legend{display:flex;gap:6px 14px;flex-wrap:wrap;margin-bottom:12px;font-size:11px;color:var(--gray-700);}
+.dash-sxg-legend .it{display:inline-flex;align-items:center;gap:6px;font-weight:600;}
+.dash-sxg-row{display:grid;grid-template-columns:22px 64px minmax(0,1fr) auto;gap:10px;align-items:center;margin-bottom:10px;}
+.dash-sxg-row .rk{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;background:var(--gray-200);color:var(--gray-700);}
+.dash-sxg-row .rk.top{background:var(--heading-2);color:var(--surface-card);}
+.dash-sxg-bar{display:flex;gap:2px;height:16px;}
+.dash-sxg-bar > span{display:block;height:100%;min-width:3px;}
+.dash-sxg-bar > span:first-child{border-radius:4px 0 0 4px;}
+.dash-sxg-bar > span:last-child{border-radius:0 4px 4px 0;}
+.dash-sxg-bar > span:only-child{border-radius:4px;}
+.dash-sxg-row .val{text-align:right;font-size:12px;font-weight:800;color:var(--heading);font-variant-numeric:tabular-nums;white-space:nowrap;}
+.dash-sxg-row .val small{display:block;font-size:10.5px;font-weight:600;color:var(--gray-500);}
+.dash-aqi-row{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:10px;align-items:center;padding:7px 0;border-bottom:1px dashed var(--gray-200);}
+.dash-aqi-row:last-child{border-bottom:none;}
+.dash-aqi-scale{position:relative;height:8px;border-radius:4px;display:flex;overflow:visible;}
+.dash-aqi-scale > span{display:block;height:100%;opacity:.35;}
+.dash-aqi-scale > span:first-child{border-radius:4px 0 0 4px;}
+.dash-aqi-scale > span:last-of-type{border-radius:0 4px 4px 0;}
+.dash-aqi-mark{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;transform:translate(-50%,-50%);border:2.5px solid var(--surface-card);box-shadow:0 0 0 1.5px var(--gray-500),0 1px 4px rgba(0,0,0,.3);z-index:1;}
+.dash-aqi-meta{font-size:10.5px;color:var(--gray-500);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dash-aqi-idx{text-align:right;}
+.dash-aqi-idx b{display:block;font-size:17px;font-weight:800;color:var(--heading);font-variant-numeric:tabular-nums;line-height:1.1;}
+.dash-aqi-cat{display:inline-block;margin-top:3px;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:700;white-space:nowrap;}
+.dash-grp-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;}
+.dash-grp-tile{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--gray-200);border-radius:12px;min-width:0;transition:border-color .15s ease,box-shadow .15s ease;}
+.dash-grp-tile:hover{border-color:var(--gray-300);box-shadow:0 6px 16px -10px rgba(10,22,40,.35);}
+.dash-grp-tile .bd{min-width:0;flex:1;}
+.dash-grp-tile .nm{font-size:12.5px;font-weight:800;color:var(--heading);line-height:1.25;}
+.dash-grp-tile .sb{font-size:10.5px;color:var(--gray-500);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dash-grp-tile .v{font-size:16px;font-weight:800;color:var(--heading);font-variant-numeric:tabular-nums;margin-top:8px;}
+.dash-grp-tile .v small{font-size:11px;color:var(--gray-500);font-weight:700;margin-left:2px;}
+.dash-grp-tile .share{height:6px;border-radius:3px;background:var(--gray-200);margin-top:7px;overflow:hidden;}
+.dash-grp-tile .share > span{display:block;height:100%;border-radius:3px;}
+.dash-grp-tile .ft{display:flex;justify-content:space-between;font-size:10.5px;color:var(--gray-500);margin-top:5px;font-variant-numeric:tabular-nums;}
 
 /* Kartu "Progress per Grup Sumber" di Dashboard — grid responsif, lebarnya menyesuaikan jumlah
    kartu yang muat (lihat dashGrpCardHtml di 04-dashboard.js). */

@@ -20,12 +20,16 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202610131200">
+<link rel="stylesheet" href="assets/css/style.css?v=202610131600">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
 <div id="accessGate" class="access-gate"></div>
 <div id="toastStack"></div>
+<!-- Tooltip donut bersama (ambBuildDonut, 20-ambien-dashboard.js) — HARUS di luar .page: dulu ditaruh di
+     dalam halaman Dashboard, jadi di halaman lain (AQI/ISPU, Dashboard Ambien) ia ikut display:none &
+     tooltip donut di sana tidak pernah tampil. -->
+<div id="ambDonutTooltip" class="amb-donut-tooltip"></div>
 <div class="app">
   <div class="sidebar">
     <button class="sidebar-toggle" id="btnSidebarToggle" type="button" title="Collapse/expand menu"><span class="ms-icon" data-icon="chevron-left" data-size="15"></span></button>
@@ -148,12 +152,16 @@
         </div>
         <div id="dashSCurve"></div>
       </div>
-      <div class="grid cols-main-side" style="margin-top:16px;">
+      <div class="grid dash-recap-row" style="margin-top:16px;">
         <div class="card" style="margin-bottom:0;">
-          <h3>Rekap per Site &amp; Grup Sumber</h3>
-          <div class="tablewrap"><table id="dashSiteTable"></table></div>
-          <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin:16px 0 10px;">Progress per Grup Sumber</div>
-          <div id="dashGroupBars" class="dash-grpgrid"></div>
+          <div class="dash-cardhead">
+            <div>
+              <h3>Rekap per Site &times; Grup Sumber</h3>
+              <div class="sub">Titik wajib pantau selesai per site &amp; jenis sumber. Klik baris site untuk membuka titiknya di Database Titik Pantau.</div>
+            </div>
+            <span class="dash-live" id="dashRecapLive"></span>
+          </div>
+          <div id="dashSiteMatrix"></div>
         </div>
         <div class="card" style="margin-bottom:0;">
           <h3>Peringatan</h3>
@@ -161,43 +169,51 @@
         </div>
       </div>
       <div class="card" style="margin-top:16px;">
-        <div class="toolbar" style="margin-bottom:2px;flex-wrap:wrap;">
-          <h3 style="margin:0;">Peringkat Beban Emisi &amp; Kualitas Ambien</h3>
-          <span class="spacer"></span>
-          <div class="field"><label>Parameter Emisi</label><select id="dashEmisiParam"></select></div>
-          <div class="field"><label>Periode Beban</label><select id="dashEmisiPeriode"></select></div>
-          <div class="field"><label>Top</label><select id="dashEmisiTopN"></select></div>
-        </div>
-        <div class="hint" id="dashEmisiRankNote" style="margin-bottom:14px;"></div>
-
-        <div class="dash-rank-kpi-row" id="dashEmisiKpiRow"></div>
-
-        <div class="grid cols-main-side" style="margin-bottom:0;">
-          <div class="dash-rank-subcard">
-            <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px;">Tren Total Beban per Periode</div>
-            <div id="dashEmisiTrend"></div>
-          </div>
-          <div class="dash-rank-subcard">
-            <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px;">Kontribusi Site Terbesar</div>
-            <div id="dashEmisiDonut"></div>
-            <div id="ambDonutTooltip" class="amb-donut-tooltip"></div>
-            <div class="legend" id="dashEmisiDonutLegend" style="margin-top:10px;justify-content:center;"></div>
-          </div>
-        </div>
-
-        <div class="grid cols-3" style="margin-top:16px;margin-bottom:0;">
+        <div class="dash-cardhead">
           <div>
-            <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Top Site — Beban Emisi</div>
+            <h3>Peringkat Beban Emisi &amp; Kualitas Ambien</h3>
+            <div class="sub" id="dashEmisiRankNote"></div>
+          </div>
+          <span class="dash-live" id="dashRankLive"></span>
+        </div>
+        <div class="sc-filterbar">
+          <div class="sc-fgroup"><span class="sc-flabel">Parameter Emisi</span><select id="dashEmisiParam" aria-label="Parameter emisi"></select></div>
+          <div class="sc-fgroup"><span class="sc-flabel">Periode Beban</span><select id="dashEmisiPeriode" aria-label="Periode beban"></select></div>
+          <div class="sc-fgroup"><span class="sc-flabel">Tampilkan</span><select id="dashEmisiTopN" aria-label="Jumlah site teratas"></select></div>
+        </div>
+
+        <div class="dash-kpi4" id="dashEmisiKpiRow"></div>
+
+        <div class="dash-rank-grid">
+          <div class="dash-rank-subcard">
+            <div class="ttl">Tren Total Beban per Periode</div>
+            <div class="ttl-sub">Klik batang untuk melihat periode tersebut</div>
+            <div class="dash-trend-plot" id="dashEmisiTrend"></div>
+          </div>
+          <div class="dash-rank-subcard">
+            <div class="ttl">Kontribusi per Site</div>
+            <div class="ttl-sub" id="dashEmisiDonutSub"></div>
+            <div id="dashEmisiDonut"></div>
+          </div>
+        </div>
+
+        <div class="dash-rank-grid">
+          <div class="dash-rank-subcard">
+            <div class="ttl">Beban per Site &times; Jenis Sumber</div>
+            <div class="ttl-sub">Komposisi beban tiap site menurut jenis engine/sumber</div>
             <div id="dashEmisiRankSite"></div>
           </div>
-          <div>
-            <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Top Grup Sumber — Beban Emisi</div>
-            <div id="dashEmisiRankGroup"></div>
-          </div>
-          <div>
-            <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Top Site — Kualitas Ambien (<span id="dashAmbienStdLabel"></span>)</div>
+          <div class="dash-rank-subcard">
+            <div class="ttl">Kualitas Ambien per Site (<span id="dashAmbienStdLabel"></span>)</div>
+            <div class="ttl-sub">Indeks terbaru tiap site &middot; polutan dominan</div>
             <div id="dashAmbienRank"></div>
           </div>
+        </div>
+
+        <div class="dash-rank-subcard">
+          <div class="ttl">Beban per Grup Sumber</div>
+          <div class="ttl-sub">Total beban tiap jenis sumber &amp; porsinya dari total seluruh site</div>
+          <div id="dashEmisiRankGroup" class="dash-grp-tiles"></div>
         </div>
       </div>
     </div>
@@ -1675,7 +1691,7 @@
 <script src="assets/js/01-state.js?v=202610121200"></script>
 <script src="assets/js/02-nav-util.js?v=202610121200"></script>
 <script src="assets/js/03-period-logic.js?v=202610121200"></script>
-<script src="assets/js/04-dashboard.js?v=202610131200"></script>
+<script src="assets/js/04-dashboard.js?v=202610131600"></script>
 <script src="assets/js/05-master-data.js?v=202610121200"></script>
 <script src="assets/js/06-plan-personil.js?v=202610121200"></script>
 <script src="assets/js/07-rules-planner.js?v=202610121200"></script>
@@ -1687,7 +1703,7 @@
 <script src="assets/js/13-hasil-db.js?v=202610121200"></script>
 <script src="assets/js/14-hasil-dashboard.js?v=202610121200"></script>
 <script src="assets/js/15-simulasi-h2s.js?v=202610121200"></script>
-<script src="assets/js/16-actions-init.js?v=202610131200"></script>
+<script src="assets/js/16-actions-init.js?v=202610131600"></script>
 <script src="assets/js/17-dokumentasi-foto.js?v=202610121200"></script>
 <script src="assets/js/18-model-dispersi.js?v=202610121200"></script>
 <script src="assets/js/19-hasil-ambien.js?v=202610121200"></script>

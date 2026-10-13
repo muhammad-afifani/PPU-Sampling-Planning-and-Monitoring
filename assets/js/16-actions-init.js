@@ -98,6 +98,18 @@ const ACTIONS = {
     document.getElementById("dashScPeriode").value = ""; // refreshDashScSelects balik ke periode default
     renderDashboardSCurve();
   },
+  // Klik baris matriks Rekap Site → buka Database Titik Pantau terfilter site tsb (wajib saja).
+  dashSiteDrill:(t)=>{
+    showPage("master");
+    document.getElementById("fltSite").value = t.dataset.site;
+    document.getElementById("fltWajib").value = "1";
+    renderMaster();
+  },
+  // Klik batang tren beban emisi → pilih periode tsb di filter Peringkat.
+  dashEmisiPickPeriode:(t)=>{
+    document.getElementById("dashEmisiPeriode").value = t.dataset.val;
+    renderDashboardEmisiAmbienRanking();
+  },
   dashScBatchChip:(t)=>{
     const val = t.dataset.val;
     if(!val){ dashScSel.batch.clear(); }
