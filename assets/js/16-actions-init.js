@@ -169,13 +169,17 @@ const ACTIONS = {
     if(p) p.style.display = simCerobongPanelOpen ? "block" : "none";
     if(simCerobongPanelOpen){ simRenderCerobongChecklist(); document.getElementById("simCerobongSearch")?.focus(); }
   },
-  simCerobongCheckAll:()=>{ simVisibleCerobongOptions().forEach(c=>simSel.cerobong.add(c)); simRenderCerobongChecklist(); },
-  simCerobongUncheckAll:()=>{ simVisibleCerobongOptions().forEach(c=>simSel.cerobong.delete(c)); simRenderCerobongChecklist(); },
+  simCerobongCheckAll:()=>{ simVisibleCerobongOptions().forEach(c=>simSel.cerobong.add(c)); simRenderCerobongChecklist(); simScheduleRun(); },
+  simCerobongUncheckAll:()=>{ simVisibleCerobongOptions().forEach(c=>simSel.cerobong.delete(c)); simRenderCerobongChecklist(); simScheduleRun(); },
+  simSetParam:(t)=>simSetParam(t.dataset.val),
+  simPreset:(t)=>simApplyPreset(t.dataset.val),
+  simToggleAll:()=>{ simShowAll = !simShowAll; hdRunSimulation(); },
   simChip:(t)=>{
     const field = t.dataset.field, val = t.dataset.val;
     if(!val){ simSel[field].clear(); } else if(simSel[field].has(val)){ simSel[field].delete(val); } else { simSel[field].add(val); }
     simRenderScopeChips();
     simRenderCerobongChecklist();
+    simScheduleRun();
   },
   simSetTrendMode:(t)=>{ simTrendMode = t.dataset.mode; hdRunSimulation(); },
   // Menampilkan salinan isi chart pada modal yang lebih lebar, dipakai sebagai fungsi memperbesar

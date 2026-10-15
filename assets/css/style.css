@@ -1600,7 +1600,8 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 .hd-kpi-head{display:flex;justify-content:space-between;align-items:center;gap:8px;}
 .hd-kpi-label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gray-500);}
 .hd-kpi-ic svg{width:18px;height:18px;fill:none;stroke:var(--gray-500);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
-.hd-kpi-body{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;min-height:40px;}
+.hd-kpi-body{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px;min-height:40px;}
+.hd-kpi-body .hd-spark{max-width:100%;}
 .hd-kpi-val{font-size:32px;line-height:1;font-weight:800;color:var(--heading);font-variant-numeric:tabular-nums;white-space:nowrap;}
 .hd-kpi-val small{font-size:13px;font-weight:600;color:var(--gray-500);margin-left:2px;}
 .hd-kpi-foot{font-size:12px;color:var(--gray-500);line-height:1.45;}
@@ -1768,3 +1769,85 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 .hd-print-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .hd-print .hd-link{text-decoration:none;}
 #page-hasildashboard .field select,#page-hasildashboard .field .xsel-btn{max-width:100%;}
+
+/* =========================================================
+   WHAT-IF SIMULATOR (usulan baku mutu) & FUEL GAS SULFUR (H2S)
+========================================================= */
+.hd-section-title.hd-anchor-divider{margin-top:28px;padding-top:22px;border-top:1px solid var(--gray-200);}
+.hd-tag{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:12px;background:var(--surface-card);border:1px solid var(--gray-200);color:var(--gray-700);}
+.hd-tag.amber{background:color-mix(in srgb, #f5d9ad 30%, var(--surface-card));border-color:color-mix(in srgb, #e8b56f 55%, var(--surface-card));color:var(--hd-warn-text);}
+
+.sim-shell{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start;margin-bottom:18px;}
+.sim-panel{flex:1 1 320px;max-width:400px;min-width:0;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:var(--hd-radius);overflow:hidden;}
+@media(max-width:1100px){.sim-panel{max-width:none;}}
+.sim-step-opt{font-size:11px;font-weight:600;color:var(--gray-500);text-transform:none;}
+.sim-result{flex:999 1 560px;min-width:0;}
+.sim-result>.card,.sim-result>.hd-row{margin-bottom:18px;}
+.sim-step{padding:16px 18px;border-bottom:1px solid var(--gray-200);display:flex;flex-direction:column;gap:12px;}
+.sim-step:last-child{border-bottom:0;}
+.sim-step .field{margin:0;}
+.sim-step .field select,.sim-step .xsel-btn{width:100%;}
+.sim-step-head{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:800;color:var(--heading);}
+.sim-step-n{width:24px;height:24px;border-radius:12px;background:var(--heading);color:var(--surface-card);font-size:12px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
+.sim-step-accent{background:color-mix(in srgb, #f5d9ad 16%, var(--surface-card));}
+.sim-step-accent .sim-step-n{background:#d97706;color:#fff;}
+.sim-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.sim-hidden-select{position:absolute !important;width:1px;height:1px;opacity:0;pointer-events:none;}
+.sim-param-tabs{display:flex;flex-wrap:wrap;gap:6px;}
+.sim-param-tabs button{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 12px;border-radius:9px;border:1px solid var(--gray-300);background:var(--surface-card);color:var(--gray-700);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;}
+.sim-param-tabs button span{font-family:var(--font-mono);font-size:10.5px;font-weight:500;opacity:.7;}
+.sim-param-tabs button:hover{border-color:var(--heading-2);color:var(--heading);}
+.sim-param-tabs button.on{background:var(--heading);border-color:var(--heading);color:var(--surface-card);}
+.sim-step .chipbar{gap:6px;}
+.sim-step .chip-toggle{min-height:32px;}
+.sim-threshold{display:flex;align-items:center;border:2px solid #d97706;border-radius:12px;background:var(--surface-card);padding:0 14px;}
+.sim-threshold:focus-within{box-shadow:0 0 0 3px rgba(217,119,6,.22);}
+.sim-threshold input{flex:1;min-width:0;border:0;background:transparent;font-family:var(--font-mono);font-size:28px;font-weight:700;color:var(--heading);padding:10px 0;outline:none;}
+.sim-unit{font-size:13px;font-weight:600;color:var(--gray-500);white-space:nowrap;}
+.sim-slider{width:100%;accent-color:#d97706;margin:0;}
+.sim-ref{font-size:12px;color:var(--gray-700);line-height:1.5;}
+.sim-ref b{color:var(--heading);}
+.sim-ref .warn{color:var(--hd-warn-text);}
+.sim-presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;}
+.sim-presets button{display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 4px;border-radius:9px;border:1px solid var(--gray-300);background:var(--surface-card);color:var(--heading);font:inherit;font-size:12px;font-weight:700;cursor:pointer;min-height:44px;}
+.sim-presets button span{font-family:var(--font-mono);font-size:10.5px;font-weight:500;color:var(--gray-500);}
+.sim-presets button:hover{border-color:#d97706;}
+.sim-presets button.on{background:#d97706;border-color:#d97706;color:#fff;}
+.sim-presets button.on span{color:#fff;opacity:.85;}
+
+.sim-verdict{display:flex;flex-direction:column;gap:6px;padding:18px 20px;border-radius:var(--hd-radius);border:1px solid var(--gray-200);background:var(--surface-card);margin-bottom:14px;position:relative;overflow:hidden;}
+.sim-verdict::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:#2f9e67;}
+.sim-verdict.warn::before{background:#d97706;} .sim-verdict.bad::before{background:#b42318;}
+.sim-verdict-badge{align-self:flex-start;font-size:11.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:3px 10px;border-radius:10px;background:#e3f4ea;color:#146c43;}
+.sim-verdict.warn .sim-verdict-badge{background:#fff1e0;color:#9a4a06;}
+.sim-verdict.bad .sim-verdict-badge{background:#fde8e6;color:#a02a24;}
+.sim-verdict p{margin:0;font-size:14px;line-height:1.6;color:var(--gray-700);}
+.sim-verdict p b{color:var(--heading);}
+.sim-verdict-meta{font-size:11.5px;color:var(--gray-500);}
+.sim-kpis{grid-template-columns:repeat(4,minmax(0,1fr));}
+@media(max-width:1300px){.sim-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:480px){.sim-kpis{grid-template-columns:1fr;}}
+.sim-bad{color:#b42318 !important;font-weight:700;}
+:root[data-theme="dark"] .sim-bad{color:#ff8a80 !important;}
+
+.sim-bars{display:flex;flex-direction:column;gap:7px;}
+.sim-bar-row{display:grid;grid-template-columns:minmax(0,160px) minmax(0,1fr) 52px;gap:10px;align-items:center;font-size:12px;}
+.sim-bar-name{display:flex;align-items:center;gap:6px;font-weight:600;color:var(--heading);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sim-bar-name i{width:8px;height:8px;border-radius:4px;flex-shrink:0;}
+.sim-bar-track{position:relative;height:14px;border-radius:4px;background:var(--gray-100);}
+.sim-bar-track i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;}
+.sim-bar-track i.ok{background:#2f9e67;} .sim-bar-track i.warn{background:#d97706;} .sim-bar-track i.bad{background:#b42318;}
+.sim-bar-track b{position:absolute;top:-4px;bottom:-4px;width:3px;margin-left:-1px;background:var(--heading);border-radius:2px;}
+.sim-bar-track em{position:absolute;top:-4px;bottom:-4px;width:0;border-left:2px dashed #c62828;}
+.sim-bar-val{font-family:var(--font-mono);font-weight:700;text-align:right;color:var(--heading);}
+.sim-bar-val.bad{color:#b42318;} .sim-bar-val.warn{color:var(--hd-warn-text);}
+
+.h2s-shell .sim-verdict{margin-bottom:14px;}
+.h2s-kpis{grid-template-columns:repeat(5,minmax(0,1fr));}
+@media(max-width:1200px){.h2s-kpis{grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media(max-width:860px){.h2s-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}}
+.h2s-matrix .hd-hc{min-width:86px;}
+.h2s-matrix .rowh{min-width:190px;}
+.hd-details{margin-top:12px;}
+.hd-details summary{cursor:pointer;font-size:12.5px;font-weight:700;color:var(--heading-2);padding:8px 0;}
+.hd-details summary:hover{color:var(--teal-500);}
