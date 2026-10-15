@@ -16,7 +16,8 @@
    (wajibReason/isEmergencyEngine/isUnder100kW di 03-period-logic.js), bukan logika baru.
    EMP (rencana pemantauan) menyusul di tahap berikutnya.
 ========================================================= */
-let emfState = {site:"", period:"", startNo:16, includeRef:true, includeSupport:true, idNumber:true};
+let emfState = {site:"", period:"", startNo:16, includeRef:true, includeSupport:true, idNumber:true, narrative:true, lab:null, labCity:null};
+let emfRefMap = {};
 let emfLastBlocks = [];
 
 /* ---------- Referensi statis (baku mutu) ---------- */
@@ -108,7 +109,7 @@ function emfDateRange(dates){
   if(!ds.length) return "";
   if(ds.length===1) return fmtTanggalIndo(ds[0]);
   const [y1,m1,d1] = ds[0].split("-").map(Number), [y2,m2,d2] = ds[ds.length-1].split("-").map(Number);
-  if(y1===y2 && m1===m2) return `${d1}–${d2} ${MONTH_FULL_ID[m1-1]} ${y1}`;
+  if(y1===y2 && m1===m2) return `${d1} – ${d2} ${MONTH_FULL_ID[m1-1]} ${y1}`;
   if(y1===y2) return `${d1} ${MONTH_FULL_ID[m1-1]} – ${d2} ${MONTH_FULL_ID[m2-1]} ${y1}`;
   return `${fmtTanggalIndo(ds[0])} – ${fmtTanggalIndo(ds[ds.length-1])}`;
 }
@@ -252,7 +253,7 @@ function emfStatusCell(r){
 
 /* ---------- Model tabel ---------- */
 function C(v, o){ return Object.assign({v: v==null ? "" : String(v)}, o||{}); }
-function emfBlock(o){ return Object.assign({id:"b"+(emfLastBlocks.length+Math.random()).toString(36).replace(".",""), caption:"", subcaption:"", tables:[], notes:[], summary:"", ref:false, empty:"", sheet:""}, o); }
+function emfBlock(o){ return Object.assign({id:"b"+(emfLastBlocks.length+Math.random()).toString(36).replace(".",""), key:"", caption:"", subcaption:"", pre:[], post:[], tables:[], notes:[], summary:"", ref:false, empty:"", sheet:""}, o); }
 
 // --- Referensi: Baku mutu turbin / heater / genset / flare
 function emfBmFuelTable(map, fuels){
@@ -273,39 +274,38 @@ function emfFuelsOf(points){
   return f.length ? f.sort() : ["Gas"];
 }
 function emfBuildBmBlocks(site, sources){
-  const out = [];
+  // Keempat tabel baku mutu emisi SELALU dicantumkan (spt format laporan EMF yang sudah berjalan),
+  // walau site tsb kebetulan tidak punya sumber emisi jenis itu — bahan bakar mengikuti sumber emisi
+  // yang ada, default Gas.
   const turbin = sources.filter(p=>emfEmisiGroup(p)==="turbin");
   const heater = sources.filter(p=>emfEmisiGroup(p)==="heater");
-  const genset = sources.filter(p=>emfEmisiGroup(p)==="genset");
-  const flare = sources.filter(p=>emfEmisiGroup(p)==="flare");
-  if(turbin.length) out.push(emfBlock({ref:true, sheet:"BM Turbin Gas", caption:"Baku Mutu Emisi Proses Pembakaran dari Turbin Gas",
-    subcaption:`${EMF_REG.turbin} — berlaku untuk compressor turbine & generator turbine.`,
-    tables:[emfBmFuelTable(EMF_BM_TURBIN, emfFuelsOf(turbin))],
-    notes:["Volume gas diukur dalam keadaan standar (25°C dan tekanan 1 atmosfer) dan semua parameter dikoreksi dengan O₂ sebesar 15% dalam keadaan kering."]}));
-  if(heater.length) out.push(emfBlock({ref:true, sheet:"BM Boiler & Heater", caption:"Baku Mutu Emisi Proses Pembakaran dari Boiler & Heater",
-    subcaption:`${EMF_REG.heater} — berlaku untuk heater, glycol reboiler & sejenisnya.`,
-    tables:[emfBmFuelTable(EMF_BM_HEATER, emfFuelsOf(heater))],
-    notes:["Volume gas diukur dalam keadaan standar (25°C dan tekanan 1 atmosfer) dan semua parameter dikoreksi dengan O₂ sebesar 3% dalam keadaan kering, kecuali opasitas."]}));
-  if(genset.length){
-    const rows = [];
-    EMF_BM_GENSET.forEach(([kap, fuel, list])=>{
-      list.forEach((it,i)=>{
-        const row = [];
-        if(i===0) row.push(C(fuel, {rs:list.length, align:"center"}), C(emfVal(kap), {rs:list.length, align:"center"}));
-        row.push(C(it[0]), C("mg/Nm³", {align:"center"}), C(emfVal(it[1]), {align:"center"}));
-        rows.push(row);
-      });
+  const fuelsOr = (list)=> list.length ? emfFuelsOf(list) : ["Gas"];
+  const rows = [];
+  EMF_BM_GENSET.forEach(([kap, fuel, list])=>{
+    list.forEach((it,i)=>{
+      const row = [];
+      if(i===0) row.push(C(fuel, {rs:list.length, align:"center"}), C(emfVal(kap), {rs:list.length, align:"center"}));
+      row.push(C(it[0]), C("mg/Nm³", {align:"center"}), C(emfVal(it[1]), {align:"center"}));
+      rows.push(row);
     });
-    out.push(emfBlock({ref:true, sheet:"BM Mesin Pemb. Dalam", caption:"Baku Mutu Emisi Mesin dengan Pembakaran Dalam",
-      subcaption:`${EMF_REG.genset} — berlaku untuk diesel/gas engine generator, pump & compressor.`,
+  });
+  return [
+    emfBlock({key:"bm-turbin", ref:true, sheet:"BM Turbin Gas", caption:"Baku Mutu Emisi Proses Pembakaran dari Turbin Gas",
+      pre:[{h:"Baku mutu emisi proses pembakaran dari turbin gas"}, "Mesin yang termasuk dalam baku mutu emisi pembakaran dari turbin gas adalah compressor turbine dan generator turbine."],
+      tables:[emfBmFuelTable(EMF_BM_TURBIN, fuelsOr(turbin))],
+      notes:["Catatan: volume gas diukur dalam keadaan standar (25°C dan tekanan 1 atmosfer) dan semua parameter dikoreksi dengan O₂ sebesar 15% dalam keadaan kering."]}),
+    emfBlock({key:"bm-heater", ref:true, sheet:"BM Boiler & Heater", caption:"Baku Mutu Boiler & Heater",
+      pre:[{h:"Baku mutu emisi proses pembakaran dari boiler dan heater"}, "Mesin yang termasuk dalam baku mutu boiler dan heater adalah heater"+(heater.some(p=>/REBOILER/.test(normKS(p.kategoriSumber)))?" dan glycol reboiler":"")+"."],
+      tables:[emfBmFuelTable(EMF_BM_HEATER, fuelsOr(heater))],
+      notes:["Catatan: volume gas diukur dalam keadaan baku mutu (25°C dan tekanan 1 atmosfer) dan semua parameter dikoreksi dengan O₂ sebesar 3% dalam keadaan kering kecuali opasitas."]}),
+    emfBlock({key:"bm-genset", ref:true, sheet:"BM Mesin Pemb. Dalam", caption:"Baku Mutu Mesin Pembakaran Dalam",
+      pre:[{h:"Baku mutu emisi proses pembakaran dari mesin pembakaran dalam"}, "Mesin yang termasuk dalam baku mutu mesin pembakaran dalam adalah diesel/gas engine generator, diesel engine (fire water) pump dan diesel/gas engine compressor."],
       tables:[{columns:[{l:"Jenis Bahan Bakar",w:17},{l:"Kapasitas",w:19},{l:"Parameter",w:34},{l:"Satuan",w:14},{l:"Baku Mutu",w:16}], rows}],
-      notes:["Volume gas diukur dalam keadaan standar (25°C dan tekanan 1 atmosfer) dan semua parameter dikoreksi dengan O₂ sebesar 15%.",
-        "Tidak berlaku bagi sumber emisi berkapasitas ≤ 100 kW, beroperasi kumulatif < 1.000 jam/tahun, atau untuk keperluan darurat/perbaikan/pemeliharaan yang beroperasi kumulatif ≤ 200 jam/tahun."]}));
-  }
-  if(flare.length) out.push(emfBlock({ref:true, sheet:"BM Flare", caption:"Baku Mutu Emisi Proses Pembakaran dari Unit Suar Bakar (Flare)",
-    subcaption:EMF_REG.flare,
-    tables:[{columns:[{l:"Jenis",w:34},{l:"Parameter",w:33},{l:"Baku Mutu",w:33}], rows:[[C("Cerobong Flare"), C("Opasitas"), C(emfVal("40")+" %", {align:"center"})]]}]}));
-  return out;
+      notes:["Catatan: volume gas diukur dalam keadaan standar (25°C dan tekanan 1 atmosfer) dan semua parameter dikoreksi dengan O₂ sebesar 15%."]}),
+    emfBlock({key:"bm-flare", ref:true, sheet:"BM Flare", caption:"Baku Mutu Flare",
+      pre:[{h:"Baku mutu emisi proses pembakaran dari unit suar bakar"}],
+      tables:[{columns:[{l:"Jenis",w:34},{l:"Parameter",w:33},{l:"Baku Mutu (%)",w:33}], rows:[[C("Cerobong Flare"), C("Opasitas"), C(emfVal("40"), {align:"center"})]]}]})
+  ];
 }
 
 // --- Daftar sumber emisi (inventaris)
@@ -325,7 +325,7 @@ function emfBuildListBlock(site, period, sources){
     C(i+1, {align:"center"}), C(p.nama, {bold:true}), C(p.kategoriSumber||"–"), C(emfKapasitas(p)),
     C(p.parameter ? p.parameter.replace(/SO2/g,"SO₂") : "–"), C(emfFrekKewajiban(p, period)), C(emfCoordText(site, p.nama), {align:"center", nowrap:true})
   ]);
-  return emfBlock({ref:true, sheet:"Daftar Sumber Emisi", caption:`Daftar Sumber Emisi ${site}`,
+  return emfBlock({key:"list", ref:true, sheet:"Daftar Sumber Emisi", caption:`Daftar Sumber Emisi ${site}`,
     tables:[{columns:[{l:"No",w:5},{l:"Nama Cerobong",w:18},{l:"Jenis Sumber",w:16},{l:"Kapasitas · Bahan Bakar",w:13},{l:"Parameter Pemantauan",w:14},{l:"Frekuensi Kewajiban",w:14},{l:"Koordinat",w:20}], rows}],
     notes:["RH = running hour (jam operasi) 12 bulan terakhir; unit emergency/standby wajib dipantau hanya bila RH > 200 jam/tahun."]});
 }
@@ -350,10 +350,10 @@ function emfBuildSulfurBlock(site, period, sources){
     });
   });
   const dt = emfDateRange(dates);
-  return emfBlock({sheet:"Kandungan Sulfur", caption:"Kandungan Sulfur dalam Bahan Bakar",
+  return emfBlock({key:"sulfur", sheet:"Kandungan Sulfur", caption:"Kandungan Sulfur dalam Bahan Bakar",
     subcaption:`${EMF_REG.turbin} Pasal 12 ayat (2) huruf b${dt?` · Tanggal pengukuran: ${dt}`:""}`,
     tables:[{columns:[{l:"Titik Pengambilan Contoh",w:34},{l:"Hasil H₂S (% berat)",w:18},{l:"Baku Mutu (%)",w:14},{l:"Status",w:34}], rows}],
-    notes:["Bagi sumber emisi dengan kapasitas < 25 MW, baku mutu SO₂ tidak berlaku bila kandungan sulfur dalam bahan bakar ≤ 0,5% berat; kandungan sulfur dipantau 6 bulan sekali."]});
+    notesNoNarr:["Bagi sumber emisi dengan kapasitas < 25 MW, baku mutu SO₂ tidak berlaku bila kandungan sulfur dalam bahan bakar ≤ 0,5% berat; kandungan sulfur dipantau 6 bulan sekali."]});
 }
 
 // --- Hasil pemantauan emisi (a: turbin/boiler/heater, b: mesin pembakaran dalam)
@@ -429,8 +429,8 @@ function emfBuildEmisiBlock(site, period, sources){
     tables.push(t);
     summaries.push(emfSummaryEmisi(st, "mesin pembakaran dalam", EMF_REG.genset));
   }
-  if(emfState.includeSupport) notes.push("Data pendukung = parameter pengukuran tanpa baku mutu (O₂, CO₂, laju alir, suhu gas) yang menyertai hasil pemantauan.");
-  return emfBlock({sheet:"Hasil Emisi", caption:`Hasil Pemantauan Emisi di Lapangan ${site} ${emfPeriodText(period)}`, tables, notes, summary:summaries.filter(Boolean).join(" ")});
+  if(tables.some(t=>t.rows.some(r=>r.some(c=>c.v==="Data pendukung")))) notes.push("Data pendukung = parameter pengukuran tanpa baku mutu (O₂, CO₂, laju alir, suhu gas) yang menyertai hasil pemantauan.");
+  return emfBlock({key:"hasil-emisi", sheet:"Hasil Emisi", caption:`Hasil Pemantauan Emisi di Lapangan ${site} ${emfPeriodText(period)}`, tables, notes, summary:summaries.filter(Boolean).join(" ")});
 }
 
 // --- Flare
@@ -459,7 +459,7 @@ function emfBuildFlareBlock(site, period, sources){
   if(sampled) summary = exceed.length
     ? `Opasitas flare ${exceed.join(", ")} melebihi baku mutu 40% (${EMF_REG.flare}).`
     : `Hasil pemantauan opasitas ${sampled} flare di lapangan ${site} pada ${emfPeriodText(period)} memenuhi baku mutu (maks. 40%) sesuai ${EMF_REG.flare}.`;
-  return emfBlock({sheet:"Hasil Flare", caption:`Hasil Pemantauan Flare di ${site} ${emfPeriodText(period)}`,
+  return emfBlock({key:"hasil-flare", sheet:"Hasil Flare", caption:`Hasil Pemantauan Flare di ${site} ${emfPeriodText(period)}`,
     subcaption:`Parameter: Opasitas (%) · Metode: SNI 19.7117.11-2005${dt?` · Tanggal pengukuran: ${dt}`:""}`,
     tables:[{columns:[{l:"No",w:6},{l:"Nama Flare",w:24},{l:"Koordinat",w:22},{l:"Hasil (%)",w:12},{l:"Baku Mutu (%)",w:14},{l:"Keterangan",w:22}], rows}], summary});
 }
@@ -515,7 +515,7 @@ function emfBuildAmbienBlocks(site, period){
   const hasPoints = emfAmbPointsOf(site, "ambient").length>0;
   if(!recs.length && !hasPoints) return out;
   if(emfState.includeRef){
-    out.push(emfBlock({ref:true, sheet:"BM Udara Ambien", caption:"Baku Mutu dan Frekuensi Pemantauan Udara Ambien",
+    out.push(emfBlock({key:"bm-ambien", ref:true, sheet:"BM Udara Ambien", caption:"Baku Mutu dan Frekuensi Pemantauan Udara Ambien",
       subcaption:`${EMF_REG.ambien} · Frekuensi pemantauan 1 x 6 bulan`,
       tables:[{columns:[{l:"Parameter",w:30},{l:"Waktu Pengukuran",w:13},{l:"Satuan",w:11},{l:"Baku Mutu",w:12},{l:"Metode Analisis",w:17},{l:"Peralatan",w:17}],
         rows:EMF_AMB_PARAMS.map(x=>[C(x.label), C(x.durasi, {align:"center"}), C("µg/Nm³", {align:"center"}), C(emfVal(x.baku), {align:"center"}), C(x.metode), C(x.alat)])}]}));
@@ -538,7 +538,7 @@ function emfBuildAmbienBlocks(site, period){
     const summary = exceed.length
       ? `Kualitas udara ambien di ${name} pada ${emfPeriodText(period)} melebihi baku mutu ${EMF_REG.ambien} untuk parameter ${exceed.join(", ")}.`
       : `Kualitas udara ambien di ${name} pada ${emfPeriodText(period)} telah memenuhi baku mutu berdasarkan ${EMF_REG.ambien}.`;
-    out.push(emfBlock({sheet:"Ambien "+name, caption:`Kualitas Udara Ambien di ${name}`, subcaption:emfLocLine(site, name, group.map(r=>r.tanggal)),
+    out.push(emfBlock({res:true, sheet:"Ambien "+name, caption:`Kualitas Udara Ambien di ${name}`, subcaption:emfLocLine(site, name, group.map(r=>r.tanggal)),
       tables:[{columns:[{l:"No",w:5},{l:"Parameter",w:28},{l:"Waktu Pengukuran",w:12},{l:"Hasil (µg/Nm³)",w:13},{l:"Baku Mutu (µg/Nm³)",w:13},{l:"Metode",w:17},{l:"Status",w:12}], rows}],
       notes:[emfWeatherNote(group), "Tanda \"<\" = di bawah batas deteksi metode analisis."].filter(Boolean), summary}));
   });
@@ -552,7 +552,7 @@ function emfBuildKebisinganBlocks(site, period){
   if(!recs.length && !hasPoints) return out;
   const baku = (recs.find(r=>r.baku!=null)||{}).baku || 70;
   if(emfState.includeRef){
-    out.push(emfBlock({ref:true, sheet:"BM Kebisingan", caption:"Baku Mutu dan Frekuensi Pemantauan Kebisingan", subcaption:EMF_REG.kebisingan,
+    out.push(emfBlock({key:"bm-kebisingan", ref:true, sheet:"BM Kebisingan", caption:"Baku Mutu dan Frekuensi Pemantauan Kebisingan", subcaption:EMF_REG.kebisingan,
       tables:[{columns:[{l:"Peruntukan Kawasan",w:40},{l:"Tingkat Kebisingan (dB(A))",w:30},{l:"Frekuensi Pemantauan",w:30}],
         rows:[[C("Industri"), C(emfVal(baku), {align:"center"}), C("1 x 6 bulan", {align:"center"})]]}],
       notes:["Faktor toleransi: + 3 dB(A)."]}));
@@ -585,7 +585,7 @@ function emfBuildKebisinganBlocks(site, period){
       tables.push({subcaption:"Data pengukuran tingkat kebisingan per jam (Leq 10 menit)", columns:hc, rows:hrows});
     }
     const ok = r.statusBakuMutu!=="exceed";
-    out.push(emfBlock({sheet:"Kebisingan "+name, caption:`Tingkat Kebisingan di ${name}`, subcaption:emfLocLine(site, name, [r.tanggal]), tables,
+    out.push(emfBlock({res:true, sheet:"Kebisingan "+name, caption:`Tingkat Kebisingan di ${name}`, subcaption:emfLocLine(site, name, [r.tanggal]), tables,
       summary:`Tingkat kebisingan siang-malam (LSM) di ${name} pada ${emfPeriodText(period)} sebesar ${emfVal(r.lSiangMalam)} dB(A), ${ok?"memenuhi":"melebihi"} baku mutu kawasan industri ${emfVal(b)} dB(A) berdasarkan ${EMF_REG.kebisingan}.`}));
   });
   return out;
@@ -596,7 +596,7 @@ function emfBuildKebauanBlocks(site, period){
   const hasPoints = emfAmbPointsOf(site, "kebauan").length>0;
   if(!recs.length && !hasPoints) return out;
   if(emfState.includeRef){
-    out.push(emfBlock({ref:true, sheet:"BM Kebauan", caption:"Baku Mutu dan Frekuensi Pemantauan Kebauan", subcaption:`${EMF_REG.kebauan} (odoran tunggal) · Frekuensi pemantauan 1 x 6 bulan`,
+    out.push(emfBlock({key:"bm-kebauan", ref:true, sheet:"BM Kebauan", caption:"Baku Mutu dan Frekuensi Pemantauan Kebauan", subcaption:`${EMF_REG.kebauan} (odoran tunggal) · Frekuensi pemantauan 1 x 6 bulan`,
       tables:[{columns:[{l:"Parameter",w:32},{l:"Satuan",w:10},{l:"Baku Mutu",w:12},{l:"Metode",w:24},{l:"Peralatan",w:22}],
         rows:EMF_ODR_PARAMS.map(x=>[C(x.label), C("ppm", {align:"center"}), C(emfVal(x.baku), {align:"center"}), C(x.metode), C(x.alat)])}]}));
   }
@@ -614,7 +614,7 @@ function emfBuildKebauanBlocks(site, period){
       return [C(i+1, {align:"center"}), C(ref?ref.label:r.parameter), C(emfVal(r.resultRaw), {align:"center"}),
         C(emfVal(r.baku!=null?r.baku:(ref?ref.baku:"")), {align:"center"}), C(r.metode||"–", {align:"center", nowrap:true}), emfStatusOf(r.statusBakuMutu)];
     });
-    out.push(emfBlock({sheet:"Kebauan "+name, caption:`Tingkat Kebauan pada ${name}`, subcaption:emfLocLine(site, name, group.map(r=>r.tanggal)),
+    out.push(emfBlock({res:true, sheet:"Kebauan "+name, caption:`Tingkat Kebauan pada ${name}`, subcaption:emfLocLine(site, name, group.map(r=>r.tanggal)),
       tables:[{columns:[{l:"No",w:6},{l:"Parameter",w:32},{l:"Hasil (ppm)",w:14},{l:"Baku Mutu (ppm)",w:14},{l:"Metode",w:20},{l:"Status",w:14}], rows}],
       notes:["Tanda \"<\" = di bawah batas deteksi metode analisis."],
       summary: exceed.length
@@ -629,7 +629,7 @@ function emfBuildGetaranBlocks(site, period){
   const hasPoints = emfAmbPointsOf(site, "getaran").length>0;
   if(!recs.length && !hasPoints) return out;
   if(emfState.includeRef){
-    out.push(emfBlock({ref:true, sheet:"BM Getaran", caption:"Baku Mutu Pemantauan Getaran",
+    out.push(emfBlock({key:"bm-getaran", ref:true, sheet:"BM Getaran", caption:"Baku Mutu Pemantauan Getaran",
       subcaption:`${EMF_REG.getaran} Lampiran I — Baku Tingkat Getaran untuk Kenyamanan dan Kesehatan (nilai simpangan, mikron / 10⁻⁶ m)`,
       tables:[{columns:[{l:"Frekuensi (Hz)",w:16},{l:"Tidak Mengganggu",w:21},{l:"Mengganggu",w:21},{l:"Tidak Nyaman",w:21},{l:"Menyakitkan",w:21}],
         rows:EMF_VIB_BM.map(x=>x.map((v,i)=>C(emfVal(v), {align:"center"})))}]}));
@@ -643,7 +643,7 @@ function emfBuildGetaranBlocks(site, period){
     const rows = bands.map((b,i)=>[C(i+1, {align:"center"}), C(emfVal(b.freq), {align:"center"}), C(emfVal(b.nilai), {align:"center"}),
       C(emfVal(b.notDisturb||""), {align:"center"}),
       C(EMF_VIB_STATUS[b.status]||b.status||"–", {align:"center", color: b.status==="Not Disturb" ? "#1E7B47" : "#C00000", bold: b.status!=="Not Disturb"})]);
-    out.push(emfBlock({sheet:"Getaran "+name, caption:`Tingkat Nilai Getaran di ${name} pada ${emfPeriodText(period)}`, subcaption:emfLocLine(site, name, [r.tanggal]),
+    out.push(emfBlock({res:true, sheet:"Getaran "+name, caption:`Tingkat Nilai Getaran di ${name} pada ${emfPeriodText(period)}`, subcaption:emfLocLine(site, name, [r.tanggal]),
       tables:[{columns:[{l:"No",w:8},{l:"Frekuensi (Hz)",w:18},{l:"Hasil ("+emfUnit(r.unit||"micron")+")",w:20},{l:"Batas Tidak Mengganggu ("+emfUnit(r.unit||"micron")+")",w:28},{l:"Kategori",w:26}], rows}],
       notes:[r.metode ? `Metode: ${r.metode}.` : ""].filter(Boolean),
       summary: worse.length
@@ -653,32 +653,145 @@ function emfBuildGetaranBlocks(site, period){
   return out;
 }
 
+/* ---------- Narasi (paragraf pengantar spt laporan EMF yang sudah berjalan) ----------
+   Paragraf berupa string (paragraf biasa), {h:"..."} (sub-judul tebal) atau {li:[...]} (butir
+   menjorok). Rujukan nomor tabel ditulis "{{T:key|cadangan}}" lalu diganti nomor aslinya saat
+   dirender (emfResolveRefs) — nomor baru diketahui SETELAH semua tabel tersusun & dinomori.
+   Yang berubah tiap semester (tanggal sampling, lokasi, periode, nama lab) diambil dari database;
+   sisanya kalimat baku mengikuti laporan EMF lama. */
+function emfDefaultLab(){
+  const labs = DB.laboratorium || [];
+  const l = labs.find(x=>x.scopeAmbien || x.scopeEmisi) || labs[0];
+  const raw = l ? l.nama : (((DB.baConfig||{}).ambient||(DB.baConfig||{}).emisi||{}).labPerusahaan || "Sucofindo");
+  const name = String(raw).replace(/^PT\.?\s+/i,"").replace(/\s*\(Persero\)/i,"").replace(/\s+[-–].*$/,"").trim() || "Sucofindo";
+  const city = l && l.kabkota ? String(l.kabkota).replace(/^(Kota|Kabupaten)\s+/i,"").trim() : "Balikpapan";
+  return {name, city};
+}
+function emfLabName(){ return emfState.lab!=null ? emfState.lab : emfDefaultLab().name; }
+function emfLabCity(){ return emfState.labCity!=null ? emfState.labCity : emfDefaultLab().city; }
+function emfAnalisisText(){
+  const lab = emfLabName(), city = emfLabCity();
+  return `Sampel kemudian dianalisis di laboratorium ${lab}${city?` ${city}`:""}.`;
+}
+function emfLocPhrase(site, names){
+  const parts = names.map(n=>{ const c = emfCoordOf(site, n); return c ? `${n} (${c.ls}, ${c.bt})` : n; });
+  return parts.length<=1 ? (parts[0]||"") : parts.slice(0,-1).join("; ")+" dan "+parts[parts.length-1];
+}
+function emfJoinNames(names){ return names.length<=1 ? (names[0]||"") : names.slice(0,-1).join(", ")+" dan "+names[names.length-1]; }
+function emfOverCompliance(site, kats){
+  const pts = kats.flatMap(k=>emfAmbPointsOf(site, k));
+  return pts.length>0 && pts.every(p=>!p.wajib);
+}
+function emfOverComplianceText(site){
+  return `PHM lapangan ${site} tidak memiliki kewajiban untuk pengukuran getaran dan kebauan sesuai dengan Matriks dalam Persetujuan Lingkungan PHM yang berlaku saat ini. Pemantauan melebihi ketaatan sebagai database internal PHM untuk mengetahui kualitas kebauan dan getaran di sekitar wilayah operasi PHM.`;
+}
+// Tempel narasi: pengantar seksi -> blok baku mutu (atau hasil pertama kalau tabel referensi
+// dimatikan); kalimat lokasi & tanggal -> blok hasil pertama.
+function emfAttach(blocks, intro, locDate){
+  const bm = blocks.find(b=>b.ref && !b.empty);
+  const res = blocks.find(b=>!b.ref && !b.empty);
+  if(bm){ bm.pre = intro.concat(bm.pre||[]); if(res) res.pre = locDate.concat(res.pre||[]); }
+  else if(res) res.pre = intro.concat(locDate, res.pre||[]);
+}
+function emfNarrateEmisi(site, period, blocks, sources){
+  const intro = [{h:"Udara Emisi"},
+    "Baku mutu untuk pemantauan udara emisi mengacu kepada Peraturan Menteri Lingkungan Hidup No. 13 Tahun 2009 tentang Baku Mutu Emisi Sumber Tidak Bergerak bagi Usaha dan/atau Kegiatan Minyak dan Gas Bumi dan Peraturan Menteri Lingkungan Hidup dan Kehutanan No. 11 Tahun 2021 tentang Baku Mutu Emisi Mesin dengan Pembakaran Dalam.",
+    "Berdasarkan Permen LH No. 13 Tahun 2009 tentang baku mutu emisi sumber tidak bergerak bagi usaha dan/atau kegiatan minyak dan gas bumi, kewajiban pemantauan setiap mesin berdasarkan kapasitas mesin yaitu:",
+    {li:["a. ≤ 570 kW (0,57 MW) = 1 x 3 tahun", "b. > 570 – 3.000 kW (0,57 – 3 MW) = 1 x 1 tahun", "c. > 3.000 kW (3 MW) = 1 x 6 bulan"]},
+    "Berdasarkan Permen LHK No. 11 Tahun 2021 tentang Baku Mutu Emisi Mesin dengan Pembakaran Dalam, kewajiban pemantauan setiap mesin pembakaran dalam berdasarkan kapasitas mesin yaitu:",
+    {li:["a. 101 – 500 kW = 1 x 3 tahun", "b. 501 – 1.000 kW = 1 x 1 tahun", "c. 1.001 – 3.000 kW = 1 x 6 bulan"]},
+    "Pemantauan emisi terhadap sumber emisi dari mesin dengan pembakaran dalam atau genset tidak berlaku bagi:",
+    {li:["a. Sumber emisi dengan kapasitas ≤ 100 kW;", "b. Sumber emisi yang beroperasi secara kumulatif < 1.000 jam per tahun;",
+      "c. Sumber emisi yang digunakan untuk kepentingan darurat, kegiatan perbaikan atau pemeliharaan yang secara kumulatif berlangsung selama ≤ 200 jam per tahun;",
+      "d. Sumber emisi yang digunakan untuk peralatan las."]},
+    "Berikut ini adalah baku mutu yang berlaku untuk PHM. Sumber emisi terdiri dari emisi proses pembakaran yang meliputi emisi dari turbin gas, ketel uap dan pemanas proses (boiler and process heater), mesin pembakaran dalam (internal combustion engine) dan suar bakar (flare)."];
+  const sulfurPts = sources.filter(p=>emfEmisiGroup(p)==="sulfur").map(p=>p.nama);
+  const dates = DB.hasilPemantauan.filter(r=>r.site===site && r.periode===period && r.resultStatus!=="declaration").map(r=>r.dateOfSampling);
+  const dt = emfDateRange(dates);
+  const mid = [];
+  if(sulfurPts.length || blocks.some(b=>b.key==="bm-flare")){
+    mid.push("Bagi emisi yang bersumber dari proses pembakaran dengan kapasitas < 25 MW:",
+      {li:[`a. Baku mutu SO₂ tidak berlaku jika kandungan sulfur dalam bahan bakar ≤ 0,5% berat. Kandungan sulfur dalam bahan bakar dipantau setiap 6 bulan sekali.${sulfurPts.length?` Pemantauan kandungan sulfur diambil dari ${emfJoinNames(sulfurPts)}.`:""}`,
+        "b. Total Partikulat tidak berlaku."]});
+  }
+  mid.push(dt
+    ? `Pemantauan emisi dilakukan pada tanggal ${dt}. Berikut hasil pemantauan emisi di ${site}.`
+    : `Pada ${emfPeriodText(period)} tidak terdapat sumber emisi di lapangan ${site} yang dipantau, karena seluruh sumber emisi tidak termasuk kewajiban pemantauan pada periode ini. Status kewajiban pemantauan tiap sumber emisi ditunjukkan pada tabel berikut.`);
+  if(sulfurPts.length) mid.push(`Hasil kandungan sulfur (H₂S) pada sumber emisi di ${site} sebagai berikut.`);
+  const firstRes = blocks.find(b=>["sulfur","list","hasil-emisi"].includes(b.key));
+  emfAttach(blocks, intro, []);
+  if(firstRes) firstRes.pre = (firstRes.pre||[]).concat(mid);
+}
+function emfNarrateAmbient(site, period, blocks, cat){
+  const recs = emfAmbRecords(cat, site, period);
+  const names = emfGroupByTitik(recs).map(g=>emfAmbTitikName(g[0]));
+  const dt = emfDateRange(recs.map(r=>r.tanggal));
+  const P = emfPeriodText(period);
+  const lab = emfLabName();
+  let intro = [], loc = [];
+  if(cat==="ambien"){
+    intro = [{h:"Udara Ambien"}, "Baku mutu untuk pemantauan udara ambien mengacu kepada Peraturan Pemerintah No. 22 Tahun 2021 Lampiran VII."];
+    if(names.length) loc = ["Lokasi untuk pemantauan udara ambien adalah:", {li:names.map(n=>{ const c = emfCoordOf(site, n); return `- ${n}${c?` (${c.ls}, ${c.bt})`:""}`; })},
+      `Hal ini merupakan kewajiban dari PT Pertamina Hulu Mahakam untuk melakukan pemantauan udara ambien di wilayah ${emfJoinNames(names)} sesuai dengan parameter pada {{T:bm-ambien|PP No. 22 Tahun 2021 Lampiran VII}}. Pada ${P}, pemantauan dilakukan oleh petugas pengambil contoh (PPC) dari ${lab}${dt?` yang dilaksanakan pada tanggal ${dt}`:""}. ${emfAnalisisText()} Hasil analisis kualitas udara ambien pada ${P} ditunjukkan pada tabel berikut.`];
+  } else if(cat==="kebisingan"){
+    intro = [{h:"Kebisingan"}, "Baku mutu pemantauan kebisingan mengacu kepada Keputusan Menteri Negara Lingkungan Hidup No. 48 Tahun 1996."];
+    if(names.length) loc = [`Lokasi pemantauan kebisingan adalah di ${emfLocPhrase(site, names)}.`,
+      `Tingkat kebisingan pada ${emfJoinNames(names)} mengacu kepada kategori Industri berdasarkan Keputusan Menteri Negara Lingkungan Hidup No. 48 Tahun 1996.${dt?` Pemantauan dilakukan pada tanggal ${dt}.`:""} ${emfAnalisisText()} Hasil dari analisis untuk tingkat kebisingan pada ${P} ditunjukkan pada tabel berikut.`];
+  } else if(cat==="kebauan"){
+    const over = emfOverCompliance(site, ["kebauan"]);
+    intro = [{h:"Kebauan"}].concat(over?["Bukan komitmen Persetujuan Lingkungan PHM (melebihi ketaatan)."]:[],
+      ["Baku mutu pemantauan kebauan mengacu kepada Keputusan Menteri Negara Lingkungan Hidup No. 50 Tahun 1996."]);
+    if(names.length) loc = [`Lokasi pemantauan kebauan adalah di ${emfLocPhrase(site, names)}.${dt?` Pemantauan kebauan dilakukan pada tanggal ${dt}.`:""} ${emfAnalisisText()} Hasil dari analisis untuk tingkat kebauan pada ${P} ditunjukkan pada {{T:res-kebauan|tabel berikut}}.`]
+      .concat(over?[emfOverComplianceText(site)]:[]);
+  } else if(cat==="getaran"){
+    const over = emfOverCompliance(site, ["getaran"]);
+    const freqs = recs.flatMap(r=>(r.bands||[]).map(b=>Number(b.freq))).filter(x=>!isNaN(x));
+    const fr = freqs.length ? ` pada frekuensi ${emfVal(Math.min(...freqs).toFixed(2))} – ${emfVal(Math.max(...freqs).toFixed(2))} Hz` : "";
+    intro = [{h:"Getaran"}].concat(over?["Bukan komitmen Persetujuan Lingkungan PHM (melebihi ketaatan)."]:[],
+      ["Baku mutu pemantauan getaran mengacu kepada Keputusan Menteri Negara Lingkungan Hidup No. 49 Tahun 1996 Lampiran I (Baku Tingkat Getaran untuk Kenyamanan dan Kesehatan)."]);
+    if(names.length) loc = [`Lokasi pemantauan getaran adalah di ${emfLocPhrase(site, names)}.${dt?` Pemantauan getaran dilakukan pada tanggal ${dt}${fr}.`:""} Hasil dari analisis untuk pemantauan getaran di ${emfJoinNames(names)} pada ${P} ditunjukkan pada tabel berikut.`];
+    const res = blocks.filter(b=>b.res && !b.empty);
+    if(over && res.length) res[res.length-1].post = [emfOverComplianceText(site)];
+  }
+  const firstRes = blocks.find(b=>b.res && !b.empty);
+  if(firstRes && cat==="kebauan") firstRes.key = firstRes.key || "res-kebauan";
+  emfAttach(blocks, intro, loc);
+}
+function emfResolveRefs(text){
+  return String(text).replace(/\{\{T:([\w-]+)(?:\|([^}]*))?\}\}/g, (m,key,fb)=> emfRefMap[key] ? `Tabel ${emfRefMap[key]}` : (fb||"tabel berikut"));
+}
+
 // Susun seluruh blok laporan utk 1 site & periode, urutan mengikuti laporan EMF yang sudah berjalan.
-// Bagian Udara Emisi cuma dicantumkan kalau site ini memang punya kewajiban/hasil emisi pada
-// periode tsb — site yang sumber emisinya seluruhnya genset emergency tidak wajib (mis. BPN, yang
-// laporan EMF-nya cuma ambien/kebisingan/kebauan/getaran) tidak perlu bagian emisi sama sekali.
+// Semua site yang punya sumber emisi di Database Titik Pantau ikut menampilkan tabel emisinya
+// (termasuk BPN yang seluruh gensetnya tidak wajib pantau — tetap dicantumkan beserta alasannya).
 function emfSiteHasEmisiDuty(sources, period){
   return sources.some(p=>p._orphan || DB.hasilPemantauan.some(r=>r.engineId===p.id && r.periode===period) || (!p.tidakBeroperasi && effectiveWajib(p, period)));
 }
 function emfBuildReport(site, period){
   emfLastBlocks = [];
+  emfRefMap = {};
   const sections = [];
   const sources = emfEmisiSources(site, period);
-  if(sources.length && emfSiteHasEmisiDuty(sources, period)){
+  if(sources.length){
     const blocks = [];
     if(emfState.includeRef) blocks.push(...emfBuildBmBlocks(site, sources));
     const sulfur = emfBuildSulfurBlock(site, period, sources); if(sulfur) blocks.push(sulfur);
     if(emfState.includeRef){ const list = emfBuildListBlock(site, period, sources); if(list) blocks.push(list); }
     const emisi = emfBuildEmisiBlock(site, period, sources); if(emisi) blocks.push(emisi);
     const flare = emfBuildFlareBlock(site, period, sources); if(flare) blocks.push(flare);
-    if(blocks.length) sections.push({title:"Udara Emisi", blocks});
+    if(blocks.length){ emfNarrateEmisi(site, period, blocks, sources); sections.push({title:"Udara Emisi", blocks}); }
   }
-  [["Udara Ambien", emfBuildAmbienBlocks], ["Kebisingan", emfBuildKebisinganBlocks], ["Kebauan", emfBuildKebauanBlocks], ["Getaran", emfBuildGetaranBlocks]]
-    .forEach(([title, fn])=>{ const blocks = fn(site, period); if(blocks.length) sections.push({title, blocks}); });
+  [["Udara Ambien", emfBuildAmbienBlocks, "ambien"], ["Kebisingan", emfBuildKebisinganBlocks, "kebisingan"], ["Kebauan", emfBuildKebauanBlocks, "kebauan"], ["Getaran", emfBuildGetaranBlocks, "getaran"]]
+    .forEach(([title, fn, cat])=>{
+      const blocks = fn(site, period);
+      if(!blocks.length) return;
+      emfNarrateAmbient(site, period, blocks, cat);
+      sections.push({title, blocks});
+    });
   // Penomoran tabel berurutan mulai dari "No. Tabel Awal" — blok kosong (belum ada data) tidak ikut
   // dinomori supaya urutan nomor di Word tetap rapat tanpa lompatan.
   let n = Math.max(1, Number(emfState.startNo)||1);
-  sections.forEach(s=>s.blocks.forEach(b=>{ if(!b.empty){ b.num = n++; } emfLastBlocks.push(b); }));
+  sections.forEach(s=>s.blocks.forEach(b=>{ if(!b.empty){ b.num = n++; if(b.key) emfRefMap[b.key] = b.num; } emfLastBlocks.push(b); }));
   return sections;
 }
 
@@ -691,7 +804,10 @@ const EMF_CSS = {
   sub:"font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#000;margin:0 0 4pt 0;text-align:center;",
   tsub:"font-family:Arial,Helvetica,sans-serif;font-size:9pt;font-weight:bold;color:#000;margin:6pt 0 3pt 0;",
   note:"font-family:Arial,Helvetica,sans-serif;font-size:8pt;font-style:italic;color:#000;margin:0 0 1pt 0;",
-  sum:"font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#000;margin:4pt 0 0 0;text-align:justify;"
+  sum:"font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#000;margin:4pt 0 0 0;text-align:justify;",
+  para:"font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#000;margin:0 0 6pt 0;text-align:justify;line-height:1.35;",
+  head:"font-family:Arial,Helvetica,sans-serif;font-size:10pt;font-weight:bold;color:#000;margin:10pt 0 4pt 0;",
+  li:"font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#000;margin:0 0 2pt 18pt;text-align:justify;"
 };
 function emfCellHtml(cell, isHead, width){
   let style = isHead ? EMF_CSS.th : EMF_CSS.td;
@@ -715,16 +831,31 @@ function emfTableHtml(t){
   return (t.subcaption?`<p style="${EMF_CSS.tsub}">${escHtml(t.subcaption)}</p>`:"")+
     `<table style="${EMF_CSS.table}" border="1" cellspacing="0" cellpadding="0"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
+// Catatan kaki tabel; notesNoNarr cuma muncul kalau narasi dimatikan (isinya sudah ada di narasi).
+function emfNotesOf(b){ return (b.notes||[]).concat(emfState.narrative ? [] : (b.notesNoNarr||[])); }
+function emfParasHtml(list){
+  if(!emfState.narrative || !list || !list.length) return "";
+  return list.map(p=>{
+    if(p && p.h) return `<p style="${EMF_CSS.head}">${escHtml(emfResolveRefs(p.h))}</p>`;
+    if(p && p.li) return p.li.map((x,i)=>`<p style="${EMF_CSS.li}${i===p.li.length-1?"margin-bottom:6pt;":""}">${escHtml(emfResolveRefs(x))}</p>`).join("");
+    return `<p style="${EMF_CSS.para}">${escHtml(emfResolveRefs(p))}</p>`;
+  }).join("");
+}
+function emfParasText(list){
+  if(!emfState.narrative || !list || !list.length) return [];
+  return list.flatMap(p=> p && p.h ? [emfResolveRefs(p.h)] : (p && p.li ? p.li.map(emfResolveRefs) : [emfResolveRefs(p)]));
+}
 function emfBlockHtml(b){
   if(b.empty) return "";
-  return `<p style="${EMF_CSS.cap}">Tabel ${b.num} ${escHtml(b.caption)}</p>`+
+  return emfParasHtml(b.pre)+`<p style="${EMF_CSS.cap}">Tabel ${b.num} ${escHtml(b.caption)}</p>`+
     (b.subcaption?`<p style="${EMF_CSS.sub}">${escHtml(b.subcaption)}</p>`:"")+
     b.tables.map(emfTableHtml).join("")+
-    b.notes.map(n=>`<p style="${EMF_CSS.note}">${escHtml(n)}</p>`).join("")+
-    (b.summary?`<p style="${EMF_CSS.sum}">${escHtml(b.summary)}</p>`:"");
+    emfNotesOf(b).map(n=>`<p style="${EMF_CSS.note}">${escHtml(n)}</p>`).join("")+
+    (b.summary && emfState.narrative?`<p style="${EMF_CSS.sum}">${escHtml(b.summary)}</p>`:"")+
+    emfParasHtml(b.post);
 }
 function emfBlockText(b){
-  const lines = [`Tabel ${b.num} ${b.caption}`];
+  const lines = emfParasText(b.pre).concat([`Tabel ${b.num} ${b.caption}`]);
   if(b.subcaption) lines.push(b.subcaption);
   b.tables.forEach(t=>{
     if(t.subcaption) lines.push(t.subcaption);
@@ -732,8 +863,9 @@ function emfBlockText(b){
     lines.push(t.columns.map(c=>c.l).join("\t"));
     g.grid.forEach(r=>lines.push(r.map(v=>String(v).replace(/\n/g," ")).join("\t")));
   });
-  b.notes.forEach(n=>lines.push(n));
-  if(b.summary) lines.push(b.summary);
+  emfNotesOf(b).forEach(n=>lines.push(n));
+  if(b.summary && emfState.narrative) lines.push(b.summary);
+  lines.push(...emfParasText(b.post));
   return lines.join("\n");
 }
 
@@ -781,8 +913,9 @@ function emfBlockSheet(b){
     g.grid.forEach(r=>aoa.push(r.slice()));
     g.merges.forEach(m=>merges.push({s:{r:base+m.r, c:m.c}, e:{r:base+m.r+m.rs-1, c:m.c+m.cs-1}}));
   });
-  if(b.notes.length || b.summary) aoa.push([]);
-  b.notes.forEach(n=>pushFull(n));
+  const xnotes = (b.notes||[]).concat(b.notesNoNarr||[]);
+  if(xnotes.length || b.summary) aoa.push([]);
+  xnotes.forEach(n=>pushFull(n));
   if(b.summary) pushFull(b.summary);
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws["!merges"] = merges;
@@ -813,7 +946,7 @@ function emfCoverageHtml(site, period, sections){
   const allSources = emfEmisiSources(site, period);
   const sources = allSources.filter(p=>emfEmisiGroup(p)!=="sulfur");
   if(sources.length && !emfSiteHasEmisiDuty(allSources, period)){
-    items.push({ok:true, text:`Emisi: ${sources.length} sumber, tidak ada yang wajib pantau/ada hasil — bagian emisi tidak dicantumkan`});
+    items.push({ok:true, text:`Emisi: ${sources.length} sumber, tidak ada yang wajib pantau periode ini`});
   } else if(sources.length){
     const sampled = sources.filter(p=>emfHasilRows(p, period).some(r=>r.resultStatus!=="declaration")).length;
     items.push({ok:true, text:`Emisi: ${sampled} dari ${sources.length} sumber dipantau`});
@@ -842,6 +975,9 @@ function emfReadControls(){
   emfState.includeRef = g("emfIncludeRef").checked;
   emfState.includeSupport = g("emfIncludeSupport").checked;
   emfState.idNumber = g("emfIdNumber").checked;
+  emfState.narrative = g("emfNarrative").checked;
+  emfState.lab = g("emfLab").value.trim();
+  emfState.labCity = g("emfLabCity").value.trim();
 }
 function renderLaporanEmf(){
   const siteSel = document.getElementById("emfSite"), perSel = document.getElementById("emfPeriod");
@@ -858,6 +994,9 @@ function renderLaporanEmf(){
   document.getElementById("emfIncludeRef").checked = emfState.includeRef;
   document.getElementById("emfIncludeSupport").checked = emfState.includeSupport;
   document.getElementById("emfIdNumber").checked = emfState.idNumber;
+  document.getElementById("emfNarrative").checked = emfState.narrative;
+  document.getElementById("emfLab").value = emfLabName();
+  document.getElementById("emfLabCity").value = emfLabCity();
 
   const site = emfState.site, period = emfState.period;
   const sections = site ? emfBuildReport(site, period) : [];
@@ -873,7 +1012,7 @@ function renderLaporanEmf(){
   </div>` : "";
 }
 document.addEventListener("change", e=>{
-  if(["emfSite","emfPeriod","emfStartNo","emfIncludeRef","emfIncludeSupport","emfIdNumber"].includes(e.target.id)){
+  if(["emfSite","emfPeriod","emfStartNo","emfIncludeRef","emfIncludeSupport","emfIdNumber","emfNarrative","emfLab","emfLabCity"].includes(e.target.id)){
     const siteChanged = e.target.id==="emfSite";
     emfReadControls();
     if(siteChanged) emfState.period = "";
