@@ -1487,3 +1487,26 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 .pg-dokfoto-table td:first-child{text-align:center;}
 .pg-dokfoto-table tr{page-break-inside:avoid;}
 .coord-tbl .coord-nama{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* Laporan EMF & EMP — pratinjau "kertas" SENGAJA tetap putih di tema gelap (mewakili dokumen
+   Word yang akan ditempel), lebar konten ~17 cm spt A4 portrait supaya yang terlihat di layar
+   mendekati hasil paste di Word. Style tabel/teksnya sendiri inline (lihat EMF_CSS di
+   27-laporan-emf.js) agar ikut terbawa saat disalin, CSS di sini cuma utk wadah & tombol. */
+.emf-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+.chip-toggle:disabled{opacity:.55;cursor:not-allowed;transform:none;}
+.chip-toggle:disabled:hover{border-color:var(--gray-300);color:var(--gray-700);}
+.emf-opts{display:flex;flex-direction:column;gap:3px;align-self:center;}
+.emf-coverage{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:0 0 10px;}
+.emf-cov-title{font-size:12px;font-weight:800;color:var(--heading);margin-right:4px;}
+.emf-cov-item{font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:14px;border:1px solid var(--gray-200);background:var(--surface-card);}
+.emf-cov-item.ok{border-color:color-mix(in srgb, var(--green-500) 45%, var(--gray-200));color:#1c7a4f;}
+.emf-cov-item.warn{border-color:#e0c07a;background:#fdf3e3;color:#8a5c11;}
+.emf-paper{background:#fff;color:#000;border:1px solid var(--gray-200);border-radius:10px;box-shadow:0 6px 24px -14px rgba(11,31,56,.35);padding:28px 34px 34px;max-width:790px;margin:0 auto 24px;}
+.emf-paper-head{font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#5b6b7d;text-align:right;border-bottom:1px solid #e3e8ef;padding-bottom:6px;margin-bottom:6px;}
+.emf-section-title{font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:800;color:#1f3864;border-bottom:2px solid #1f3864;padding-bottom:3px;margin:22px 0 4px;text-transform:uppercase;letter-spacing:.03em;}
+.emf-block{position:relative;margin:0 -10px 8px;padding:4px 10px 8px;border:1px dashed transparent;border-radius:8px;transition:border-color .12s ease,background .12s ease;}
+.emf-block:hover{border-color:#b9c6d8;background:#fafcff;}
+.emf-block-tools{position:absolute;top:6px;right:8px;display:flex;align-items:center;gap:6px;opacity:0;transition:opacity .12s ease;z-index:2;}
+.emf-block:hover .emf-block-tools,.emf-block:focus-within .emf-block-tools{opacity:1;}
+.emf-ref-tag{font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:700;color:#5b6b7d;background:#eef2f7;border-radius:10px;padding:2px 8px;}
+.emf-empty{border:1px solid #e0c07a;background:#fdf3e3;color:#7a5209;padding:10px 12px;border-radius:7px;font-size:12px;margin:10px 0 12px;font-family:Arial,Helvetica,sans-serif;}
+@media (hover:none){ .emf-block-tools{opacity:1;position:static;justify-content:flex-end;margin-bottom:4px;} }
