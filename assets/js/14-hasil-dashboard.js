@@ -89,8 +89,17 @@ function hdVisibleCerobongOptions(){
   return q ? all.filter(c=>c.toLowerCase().includes(q)) : all;
 }
 function hdRenderChipBar(field, values){
-  const all = `<button type="button" class="chip-toggle all ${hdSel[field].size===0?'active':''}" data-action="hdChip" data-field="${field}" data-val="">Semua</button>`;
-  return all + values.map(v=>`<button type="button" class="chip-toggle ${hdSel[field].has(v)?'active':''}" data-action="hdChip" data-field="${field}" data-val="${escHtml(v)}">${escHtml(v)}</button>`).join("");
+  // Chip Site memakai titik warna site (sama dengan warna garis di chart) dan jumlah titik per site.
+  const titikPerSite = {};
+  if(field==="site") DB.hasilPemantauan.forEach(r=>{ (titikPerSite[r.site] = titikPerSite[r.site] || new Set()).add(r.cerobong); });
+  const total = field==="site" ? new Set(DB.hasilPemantauan.map(r=>r.cerobong)).size : null;
+  const all = `<button type="button" class="chip-toggle all ${hdSel[field].size===0?'active':''}" data-action="hdChip" data-field="${field}" data-val="" aria-pressed="${hdSel[field].size===0}">Semua${total!=null?` <span class="hd-chip-n">${total}</span>`:""}</button>`;
+  return all + values.map(v=>{
+    const on = hdSel[field].has(v);
+    const dot = field==="site" ? `<span class="hd-chip-dot" style="background:${HASIL_SITE_COLORS[v]||"#7f8fa0"}" aria-hidden="true"></span>` : "";
+    const n = field==="site" && titikPerSite[v] ? ` <span class="hd-chip-n">${titikPerSite[v].size}</span>` : "";
+    return `<button type="button" class="chip-toggle ${on?'active':''}" data-action="hdChip" data-field="${field}" data-val="${escHtml(v)}" aria-pressed="${on}">${dot}${escHtml(v)}${n}</button>`;
+  }).join("");
 }
 // Checklist gaya Excel (centang + kotak cari) menggantikan <select multiple> — ctrl/cmd+klik di
 // listbox native gampang bikin pilihan sebelumnya kehapus tanpa sadar. Dipanggil lagi tiap kali
@@ -134,25 +143,25 @@ function renderHdFilterBar(){
   const listScroll = document.getElementById("hdCerobongList")?.scrollTop || 0;
 
   bar.innerHTML = `
-    <div class="card">
+    <div class="card hd-filter-card">
       <div class="toolbar">
-        <div class="field"><label>Parameter</label><select id="hdFltParameter">
+        <div class="field hd-param-field"><label for="hdFltParameter">Parameter</label><select id="hdFltParameter">
           <optgroup label="Emisi, dievaluasi terhadap baku mutu">${emisiParams.map(p=>`<option value="${escHtml(p)}">${escHtml(p)}</option>`).join("")}</optgroup>
           <optgroup label="Parameter pendukung, bukan objek baku mutu">${pendukungParams.map(p=>`<option value="${escHtml(p)}">${escHtml(p)}</option>`).join("")}</optgroup>
         </select></div>
-        <div class="field"><label>Dari Periode</label><select id="hdFltPeriodeFrom">${periods.map(p=>`<option value="${p}">${p}</option>`).join("")}</select></div>
-        <div class="field"><label>Sampai Periode</label><select id="hdFltPeriodeTo">${periods.map(p=>`<option value="${p}">${p}</option>`).join("")}</select></div>
-        <div class="field"><label>Permen atau Regulasi</label><select id="hdFltPermen">
+        <div class="field"><label for="hdFltPeriodeFrom">Periode, dari</label><select id="hdFltPeriodeFrom">${periods.map(p=>`<option value="${p}">${p}</option>`).join("")}</select></div>
+        <div class="field"><label for="hdFltPeriodeTo">Sampai</label><select id="hdFltPeriodeTo">${periods.map(p=>`<option value="${p}">${p}</option>`).join("")}</select></div>
+        <div class="field"><label for="hdFltPermen">Regulasi</label><select id="hdFltPermen">
           <option value="">Semua Regulasi</option>
           <option value="PERMEN LH 13 2009">${HD_PERMEN_LABEL["PERMEN LH 13 2009"]}</option>
           <option value="PERMEN LH 11 2021">${HD_PERMEN_LABEL["PERMEN LH 11 2021"]}</option>
         </select></div>
-        <div class="field"><label>Kapasitas</label><select id="hdFltKapasitas">
+        <div class="field"><label for="hdFltKapasitas">Kapasitas</label><select id="hdFltKapasitas">
           <option value="">Semua Kapasitas</option>
           ${kapasitasList.map(k=>`<option value="${escHtml(k)}">${escHtml(k)}</option>`).join("")}
         </select></div>
         <div class="field" style="min-width:220px;">
-          <label>Titik atau Cerobong, centang untuk membandingkan</label>
+          <label>Titik atau Engine, centang untuk membandingkan</label>
           <div class="xsel" id="hdCerobongXsel">
             <button type="button" class="xsel-btn" data-action="hdToggleCerobongPanel"><span id="hdCerobongBtnLabel">Semua titik, tidak difilter</span> <span>&#9662;</span></button>
             <div class="xsel-panel" id="hdCerobongPanel" style="display:none;">
@@ -166,13 +175,15 @@ function renderHdFilterBar(){
           </div>
         </div>
       </div>
-      <div class="field" style="margin-bottom:6px;">
-        <label>Site</label>
-        <div class="chipbar">${hdRenderChipBar("site", sites)}</div>
-      </div>
-      <div class="field">
-        <label>Jenis Sumber Emisi, Kelompok Engine</label>
-        <div class="chipbar">${hdRenderChipBar("sumber", sumbers)}</div>
+      <div class="hd-chip-rows">
+        <div class="field">
+          <label>Site &middot; jumlah titik</label>
+          <div class="chipbar">${hdRenderChipBar("site", sites)}</div>
+        </div>
+        <div class="field">
+          <label>Jenis sumber emisi</label>
+          <div class="chipbar">${hdRenderChipBar("sumber", sumbers)}</div>
+        </div>
       </div>
     </div>`;
 
@@ -181,7 +192,9 @@ function renderHdFilterBar(){
   document.getElementById("hdFltKapasitas").value = curKapasitas;
   if(!document.getElementById("hdFltParameter").value){
     // default ke parameter emisi yang paling banyak punya baku mutu (NOx biasanya)
-    const withStd = emisiParams.find(p=> DB.hasilPemantauan.some(r=>r.parameter===p && r.standard!=null)) || params[0];
+    // (dulu .find() pertama secara alfabet, jadi yang terpilih CO yang datanya cuma segelintir)
+    const stdCount = p=>DB.hasilPemantauan.filter(r=>r.parameter===p && r.standard!=null).length;
+    const withStd = emisiParams.slice().sort((a,b)=>stdCount(b)-stdCount(a)).find(p=>stdCount(p)>0) || params[0];
     document.getElementById("hdFltParameter").value = withStd;
   }
   const fromSel = document.getElementById("hdFltPeriodeFrom"), toSel = document.getElementById("hdFltPeriodeTo");
@@ -246,48 +259,33 @@ function hdRenderEngineCounts(filteredAllParams){
   });
   const total = seen.size;
   const perSite = Object.entries(bySite).sort((a,b)=>b[1]-a[1]).map(([s,n])=>`<span class="hd-engine-count-badge">${escHtml(s)}: ${n}</span>`).join("");
-  document.getElementById("hdEngineCounts").innerHTML = `<span class="hd-engine-count-badge" style="background:var(--teal-100);border-color:var(--teal-500);color:#0b6b66;">Total ${total} titik/engine</span>${perSite}`;
+  document.getElementById("hdEngineCounts").innerHTML = `<span class="hd-engine-count-badge total">Total ${total} titik/engine</span>${perSite}`;
 }
 function renderHasilDashboard(){
   const {sites, periods} = renderHdFilterBar();
   const filtered = hasilDashboardFiltered();
   const filteredAllParams = hasilDashboardFilteredAllParams();
   const parameter = document.getElementById("hdFltParameter").value;
-  document.getElementById("hdTrendParamLabel").textContent = parameter ? "— "+parameter : "";
+  document.getElementById("hdTrendParamLabel").textContent = parameter ? "\u00B7 "+parameter : "";
   const fromPeriodeVal = document.getElementById("hdFltPeriodeFrom").value, toPeriodeVal = document.getElementById("hdFltPeriodeTo").value;
   const fromOrder = fromPeriodeVal ? hasilPeriodParts(fromPeriodeVal).order : -Infinity;
   const toOrder = toPeriodeVal ? hasilPeriodParts(toPeriodeVal).order : Infinity;
-
-  const measured = filtered.filter(r=>r.resultNumeric!=null);
-  const withStd = filtered.filter(r=>r.statusBakuMutu==="ok"||r.statusBakuMutu==="exceed");
-  const okCount = filtered.filter(r=>r.statusBakuMutu==="ok").length;
-  const exceedCount = filtered.filter(r=>r.statusBakuMutu==="exceed").length;
-  const compliance = withStd.length ? Math.round(okCount/withStd.length*1000)/10 : null;
   const periodsInScope = [...new Set(filtered.map(r=>r.periode))].sort((a,b)=>hasilPeriodParts(a).order-hasilPeriodParts(b).order);
   const periodsInScopeAll = [...new Set(filteredAllParams.map(r=>r.periode))].sort((a,b)=>hasilPeriodParts(a).order-hasilPeriodParts(b).order);
 
-  document.getElementById("hdStats").innerHTML = `
-    <div class="stat"><div class="num">${filtered.length}</div><div class="lbl">Total Data Terfilter</div></div>
-    <div class="stat"><div class="num">${measured.length}</div><div class="lbl">Data Terukur</div></div>
-    <div class="stat ${compliance==null?'':(compliance>=95?'good':compliance>=80?'warn':'bad')}"><div class="num">${compliance!=null?compliance+"%":"-"}</div><div class="lbl">Tingkat Kepatuhan Baku Mutu</div></div>
-    <div class="stat ${exceedCount>0?'bad':'good'}"><div class="num">${exceedCount}</div><div class="lbl">Melebihi Baku Mutu</div></div>
-  `;
-  document.getElementById("hdFilterSummary").textContent = `Menampilkan ${filtered.length} baris data (dari total ${DB.hasilPemantauan.length} baris) sesuai kombinasi filter aktif.`;
+  document.getElementById("hdFilterSummary").textContent = `Menampilkan ${filtered.length} baris data ${parameter} (dari total ${DB.hasilPemantauan.length} baris) sesuai kombinasi filter aktif.`;
   hdRenderEngineCounts(filteredAllParams);
 
-  document.getElementById("hdTrendChart").innerHTML = buildHasilTrendChart(filtered, parameter, periodsInScope, sites, hdSel.site, hdSel.cerobong);
-  document.getElementById("hdTrendLegend").innerHTML = buildHasilTrendLegend(filtered, hdSel.site, sites, hdSel.cerobong);
+  // Overview, Trend, Distribution, Watchlist, Heatmap, Running Hour, Scorecard (14b-hasil-dashboard-analytics.js)
+  const ctx = hdBuildContext(filtered, filteredAllParams, periodsInScope);
+  hdRenderAnalytics(ctx);
+
   const donut = buildHasilDonutChart(filtered);
   document.getElementById("hdDonutChart").innerHTML = donut.svg;
   document.getElementById("hdDonutLegend").innerHTML = donut.legend;
-  document.getElementById("hdRankChart").innerHTML = buildHasilRankChart(filtered, parameter, periodsInScope);
   document.getElementById("hdSiteChart").innerHTML = buildHasilSiteChart(filtered, parameter);
 
-  document.getElementById("hdCompareModeToggle").innerHTML = `
-    <div class="toolbar" style="margin:0;gap:6px;">
-      <button type="button" class="btn small ${hdCompareMode==='nominal'?'primary':'ghost'}" data-action="hdSetCompareMode" data-mode="nominal">Nilai Nominal</button>
-      <button type="button" class="btn small ${hdCompareMode==='percent'?'primary':'ghost'}" data-action="hdSetCompareMode" data-mode="percent">% Baku Mutu</button>
-    </div>`;
+  document.getElementById("hdCompareModeToggle").innerHTML = hdSeg("hdSetCompareMode", hdCompareMode, [["nominal","Nilai Nominal"],["percent","% Baku Mutu"]]).replace(/data-val=/g, "data-mode=");
   const compareResult = buildHasilCompareChart(filtered, parameter, periodsInScope, hdSel.cerobong, hdCompareMode);
   document.getElementById("hdCompareChart").innerHTML = compareResult.svg;
   document.getElementById("hdCompareUnitNote").innerHTML = compareResult.unitNote;
@@ -321,16 +319,18 @@ function renderHasilDashboard(){
   document.getElementById("hdCorrLegend").innerHTML = buildHasilCorrelationLegend(hdCorrParams, corrDataScope);
   document.getElementById("hdCorrStats").innerHTML = buildHasilCorrelationStats(corrDataScope, hdCorrParams, corrScopeLabel);
 
-  const detail = filtered.slice().sort((a,b)=>b.periodeOrder-a.periodeOrder).slice(0,300);
+  const detail = filtered.slice().sort((a,b)=>b.periodeOrder-a.periodeOrder || (b.pctOfStandard??-1)-(a.pctOfStandard??-1)).slice(0,300);
   document.getElementById("hdDetailTable").innerHTML = `
-    <thead><tr><th>Cerobong</th><th>Site</th><th>Periode</th><th>Parameter</th><th>Hasil</th><th>Baku Mutu</th><th>Status</th></tr></thead>
+    <thead><tr><th>Titik atau Cerobong</th><th>Site</th><th>Jenis Sumber</th><th>Periode</th><th>Sampling</th><th>Parameter</th><th>Hasil</th><th>Baku Mutu</th><th>% BM</th><th>RH Semester</th><th>Status</th></tr></thead>
     <tbody>${detail.map(r=>{
       const badge = HASIL_STATUS_BADGE[r.statusBakuMutu] || HASIL_STATUS_BADGE.not_evaluated;
-      return `<tr><td>${escHtml(r.cerobong)}</td><td>${r.site}</td><td>${r.periode}</td><td>${escHtml(r.parameter)}</td>
+      const rh = hdRhSemester(r.cerobong, r.periode);
+      return `<tr><td>${escHtml(r.cerobong)}</td><td>${escHtml(r.site)}</td><td class="muted">${escHtml(r.namaSumber||"")}</td><td>${r.periode}</td><td class="muted">${escHtml(r.dateOfSampling||"-")}</td><td>${escHtml(r.parameter)}</td>
         <td style="font-family:var(--font-mono);">${escHtml(r.resultRaw)} ${escHtml(r.unit)}</td><td class="muted">${r.standard!=null?r.standard:"-"}</td>
+        <td style="font-family:var(--font-mono);">${r.pctOfStandard!=null?hdPct(r.pctOfStandard):"-"}</td><td style="font-family:var(--font-mono);">${rh!=null?hdNum(rh,0):"-"}</td>
         <td><span class="badge ${badge[0]}">${badge[1]}</span></td></tr>`;
     }).join("")}</tbody>`;
-  document.getElementById("hdDetailCount").textContent = "Menampilkan "+detail.length+" dari "+filtered.length+" baris terfilter (urut periode terbaru).";
+  document.getElementById("hdDetailCount").textContent = "Menampilkan "+detail.length+" dari "+filtered.length+" baris terfilter (urut periode terbaru, lalu % baku mutu tertinggi).";
 }
 ["hdFltParameter","hdFltPeriodeFrom","hdFltPeriodeTo","hdFltPermen","hdFltKapasitas"].forEach(id=>{
   document.addEventListener("change", e=>{ if(e.target.id===id) renderHasilDashboard(); });
@@ -389,82 +389,6 @@ document.addEventListener("change", e=>{
 });
 document.addEventListener("input", e=>{ if(e.target.id==="simCerobongSearch") simRenderCerobongChecklist(); });
 
-function buildHasilTrendChart(filtered, parameter, periodsInScope, allSites, selectedSites, selectedCerobong){
-  if(!parameter || !periodsInScope.length) return "<div class='hint' style='padding:14px;'>Pilih parameter untuk melihat tren.</div>";
-  const dataByParam = filtered.filter(r=>r.parameter===parameter && r.resultNumeric!=null);
-  if(!dataByParam.length) return "<div class='hint' style='padding:14px;'>Tidak ada data terukur untuk parameter ini pada rentang/filter saat ini.</div>";
-  // Mode perbandingan: kalau ada titik/cerobong spesifik dipilih, plot per-cerobong (biar bisa
-  // membandingkan langsung antar engine) — kalau tidak, fallback ke agregat per-site seperti semula.
-  const compareMode = selectedCerobong && selectedCerobong.size>0;
-  let seriesKeys, keyFn, colorFn;
-  if(compareMode){
-    seriesKeys = [...selectedCerobong].filter(c=>dataByParam.some(r=>r.cerobong===c));
-    keyFn = r=>r.cerobong;
-    colorFn = (k,i)=>HD_PALETTE[i%HD_PALETTE.length];
-  }else{
-    seriesKeys = selectedSites && selectedSites.size ? [...selectedSites].filter(s=>allSites.includes(s)) : allSites.filter(s=>dataByParam.some(r=>r.site===s));
-    keyFn = r=>r.site;
-    colorFn = k=>HASIL_SITE_COLORS[k]||"#7f8fa0";
-  }
-  if(!seriesKeys.length) return "<div class='hint' style='padding:14px;'>Tidak ada data untuk kombinasi filter ini.</div>";
-
-  const stdVals = dataByParam.map(r=>r.standard).filter(v=>v!=null);
-  const standardRef = stdVals.length ? stdVals.sort((a,b)=>a-b)[Math.floor(stdVals.length/2)] : null;
-
-  const W=760,H=300,padL=54,padR=16,padT=18,padB=34;
-  const plotW=W-padL-padR, plotH=H-padT-padB;
-  const n = periodsInScope.length;
-
-  let maxY = Math.max(...dataByParam.map(r=>r.resultNumeric), standardRef||0) * 1.15;
-  if(!isFinite(maxY) || maxY<=0) maxY = 100;
-
-  function xFor(i){ return padL + (n<=1?plotW/2:(i/(n-1))*plotW); }
-  function yFor(v){ return padT + plotH - (v/maxY)*plotH; }
-
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11.5px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;">`;
-  for(let g=0; g<=4; g++){
-    const y = padT + plotH - (g/4)*plotH;
-    svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--gray-200)"/>`;
-    svg += `<text x="2" y="${y+4}" fill="var(--gray-500)">${Math.round(maxY*g/4)}</text>`;
-  }
-  periodsInScope.forEach((p,i)=>{ svg += `<text x="${xFor(i)}" y="${H-10}" text-anchor="middle" fill="var(--gray-500)">${p}</text>`; });
-
-  if(standardRef){
-    const ys = yFor(standardRef);
-    svg += `<line x1="${padL}" y1="${ys}" x2="${W-padR}" y2="${ys}" stroke="#e0554f" stroke-width="1.5" stroke-dasharray="6,4"/>`;
-    svg += `<text x="${W-padR-2}" y="${ys-5}" text-anchor="end" fill="#e0554f" font-weight="700">Baku Mutu ${standardRef}</text>`;
-  }
-
-  seriesKeys.forEach((key,i)=>{
-    const color = colorFn(key,i);
-    const pts = periodsInScope.map((p,pi)=>{
-      const vals = dataByParam.filter(r=>keyFn(r)===key && r.periode===p).map(r=>r.resultNumeric);
-      if(!vals.length) return null;
-      const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
-      return [xFor(pi), yFor(avg)];
-    });
-    const validPts = pts.map((pt,pi)=>pt?[pi,pt]:null).filter(Boolean);
-    if(validPts.length<1) return;
-    let path = "";
-    validPts.forEach(([pi,pt],k)=>{ path += (k===0?"M":"L")+pt[0]+","+pt[1]+" "; });
-    svg += `<path d="${path.trim()}" fill="none" stroke="${color}" stroke-width="2.5"/>`;
-    validPts.forEach(([pi,pt])=>{ svg += `<circle cx="${pt[0]}" cy="${pt[1]}" r="3.5" fill="${color}"/>`; });
-  });
-  svg += `</svg>`;
-  return svg;
-}
-function buildHasilTrendLegend(filtered, selectedSites, allSites, selectedCerobong){
-  const compareMode = selectedCerobong && selectedCerobong.size>0;
-  let items;
-  if(compareMode){
-    items = [...selectedCerobong].map((c,i)=>({label:c, color:HD_PALETTE[i%HD_PALETTE.length]}));
-  }else{
-    const sitesToPlot = selectedSites && selectedSites.size ? [...selectedSites] : allSites.filter(s=>filtered.some(r=>r.site===s));
-    items = sitesToPlot.map(s=>({label:s, color:HASIL_SITE_COLORS[s]||"#7f8fa0"}));
-  }
-  return items.map(it=>`<span class="item"><span class="sw" style="background:${it.color}"></span>${escHtml(it.label)}</span>`).join("")
-    + `<span class="item"><span class="sw" style="background:#e0554f;opacity:.5;"></span>Baku Mutu (referensi)</span>`;
-}
 function buildHasilDonutChart(filtered){
   const withStd = filtered.filter(r=>r.statusBakuMutu==="ok"||r.statusBakuMutu==="exceed");
   const ok = filtered.filter(r=>r.statusBakuMutu==="ok").length;
@@ -497,61 +421,48 @@ function buildHasilDonutChart(filtered){
       angle = endAngle;
     });
   }
-  const svg = `<svg viewBox="0 0 220 220" style="width:220px;height:220px;display:block;margin:0 auto;">
+  // Angka tengah = kepatuhan dari data yang PUNYA baku mutu (ok / (ok+exceed)) — sama persis dengan
+  // KPI Compliance Rate di atas. Dulu dibagi total semua status, jadi data "belum dievaluasi" ikut
+  // menurunkan persentase dan angkanya tidak cocok dengan KPI.
+  const comp = withStd.length ? Math.round(ok/withStd.length*1000)/10 : null;
+  const svg = `<svg viewBox="0 0 220 220" style="width:200px;height:200px;display:block;margin:0 auto;" role="img" aria-label="Compliance ${comp==null?"-":comp+"%"}">
     ${paths}
-    <text x="110" y="104" text-anchor="middle" font-size="24" font-weight="800" fill="var(--navy-900)">${Math.round(ok/total*100)}%</text>
-    <text x="110" y="124" text-anchor="middle" font-size="11" fill="var(--gray-500)">memenuhi</text>
+    <text x="110" y="106" text-anchor="middle" font-size="26" font-weight="800" fill="var(--heading)">${comp==null?"-":String(comp).replace(".",",")+"%"}</text>
+    <text x="110" y="126" text-anchor="middle" font-size="11" fill="var(--gray-500)">${comp==null?"tanpa baku mutu":"compliant"}</text>
   </svg>`;
   const labels = {ok:["Memenuhi Baku Mutu","#3fb27f"], exceed:["Melebihi Baku Mutu","#e0554f"], not_applicable:["Tidak Ada Baku Mutu","#c8d2db"], not_evaluated:["Belum Dievaluasi","#e8a33d"]};
-  const legend = segs.map(([key,val])=>`<span class="item"><span class="sw" style="background:${labels[key][1]}"></span>${labels[key][0]}: ${val}</span>`).join("");
+  const legend = segs.map(([key,val])=>`<span class="item"><span class="sw" style="background:${labels[key][1]}"></span>${labels[key][0]}: <b>${val}</b></span>`).join("")
+    + (ne||na ? `<span class="item muted">Data belum dievaluasi atau tanpa baku mutu tidak dihitung sebagai pembagi.</span>` : "");
   return {svg, legend};
-}
-function buildHasilRankChart(filtered, parameter, periodsInScope){
-  if(!parameter || !periodsInScope.length) return "<div class='hint' style='padding:14px;'>Pilih parameter untuk melihat ranking.</div>";
-  const lastPeriod = periodsInScope[periodsInScope.length-1];
-  const rows = filtered.filter(r=>r.parameter===parameter && r.periode===lastPeriod && r.pctOfStandard!=null)
-    .sort((a,b)=>b.pctOfStandard-a.pctOfStandard).slice(0,15);
-  if(!rows.length) return `<div class='hint' style='padding:14px;'>Tidak ada data dengan baku mutu untuk ${escHtml(parameter)} pada periode ${lastPeriod}.</div>`;
-  const W=560, rowH=26, padL=200, padR=50, topPad=10;
-  const H = topPad + rows.length*rowH + 10;
-  const maxPct = Math.max(100, ...rows.map(r=>r.pctOfStandard))*1.05;
-  const plotW = W-padL-padR;
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;">`;
-  rows.forEach((r,i)=>{
-    const y = topPad + i*rowH;
-    const barLen = (r.pctOfStandard/maxPct)*plotW;
-    const color = r.pctOfStandard>=100?"#e0554f":r.pctOfStandard>=80?"#e8a33d":"#3fb27f";
-    svg += `<text x="${padL-8}" y="${y+rowH/2+4}" text-anchor="end" fill="var(--gray-900)">${escHtml(r.cerobong)}</text>`;
-    svg += `<rect x="${padL}" y="${y+4}" width="${Math.max(2,barLen)}" height="${rowH-10}" rx="4" fill="${color}"/>`;
-    svg += `<text x="${padL+barLen+6}" y="${y+rowH/2+4}" fill="var(--gray-900)" font-weight="700">${r.pctOfStandard}%</text>`;
-  });
-  const x100 = padL + (100/maxPct)*plotW;
-  svg += `<line x1="${x100}" y1="0" x2="${x100}" y2="${H}" stroke="#e0554f" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>`;
-  svg += `</svg>`;
-  return svg;
 }
 function buildHasilSiteChart(filtered, parameter){
   if(!parameter) return "<div class='hint' style='padding:14px;'>Pilih parameter untuk melihat perbandingan site.</div>";
   const bySite = {};
-  filtered.filter(r=>r.parameter===parameter && r.pctOfStandard!=null).forEach(r=>{ (bySite[r.site]=bySite[r.site]||[]).push(r.pctOfStandard); });
+  const usePct = filtered.some(r=>r.parameter===parameter && r.pctOfStandard!=null);
+  filtered.filter(r=>r.parameter===parameter && (usePct ? r.pctOfStandard!=null : r.resultNumeric!=null)).forEach(r=>{ (bySite[r.site]=bySite[r.site]||[]).push(usePct ? r.pctOfStandard : r.resultNumeric); });
   const sites = Object.keys(bySite);
-  if(!sites.length) return "<div class='hint' style='padding:14px;'>Tidak ada data dengan baku mutu untuk parameter ini.</div>";
+  if(!sites.length) return "<div class='hint' style='padding:14px;'>Tidak ada data terukur untuk parameter ini.</div>";
+  const unit = (filtered.find(r=>r.parameter===parameter)||{}).unit || "";
   const avgs = sites.map(s=>({site:s, avg: bySite[s].reduce((a,b)=>a+b,0)/bySite[s].length, n: bySite[s].length})).sort((a,b)=>b.avg-a.avg);
   const W=520, barH=30, gap=12, padL=90, padR=60, topPad=10;
   const H = topPad + avgs.length*(barH+gap);
-  const maxPct = Math.max(100, ...avgs.map(a=>a.avg))*1.05;
+  const maxPct = Math.max(usePct?100:0, ...avgs.map(a=>a.avg))*1.05;
   const plotW = W-padL-padR;
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11.5px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;">`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;font-size:11.5px;">`;
+  if(usePct){
+    const x70 = padL+(70/maxPct)*plotW, x100 = padL+(100/maxPct)*plotW;
+    svg += `<line x1="${x70}" y1="0" x2="${x70}" y2="${H}" stroke="#c2620a" stroke-width="1" stroke-dasharray="3,3" opacity=".7"/><line x1="${x100}" y1="0" x2="${x100}" y2="${H}" stroke="#c62828" stroke-width="1.2" stroke-dasharray="5,3"/>`;
+  }
   avgs.forEach((a,i)=>{
     const y = topPad + i*(barH+gap);
     const barLen = (a.avg/maxPct)*plotW;
     const color = HASIL_SITE_COLORS[a.site] || "#7f8fa0";
     svg += `<text x="${padL-8}" y="${y+barH/2+4}" text-anchor="end" fill="var(--gray-900)" font-weight="700">${a.site}</text>`;
-    svg += `<rect x="${padL}" y="${y}" width="${Math.max(2,barLen)}" height="${barH}" rx="6" fill="${color}"/>`;
-    svg += `<text x="${padL+barLen+6}" y="${y+barH/2+4}" fill="var(--gray-900)">${Math.round(a.avg*10)/10}% <tspan fill="#9db3c9" font-size="10px">(n=${a.n})</tspan></text>`;
+    svg += `<rect x="${padL}" y="${y}" width="${Math.max(2,barLen)}" height="${barH}" rx="6" fill="${color}"><title>${a.site}: ${hdNum(a.avg,1)}${usePct?"% BM":" "+unit}</title></rect>`;
+    svg += `<text x="${padL+barLen+6}" y="${y+barH/2+4}" fill="var(--gray-900)" font-weight="700">${hdNum(a.avg,1)}${usePct?"%":""} <tspan fill="var(--gray-500)" font-size="10px" font-weight="400">(n=${a.n})</tspan></text>`;
   });
   svg += `</svg>`;
-  return svg;
+  return svg + `<div class="hint">${usePct?"Rata-rata % baku mutu. Garis jingga 70% (Early Warning), garis merah 100% (baku mutu).":`Rata-rata nilai dalam ${escHtml(unit)}, parameter pendukung tanpa baku mutu.`}</div>`;
 }
 // Bar chart pembanding langsung antar titik/engine yang dipilih user di filter Titik & Cerobong,
 // untuk parameter yang sedang aktif di dropdown Parameter. Kalau parameter itu punya baku mutu
@@ -661,6 +572,21 @@ function buildHasilEngineProfile(filteredAllParams, selectedCerobong, periodsInS
             <span class="badge ${badge[0]}" style="margin-top:3px;">${badge[1]}</span>
           </div>`;
         }).join("")}
+        ${(()=>{
+          // Running Hour per semester dari data bulanan engine (bukan parameter uji), supaya beban
+          // operasi bisa langsung dibandingkan dengan trend parameter emisi di kartu yang sama.
+          const rhSeries = periodsInScope.map(p=>hdRhSemester(c, p));
+          const rhVals = rhSeries.filter(v=>v!=null);
+          if(!rhVals.length) return "";
+          const lastIdx = rhSeries.map((v,i)=>v==null?-1:i).filter(i=>i>=0).pop();
+          return `<div class="hd-param-pill hd-param-rh">
+            <div class="lbl">Running Hour</div>
+            <div class="val">${hdNum(rhSeries[lastIdx],0)} <span class="muted" style="font-weight:400;font-size:10.5px;">jam</span></div>
+            ${rhVals.length>1 ? `<div style="margin:3px 0;">${hdSparkline(rhVals, "#3d78c9")}</div>` : ""}
+            <div class="meta">${rhVals.length} semester &middot; terakhir ${periodsInScope[lastIdx]}</div>
+            <span class="badge b-blue" style="margin-top:3px;">Operasi</span>
+          </div>`;
+        })()}
       </div>
     </div>`;
   });

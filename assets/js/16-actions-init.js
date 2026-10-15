@@ -122,10 +122,23 @@ const ACTIONS = {
     const p = document.getElementById("hdFltPermen"); if(p) p.value="";
     const k = document.getElementById("hdFltKapasitas"); if(k) k.value="";
     const s = document.getElementById("hdCerobongSearch"); if(s) s.value="";
-    hdCerobongPanelOpen = false; hdCorrParams = [];
+    hdCerobongPanelOpen = false; hdCorrParams = []; hdTrendMode = null;
     renderHasilDashboard();
   },
   hdToggleFilterCollapse:()=>{ hdFilterCollapsed = !hdFilterCollapsed; renderHasilDashboard(); },
+  // Redesign Dashboard Hasil Emisi (14b-hasil-dashboard-analytics.js): tab parameter, toggle mode
+  // chart, drill-down titik dari Watchlist/Heatmap/Scorecard/tabel Running Hour, ekspor & navigasi.
+  hdSetParam:(t)=>hdSetParam(t.dataset.val),
+  hdSetTrendMode:(t)=>{ hdTrendMode = t.dataset.val; renderHasilDashboard(); },
+  hdSetHeatMode:(t)=>{ hdHeatMode = t.dataset.val; renderHasilDashboard(); },
+  hdSetRhGran:(t)=>{ hdRhGran = t.dataset.val; renderHasilDashboard(); },
+  hdSetScoreSort:(t)=>{ hdScoreSort = t.dataset.val; renderHasilDashboard(); },
+  hdToggleScoreAll:()=>{ hdScoreShowAll = !hdScoreShowAll; renderHasilDashboard(); },
+  hdToggleRhAll:()=>{ hdRhShowAll = !hdRhShowAll; renderHasilDashboard(); },
+  hdPickCerobong:(t)=>hdTogglePickCerobong(t.dataset.val),
+  hdExportFiltered:()=>hdExportFiltered(),
+  hdPrintDashboard:()=>hdPrintDashboard(),
+  hdJump:(t)=>hdJumpTo(t.dataset.target),
   hdToggleCerobongPanel:()=>{
     hdCerobongPanelOpen = !hdCerobongPanelOpen;
     const p = document.getElementById("hdCerobongPanel");
