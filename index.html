@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202610151800">
+<link rel="stylesheet" href="assets/css/style.css?v=202610152000">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -823,60 +823,191 @@
 
     <!-- DASHBOARD HASIL PEMANTAUAN -->
     <div class="page" id="page-hasildashboard">
-      <div class="stickytop">
-      <div class="pagehead"><div><h2>Dashboard Hasil Emisi</h2><div class="desc">Analitik hasil uji emisi terhadap baku mutu, mencakup tren per periode, site, jenis sumber atau engine, regulasi, kapasitas, dan titik atau cerobong.</div></div>
-        <div class="toolbar">
-          <button class="btn small ghost" data-action="hdToggleFilterCollapse" id="hdFilterCollapseBtn">Ciutkan Filter</button>
-          <button class="btn small ghost" data-action="hdResetFilters">Reset Semua Filter</button>
+      <!-- Hero: judul, metadata kesegaran data, aksi ekspor, dan tab parameter emisi. Tab parameter
+           menyetel <select id="hdFltParameter"> yang sama di filter bar (sumber kebenaran tunggal). -->
+      <section class="hd-hero" aria-label="Dashboard Hasil Emisi">
+        <div class="hd-hero-top">
+          <div class="hd-hero-title">
+            <div class="hd-eyebrow">Hasil Pemantauan <span aria-hidden="true">/</span> Emisi Sumber Tidak Bergerak</div>
+            <h2>Dashboard Hasil Emisi</h2>
+            <p id="hdHeroDesc">Evaluasi hasil uji emisi terhadap baku mutu, lengkap dengan tren per site, per engine, per periode, dan Running Hour.</p>
+          </div>
+          <div class="hd-hero-actions">
+            <span class="hd-fresh" id="hdHeroMeta"></span>
+            <button type="button" class="hd-btn-outline" data-action="hdExportFiltered" title="Unduh baris data yang sesuai filter aktif">
+              <span class="ms-icon" data-icon="arrow-left-right" aria-hidden="true"></span>Export Excel
+            </button>
+            <button type="button" class="hd-btn-solid" data-action="hdPrintDashboard" title="Cetak atau simpan sebagai PDF">
+              <span class="ms-icon" data-icon="file-text" aria-hidden="true"></span>Print / PDF
+            </button>
+          </div>
         </div>
-      </div>
-      </div>
+        <div class="hd-tabs" id="hdParamTabs" role="tablist" aria-label="Parameter"></div>
+      </section>
+
+      <!-- Navigasi antar-section, menempel di atas saat halaman di-scroll -->
+      <nav class="hd-secnav" aria-label="Bagian dashboard">
+        <button type="button" data-action="hdJump" data-target="hdSecOverview">Overview</button>
+        <button type="button" data-action="hdJump" data-target="hdSecTrend">Trend &amp; Distribution</button>
+        <button type="button" data-action="hdJump" data-target="hdSecWatch">Watchlist &amp; Heatmap</button>
+        <button type="button" data-action="hdJump" data-target="hdSecRh">Running Hour</button>
+        <button type="button" data-action="hdJump" data-target="hdSecEngine">Engine Scorecard</button>
+        <button type="button" data-action="hdJump" data-target="hdSecCompare">Comparison &amp; Correlation</button>
+        <button type="button" data-action="hdJump" data-target="hdSecData">Detail Data</button>
+        <button type="button" data-action="hdJump" data-target="hdSecSim">Simulasi BM</button>
+        <button type="button" data-action="hdJump" data-target="hdSecH2s">Sulfur (H&#8322;S)</button>
+        <span class="spacer"></span>
+        <button class="btn small ghost" data-action="hdToggleFilterCollapse" id="hdFilterCollapseBtn">Ciutkan Filter</button>
+        <button class="btn small ghost hd-reset" data-action="hdResetFilters">Reset Filter</button>
+      </nav>
+
       <div id="hdFilterBarWrap">
         <div id="hdFilterBar"></div>
-        <div class="hint" id="hdFilterSummary" style="margin-top:-6px;"></div>
-        <div id="hdEngineCounts" style="margin:2px 0 14px;"></div>
+        <div class="hd-scope-row">
+          <span class="hint" id="hdFilterSummary" style="margin:0;"></span>
+          <div id="hdEngineCounts"></div>
+        </div>
       </div>
-      <div class="grid cols-4" id="hdStats" style="margin-bottom:16px;"></div>
-      <div class="grid cols-2">
-        <div class="card">
-          <div class="cardhead"><h3>Tren Hasil per Periode <span class="muted" id="hdTrendParamLabel" style="text-transform:none;font-weight:400;"></span></h3><button class="btn small ghost" data-action="hdZoomChart" data-target="hdTrendChartWrap" data-title="Tren Hasil per Periode">Perbesar</button></div>
-          <div class="hint" style="margin-top:-6px;margin-bottom:8px;">Menampilkan naik turunnya hasil pengukuran dari periode ke periode, per site atau per titik apabila terdapat titik yang dicentang pada filter Titik atau Cerobong, dibandingkan dengan garis putus putus baku mutu. Grafik ini berguna untuk mendeteksi tren yang memburuk sebelum melampaui ambang batas.</div>
+
+      <!-- ===================== OVERVIEW ===================== -->
+      <div id="hdSecOverview" class="hd-anchor"></div>
+      <div id="hdInsight"></div>
+      <div class="hd-kpis" id="hdStats"></div>
+
+      <!-- ===================== TREND & DISTRIBUTION ===================== -->
+      <div id="hdSecTrend" class="hd-anchor"></div>
+      <div class="hd-row">
+        <div class="card hd-col-wide">
+          <div class="cardhead">
+            <div>
+              <h3>Trend Hasil per Periode <span class="muted" id="hdTrendParamLabel" style="text-transform:none;font-weight:400;"></span></h3>
+              <div class="hint hd-sub" id="hdTrendSub">Naik turunnya hasil dari periode ke periode, dibandingkan garis baku mutu dan zona Early Warning (&ge;70% BM).</div>
+            </div>
+            <button class="btn small ghost" data-action="hdZoomChart" data-target="hdTrendChartWrap" data-title="Trend Hasil per Periode">Perbesar</button>
+          </div>
+          <div class="hd-seg" id="hdTrendModeToggle"></div>
           <div id="hdTrendChartWrap"><div id="hdTrendChart"></div><div class="legend" id="hdTrendLegend"></div></div>
         </div>
-        <div class="card">
-          <div class="cardhead"><h3>Kepatuhan Baku Mutu</h3><button class="btn small ghost" data-action="hdZoomChart" data-target="hdDonutChartWrap" data-title="Kepatuhan Baku Mutu">Perbesar</button></div>
-          <div class="hint" style="margin-top:-6px;margin-bottom:8px;">Menampilkan proporsi data pada filter yang aktif, yaitu perbandingan jumlah data yang memenuhi dengan yang melebihi baku mutu. Angka di tengah menunjukkan persentase data yang memenuhi baku mutu, dihitung hanya dari data yang memiliki nilai baku mutu. Data tanpa baku mutu atau yang belum dievaluasi tidak dihitung sebagai pembagi.</div>
+        <div class="card hd-col-side">
+          <div class="cardhead">
+            <div>
+              <h3>Distribution terhadap Baku Mutu</h3>
+              <div class="hint hd-sub" id="hdDistSub">Sebaran titik pada periode terakhir, dikelompokkan per 10% baku mutu.</div>
+            </div>
+            <button class="btn small ghost" data-action="hdZoomChart" data-target="hdDistChart" data-title="Distribution terhadap Baku Mutu">Perbesar</button>
+          </div>
+          <div id="hdDistChart"></div>
+        </div>
+      </div>
+
+      <!-- ===================== WATCHLIST & HEATMAP ===================== -->
+      <div id="hdSecWatch" class="hd-anchor"></div>
+      <div class="card">
+        <div class="cardhead">
+          <div>
+            <h3>Priority Watchlist</h3>
+            <div class="hint hd-sub" id="hdWatchSub">Titik dengan persentase baku mutu tertinggi pada periode terakhir, dibandingkan periode sebelumnya di titik yang sama. Klik nama titik untuk drill-down ke Engine Comparison dan Multi-Parameter Profile.</div>
+          </div>
+          <button class="btn small ghost" data-action="hdZoomChart" data-target="hdWatchlist" data-title="Priority Watchlist">Perbesar</button>
+        </div>
+        <div id="hdWatchlist"></div>
+      </div>
+      <div class="hd-row">
+        <div class="card hd-col-wide">
+          <div class="cardhead">
+            <div>
+              <h3>Heatmap <span class="muted" id="hdHeatTitle" style="text-transform:none;font-weight:400;"></span></h3>
+              <div class="hint hd-sub" id="hdHeatSub"></div>
+            </div>
+            <button class="btn small ghost" data-action="hdZoomChart" data-target="hdHeatmap" data-title="Heatmap">Perbesar</button>
+          </div>
+          <div class="hd-seg" id="hdHeatModeToggle"></div>
+          <div id="hdHeatmap"></div>
+        </div>
+        <div class="card hd-col-side">
+          <div class="cardhead"><div><h3>Compliance Breakdown</h3><div class="hint hd-sub">Proporsi status evaluasi pada filter aktif. Persentase dihitung hanya dari data yang memiliki baku mutu.</div></div><button class="btn small ghost" data-action="hdZoomChart" data-target="hdDonutChartWrap" data-title="Compliance Breakdown">Perbesar</button></div>
           <div id="hdDonutChartWrap"><div id="hdDonutChart"></div><div class="legend" id="hdDonutLegend"></div></div>
         </div>
       </div>
-      <div class="grid cols-2">
-        <div class="card">
-          <div class="cardhead"><h3>Peringkat Titik Terhadap Baku Mutu <span class="muted" style="text-transform:none;font-weight:400;">(periode data terakhir)</span></h3><button class="btn small ghost" data-action="hdZoomChart" data-target="hdRankChart" data-title="Peringkat Titik Terhadap Baku Mutu">Perbesar</button></div>
-          <div class="hint" style="margin-top:-6px;margin-bottom:8px;">Menampilkan lima belas titik dengan hasil tertinggi secara relatif terhadap baku mutunya pada periode terbaru. Semakin mendekati atau melewati garis merah pada seratus persen, semakin perlu mendapat perhatian meskipun belum tentu melebihi baku mutu.</div>
-          <div id="hdRankChart"></div>
-        </div>
-        <div class="card">
-          <div class="cardhead"><h3>Perbandingan Rata Rata per Site</h3><button class="btn small ghost" data-action="hdZoomChart" data-target="hdSiteChart" data-title="Perbandingan Rata Rata per Site">Perbesar</button></div>
-          <div class="hint" style="margin-top:-6px;margin-bottom:8px;">Menampilkan rata rata persentase terhadap baku mutu dari seluruh titik pada tiap site, untuk parameter yang dipilih. Grafik ini digunakan untuk melihat site mana yang secara umum lebih dekat dengan ambang baku mutu dibandingkan site lainnya.</div>
+      <div class="hd-row">
+        <div class="card hd-col-half">
+          <div class="cardhead"><div><h3>Rata-rata per Site</h3><div class="hint hd-sub" id="hdSiteSub">Rata-rata seluruh titik per site pada rentang periode aktif, untuk melihat site mana yang secara umum paling dekat ke ambang baku mutu.</div></div><button class="btn small ghost" data-action="hdZoomChart" data-target="hdSiteChart" data-title="Rata-rata per Site">Perbesar</button></div>
           <div id="hdSiteChart"></div>
         </div>
+        <div class="card hd-col-half">
+          <div class="cardhead"><div><h3>Profil per Jenis Sumber</h3><div class="hint hd-sub" id="hdSourceSub">Rentang hasil (min sampai maks) dan rata-rata per jenis sumber pada periode terakhir.</div></div><button class="btn small ghost" data-action="hdZoomChart" data-target="hdSourceProfile" data-title="Profil per Jenis Sumber">Perbesar</button></div>
+          <div id="hdSourceProfile"></div>
+        </div>
       </div>
-      <div class="grid cols-2">
-        <div class="card">
-          <div class="cardhead"><h3>Perbandingan Antar Titik atau Engine Terpilih <span class="muted" style="text-transform:none;font-weight:400;">, parameter: <span id="hdCompareParamLabel"></span></span></h3><button class="btn small ghost" data-action="hdZoomChart" data-target="hdCompareChartWrap" data-title="Perbandingan Antar Titik atau Engine Terpilih">Perbesar</button></div>
-          <div class="hint" style="margin-top:-6px;margin-bottom:8px;">Menampilkan perbandingan langsung antar titik atau engine yang dicentang pada filter Titik atau Cerobong, pada periode terakhir. Tampilan dapat dipilih antara Nilai Nominal, yaitu angka hasil pengukuran asli, atau Persentase Baku Mutu, yaitu seberapa dekat hasil tersebut dengan ambang batas.</div>
+
+      <!-- ===================== RUNNING HOUR ===================== -->
+      <div id="hdSecRh" class="hd-anchor"></div>
+      <div class="hd-section-title">
+        <h3>Running Hour &amp; Beban Operasi</h3>
+        <span class="hint" style="margin:0;">Sumber: Running Hour bulanan per engine (menu Running Hour Detail), mengikuti filter Site, Jenis Sumber, Titik, Regulasi, dan Kapasitas di atas.</span>
+      </div>
+      <div class="hd-row">
+        <div class="card hd-col-wide">
+          <div class="cardhead">
+            <div>
+              <h3>Running Hour Trend per Site</h3>
+              <div class="hint hd-sub" id="hdRhTrendSub">Total jam operasi seluruh engine pada cakupan filter, ditumpuk per site.</div>
+            </div>
+            <button class="btn small ghost" data-action="hdZoomChart" data-target="hdRhTrendWrap" data-title="Running Hour Trend per Site">Perbesar</button>
+          </div>
+          <div class="hd-seg" id="hdRhGranToggle"></div>
+          <div id="hdRhTrendWrap"><div id="hdRhTrend"></div><div class="legend" id="hdRhTrendLegend"></div></div>
+        </div>
+        <div class="card hd-col-side">
+          <div class="cardhead">
+            <div>
+              <h3>Running Hour vs Emisi</h3>
+              <div class="hint hd-sub" id="hdRhScatterSub">Setiap titik adalah satu engine pada satu periode: Running Hour semester itu terhadap hasil parameter terpilih.</div>
+            </div>
+            <button class="btn small ghost" data-action="hdZoomChart" data-target="hdRhScatter" data-title="Running Hour vs Emisi">Perbesar</button>
+          </div>
+          <div id="hdRhScatter"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardhead">
+          <div>
+            <h3>Engine Utilization</h3>
+            <div class="hint hd-sub" id="hdRhTableSub">Running Hour per engine pada semester terakhir di rentang filter, utilisasi terhadap jam kalender, dan hasil emisi terakhir.</div>
+          </div>
+        </div>
+        <div id="hdRhTable"></div>
+      </div>
+
+      <!-- ===================== ENGINE SCORECARD ===================== -->
+      <div id="hdSecEngine" class="hd-anchor"></div>
+      <div class="card">
+        <div class="cardhead">
+          <div>
+            <h3>Engine Trend Scorecard <span class="muted" id="hdScoreParamLabel" style="text-transform:none;font-weight:400;"></span></h3>
+            <div class="hint hd-sub">Trend tiap engine atau titik sepanjang rentang periode aktif. Garis merah putus-putus adalah baku mutu titik tersebut. Klik kartu untuk membandingkannya di grafik Trend dan Comparison.</div>
+          </div>
+        </div>
+        <div class="hd-seg" id="hdScoreSortToggle"></div>
+        <div id="hdScorecard"></div>
+      </div>
+
+      <!-- ===================== COMPARISON & CORRELATION ===================== -->
+      <div id="hdSecCompare" class="hd-anchor"></div>
+      <div class="hd-row">
+        <div class="card hd-col-half">
+          <div class="cardhead"><div><h3>Engine Comparison <span class="muted" style="text-transform:none;font-weight:400;">, parameter: <span id="hdCompareParamLabel"></span></span></h3><div class="hint hd-sub">Perbandingan langsung antar titik yang dicentang pada filter Titik atau Cerobong (atau diklik di Watchlist dan Scorecard), pada periode terakhir. Pilih Nilai Nominal atau % Baku Mutu.</div></div><button class="btn small ghost" data-action="hdZoomChart" data-target="hdCompareChartWrap" data-title="Engine Comparison">Perbesar</button></div>
           <div id="hdCompareModeToggle" style="margin-bottom:8px;"></div>
           <div id="hdCompareChartWrap"><div id="hdCompareChart"></div><div class="hint" id="hdCompareUnitNote" style="margin-top:6px;"></div></div>
         </div>
-        <div class="card">
-          <h3>Profil Multi Parameter Titik <span class="muted" id="hdProfileTitleLabel" style="text-transform:none;font-weight:400;"></span></h3>
-          <div class="hint" style="margin-top:0;margin-bottom:8px;">Menampilkan seluruh parameter yang tercatat untuk titik terpilih, termasuk parameter pendukung seperti O&#8322;, CO&#8322;, suhu gas, dan laju alir yang bukan merupakan objek baku mutu. Nilai terbaru ditampilkan lengkap dengan tren singkat sepanjang rentang periode yang dipilih.</div>
+        <div class="card hd-col-half">
+          <div class="cardhead"><div><h3>Multi-Parameter Profile <span class="muted" id="hdProfileTitleLabel" style="text-transform:none;font-weight:400;"></span></h3><div class="hint hd-sub">Seluruh parameter titik terpilih, termasuk parameter pendukung (O&#8322;, CO&#8322;, suhu gas, laju alir) dan Running Hour per semester. Nilai terbaru ditonjolkan, sparkline menunjukkan trend sepanjang rentang periode.</div></div></div>
           <div id="hdProfileChart"></div>
         </div>
       </div>
       <div class="card">
-        <div class="cardhead"><h3>Tren Multi Parameter (Korelasi) <span class="muted" style="text-transform:none;font-weight:400;">, centang dua sampai tiga parameter untuk melihat kecenderungan bersama, misalnya NOx dan Gas Temperatur</span></h3><button class="btn small ghost" data-action="hdZoomChart" data-target="hdCorrChartWrap" data-title="Tren Multi Parameter (Korelasi)">Perbesar</button></div>
-        <div class="hint" style="margin-top:-6px;">Perbandingan ini diperlukan karena parameter emisi jarang berdiri sendiri. Apabila NOx naik bersamaan dengan Gas Temperatur, hal tersebut menjadi petunjuk kuat bahwa penyebabnya adalah suhu pembakaran yang naik, bukan sekadar kebetulan. Menumpuk dua tren dalam satu grafik akan jauh lebih cepat dibandingkan membandingkan dua grafik terpisah secara bergantian.</div>
+        <div class="cardhead"><div><h3>Multi-Parameter Trend (Correlation) <span class="muted" style="text-transform:none;font-weight:400;">, centang dua sampai tiga parameter, misalnya NOx dan Gas Temperatur</span></h3></div><button class="btn small ghost" data-action="hdZoomChart" data-target="hdCorrChartWrap" data-title="Multi-Parameter Trend (Correlation)">Perbesar</button></div>
+        <div class="hint" style="margin-top:-6px;">Parameter emisi jarang berdiri sendiri. Apabila NOx naik bersamaan dengan Gas Temperatur, itu petunjuk kuat bahwa penyebabnya adalah suhu pembakaran yang naik, bukan kebetulan. Menumpuk dua tren dalam satu grafik jauh lebih cepat dibandingkan membandingkan dua grafik terpisah.</div>
         <div class="hint" id="hdCorrScopeNote" style="margin-top:4px;font-style:italic;"></div>
         <div class="field" style="margin:8px 0 4px;max-width:440px;">
           <label>Titik atau Engine Khusus untuk Korelasi, opsional dan independen dari filter di atas</label>
@@ -911,13 +1042,15 @@
           </div>
         </details>
       </div>
+      <div id="hdSecData" class="hd-anchor"></div>
       <div class="card">
-        <h3>Rincian Data Terfilter</h3>
+        <div class="cardhead"><div><h3>Detail Data Terfilter</h3><div class="hint hd-sub">Baris data sesuai filter aktif, urut periode terbaru. Running Hour diambil dari data bulanan engine untuk semester sampling.</div></div>
+          <button class="btn small" data-action="hdExportFiltered">Export Excel</button></div>
         <div class="tablewrap"><table id="hdDetailTable"></table></div>
         <div class="hint" id="hdDetailCount"></div>
       </div>
 
-      <div class="reg-divider">Simulasi Usulan Baku Mutu Baru, Terpisah dari Filter Dashboard di Atas</div>
+      <div class="reg-divider hd-anchor-divider" id="hdSecSim">Simulasi Usulan Baku Mutu Baru, Terpisah dari Filter Dashboard di Atas</div>
       <div class="card" style="border-top:4px solid var(--amber-500);">
         <h3>Simulasi Usulan Baku Mutu Baru <span class="muted" style="text-transform:none;font-weight:400;">, bersifat simulasi dan tidak mengubah baku mutu resmi</span></h3>
         <div class="hint" style="margin-top:-6px;">Bagian ini digunakan untuk menguji dampak apabila terdapat usulan revisi terhadap suatu angka baku mutu. Pilih parameter dan lingkup engine yang ingin diuji, tentukan rentang periode data yang ingin dijadikan acuan, kemudian masukkan angka usulan tersebut. Sistem akan menampilkan titik yang riwayat hasilnya pernah melebihi angka usulan tersebut, yang berarti berpotensi terdampak apabila usulan tersebut benar benar diberlakukan. Seluruh filter pada bagian ini bersifat independen terhadap filter dashboard di bagian atas, sehingga pengujian dapat dilakukan tanpa mengubah tampilan yang sedang dilihat.</div>
@@ -957,7 +1090,7 @@
         <div id="simResult"></div>
       </div>
 
-      <div class="reg-divider">Pemantauan Kandungan Sulfur (H2S) pada Fuel Gas Turbin &amp; Heater/Reboiler</div>
+      <div class="reg-divider hd-anchor-divider" id="hdSecH2s">Pemantauan Kandungan Sulfur (H2S) pada Fuel Gas Turbin &amp; Heater/Reboiler</div>
       <div class="card" style="border-top:4px solid #b3690a;">
         <h3>Rincian Kandungan Sulfur (H2S) per Titik, Site, dan Semester</h3>
         <div class="hint" style="margin-top:-6px;">Bagian ini berdiri sendiri, terpisah dari filter dashboard di bagian atas, dan selalu menampilkan seluruh riwayat H2S yang ada. Data ini adalah bukti pemantauan wajib sesuai Pasal 12 ayat (2) huruf b Permen LH 13/2009, dasar hukum lengkapnya dapat dilihat di <a href="#" data-action="goToPage" data-page="bakumutu">Baku Mutu &amp; Periode Pantau</a>. Nilai ditampilkan dalam notasi ilmiah dan notasi desimal sekaligus supaya mudah dibaca dalam bentuk apapun.</div>
@@ -1712,39 +1845,40 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202610151800"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202610151800"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202610152000"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202610152000"></script>
 
-<script src="assets/data/default-data.js?v=202610151800"></script>
-<script src="assets/data/brand-assets.js?v=202610151800"></script>
-<script src="assets/data/travel-routes.js?v=202610151800"></script>
-<script src="assets/js/00-icons.js?v=202610151800"></script>
-<script src="assets/js/01-state.js?v=202610151800"></script>
-<script src="assets/js/02-nav-util.js?v=202610151800"></script>
-<script src="assets/js/03-period-logic.js?v=202610151800"></script>
-<script src="assets/js/04-dashboard.js?v=202610151800"></script>
-<script src="assets/js/05-master-data.js?v=202610151800"></script>
-<script src="assets/js/06-plan-personil.js?v=202610151800"></script>
-<script src="assets/js/07-rules-planner.js?v=202610151800"></script>
-<script src="assets/js/08-gantt-print.js?v=202610151800"></script>
-<script src="assets/js/09-tracking-map.js?v=202610151800"></script>
-<script src="assets/js/10-running-hour.js?v=202610151800"></script>
-<script src="assets/js/11-berita-acara.js?v=202610151800"></script>
-<script src="assets/js/12-data-page.js?v=202610151800"></script>
-<script src="assets/js/13-hasil-db.js?v=202610151800"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202610151800"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202610151800"></script>
-<script src="assets/js/16-actions-init.js?v=202610151800"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202610151800"></script>
-<script src="assets/js/18-model-dispersi.js?v=202610151800"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202610151800"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202610151800"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202610151800"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202610151800"></script>
-<script src="assets/js/23-budget-proyeksi.js?v=202610151800"></script>
-<script src="assets/js/24-personil-ppu.js?v=202610151800"></script>
-<script src="assets/js/25-access-gate.js?v=202610151800"></script>
-<script src="assets/js/26-laboratorium.js?v=202610151800"></script>
-<script src="assets/js/27-laporan-emf.js?v=202610151800"></script>
+<script src="assets/data/default-data.js?v=202610152000"></script>
+<script src="assets/data/brand-assets.js?v=202610152000"></script>
+<script src="assets/data/travel-routes.js?v=202610152000"></script>
+<script src="assets/js/00-icons.js?v=202610152000"></script>
+<script src="assets/js/01-state.js?v=202610152000"></script>
+<script src="assets/js/02-nav-util.js?v=202610152000"></script>
+<script src="assets/js/03-period-logic.js?v=202610152000"></script>
+<script src="assets/js/04-dashboard.js?v=202610152000"></script>
+<script src="assets/js/05-master-data.js?v=202610152000"></script>
+<script src="assets/js/06-plan-personil.js?v=202610152000"></script>
+<script src="assets/js/07-rules-planner.js?v=202610152000"></script>
+<script src="assets/js/08-gantt-print.js?v=202610152000"></script>
+<script src="assets/js/09-tracking-map.js?v=202610152000"></script>
+<script src="assets/js/10-running-hour.js?v=202610152000"></script>
+<script src="assets/js/11-berita-acara.js?v=202610152000"></script>
+<script src="assets/js/12-data-page.js?v=202610152000"></script>
+<script src="assets/js/13-hasil-db.js?v=202610152000"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202610152000"></script>
+<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610152000"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202610152000"></script>
+<script src="assets/js/16-actions-init.js?v=202610152000"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202610152000"></script>
+<script src="assets/js/18-model-dispersi.js?v=202610152000"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202610152000"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202610152000"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202610152000"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202610152000"></script>
+<script src="assets/js/23-budget-proyeksi.js?v=202610152000"></script>
+<script src="assets/js/24-personil-ppu.js?v=202610152000"></script>
+<script src="assets/js/25-access-gate.js?v=202610152000"></script>
+<script src="assets/js/26-laboratorium.js?v=202610152000"></script>
+<script src="assets/js/27-laporan-emf.js?v=202610152000"></script>
 </body>
 </html>
