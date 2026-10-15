@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202610152000">
+<link rel="stylesheet" href="assets/css/style.css?v=202610152200">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -1050,65 +1050,104 @@
         <div class="hint" id="hdDetailCount"></div>
       </div>
 
-      <div class="reg-divider hd-anchor-divider" id="hdSecSim">Simulasi Usulan Baku Mutu Baru, Terpisah dari Filter Dashboard di Atas</div>
-      <div class="card" style="border-top:4px solid var(--amber-500);">
-        <h3>Simulasi Usulan Baku Mutu Baru <span class="muted" style="text-transform:none;font-weight:400;">, bersifat simulasi dan tidak mengubah baku mutu resmi</span></h3>
-        <div class="hint" style="margin-top:-6px;">Bagian ini digunakan untuk menguji dampak apabila terdapat usulan revisi terhadap suatu angka baku mutu. Pilih parameter dan lingkup engine yang ingin diuji, tentukan rentang periode data yang ingin dijadikan acuan, kemudian masukkan angka usulan tersebut. Sistem akan menampilkan titik yang riwayat hasilnya pernah melebihi angka usulan tersebut, yang berarti berpotensi terdampak apabila usulan tersebut benar benar diberlakukan. Seluruh filter pada bagian ini bersifat independen terhadap filter dashboard di bagian atas, sehingga pengujian dapat dilakukan tanpa mengubah tampilan yang sedang dilihat.</div>
-        <div class="toolbar" style="margin-top:10px;">
-          <div class="field"><label>Parameter Diuji</label><select id="simParam"></select></div>
-          <div class="field"><label>Lingkup Kapasitas</label><select id="simKapasitas"><option value="">Semua Kapasitas</option></select></div>
-          <div class="field"><label>Lingkup Bahan Bakar</label><select id="simBahanBakar"><option value="">Semua Bahan Bakar</option></select></div>
-          <div class="field"><label>Dari Periode</label><select id="simFrom"></select></div>
-          <div class="field"><label>Sampai Periode</label><select id="simTo"></select></div>
-        </div>
-        <div class="field" style="margin-bottom:10px;">
-          <label>Lingkup Jenis Sumber, dapat mencentang lebih dari satu</label>
-          <div class="chipbar" id="simSumberChips"></div>
-        </div>
-        <div class="field" style="margin-bottom:10px;">
-          <label>Lingkup Permen LH, dapat mencentang lebih dari satu</label>
-          <div class="chipbar" id="simPermenChips"></div>
-        </div>
-        <div class="field" style="margin-bottom:10px;max-width:440px;">
-          <label>Titik atau Cerobong, centang untuk mempersempit lingkup simulasi</label>
-          <div class="xsel" id="simCerobongXsel">
-            <button type="button" class="xsel-btn" data-action="simToggleCerobongPanel"><span id="simCerobongBtnLabel">Semua titik pada lingkup di atas</span> <span>&#9662;</span></button>
-            <div class="xsel-panel" id="simCerobongPanel" style="display:none;">
-              <input type="text" id="simCerobongSearch" placeholder="cari nama titik atau cerobong">
-              <div class="xsel-toolbar">
-                <button type="button" class="btn small ghost" data-action="simCerobongCheckAll">Centang Semua yang Tampil</button>
-                <button type="button" class="btn small ghost" data-action="simCerobongUncheckAll">Kosongkan</button>
-              </div>
-              <div class="xsel-list" id="simCerobongList"></div>
+      <!-- ===================== SIMULASI USULAN BAKU MUTU ===================== -->
+      <div class="hd-section-title hd-anchor-divider" id="hdSecSim">
+        <h3>What-if Simulator &middot; Usulan Baku Mutu</h3>
+        <span class="hd-tag">Independen dari filter dashboard</span>
+        <span class="hd-tag amber">Simulasi, tidak mengubah baku mutu resmi</span>
+      </div>
+      <div class="sim-shell">
+        <!-- Panel kontrol: 3 langkah. Semua kontrol memicu hitung ulang langsung (tanpa tombol). -->
+        <aside class="sim-panel" aria-label="Pengaturan simulasi">
+          <div class="sim-step">
+            <div class="sim-step-head"><span class="sim-step-n">1</span>Parameter &amp; periode acuan</div>
+            <div class="sim-param-tabs" id="simParamTabs" role="tablist" aria-label="Parameter diuji"></div>
+            <select id="simParam" class="sim-hidden-select" aria-label="Parameter diuji" tabindex="-1"></select>
+            <div class="sim-grid2">
+              <div class="field"><label for="simFrom">Dari periode</label><select id="simFrom"></select></div>
+              <div class="field"><label for="simTo">Sampai periode</label><select id="simTo"></select></div>
             </div>
           </div>
-        </div>
-        <div class="toolbar">
-          <div class="field"><label>Usulan Baku Mutu Baru</label><input type="number" id="simThreshold" placeholder="misalnya 250" style="width:130px;"></div>
-          <button class="btn primary" data-action="hdRunSimulation">Jalankan Simulasi</button>
-        </div>
-        <div id="simResult"></div>
+          <div class="sim-step sim-step-accent">
+            <div class="sim-step-head"><span class="sim-step-n">2</span>Usulan baku mutu baru</div>
+            <div class="sim-threshold">
+              <input type="number" id="simThreshold" min="0" step="any" inputmode="decimal" aria-label="Usulan baku mutu baru" placeholder="misalnya 250">
+              <span class="sim-unit" id="simUnit"></span>
+            </div>
+            <input type="range" id="simSlider" class="sim-slider" min="0" max="100" step="1" aria-label="Geser usulan baku mutu">
+            <div class="sim-ref" id="simRefNote"></div>
+            <div class="sim-presets" id="simPresets"></div>
+          </div>
+          <div class="sim-step">
+            <div class="sim-step-head"><span class="sim-step-n">3</span>Lingkup engine <span class="sim-step-opt">opsional</span></div>
+            <div class="sim-grid2">
+              <div class="field"><label for="simKapasitas">Kapasitas</label><select id="simKapasitas"><option value="">Semua kapasitas</option></select></div>
+              <div class="field"><label for="simBahanBakar">Bahan bakar</label><select id="simBahanBakar"><option value="">Semua bahan bakar</option></select></div>
+            </div>
+            <div class="field">
+              <label>Regulasi</label>
+              <div class="chipbar" id="simPermenChips"></div>
+            </div>
+            <div class="field">
+              <label>Jenis sumber</label>
+              <div class="chipbar" id="simSumberChips"></div>
+            </div>
+            <div class="field">
+              <label>Titik atau engine</label>
+              <div class="xsel" id="simCerobongXsel">
+                <button type="button" class="xsel-btn" data-action="simToggleCerobongPanel"><span id="simCerobongBtnLabel">Semua titik pada lingkup di atas</span> <span aria-hidden="true">&#9662;</span></button>
+                <div class="xsel-panel" id="simCerobongPanel" style="display:none;">
+                  <input type="text" id="simCerobongSearch" placeholder="cari nama titik atau cerobong">
+                  <div class="xsel-toolbar">
+                    <button type="button" class="btn small ghost" data-action="simCerobongCheckAll">Centang Semua yang Tampil</button>
+                    <button type="button" class="btn small ghost" data-action="simCerobongUncheckAll">Kosongkan</button>
+                  </div>
+                  <div class="xsel-list" id="simCerobongList"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+        <!-- Hasil -->
+        <section class="sim-result" id="simResult" aria-live="polite"></section>
       </div>
 
-      <div class="reg-divider hd-anchor-divider" id="hdSecH2s">Pemantauan Kandungan Sulfur (H2S) pada Fuel Gas Turbin &amp; Heater/Reboiler</div>
-      <div class="card" style="border-top:4px solid #b3690a;">
-        <h3>Rincian Kandungan Sulfur (H2S) per Titik, Site, dan Semester</h3>
-        <div class="hint" style="margin-top:-6px;">Bagian ini berdiri sendiri, terpisah dari filter dashboard di bagian atas, dan selalu menampilkan seluruh riwayat H2S yang ada. Data ini adalah bukti pemantauan wajib sesuai Pasal 12 ayat (2) huruf b Permen LH 13/2009, dasar hukum lengkapnya dapat dilihat di <a href="#" data-action="goToPage" data-page="bakumutu">Baku Mutu &amp; Periode Pantau</a>. Nilai ditampilkan dalam notasi ilmiah dan notasi desimal sekaligus supaya mudah dibaca dalam bentuk apapun.</div>
-        <div class="grid cols-2" style="margin-top:12px;">
-          <div class="card" style="margin-bottom:0;">
-            <div class="cardhead"><h3 style="font-size:12.5px;">Tren Nilai per Site, Skala Mengikuti Data Aktual</h3><button class="btn small ghost" data-action="hdZoomChart" data-target="h2sTrendWrap" data-title="Tren Kandungan H2S per Site">Perbesar</button></div>
-            <div class="hint" style="margin:0 0 8px;">Skala grafik ini TIDAK dipatok ke ambang batas 0,5% (kalau dipatok ke sana, semua garis akan terlihat rata di dasar grafik karena nilainya jauh lebih kecil). Skala di sini mengikuti rentang data aktual sendiri, supaya naik turunnya tetap terlihat jelas walau seluruhnya masih jauh di bawah ambang batas.</div>
+      <!-- ===================== SULFUR BAHAN BAKAR (H2S) ===================== -->
+      <div class="hd-section-title hd-anchor-divider" id="hdSecH2s">
+        <h3>Fuel Gas Sulfur Compliance &middot; H&#8322;S</h3>
+        <span class="hd-tag">Pasal 12 ayat (2) huruf b, Permen LH 13/2009</span>
+        <span class="hd-tag">Selalu seluruh riwayat, tidak ikut filter</span>
+      </div>
+      <div class="h2s-shell">
+        <div class="h2s-banner" id="h2sBanner"></div>
+        <div class="hd-kpis h2s-kpis" id="h2sSummary"></div>
+        <div class="hd-row">
+          <div class="card hd-col-wide">
+            <div class="cardhead">
+              <div><h3>Headroom terhadap Ambang 0,5%</h3><div class="hint hd-sub">Skala logaritmik: setiap garis bantu bernilai 10 kali garis sebelumnya. Setiap titik adalah satu hasil uji (setara sulfur), warna mengikuti site. Dengan skala ini, nilai yang sangat kecil tetap terlihat jujur posisinya terhadap ambang batas.</div></div>
+              <button class="btn small ghost" data-action="hdZoomChart" data-target="h2sLogStrip" data-title="Headroom Sulfur terhadap Ambang 0,5%">Perbesar</button>
+            </div>
+            <div id="h2sLogStrip"></div>
+          </div>
+          <div class="card hd-col-side">
+            <div class="cardhead">
+              <div><h3>Trend per Site</h3><div class="hint hd-sub">Dalam ppm (1% = 10.000 ppm). Skala mengikuti data aktual supaya naik turunnya terlihat; ambang 0,5% = 5.000 ppm berada jauh di atas grafik.</div></div>
+              <button class="btn small ghost" data-action="hdZoomChart" data-target="h2sTrendWrap" data-title="Trend Kandungan H2S per Site">Perbesar</button>
+            </div>
             <div id="h2sTrendWrap"></div>
           </div>
-          <div class="card" style="margin-bottom:0;">
-            <h3 style="font-size:12.5px;">Ringkasan Terhadap Ambang Batas</h3>
-            <div id="h2sSummary"></div>
+        </div>
+        <div class="card">
+          <div class="cardhead">
+            <div><h3>Matrix Site &times; Periode</h3><div class="hint hd-sub">Nilai H&#8322;S dalam ppm per titik fuel gas. Warna makin gelap = nilai makin tinggi relatif terhadap riwayat; semuanya tetap jauh di bawah ambang.</div></div>
           </div>
+          <div id="h2sMatrix"></div>
+          <details class="hd-details">
+            <summary>Tabel lengkap: notasi ilmiah, desimal, setara sulfur, dan % ambang</summary>
+            <div class="tablewrap" style="margin-top:10px;"><table id="h2sDetailTable" class="hd-table"></table></div>
+          </details>
         </div>
-        <div class="tablewrap" style="margin-top:12px;">
-          <table id="h2sDetailTable"></table>
-        </div>
-        <details class="card guide" style="margin-top:12px;">
+        <details class="card guide" style="margin-top:0;">
           <summary>Cara mengonversi H2S menjadi setara Kandungan Sulfur (S)</summary>
           <div class="guide-body">
             <div class="hint" style="margin-top:0;">Baku mutu pada Pasal 12 ayat (2) huruf b secara harfiah berbunyi "kandungan Sulfur dalam bahan bakar", sedangkan data yang tersedia berupa hasil uji H2S (Hidrogen Sulfida). Keduanya dapat dihubungkan lewat perhitungan kimia sederhana berikut.</div>
@@ -1117,7 +1156,7 @@
               Fraksi massa Sulfur (S) dalam H2S = 32,06 &divide; 34,08 = 0,9407 (94,07%)<br>
               Perkiraan Kandungan Sulfur (S) &asymp; Hasil Ukur H2S &times; 0,9407
             </div>
-            <div class="hint" style="margin-top:8px;">Perhitungan ini adalah pendekatan rekayasa (engineering approximation) untuk kebutuhan pemantauan tren dan skrining rutin, bukan pengganti metode uji kandungan Sulfur bahan bakar bersertifikat (mis. ASTM D1072 atau setara). Pendekatan ini valid karena pada fuel gas yang sudah melalui proses sweetening, H2S adalah senyawa pembawa sulfur yang dominan, sehingga hasil ukur H2S dapat dipakai sebagai proksi kandungan sulfur total. Karena faktor konversinya mendekati 1 (0,9407), hasil setelah dikonversi tidak akan berbeda jauh dari angka H2S mentahnya, dan kolom "Setara Kandungan Sulfur (S)" pada tabel di atas menunjukkan bahwa kesimpulannya tetap sama, yaitu jauh di bawah ambang batas 0,5% berat pada seluruh titik dan periode yang tercatat.</div>
+            <div class="hint" style="margin-top:8px;">Perhitungan ini adalah pendekatan rekayasa (engineering approximation) untuk kebutuhan pemantauan tren dan skrining rutin, bukan pengganti metode uji kandungan Sulfur bahan bakar bersertifikat (mis. ASTM D1072 atau setara). Pendekatan ini valid karena pada fuel gas yang sudah melalui proses sweetening, H2S adalah senyawa pembawa sulfur yang dominan, sehingga hasil ukur H2S dapat dipakai sebagai proksi kandungan sulfur total. Karena faktor konversinya mendekati 1 (0,9407), hasil setelah dikonversi tidak akan berbeda jauh dari angka H2S mentahnya, dan kolom "Setara Kandungan Sulfur (S)" pada tabel lengkap menunjukkan bahwa kesimpulannya tetap sama, yaitu jauh di bawah ambang batas 0,5% berat pada seluruh titik dan periode yang tercatat.</div>
           </div>
         </details>
       </div>
@@ -1845,40 +1884,40 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202610152000"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202610152000"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202610152200"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202610152200"></script>
 
-<script src="assets/data/default-data.js?v=202610152000"></script>
-<script src="assets/data/brand-assets.js?v=202610152000"></script>
-<script src="assets/data/travel-routes.js?v=202610152000"></script>
-<script src="assets/js/00-icons.js?v=202610152000"></script>
-<script src="assets/js/01-state.js?v=202610152000"></script>
-<script src="assets/js/02-nav-util.js?v=202610152000"></script>
-<script src="assets/js/03-period-logic.js?v=202610152000"></script>
-<script src="assets/js/04-dashboard.js?v=202610152000"></script>
-<script src="assets/js/05-master-data.js?v=202610152000"></script>
-<script src="assets/js/06-plan-personil.js?v=202610152000"></script>
-<script src="assets/js/07-rules-planner.js?v=202610152000"></script>
-<script src="assets/js/08-gantt-print.js?v=202610152000"></script>
-<script src="assets/js/09-tracking-map.js?v=202610152000"></script>
-<script src="assets/js/10-running-hour.js?v=202610152000"></script>
-<script src="assets/js/11-berita-acara.js?v=202610152000"></script>
-<script src="assets/js/12-data-page.js?v=202610152000"></script>
-<script src="assets/js/13-hasil-db.js?v=202610152000"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202610152000"></script>
-<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610152000"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202610152000"></script>
-<script src="assets/js/16-actions-init.js?v=202610152000"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202610152000"></script>
-<script src="assets/js/18-model-dispersi.js?v=202610152000"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202610152000"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202610152000"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202610152000"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202610152000"></script>
-<script src="assets/js/23-budget-proyeksi.js?v=202610152000"></script>
-<script src="assets/js/24-personil-ppu.js?v=202610152000"></script>
-<script src="assets/js/25-access-gate.js?v=202610152000"></script>
-<script src="assets/js/26-laboratorium.js?v=202610152000"></script>
-<script src="assets/js/27-laporan-emf.js?v=202610152000"></script>
+<script src="assets/data/default-data.js?v=202610152200"></script>
+<script src="assets/data/brand-assets.js?v=202610152200"></script>
+<script src="assets/data/travel-routes.js?v=202610152200"></script>
+<script src="assets/js/00-icons.js?v=202610152200"></script>
+<script src="assets/js/01-state.js?v=202610152200"></script>
+<script src="assets/js/02-nav-util.js?v=202610152200"></script>
+<script src="assets/js/03-period-logic.js?v=202610152200"></script>
+<script src="assets/js/04-dashboard.js?v=202610152200"></script>
+<script src="assets/js/05-master-data.js?v=202610152200"></script>
+<script src="assets/js/06-plan-personil.js?v=202610152200"></script>
+<script src="assets/js/07-rules-planner.js?v=202610152200"></script>
+<script src="assets/js/08-gantt-print.js?v=202610152200"></script>
+<script src="assets/js/09-tracking-map.js?v=202610152200"></script>
+<script src="assets/js/10-running-hour.js?v=202610152200"></script>
+<script src="assets/js/11-berita-acara.js?v=202610152200"></script>
+<script src="assets/js/12-data-page.js?v=202610152200"></script>
+<script src="assets/js/13-hasil-db.js?v=202610152200"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202610152200"></script>
+<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610152200"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202610152200"></script>
+<script src="assets/js/16-actions-init.js?v=202610152200"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202610152200"></script>
+<script src="assets/js/18-model-dispersi.js?v=202610152200"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202610152200"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202610152200"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202610152200"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202610152200"></script>
+<script src="assets/js/23-budget-proyeksi.js?v=202610152200"></script>
+<script src="assets/js/24-personil-ppu.js?v=202610152200"></script>
+<script src="assets/js/25-access-gate.js?v=202610152200"></script>
+<script src="assets/js/26-laboratorium.js?v=202610152200"></script>
+<script src="assets/js/27-laporan-emf.js?v=202610152200"></script>
 </body>
 </html>
