@@ -12,6 +12,14 @@ let simTrendMode = "auto"; // "auto", "engine", "site", atau "avg", lihat simRes
 let simShowAll = false;
 let simRunTimer = null;
 const SIM_PROPOSAL_COLOR = "#d97706";
+// Filter TAMPILAN hasil simulasi (bukan lingkup perhitungan): titik mana yang muncul di grafik
+// Trend, Nilai Tertinggi, Impact Table, Rekap per Site, dan ekspor. KPI & Sensitivity Curve tetap
+// dihitung dari seluruh lingkup supaya angka dampaknya tidak ikut berubah karena filter tampilan.
+let simShowFilter = "all";      // "all" | "ever" | "now" | "manual"
+let simSiteShow = new Set();    // kosong = semua site
+let simManual = new Set();      // titik pilihan manual
+let simDriverScope = "scope";   // Driver Analysis: "scope" (seluruh lingkup) | "shown" (titik yang ditampilkan)
+let simLast = null;             // hasil hitung terakhir, dipakai ekspor Excel
 function simScheduleRun(){ clearTimeout(simRunTimer); simRunTimer = setTimeout(hdRunSimulation, 120); }
 
 function simAvailableCerobong(){
@@ -145,6 +153,7 @@ const SIM_TREND_ENGINE_LIMIT = 10;
 function simResolveTrendMode(engineCount, siteCount){
   if(simTrendMode!=="auto") return simTrendMode;
   if(simSel.cerobong.size>0) return "engine";
+  if(simShowFilter!=="all" && engineCount<=20) return "engine";
   if(engineCount<=SIM_TREND_ENGINE_LIMIT) return "engine";
   return "site";
 }
@@ -271,6 +280,8 @@ function simSpark(values, threshold){
 function hdRunSimulation(){
   const out = document.getElementById("simResult");
   if(!out) return;
+  const wide = document.getElementById("simResultWide");
+  if(wide) wide.innerHTML = "";
   const parameter = document.getElementById("simParam").value;
   const from = document.getElementById("simFrom").value, to = document.getElementById("simTo").value;
   const inp = document.getElementById("simThreshold");
@@ -350,24 +361,33 @@ function hdRunSimulation(){
     ? `Tidak ada satu pun dari ${engines.length} titik yang pernah melebihi ${hdNum(threshold)} ${escHtml(unit)} pada ${from} sampai ${to}. Dengan data saat ini, usulan ini masih bisa diperketat sampai sekitar ${hdNum(maxSorted[0])} ${escHtml(unit)} tanpa berdampak.`
     : `${impacted.length} dari ${engines.length} titik (${hdNum(pctImp,0)}%) pernah melebihi usulan${nowExceed.length?`, dan <b>${nowExceed.length} titik masih melebihi pada data terbarunya</b>`:", namun semua data terbarunya sudah di bawah usulan"}. ${worst?`Paling berat: <b>${escHtml(worst.cerobong)}</b> (${escHtml(worst.site)}), perlu turun ${hdNum((worst.currentlyExceeds?worst.latest.resultNumeric:worst.maxVal)-threshold)} ${escHtml(unit)} (${hdNum(((worst.currentlyExceeds?worst.latest.resultNumeric:worst.maxVal)-threshold)/(worst.currentlyExceeds?worst.latest.resultNumeric:worst.maxVal)*100,0)}%).`:""} Usulan &ge; ${hdNum(maxSorted[0])} tidak berdampak ke titik mana pun${p10<maxSorted[0]?`; usulan sekitar ${hdNum(p10)} hanya berdampak ke &plusmn;10% titik`:""}.`;
 
-  const tableRows = simShowAll ? engines : engines.slice(0, Math.max(impacted.length, 12));
-  const table = `<div class="tablewrap hd-table-wrap"><table class="hd-table">
+  // ---- Filter tampilan ----
+  const sitesAll = [...new Set(engines.map(e=>e.site))].sort();
+  [...simSiteShow].forEach(x=>{ if(!sitesAll.includes(x)) simSiteShow.delete(x); });
+  [...simManual].forEach(c=>{ if(!engines.some(e=>e.cerobong===c)) simManual.delete(c); });
+  const shown = simDisplayEngines(engines);
+  const shownSet = new Set(shown.map(e=>e.cerobong));
+  const scopeShown = scope.filter(r=>shownSet.has(r.cerobong));
+  const shownMode = simResolveTrendMode(shown.length, new Set(scopeShown.map(r=>r.site)).size);
+  simLast = {parameter, unit, threshold, std, from, to, engines, shown, scope};
+
+  const tableRows = simShowAll ? shown : shown.slice(0, Math.max(shown.filter(e=>e.exceedCount).length, 12));
+  const table = !shown.length ? hdEmpty("Tidak ada titik yang cocok dengan filter tampilan.") : `<div class="tablewrap hd-table-wrap"><table class="hd-table">
     <thead><tr><th>Titik atau engine</th><th class="num">Terbaru</th><th class="num">Maks tercatat</th><th>Trend vs usulan</th><th>Data &gt; usulan</th><th class="num">Reduksi diperlukan</th><th>Status</th></tr></thead>
     <tbody>${tableRows.map(e=>{
       const need = e.currentlyExceeds ? (e.latest.resultNumeric-threshold)/e.latest.resultNumeric*100 : null;
       const share = e.exceedCount/e.records.length*100;
-      const status = e.currentlyExceeds ? `<span class="badge b-red">Masih melebihi</span>` : e.exceedCount ? `<span class="badge hd-b-warn">Pernah melebihi</span>` : `<span class="badge b-green">Selalu di bawah</span>`;
       return `<tr>
         <td><div class="hd-cell-main"><span class="hd-site"><i style="background:${hdSiteColor(e.site)}"></i>${escHtml(e.cerobong)}</span><span class="hd-cell-sub">${escHtml(e.site)} &middot; ${escHtml(e.namaSumber||"")}</span></div></td>
         <td class="num ${e.currentlyExceeds?"sim-bad":""}">${hdNum(e.latest.resultNumeric)} <span class="muted">${e.latest.periode}</span></td>
         <td class="num">${hdNum(e.maxVal)}</td>
         <td>${simSpark(e.series, threshold)}</td>
         <td><div class="hd-bullet"><div class="track"><i style="width:${share.toFixed(1)}%;background:${e.exceedCount?SIM_PROPOSAL_COLOR:"#2f9e67"}"></i></div><span class="v">${e.exceedCount}/${e.records.length}</span></div></td>
-        <td class="num">${need==null?"-":`<span class="hd-delta up">−${hdNum(need,0)}%</span>`}</td>
-        <td>${status}</td>
+        <td class="num">${need==null?"-":`<span class="hd-delta up">\u2212${hdNum(need,0)}%</span>`}</td>
+        <td>${simStatusBadge(e)}</td>
       </tr>`;
     }).join("")}</tbody></table></div>
-    ${engines.length>tableRows.length || simShowAll ? `<button type="button" class="btn small ghost" data-action="simToggleAll" style="margin-top:8px;">${simShowAll?"Tampilkan ringkas":`Tampilkan semua ${engines.length} titik`}</button>` : ""}`;
+    ${shown.length>tableRows.length || simShowAll ? `<button type="button" class="btn small ghost" data-action="simToggleAll" style="margin-top:8px;">${simShowAll?"Tampilkan ringkas":`Tampilkan semua ${shown.length} titik`}</button>` : ""}`;
 
   out.innerHTML = `
     <div class="sim-verdict ${verdictTone}">
@@ -377,27 +397,251 @@ function hdRunSimulation(){
     </div>
     <div class="hd-kpis sim-kpis">${kpis}</div>
     <div class="card sim-card">
-      <div class="cardhead"><div><h3>Sensitivity Curve</h3><div class="hint hd-sub">Persentase titik terdampak untuk setiap kandidat angka baku mutu. Garis vertikal hitam adalah usulan saat ini; geser slider untuk melihat titik di mana dampaknya mulai melonjak.</div></div>
+      <div class="cardhead"><div><h3>Sensitivity Curve</h3><div class="hint hd-sub">Persentase titik terdampak untuk setiap kandidat angka baku mutu (seluruh lingkup). Garis vertikal hitam adalah usulan saat ini; geser slider untuk melihat di angka berapa dampaknya mulai melonjak.</div></div>
         <button class="btn small ghost" data-action="hdZoomChart" data-target="simSensWrap" data-title="Sensitivity Curve Usulan Baku Mutu">Perbesar</button></div>
       <div id="simSensWrap">${buildSimSensitivity(engines, threshold, std, unit)}</div>
-    </div>
+    </div>`;
+  (wide || out).insertAdjacentHTML("beforeend", `
+    ${buildSimShowFilter(engines, shown, sitesAll)}
     <div class="hd-row">
       <div class="card hd-col-wide">
-        <div class="cardhead"><div><h3>Trend vs Usulan</h3><div class="hint hd-sub">${simTrendMode==="auto"?`Mode otomatis: <b>${resolvedMode==="engine"?"per titik":resolvedMode==="site"?"per site":"rata-rata gabungan"}</b> (${engines.length} titik pada lingkup).`:"Mode dipilih manual."} Area jingga muda berada di atas usulan.</div></div>
+        <div class="cardhead"><div><h3>Trend vs Usulan</h3><div class="hint hd-sub">${simTrendMode==="auto"?`Mode otomatis: <b>${shownMode==="engine"?"per titik":shownMode==="site"?"per site":"rata-rata gabungan"}</b> (${shown.length} titik ditampilkan).`:"Mode dipilih manual."} Area jingga muda berada di atas usulan.</div></div>
           <button class="btn small ghost" data-action="hdZoomChart" data-target="simTrendWrap" data-title="Trend Nilai terhadap Usulan Baku Mutu">Perbesar</button></div>
         <div class="hd-seg">${hdSeg("simSetTrendMode", simTrendMode, [["auto","Otomatis"],["engine","Per Titik"],["site","Per Site"],["avg","Rata-rata"]]).replace(/data-val=/g,"data-mode=")}</div>
-        <div id="simTrendWrap">${buildSimTrendChart(scope, periodsInScope, threshold, unit, resolvedMode, std)}</div>
+        <div id="simTrendWrap">${scopeShown.length ? buildSimTrendChart(scopeShown, hdSortPeriods(scopeShown.map(r=>r.periode)), threshold, unit, shownMode, std) : hdEmpty("Tidak ada titik yang cocok dengan filter tampilan.")}</div>
       </div>
       <div class="card hd-col-side">
-        <div class="cardhead"><div><h3>Nilai Tertinggi per Titik</h3><div class="hint hd-sub">Nilai maksimum tiap titik pada rentang periode, dibandingkan usulan.</div></div>
+        <div class="cardhead"><div><h3>Nilai Tertinggi per Titik</h3><div class="hint hd-sub">Nilai maksimum tiap titik yang ditampilkan, dibandingkan usulan.</div></div>
           <button class="btn small ghost" data-action="hdZoomChart" data-target="simEngineWrap" data-title="Nilai Tertinggi per Titik terhadap Usulan">Perbesar</button></div>
-        <div id="simEngineWrap">${buildSimEngineChart(engines, threshold, unit, std)}</div>
+        <div id="simEngineWrap">${shown.length ? buildSimEngineChart(shown, threshold, unit, std) : hdEmpty("Tidak ada titik.")}</div>
       </div>
     </div>
     <div class="card sim-card">
-      <div class="cardhead"><div><h3>Impact Table</h3><div class="hint hd-sub">Titik terdampak di urutan teratas. Reduksi diperlukan = penurunan dari data terbaru agar berada di bawah usulan.</div></div></div>
-      ${table}
-    </div>`;
+      <div class="cardhead"><div><h3>Rekap per Site</h3><div class="hint hd-sub">Jumlah titik yang pernah dan masih melebihi usulan ${hdNum(threshold)} ${escHtml(unit)} di tiap site, sesuai filter tampilan. Siap disalin ke laporan atau diekspor ke Excel.</div></div>
+        <div class="sim-head-actions"><button class="btn small" data-action="simExportXlsx">Export Excel</button><button class="btn small ghost" data-action="hdZoomChart" data-target="simSiteWrap" data-title="Rekap per Site terhadap Usulan Baku Mutu">Perbesar</button></div></div>
+      <div id="simSiteWrap">${buildSimSiteSummary(shown, threshold, unit)}</div>
+    </div>
+    <div class="card sim-card">
+      <div class="cardhead"><div><h3>Impact Table</h3><div class="hint hd-sub">Detail titik yang ditampilkan; titik terdampak di urutan teratas. Reduksi diperlukan = penurunan dari data terbaru agar berada di bawah usulan.</div></div>
+        <button class="btn small ghost" data-action="hdZoomChart" data-target="simImpactWrap" data-title="Impact Table Usulan Baku Mutu">Perbesar</button></div>
+      <div id="simImpactWrap">${table}</div>
+    </div>
+    <div class="card sim-card">
+      <div class="cardhead"><div><h3>Driver Analysis &middot; apa yang berkaitan dengan tingginya ${escHtml(parameter)}?</h3><div class="hint hd-sub">Korelasi ${escHtml(parameter)} dengan Running Hour dan parameter pendukung yang diukur pada titik dan periode yang sama.</div></div>
+        <button class="btn small ghost" data-action="hdZoomChart" data-target="simDriverWrap" data-title="Driver Analysis">Perbesar</button></div>
+      <div class="hd-seg">${hdSeg("simSetDriverScope", simDriverScope, [["scope",`Seluruh lingkup (${engines.length} titik)`],["shown",`Titik yang ditampilkan (${shown.length})`]])}</div>
+      <div id="simDriverWrap">${buildSimDriverAnalysis(simDriverScope==="shown" ? scopeShown : scope, threshold, parameter, unit, from, to)}</div>
+    </div>`);
+}
+function simStatusBadge(e){
+  return e.currentlyExceeds ? `<span class="badge b-red">Masih melebihi</span>` : e.exceedCount ? `<span class="badge hd-b-warn">Pernah melebihi</span>` : `<span class="badge b-green">Selalu di bawah</span>`;
+}
+function simDisplayEngines(engines){
+  return engines.filter(e=>{
+    if(simSiteShow.size && !simSiteShow.has(e.site)) return false;
+    if(simShowFilter==="ever") return e.exceedCount>0;
+    if(simShowFilter==="now") return e.currentlyExceeds;
+    if(simShowFilter==="manual") return simManual.has(e.cerobong);
+    return true;
+  });
+}
+function buildSimShowFilter(engines, shown, sites){
+  const inSite = e=>!simSiteShow.size || simSiteShow.has(e.site);
+  const nAll = engines.filter(inSite).length, nEver = engines.filter(e=>inSite(e) && e.exceedCount>0).length, nNow = engines.filter(e=>inSite(e) && e.currentlyExceeds).length;
+  const siteChips = `<button type="button" class="chip-toggle all ${simSiteShow.size?"":"active"}" data-action="simSiteToggle" data-val="" aria-pressed="${!simSiteShow.size}">Semua site</button>` + sites.map(s=>{
+    const es = engines.filter(e=>e.site===s), imp = es.filter(e=>e.exceedCount>0).length, on = simSiteShow.has(s);
+    return `<button type="button" class="chip-toggle ${on?"active":""}" data-action="simSiteToggle" data-val="${escHtml(s)}" aria-pressed="${on}"><span class="hd-chip-dot" style="background:${hdSiteColor(s)}"></span>${escHtml(s)} <span class="hd-chip-n">${imp}/${es.length}</span></button>`;
+  }).join("");
+  const manual = simShowFilter!=="manual" ? "" : `<div class="field"><label>Pilih titik (titik bertanda jingga pernah melebihi usulan)</label>
+    <div class="sim-manual-tools"><button type="button" class="btn small" data-action="simManualPreset" data-val="ever">Pilih semua yang terdampak</button><button type="button" class="btn small ghost" data-action="simManualPreset" data-val="clear">Kosongkan</button></div>
+    <div class="chipbar sim-manual">${engines.filter(inSite).map(e=>{ const on = simManual.has(e.cerobong); return `<button type="button" class="chip-toggle ${on?"active":""} ${e.exceedCount?"sim-imp":""}" data-action="simManualToggle" data-val="${escHtml(e.cerobong)}" aria-pressed="${on}">${escHtml(e.cerobong)}</button>`; }).join("")}</div></div>`;
+  return `<div class="card sim-card sim-filter">
+    <div class="sim-filter-row">
+      <div class="field"><label>Tampilkan di grafik &amp; tabel</label>${hdSeg("simShowFilter", simShowFilter, [["all",`Semua titik (${nAll})`],["ever",`Pernah melebihi (${nEver})`],["now",`Masih melebihi (${nNow})`],["manual","Pilih manual"]])}</div>
+      <div class="field"><label>Site &middot; terdampak / total</label><div class="chipbar">${siteChips}</div></div>
+    </div>
+    ${manual}
+    <div class="hint" style="margin:0;">Menampilkan <b>${shown.length}</b> dari ${engines.length} titik. Filter ini hanya mengatur tampilan; KPI dan Sensitivity Curve tetap menghitung seluruh lingkup.</div>
+  </div>`;
+}
+function simSiteRows(shown, threshold){
+  const sites = [...new Set(shown.map(e=>e.site))].sort();
+  return sites.map(s=>{
+    const es = shown.filter(e=>e.site===s);
+    const ever = es.filter(e=>e.exceedCount>0), now = es.filter(e=>e.currentlyExceeds);
+    const top = es.slice().sort((a,b)=>b.maxVal-a.maxVal)[0];
+    return {site:s, total:es.length, ever, now, rowsOver: es.reduce((a,e)=>a+e.exceedCount,0), rows: es.reduce((a,e)=>a+e.records.length,0), top};
+  });
+}
+function buildSimSiteSummary(shown, threshold, unit){
+  if(!shown.length) return hdEmpty("Tidak ada titik yang cocok dengan filter tampilan.");
+  const rows = simSiteRows(shown, threshold);
+  const tot = {total:0, ever:0, now:0, rowsOver:0, rows:0};
+  rows.forEach(r=>{ tot.total+=r.total; tot.ever+=r.ever.length; tot.now+=r.now.length; tot.rowsOver+=r.rowsOver; tot.rows+=r.rows; });
+  return `<div class="tablewrap hd-table-wrap"><table class="hd-table sim-site-table">
+    <thead><tr><th>Site</th><th class="num">Titik</th><th class="num">Pernah melebihi</th><th class="num">Masih melebihi</th><th>% titik terdampak</th><th class="num">Data &gt; usulan</th><th>Titik yang pernah melebihi (nilai maks)</th></tr></thead>
+    <tbody>${rows.map(r=>{ const pct = r.ever.length/r.total*100; return `<tr>
+      <td><span class="hd-site"><i style="background:${hdSiteColor(r.site)}"></i>${escHtml(r.site)}</span></td>
+      <td class="num">${r.total}</td>
+      <td class="num ${r.ever.length?"strong":""}">${r.ever.length}</td>
+      <td class="num ${r.now.length?"sim-bad":""}">${r.now.length}</td>
+      <td><div class="hd-bullet"><div class="track"><i style="width:${pct.toFixed(1)}%;background:${r.ever.length?SIM_PROPOSAL_COLOR:"#2f9e67"}"></i></div><span class="v">${hdNum(pct,0)}%</span></div></td>
+      <td class="num">${r.rowsOver}/${r.rows}</td>
+      <td class="sim-names">${r.ever.length ? r.ever.sort((a,b)=>b.maxVal-a.maxVal).map(e=>`<span class="sim-name ${e.currentlyExceeds?"now":""}">${escHtml(e.cerobong)} <b>${hdNum(e.maxVal)}</b></span>`).join("") : `<span class="muted">Tertinggi ${escHtml(r.top.cerobong)} ${hdNum(r.top.maxVal)}</span>`}</td>
+    </tr>`; }).join("")}</tbody>
+    <tfoot><tr><td><b>Total</b></td><td class="num"><b>${tot.total}</b></td><td class="num"><b>${tot.ever}</b></td><td class="num"><b>${tot.now}</b></td><td><b>${hdNum(tot.ever/tot.total*100,0)}%</b></td><td class="num"><b>${tot.rowsOver}/${tot.rows}</b></td><td class="muted">Satuan ${escHtml(unit)}. Nama berwarna merah: data terbarunya masih melebihi.</td></tr></tfoot>
+  </table></div>`;
+}
+
+/* ---------------- Driver Analysis ---------------- */
+// Pasangkan nilai parameter uji dengan Running Hour semester dan setiap parameter pendukung pada
+// titik & periode yang sama. Selain korelasi gabungan (pooled), dihitung juga korelasi DALAM engine
+// (nilai dikurangi rata-rata engine masing-masing) — korelasi gabungan bisa menyesatkan karena
+// perbedaan antar engine (mis. turbin besar vs kecil), sedangkan korelasi dalam engine menjawab
+// "saat engine yang sama naik, apakah NOx-nya ikut naik?".
+const SIM_DRIVER_HINT = {
+  "Gas Temperatur":"suhu gas buang tinggi menandakan suhu pembakaran tinggi, pemicu utama thermal NOx",
+  "O₂":"kelebihan udara; di sekitar titik optimum menambah NOx, kelebihan besar justru mendinginkan nyala",
+  "CO₂":"proksi jumlah bahan bakar yang terbakar atau beban pembakaran",
+  "Laju Alir (v)":"throughput gas buang; laju tinggi bisa mengencerkan konsentrasi",
+  "Running Hour":"beban operasi dan keausan; jam jalan tinggi bisa menurunkan efisiensi pembakaran"
+};
+// Batas fisik: nilai di luar rentang ini hampir pasti salah input (mis. CO2 384%), jadi dikeluarkan
+// dari korelasi supaya tidak mendominasi hasil, lalu dilaporkan sebagai temuan kualitas data.
+const SIM_PLAUSIBLE = {"O₂":[0,21], "CO₂":[0,25]};
+function simDriverPairs(rows, driver){
+  if(driver==="Running Hour") return rows.map(r=>{ const x = hdRhSemester(r.cerobong, r.periode); return x!=null && x>0 ? {x, y:r.resultNumeric, r} : null; }).filter(Boolean);
+  const m = new Map();
+  DB.hasilPemantauan.forEach(d=>{ if(d.parameter===driver && d.resultNumeric!=null) m.set(d.cerobong+"||"+d.periode, d); });
+  return rows.map(r=>{ const d = m.get(r.cerobong+"||"+r.periode); return d ? {x:d.resultNumeric, y:r.resultNumeric, r, unit:d.unit} : null; }).filter(Boolean);
+}
+function simSplitPlausible(pairs, driver){
+  const lim = SIM_PLAUSIBLE[driver];
+  if(!lim) return {ok:pairs, bad:[]};
+  return {ok:pairs.filter(p=>p.x>=lim[0] && p.x<=lim[1]), bad:pairs.filter(p=>p.x<lim[0] || p.x>lim[1])};
+}
+function simWithinR(pairs){
+  const by = {};
+  pairs.forEach(p=>{ (by[p.r.cerobong] = by[p.r.cerobong] || []).push(p); });
+  const dm = [];
+  Object.values(by).forEach(g=>{
+    if(g.length<2) return;
+    const mx = hdMean(g.map(p=>p.x)), my = hdMean(g.map(p=>p.y));
+    g.forEach(p=>dm.push({x:p.x-mx, y:p.y-my}));
+  });
+  return {r: hdPearsonR(dm), n: dm.length};
+}
+function simDriverStats(rows, threshold){
+  const drivers = ["Running Hour"].concat(hdAllValues("parameter").filter(p=>!hdIsEmisiParam(p)));
+  return drivers.map(d=>{
+    const split = simSplitPlausible(simDriverPairs(rows, d), d);
+    const pairs = split.ok;
+    const r = hdPearsonR(pairs), w = simWithinR(pairs);
+    const over = pairs.filter(p=>p.y>threshold).map(p=>p.x), under = pairs.filter(p=>p.y<=threshold).map(p=>p.x);
+    const mO = hdMean(over), mU = hdMean(under);
+    return {driver:d, unit: d==="Running Hour" ? "jam/semester" : (pairs[0]?.unit||""), pairs, n:pairs.length, r, rw:w.r, nw:w.n,
+      mOver:mO, mUnder:mU, diff: mO!=null && mU ? (mO-mU)/Math.abs(mU)*100 : null, nOver:over.length, bad:split.bad};
+  });
+}
+function simRBar(r, n){
+  if(r==null) return `<span class="muted">n &lt; 3</span>`;
+  if(n!=null && n<8) return `<span class="muted sim-rsmall" title="Pasangan data kurang dari 8, korelasi belum bermakna">${r>=0?"+":"\u2212"}${Math.abs(r).toFixed(2)} &middot; n kecil</span>`;
+  const w = Math.min(50, Math.abs(r)*50);
+  const color = Math.abs(r)>=0.4 ? (r>0?"#c2620a":"#2563a8") : "var(--gray-500)";
+  return `<div class="sim-rbar" role="img" aria-label="r ${r.toFixed(2)}"><span class="axis"></span><i style="${r>=0?`left:50%`:`right:50%`};width:${w.toFixed(1)}%;background:${color}"></i></div><b class="sim-rval" style="color:${color}">${r>=0?"+":"\u2212"}${Math.abs(r).toFixed(2)}</b>`;
+}
+function simMiniScatter(st, threshold, unitY){
+  const ps = st.pairs; if(ps.length<3) return "";
+  const W=260, H=170, pl=36, pr=8, pt=10, pb=28;
+  const xs = ps.map(p=>p.x), ys = ps.map(p=>p.y);
+  const sx = xs.slice().sort((a,b)=>a-b), q = f=>sx[Math.min(sx.length-1, Math.max(0, Math.round(f*(sx.length-1))))];
+  const x0 = ps.length>=20 ? q(0.02) : sx[0], x1 = ps.length>=20 ? q(0.98) : sx[sx.length-1];
+  const yMax = hdNiceMax(Math.max(...ys, threshold)*1.05);
+  const X = v=>pl+(x1>x0?(Math.max(x0,Math.min(x1,v))-x0)/(x1-x0):0.5)*(W-pl-pr), Y = v=>pt+(H-pt-pb)-v/yMax*(H-pt-pb);
+  let s = `<svg class="hd-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Sebaran ${escHtml(st.driver)} terhadap hasil">`;
+  [0,0.5,1].forEach(g=>{ s += `<line x1="${pl}" y1="${Y(yMax*g).toFixed(1)}" x2="${W-pr}" y2="${Y(yMax*g).toFixed(1)}" class="hd-grid"/><text x="${pl-4}" y="${(Y(yMax*g)+3).toFixed(1)}" text-anchor="end" class="hd-axis tiny">${hdNum(yMax*g)}</text>`; });
+  s += `<line x1="${pl}" y1="${Y(threshold).toFixed(1)}" x2="${W-pr}" y2="${Y(threshold).toFixed(1)}" stroke="${SIM_PROPOSAL_COLOR}" stroke-width="1.5"/>`;
+  ps.forEach(p=>{ const o = p.y>threshold, clip = p.x<x0 || p.x>x1; s += `<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="${o?3.6:2.8}" fill="${clip?"none":o?SIM_PROPOSAL_COLOR:"#5a7fb0"}" stroke="${clip?(o?SIM_PROPOSAL_COLOR:"#5a7fb0"):"none"}" fill-opacity="${o?.95:.45}"><title>${escHtml(p.r.cerobong)} ${p.r.periode}: ${escHtml(st.driver)} ${hdNum(p.x)}, ${hdNum(p.y)} ${escHtml(unitY)}</title></circle>`; });
+  if(st.r!=null){
+    const mx = hdMean(xs), my = hdMean(ys); let num=0, den=0; ps.forEach(p=>{ num+=(p.x-mx)*(p.y-my); den+=(p.x-mx)**2; });
+    const b = den?num/den:0, a = my-b*mx, cl = v=>Math.max(0,Math.min(yMax,v));
+    s += `<line x1="${X(x0).toFixed(1)}" y1="${Y(cl(a+b*x0)).toFixed(1)}" x2="${X(x1).toFixed(1)}" y2="${Y(cl(a+b*x1)).toFixed(1)}" stroke="var(--heading-2)" stroke-width="1.4" stroke-dasharray="4 3"/>`;
+  }
+  s += `<text x="${pl}" y="${H-8}" class="hd-axis tiny">${hdNum(x0)}</text><text x="${W-pr}" y="${H-8}" text-anchor="end" class="hd-axis tiny">${hdNum(x1)}</text><text x="${(pl+W-pr)/2}" y="${H-8}" text-anchor="middle" class="hd-axis tiny">${escHtml(st.driver)} (${escHtml(st.unit)})</text></svg>`;
+  return s;
+}
+function buildSimDriverAnalysis(rows, threshold, parameter, unit, from, to){
+  if(rows.length<3) return hdEmpty("Data belum cukup untuk analisis korelasi (minimal 3 pasangan).");
+  const stats = simDriverStats(rows, threshold).filter(s=>s.n>0);
+  if(!stats.length) return hdEmpty("Tidak ada parameter pendukung atau Running Hour yang tercatat pada titik dan periode yang sama.");
+  const ranked = stats.filter(s=>s.rw!=null && s.nw>=8).sort((a,b)=>Math.abs(b.rw)-Math.abs(a.rw));
+  const pooledRanked = stats.filter(s=>s.r!=null && s.n>=8).sort((a,b)=>Math.abs(b.r)-Math.abs(a.r));
+  const fmtR = r=>r==null?"-":(r>=0?"+":"\u2212")+Math.abs(r).toFixed(2);
+  const lines = [];
+  const top = ranked[0];
+  if(top && Math.abs(top.rw)>=0.2){
+    const {strength} = hdCorrInterpretation(top.rw);
+    lines.push(`Di dalam engine yang sama, <b>${escHtml(top.driver)}</b> paling berkaitan dengan ${escHtml(parameter)} (r ${fmtR(top.rw)}, korelasi ${strength}, ${top.rw>0?"searah":"berlawanan arah"}). ${SIM_DRIVER_HINT[top.driver]?`Secara teknis: ${SIM_DRIVER_HINT[top.driver]}.`:""}`);
+  }else{
+    lines.push(`Tidak ada parameter pendukung yang berkorelasi berarti dengan ${escHtml(parameter)} di dalam engine yang sama (semua |r| &lt; 0,2). Naik turunnya ${escHtml(parameter)} kemungkinan dipengaruhi faktor di luar data ini, misalnya kondisi burner, kualitas bahan bakar, atau beban saat sampling.`);
+  }
+  const pTop = pooledRanked[0];
+  if(pTop && Math.abs(pTop.r)>=0.4 && (!top || pTop.driver!==top.driver || Math.abs(top.rw)<0.2)){
+    lines.push(`Antar engine, ${escHtml(pTop.driver)} berkorelasi ${hdCorrInterpretation(pTop.r).strength} (r ${fmtR(pTop.r)}), yang lebih mencerminkan perbedaan jenis atau ukuran engine daripada perubahan kondisi operasi.`);
+  }
+  const big = stats.filter(s=>s.diff!=null && s.nOver>=3 && s.n>=8 && Math.abs(s.diff)>=10).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff))[0];
+  if(big) lines.push(`Saat ${escHtml(parameter)} melebihi usulan, rata-rata <b>${escHtml(big.driver)}</b> ${big.diff>0?"lebih tinggi":"lebih rendah"} ${hdNum(Math.abs(big.diff),0)}% (${hdNum(big.mOver)} vs ${hdNum(big.mUnder)} ${escHtml(big.unit)}). Perbedaan rata-rata ini bisa juga berasal dari jenis engine yang berbeda, jadi bandingkan dengan kolom r dalam engine.`);
+  const bad = stats.filter(s=>s.bad.length);
+  if(bad.length) lines.push(`<span class="sim-dq">Kualitas data:</span> ${bad.map(s=>`${s.bad.length} nilai ${escHtml(s.driver)} di luar batas fisik (${s.bad.slice(0,3).map(p=>`${escHtml(p.r.cerobong)} ${p.r.periode}: ${hdNum(p.x)}${escHtml(s.unit)}`).join("; ")}${s.bad.length>3?", ...":""})`).join("; ")} tidak diikutkan dalam korelasi. Periksa kembali data di Database Hasil Emisi.`);
+  if(rows.length && stats.every(s=>s.n<8)) lines.push(`Jumlah pasangan data masih di bawah 8, jadi angka korelasi di bawah belum bisa dijadikan kesimpulan. Pilih "Seluruh lingkup" atau perluas rentang periode.`);
+  const tableRows = stats.map(s=>{
+    const strong = s.rw!=null && s.nw>=8 && Math.abs(s.rw)>=0.4;
+    return `<tr class="${strong?"sim-strong":""}">
+      <td><b>${escHtml(s.driver)}</b><div class="hd-cell-sub">${escHtml(s.unit)}</div></td>
+      <td class="num">${s.n}</td>
+      <td>${simRBar(s.r, s.n)}</td>
+      <td>${simRBar(s.rw, s.nw)}</td>
+      <td class="num">${s.r==null||s.n<8?"-":(s.r*s.r).toFixed(2)}</td>
+      <td class="num">${hdNum(s.mOver)} <span class="muted">(n=${s.nOver})</span></td>
+      <td class="num">${hdNum(s.mUnder)}</td>
+      <td class="num">${s.diff==null?"-":`<span class="hd-delta ${s.diff>0.05?"up-neutral":s.diff<-0.05?"down-neutral":""}">${hdSignedPct(s.diff)}</span>`}</td>
+    </tr>`;
+  }).join("");
+  return `<div class="sim-driver-summary">${lines.map(l=>`<p>${l}</p>`).join("")}</div>
+    <div class="tablewrap hd-table-wrap"><table class="hd-table sim-driver-table">
+      <thead><tr><th>Faktor</th><th class="num">n pasangan</th><th>r antar semua data</th><th>r dalam engine</th><th class="num">R&sup2;</th><th class="num">Rata-rata saat &gt; usulan</th><th class="num">Saat &le; usulan</th><th class="num">Selisih</th></tr></thead>
+      <tbody>${tableRows}</tbody></table></div>
+    <div class="sim-scatter-grid">${stats.map(s=>{ const sc = simMiniScatter(s, threshold, unit); return sc ? `<figure><figcaption><b>${escHtml(s.driver)}</b> <span class="muted">r ${fmtR(s.r)} &middot; dalam engine ${fmtR(s.rw)}</span></figcaption>${sc}</figure>` : ""; }).join("")}</div>
+    <div class="hint">Titik jingga: data ${escHtml(parameter)} di atas usulan ${hdNum(threshold)} ${escHtml(unit)}. Garis putus-putus: garis regresi. Lingkaran kosong di tepi grafik: nilai ekstrem di luar persentil 2 sampai 98 (tetap dihitung). Korelasi menunjukkan keterkaitan, bukan bukti sebab-akibat; |r| &ge; 0,7 kuat, 0,4 sampai 0,7 sedang, 0,2 sampai 0,4 lemah. Periode ${escHtml(from)} sampai ${escHtml(to)}.</div>`;
+}
+
+/* ---------------- Ekspor Excel simulasi ---------------- */
+function simExportXlsx(){
+  if(!simLast){ toast("Jalankan simulasi terlebih dahulu.", "warn"); return; }
+  const {parameter, unit, threshold, from, to, shown, scope} = simLast;
+  const siteRows = simSiteRows(shown, threshold).map(r=>({
+    "Site": r.site, "Jumlah titik": r.total, "Pernah melebihi usulan": r.ever.length, "Masih melebihi (data terbaru)": r.now.length,
+    "% titik terdampak": Math.round(r.ever.length/r.total*1000)/10, "Data melebihi usulan": r.rowsOver, "Total data": r.rows,
+    "Titik yang pernah melebihi": r.ever.map(e=>`${e.cerobong} (${e.maxVal})`).join("; "), "Nilai tertinggi": r.top.maxVal, "Titik nilai tertinggi": r.top.cerobong
+  }));
+  const engRows = shown.map(e=>({
+    "Titik": e.cerobong, "Site": e.site, "Jenis sumber": e.namaSumber, "Nilai terbaru": e.latest.resultNumeric, "Periode terbaru": e.latest.periode,
+    "Nilai maks": e.maxVal, "Data melebihi usulan": e.exceedCount, "Total data": e.records.length,
+    "Status": e.currentlyExceeds ? "Masih melebihi" : e.exceedCount ? "Pernah melebihi" : "Selalu di bawah",
+    "Reduksi diperlukan (%)": e.currentlyExceeds ? Math.round((e.latest.resultNumeric-threshold)/e.latest.resultNumeric*1000)/10 : ""
+  }));
+  const shownSet = new Set(shown.map(e=>e.cerobong));
+  const overRows = scope.filter(r=>shownSet.has(r.cerobong) && r.resultNumeric>threshold).sort((a,b)=>a.site.localeCompare(b.site)||b.resultNumeric-a.resultNumeric).map(r=>({
+    "Titik": r.cerobong, "Site": r.site, "Periode": r.periode, "Tanggal sampling": r.dateOfSampling||"", "Hasil": r.resultNumeric, "Satuan": r.unit, "Usulan": threshold, "BM resmi": r.standard, "Selisih": Math.round((r.resultNumeric-threshold)*100)/100
+  }));
+  const drv = simDriverStats(simDriverScope==="shown" ? scope.filter(r=>shownSet.has(r.cerobong)) : scope, threshold).filter(s=>s.n>0).map(s=>({
+    "Faktor": s.driver, "Satuan": s.unit, "n pasangan": s.n, "r antar semua data": s.r==null?"":Math.round(s.r*1000)/1000, "r dalam engine": s.rw==null?"":Math.round(s.rw*1000)/1000,
+    "R kuadrat": s.r==null?"":Math.round(s.r*s.r*1000)/1000, "Rata-rata saat melebihi": s.mOver==null?"":Math.round(s.mOver*100)/100, "Rata-rata saat di bawah": s.mUnder==null?"":Math.round(s.mUnder*100)/100
+  }));
+  const info = [{"Keterangan":"Parameter","Nilai":parameter},{"Keterangan":"Usulan baku mutu","Nilai":`${threshold} ${unit}`},{"Keterangan":"Periode","Nilai":`${from} sampai ${to}`},{"Keterangan":"Filter tampilan","Nilai":{all:"Semua titik",ever:"Pernah melebihi",now:"Masih melebihi",manual:"Pilih manual"}[simShowFilter]+(simSiteShow.size?`, site ${[...simSiteShow].join(", ")}`:"")},{"Keterangan":"Dibuat","Nilai":new Date().toLocaleString("id-ID")}];
+  const sheet = rows=>xlsxSheetFromRows(rows.length?Object.keys(rows[0]):["-"], rows);
+  const wb = xlsxWorkbookFromSheets([["Info", sheet(info)],["Rekap per Site", sheet(siteRows)],["Detail Titik", sheet(engRows)],["Data Melebihi Usulan", sheet(overRows)],["Driver Analysis", sheet(drv)]]);
+  xlsxDownload(wb, `simulasi_bm_${String(parameter).replace(/[^A-Za-z0-9]+/g,"")}_${threshold}_${from.replace(/\s/g,"")}-${to.replace(/\s/g,"")}.xlsx`);
 }
 
 /* =========================================================
