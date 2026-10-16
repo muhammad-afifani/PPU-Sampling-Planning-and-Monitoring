@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202610171000">
+<link rel="stylesheet" href="assets/css/style.css?v=202610171100">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -635,24 +635,26 @@
     </div>
 
     <!-- GANTT -->
-    <div class="page" id="page-gantt">
+    <div class="page dp-page" id="page-gantt">
       <div class="stickytop">
-      <div class="pagehead"><div><h2>Scheduling Tools</h2><div class="desc">Visualisasi jadwal per tim dan per batch dalam bentuk Gantt chart dan kurva-S</div></div>
-        <div class="toolbar"><button class="btn ghost" data-action="refreshGanttPage" title="Muat ulang progress/status titik terbaru dari Tracking BA/CoA — pakai ini kalau progress kelihatan tidak sesuai setelah ubah jadwal">&#128260; Refresh</button><button class="btn ghost" data-action="finalizeBatchSchedule">Finalisasi Jadwal</button><button class="btn primary" data-action="printSamplingGuide">Cetak Panduan Sampling (A4)</button></div>
+      <div class="pagehead"><div><h2>Scheduling Tools</h2><div class="desc">Jadwal harian per tim &amp; batch, kurva-S progres, dan persiapan keberangkatan ke tiap site.</div></div>
+        <div class="toolbar dp-actions"><span class="dp-btn-group"><button class="btn" data-action="refreshGanttPage" title="Muat ulang progress/status titik terbaru dari Tracking BA/CoA — pakai ini kalau progress kelihatan tidak sesuai setelah ubah jadwal">&#128260; Refresh</button><button class="btn" data-action="finalizeBatchSchedule" title="Tandai batch yang sedang dipilih sudah final/siap dicetak (bukan mengunci data) — pilih 1 batch spesifik dulu di filter Batch">Finalisasi Jadwal</button></span><button class="btn primary" data-action="printSamplingGuide" title="Cetak jadwal beserta daftar titik &amp; kolom ceklist untuk batch terpilih. Filter Batch kosong = seluruh batch tim dicetak berurutan, masing-masing mulai di halaman baru.">&#128438; Cetak Panduan Sampling (A4)</button></div>
+      </div>
+      <div class="toolbar card dp-filter">
+        <div class="field"><label>Tampilkan</label><select id="ganttView"><option value="emisi">Tim Emisi</option><option value="ambient">Tim Ambient</option><option value="overlay">Overlay (keduanya)</option></select></div>
+        <div class="field"><label>Batch</label><select id="ganttBatch"></select></div>
+        <div class="field"><label>Mode Tampilan</label><select id="ganttMode"><option value="calendar" selected>Tabel Harian (Gantt)</option><option value="bar">Gantt Bar (SVG)</option></select></div>
+        <div class="hint dp-filter-note">Cetak Panduan: batch terpilih, atau semua batch tim bila filter Batch kosong. Finalisasi hanya penanda "siap cetak", data tetap bisa diubah.</div>
       </div>
       </div>
-      <div class="card">
-        <div class="inline-fields">
-          <div class="field"><label>Tampilkan</label><select id="ganttView"><option value="emisi">Tim Emisi</option><option value="ambient">Tim Ambient</option><option value="overlay">Overlay (keduanya)</option></select></div>
-          <div class="field"><label>Batch</label><select id="ganttBatch"></select></div>
-          <div class="field"><label>Mode Tampilan</label><select id="ganttMode"><option value="calendar" selected>Tabel Harian (Gantt)</option><option value="bar">Gantt Bar (SVG)</option></select></div>
-        </div>
-        <div class="hint" style="margin-top:4px;">Tombol "Cetak Panduan Sampling" akan mencetak jadwal beserta daftar titik dan kolom ceklist untuk batch yang sedang dipilih pada filter Batch di atas. Jika filter Batch dikosongkan, seluruh batch pada Tim yang dipilih akan dicetak berurutan, masing masing mulai di halaman baru. "Finalisasi Jadwal" cuma menandai batch yang sedang dipilih sudah final/siap dicetak (bukan mengunci data) — pilih 1 batch spesifik dulu di filter Batch di atas, bukan "Semua batch".</div>
-        <div id="ganttFinalizeStatus"></div>
-        <div id="ganttMeta" class="hint" style="margin-top:8px;font-size:12.5px;"></div>
-        <div id="ganttCrewChangeInfo" class="hint" style="margin-top:4px;font-size:12.5px;"></div>
-        <div id="ganttWrap" style="margin-top:10px;overflow-x:auto;padding-bottom:6px;"></div>
-        <div class="legend">
+      <div id="ganttFinalizeStatus"></div>
+      <div class="dp-kpis" id="ganttKpis"></div>
+
+      <div class="card dp-listcard gn-card">
+        <div class="dp-listhead"><h3>Jadwal Harian</h3><span id="ganttMeta" class="hint gn-meta"></span></div>
+        <div id="ganttCrewChangeInfo" class="gn-cc"></div>
+        <div id="ganttWrap" class="gn-wrap"></div>
+        <div class="legend gn-legend" id="ganttBarLegend">
           <span class="item"><span class="sw" style="background:#0ea5a0"></span> Rencana (Emisi)</span>
           <span class="item"><span class="sw" style="background:#3d78c9"></span> Rencana (Ambient)</span>
           <span class="item"><span class="sw" style="background:#3fb27f"></span> Aktual selesai</span>
@@ -661,13 +663,19 @@
           <span class="item"><span class="sw" style="background:#e0554f;opacity:.35"></span> Hari crew change</span>
         </div>
       </div>
-      <div style="margin:24px 0;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+
+      <div class="card dp-listcard gn-card">
+        <div class="dp-listhead"><h3>S-Curve &middot; Rencana vs Aktual</h3><span class="hint" style="margin:0;">Garis putus = rencana kumulatif, garis solid = aktual kumulatif (dari Tracking). Muncul setelah "Buat &amp; Terapkan Jadwal" di Perencanaan Batch.</span></div>
+        <div id="scurveWrap" class="gn-body"></div>
+      </div>
+
+      <div class="gn-section">
+        <div class="gn-section-head">
           <div>
-            <h3 style="margin-bottom:4px;">Preview Persiapan per Site</h3>
-            <div class="hint" style="max-width:640px;margin-bottom:0;">Ringkasan otomatis dari jadwal batch yang sedang tampil di filter di atas: siapa saja yang masuk ke site tsb dan kapan, batas ajukan izin masuk, pengingat akomodasi, dan (untuk site yang jadi titik keberangkatan ke site berikutnya) siapa yang bertanggung jawab memesan transport beserta personil &amp; PTS yang perlu dicek sebelum naik.</div>
+            <h3>Preview Persiapan per Site</h3>
+            <div class="hint" style="max-width:760px;margin:0;">Siapa masuk ke site mana &amp; kapan, batas ajukan izin masuk, pengingat akomodasi, serta siapa yang memesan transport ke site berikutnya beserta personil &amp; PTS yang perlu dicek sebelum naik.</div>
           </div>
-          <div style="display:flex;gap:8px;flex-shrink:0;">
+          <div class="dp-btn-group" style="flex-shrink:0;">
             <button class="btn small" data-action="expandAllSitePreview">Buka Semua</button>
             <button class="btn small" data-action="collapseAllSitePreview">Tutup Semua</button>
           </div>
@@ -682,15 +690,10 @@
         <div id="spNoResults" class="hint" style="display:none;padding:22px;text-align:center;border:1px dashed var(--gray-200);border-radius:8px;margin-bottom:10px;">Tidak ada site yang cocok dengan pencarian/filter saat ini.</div>
         <div id="siteBriefingWrap"></div>
       </div>
-      <div class="card">
-        <h3>Transport Arrange</h3>
-        <div class="hint" style="margin-bottom:10px;">Rekap semua leg perpindahan antar-site dari jadwal batch yang sedang tampil di filter di atas, per tim, diurut tanggal — dipisah Transport Darat (BPN/SPS/HCA, booking oleh PPC SCI) dan Transport Air/Laut &amp; Seatruck (BKP/CPU/SPU/NPU, booking oleh ENV Site/Site Reps. asal kecuali rute khusus). Termasuk leg keberangkatan dari &amp; kembali ke BPN (Base Office) kalau datanya tersedia.</div>
-        <div id="transportArrangeWrap"></div>
-      </div>
-      <div class="card">
-        <h3>S-Curve (Rencana vs Aktual)</h3>
-        <div class="hint" style="margin-bottom:8px;">Muncul otomatis setelah tombol "Buat &amp; Terapkan Jadwal" diklik di halaman Perencanaan Batch. Garis putus = rencana kumulatif, garis solid = aktual kumulatif (dari Tracking).</div>
-        <div id="scurveWrap"></div>
+
+      <div class="card dp-listcard gn-card">
+        <div class="dp-listhead"><h3>Transport Arrange</h3><span class="hint" style="margin:0;">Semua leg perpindahan antar-site per tim, urut tanggal. Darat (BPN/SPS/HCA) dipesan PPC SCI; Air/Laut &amp; Seatruck (BKP/CPU/SPU/NPU) oleh ENV Site/Site Reps. asal kecuali rute khusus. Termasuk leg dari &amp; kembali ke BPN bila datanya ada.</span></div>
+        <div id="transportArrangeWrap" class="gn-body"></div>
       </div>
     </div>
 
@@ -1910,40 +1913,40 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202610171000"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202610171000"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202610171100"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202610171100"></script>
 
-<script src="assets/data/default-data.js?v=202610171000"></script>
-<script src="assets/data/brand-assets.js?v=202610171000"></script>
-<script src="assets/data/travel-routes.js?v=202610171000"></script>
-<script src="assets/js/00-icons.js?v=202610171000"></script>
-<script src="assets/js/01-state.js?v=202610171000"></script>
-<script src="assets/js/02-nav-util.js?v=202610171000"></script>
-<script src="assets/js/03-period-logic.js?v=202610171000"></script>
-<script src="assets/js/04-dashboard.js?v=202610171000"></script>
-<script src="assets/js/05-master-data.js?v=202610171000"></script>
-<script src="assets/js/06-plan-personil.js?v=202610171000"></script>
-<script src="assets/js/07-rules-planner.js?v=202610171000"></script>
-<script src="assets/js/08-gantt-print.js?v=202610171000"></script>
-<script src="assets/js/09-tracking-map.js?v=202610171000"></script>
-<script src="assets/js/10-running-hour.js?v=202610171000"></script>
-<script src="assets/js/11-berita-acara.js?v=202610171000"></script>
-<script src="assets/js/12-data-page.js?v=202610171000"></script>
-<script src="assets/js/13-hasil-db.js?v=202610171000"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202610171000"></script>
-<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610171000"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202610171000"></script>
-<script src="assets/js/16-actions-init.js?v=202610171000"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202610171000"></script>
-<script src="assets/js/18-model-dispersi.js?v=202610171000"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202610171000"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202610171000"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202610171000"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202610171000"></script>
-<script src="assets/js/23-budget-proyeksi.js?v=202610171000"></script>
-<script src="assets/js/24-personil-ppu.js?v=202610171000"></script>
-<script src="assets/js/25-access-gate.js?v=202610171000"></script>
-<script src="assets/js/26-laboratorium.js?v=202610171000"></script>
-<script src="assets/js/27-laporan-emf.js?v=202610171000"></script>
+<script src="assets/data/default-data.js?v=202610171100"></script>
+<script src="assets/data/brand-assets.js?v=202610171100"></script>
+<script src="assets/data/travel-routes.js?v=202610171100"></script>
+<script src="assets/js/00-icons.js?v=202610171100"></script>
+<script src="assets/js/01-state.js?v=202610171100"></script>
+<script src="assets/js/02-nav-util.js?v=202610171100"></script>
+<script src="assets/js/03-period-logic.js?v=202610171100"></script>
+<script src="assets/js/04-dashboard.js?v=202610171100"></script>
+<script src="assets/js/05-master-data.js?v=202610171100"></script>
+<script src="assets/js/06-plan-personil.js?v=202610171100"></script>
+<script src="assets/js/07-rules-planner.js?v=202610171100"></script>
+<script src="assets/js/08-gantt-print.js?v=202610171100"></script>
+<script src="assets/js/09-tracking-map.js?v=202610171100"></script>
+<script src="assets/js/10-running-hour.js?v=202610171100"></script>
+<script src="assets/js/11-berita-acara.js?v=202610171100"></script>
+<script src="assets/js/12-data-page.js?v=202610171100"></script>
+<script src="assets/js/13-hasil-db.js?v=202610171100"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202610171100"></script>
+<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610171100"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202610171100"></script>
+<script src="assets/js/16-actions-init.js?v=202610171100"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202610171100"></script>
+<script src="assets/js/18-model-dispersi.js?v=202610171100"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202610171100"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202610171100"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202610171100"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202610171100"></script>
+<script src="assets/js/23-budget-proyeksi.js?v=202610171100"></script>
+<script src="assets/js/24-personil-ppu.js?v=202610171100"></script>
+<script src="assets/js/25-access-gate.js?v=202610171100"></script>
+<script src="assets/js/26-laboratorium.js?v=202610171100"></script>
+<script src="assets/js/27-laporan-emf.js?v=202610171100"></script>
 </body>
 </html>
