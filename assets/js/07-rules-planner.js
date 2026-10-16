@@ -324,11 +324,13 @@ function renderPlanner(){
     const bySub = {};
     sitePts.forEach(p=>{ const sg = subgroupOf(p); (bySub[sg]=bySub[sg]||[]).push(p); });
     const subs = Object.keys(bySub).sort((a,c)=>subgroupOrderIdx(bySub[a][0])-subgroupOrderIdx(bySub[c][0]));
-    let html = `<div class="tree-site">
-      <div class="tree-head">
+    const siteC = (typeof HASIL_SITE_COLORS!=="undefined" && HASIL_SITE_COLORS[site]) || "#7f8fa0";
+    let html = `<div class="tree-site dp-site" style="--site-c:${siteC};">
+      <div class="tree-head dp-site-head" style="cursor:default;">
         <span class="tree-toggle" data-action="togglePlGroup" data-key="${escHtml(site)}">
-          <span class="tree-caret">${siteExpanded?"&#9660;":"&#9654;"}</span>
-          <b>${site}</b> <span class="muted" style="color:#9db3c9;">— ${sitePts.length} titik</span>
+          <span class="tree-caret">${siteExpanded?"&#9662;":"&#9656;"}</span>
+          <span class="dp-site-dot" aria-hidden="true"></span><b class="dp-site-name">${site}</b>
+          <span class="dp-pills"><span class="dp-pill">${sitePts.length} titik</span><span class="dp-pill">${subs.length} kategori</span></span>
         </span>
         <span class="spacer"></span>
         <button class="btn small ghost" data-action="siteAllToggle" data-site="${escHtml(site)}">pilih/kosongkan semua</button>
@@ -338,23 +340,24 @@ function renderPlanner(){
       const subKey = site+"::"+sg;
       const subExpanded = plExpanded.has(subKey);
       const pts = bySub[sg];
-      html += `<div class="tree-sub">
-        <div class="tree-subhead">
+      const grpC = (typeof dashGrpVisual==="function" && dashGrpVisual(sg).color) || "#7f8fa0";
+      html += `<div class="tree-sub dp-sub" style="--grp-c:${grpC};">
+        <div class="tree-subhead dp-sub-head" style="cursor:default;">
           <span class="tree-toggle" data-action="togglePlGroup" data-key="${escHtml(subKey)}">
-            <span class="tree-caret">${subExpanded?"&#9660;":"&#9654;"}</span>
-            ${escHtml(sg)} <span class="muted">(${pts.length})</span>
+            <span class="tree-caret">${subExpanded?"&#9662;":"&#9656;"}</span>
+            <span class="dp-grp-bar" aria-hidden="true"></span>${escHtml(sg)} <span class="dp-count">${pts.length} titik</span>
           </span>
           <span class="spacer"></span>
           <button class="btn small ghost" data-action="subAllToggle" data-site="${escHtml(site)}" data-sub="${escHtml(sg)}">pilih/kosongkan</button>
         </div>
         <div style="display:${subExpanded?"block":"none"};">
-        <table class="tree-table"><thead><tr><th style="width:30px;"></th><th>Nama</th><th style="width:110px;">${rhColumnLabel(currentPeriodStr())}</th><th style="width:90px;">Prediksi</th></tr></thead><tbody>`;
+        <table class="tree-table dp-table"><thead><tr><th style="width:30px;"></th><th>Nama</th><th style="width:110px;">${rhColumnLabel(currentPeriodStr())}</th><th style="width:90px;">Prediksi</th></tr></thead><tbody>`;
       pts.forEach(p=>{
         const defaultChecked = isFresh || p.batchId===b.id;
         const chk = existingChecks.has(p.id) ? existingChecks.get(p.id) : defaultChecked;
         const rhVal = rhYearValue(p, currentPeriodStr());
         html += `<tr>
-          <td style="padding-left:34px;"><input type="checkbox" class="ptChk" data-id="${p.id}" data-site="${escHtml(site)}" data-sub="${escHtml(sg)}" ${chk?"checked":""}></td>
+          <td style="padding-left:20px;"><input type="checkbox" class="ptChk" data-id="${p.id}" data-site="${escHtml(site)}" data-sub="${escHtml(sg)}" ${chk?"checked":""}></td>
           <td>${escHtml(p.nama)}${p.status==="failed"?' <span class="badge b-red">gagal batch lalu</span>':""}${!effectiveWajib(p)?' <span class="badge b-amber" title="Bukan titik wajib pantau — muncul di sini krn sudah dicentang Verifikasi di Database Titik Pantau">manual</span>':""}</td>
           <td class="muted">${rhVal!=null?rhVal:"-"}</td>
           <td style="white-space:nowrap;">${prediksiCellHtml(p)}</td>

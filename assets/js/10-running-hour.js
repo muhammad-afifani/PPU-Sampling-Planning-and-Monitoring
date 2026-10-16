@@ -42,7 +42,7 @@ function renderRunningHour(){
       <th>Site</th><th>Nama Titik</th><th>Kategori Sumber</th>
       <th style="width:95px;">RH Manual</th><th>RH Bulan Terakhir</th>
       ${semesters.map(s=>`<th style="text-align:right;">${s.label}</th>`).join("")}
-      <th style="text-align:right;background:var(--navy-700);">Trailing 12 Bln<div style="font-weight:400;font-size:9px;opacity:.8;">s.d. sblm ${escHtml(period)}</div></th>
+      <th style="text-align:right;background:var(--teal-100);color:#0b6b66;">Trailing 12 Bln<div style="font-weight:400;font-size:9px;opacity:.8;">s.d. sblm ${escHtml(period)}</div></th>
       <th style="width:170px;">Status Wajib &middot; ${escHtml(period)}</th>
       <th>Pemantauan Terakhir</th><th>Prediksi Berikutnya</th><th></th>
     </tr></thead>
