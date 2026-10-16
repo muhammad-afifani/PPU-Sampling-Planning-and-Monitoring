@@ -56,20 +56,62 @@ function simRenderCerobongChecklist(){
   list.innerHTML = visible.length ? visible.map(c=>`<label class="xsel-opt"><input type="checkbox" class="simCerobongCheck" data-val="${escHtml(c)}" ${simSel.cerobong.has(c)?"checked":""}> ${escHtml(c)}</label>`).join("")
     : `<div class="xsel-empty">Tidak ada titik yang sesuai dengan lingkup atau pencarian.</div>`;
 }
-// Chip centang untuk lingkup Jenis Sumber dan Permen LH, dapat mencentang lebih dari satu pilihan.
-function simRenderChipBar(field, values, labelMap){
-  const all = `<button type="button" class="chip-toggle all ${simSel[field].size===0?'active':''}" data-action="simChip" data-field="${field}" data-val="" aria-pressed="${simSel[field].size===0}">Semua</button>`;
-  return all + values.map(v=>{ const on = simSel[field].has(v); return `<button type="button" class="chip-toggle ${on?'active':''}" data-action="simChip" data-field="${field}" data-val="${escHtml(v)}" aria-pressed="${on}">${escHtml((labelMap&&labelMap[v])||v)}</button>`; }).join("");
-}
-const SIM_PERMEN_SHORT = {"PERMEN LH 13 2009":"Permen LH 13/2009 · Turbin, Heater, Flare", "PERMEN LH 11 2021":"Permen LHK 11/2021 · Genset"};
-function simRenderScopeChips(){
+// Dropdown centang (checklist) untuk lingkup Regulasi dan Jenis sumber, dapat memilih lebih dari satu.
+// Kosong = semua. Dipakai alih-alih deretan chip supaya panel kontrol tetap ringkas dan tidak
+// menyisakan ruang kosong di sebelah hasil. Hanya isi daftar yang dirender ulang saat centang
+// berubah, supaya panel tetap terbuka dan posisi scroll tidak hilang.
+const SIM_PERMEN_SHORT = {"PERMEN LH 13 2009":"Permen LH 13/2009 \u00B7 Turbin, Heater, Flare", "PERMEN LH 11 2021":"Permen LHK 11/2021 \u00B7 Genset"};
+const SIM_MS = {
+  permen:{id:"Permen", all:"Semua regulasi", noun:"regulasi"},
+  sumber:{id:"Sumber", all:"Semua jenis sumber", noun:"jenis sumber"}
+};
+let simMsOpen = null;
+function simMsOptions(field){
   const param = document.getElementById("simParam")?.value || "";
-  // Hanya tawarkan jenis sumber yang memang punya data parameter ini, supaya chip tidak menyesatkan.
-  const sumbers = [...new Set(DB.hasilPemantauan.filter(r=>!param || r.parameter===param).map(r=>r.namaSumber))].filter(Boolean).sort();
-  [...simSel.sumber].forEach(s=>{ if(!sumbers.includes(s)) simSel.sumber.delete(s); });
-  document.getElementById("simSumberChips").innerHTML = simRenderChipBar("sumber", sumbers);
-  document.getElementById("simPermenChips").innerHTML = simRenderChipBar("permen", Object.keys(HD_PERMEN_LABEL), SIM_PERMEN_SHORT);
+  const rows = DB.hasilPemantauan.filter(r=>!param || r.parameter===param);
+  const key = field==="permen" ? (r=>r.regulasiCek) : (r=>r.namaSumber);
+  const count = new Map();
+  rows.forEach(r=>{ const k = key(r); if(!k) return; (count.get(k) || count.set(k,new Set()).get(k)).add(r.cerobong); });
+  let vals = field==="permen" ? Object.keys(HD_PERMEN_LABEL) : [...count.keys()].sort();
+  return vals.map(v=>({value:v, label: field==="permen" ? (SIM_PERMEN_SHORT[v]||v) : v, n: count.has(v) ? count.get(v).size : 0}));
 }
+function simRenderMs(field){
+  const cfg = SIM_MS[field], opts = simMsOptions(field);
+  [...simSel[field]].forEach(v=>{ if(!opts.some(o=>o.value===v)) simSel[field].delete(v); });
+  const label = document.getElementById(`sim${cfg.id}Label`), list = document.getElementById(`sim${cfg.id}List`);
+  if(label){
+    const n = simSel[field].size;
+    label.textContent = n===0 ? cfg.all : n===1 ? (opts.find(o=>o.value===[...simSel[field]][0])?.label || "1 dipilih") : `${n} ${cfg.noun} dipilih`;
+  }
+  if(!list) return;
+  const top = list.scrollTop;
+  const total = opts.reduce((a,o)=>a+o.n,0);
+  list.innerHTML = `<label class="xsel-opt xsel-all"><input type="checkbox" class="simMsCheck" data-field="${field}" data-val="" ${simSel[field].size===0?"checked":""}> <span>${cfg.all}</span></label>`
+    + opts.map(o=>`<label class="xsel-opt"><input type="checkbox" class="simMsCheck" data-field="${field}" data-val="${escHtml(o.value)}" ${simSel[field].has(o.value)?"checked":""}> <span>${escHtml(o.label)}</span><em>${o.n}</em></label>`).join("");
+  list.scrollTop = top;
+}
+function simRenderScopeSelects(){ simRenderMs("permen"); simRenderMs("sumber"); }
+function simMsSetOpen(field){
+  simMsOpen = field;
+  Object.keys(SIM_MS).forEach(f=>{
+    const p = document.getElementById(`sim${SIM_MS[f].id}Panel`);
+    if(p) p.style.display = f===field ? "block" : "none";
+  });
+}
+document.addEventListener("click", e=>{
+  if(!simMsOpen) return;
+  const x = document.getElementById(`sim${SIM_MS[simMsOpen].id}Xsel`);
+  if(x && !x.contains(e.target)) simMsSetOpen(null);
+});
+document.addEventListener("change", e=>{
+  if(!e.target.classList?.contains("simMsCheck")) return;
+  const field = e.target.dataset.field, val = e.target.dataset.val;
+  if(!val) simSel[field].clear();
+  else if(e.target.checked) simSel[field].add(val); else simSel[field].delete(val);
+  simRenderMs(field);
+  simRenderCerobongChecklist();
+  simScheduleRun();
+});
 function simRenderParamTabs(){
   const sel = document.getElementById("simParam"), tabs = document.getElementById("simParamTabs");
   if(!sel || !tabs) return;
@@ -121,7 +163,7 @@ function hdRenderSimulationFilters(){
   fromSel.value = periods[0]||"";
   toSel.value = periods[periods.length-1]||"";
   simRenderParamTabs();
-  simRenderScopeChips();
+  simRenderScopeSelects();
   simRenderCerobongChecklist();
   simResetThresholdToOfficial();
   hdRunSimulation();
@@ -136,7 +178,7 @@ function simSetParam(val){
   if(!sel || !val) return;
   sel.value = val;
   simSel.cerobong.clear();
-  simRenderParamTabs(); simRenderScopeChips(); simRenderCerobongChecklist();
+  simRenderParamTabs(); simRenderScopeSelects(); simRenderCerobongChecklist();
   simResetThresholdToOfficial();
   hdRunSimulation();
 }
@@ -308,7 +350,7 @@ function hdRunSimulation(){
   const presets = document.getElementById("simPresets");
   if(presets){
     const base = std ? std.median : null;
-    presets.innerHTML = base ? [["BM resmi",base],["−10%",base*0.9],["−20%",base*0.8],["−30%",base*0.7],["−50%",base*0.5]].map(([l,v])=>{
+    presets.innerHTML = base ? [["Resmi",base],["−10%",base*0.9],["−20%",base*0.8],["−30%",base*0.7],["−50%",base*0.5]].map(([l,v])=>{
       const val = Math.round(v*100)/100;
       return `<button type="button" class="${isFinite(threshold)&&Math.abs(threshold-val)<1e-9?"on":""}" data-action="simPreset" data-val="${val}">${l}<span>${hdNum(val)}</span></button>`;
     }).join("") : "";
@@ -608,8 +650,14 @@ function buildSimDriverAnalysis(rows, threshold, parameter, unit, from, to){
     </tr>`;
   }).join("");
   return `<div class="sim-driver-summary">${lines.map(l=>`<p>${l}</p>`).join("")}</div>
+    <div class="sim-r-help" role="note">
+      <div><b>Apa itu r?</b> Koefisien korelasi: ukuran seberapa searah naik turunnya dua hal, dari <b>&minus;1</b> sampai <b>+1</b>. Mendekati <b>+1</b> berarti keduanya cenderung naik bersama, mendekati <b>&minus;1</b> berarti yang satu naik saat yang lain turun, dan mendekati <b>0</b> berarti tidak ada hubungan yang terlihat.</div>
+      <div><b>r semua data</b>: membandingkan seluruh titik dan periode sekaligus. Engine besar dan kecil ikut tercampur, jadi hasilnya bisa menyesatkan.</div>
+      <div><b>r dalam engine</b>: hanya melihat perubahan pada engine yang sama dari periode ke periode. Ini yang paling tepat untuk menjawab "kalau faktor ini naik, apakah hasilnya ikut naik?"</div>
+      <div><b>n pasangan</b>: jumlah titik dan periode yang punya nilai kedua parameter. <b>R&sup2;</b>: r dikuadratkan, yaitu persen variasi hasil yang bisa dijelaskan oleh faktor tersebut. Jika n kecil (di bawah 8), angka r belum bermakna.</div>
+    </div>
     <div class="tablewrap hd-table-wrap"><table class="hd-table sim-driver-table">
-      <thead><tr><th>Faktor</th><th class="num">n pasangan</th><th>r antar semua data</th><th>r dalam engine</th><th class="num">R&sup2;</th><th class="num">Rata-rata saat &gt; usulan</th><th class="num">Saat &le; usulan</th><th class="num">Selisih</th></tr></thead>
+      <thead><tr><th>Faktor</th><th class="num" style="white-space:nowrap" title="Jumlah pasangan data: titik dan periode yang punya nilai kedua parameter"><span class="lc">n</span> pasangan</th><th style="min-width:170px" title="r dihitung dari seluruh titik dan periode sekaligus"><span class="lc">r</span> semua data</th><th style="min-width:170px" title="r dihitung hanya dari perubahan pada engine yang sama dari periode ke periode"><span class="lc">r</span> dalam engine</th><th class="num" title="R kuadrat: persen variasi hasil yang bisa dijelaskan oleh faktor ini"><span class="lc">R&sup2;</span></th><th class="num">Rata-rata saat &gt; usulan</th><th class="num">Rata-rata saat &le; usulan</th><th class="num">Selisih</th></tr></thead>
       <tbody>${tableRows}</tbody></table></div>
     <div class="sim-scatter-grid">${stats.map(s=>{ const sc = simMiniScatter(s, threshold, unit); return sc ? `<figure><figcaption><b>${escHtml(s.driver)}</b> <span class="muted">r ${fmtR(s.r)} &middot; dalam engine ${fmtR(s.rw)}</span></figcaption>${sc}</figure>` : ""; }).join("")}</div>
     <div class="hint">Titik jingga: data ${escHtml(parameter)} di atas usulan ${hdNum(threshold)} ${escHtml(unit)}. Garis putus-putus: garis regresi. Lingkaran kosong di tepi grafik: nilai ekstrem di luar persentil 2 sampai 98 (tetap dihitung). Korelasi menunjukkan keterkaitan, bukan bukti sebab-akibat; |r| &ge; 0,7 kuat, 0,4 sampai 0,7 sedang, 0,2 sampai 0,4 lemah. Periode ${escHtml(from)} sampai ${escHtml(to)}.</div>`;
