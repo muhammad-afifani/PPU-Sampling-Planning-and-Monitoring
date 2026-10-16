@@ -821,26 +821,146 @@ function hdExportFiltered(){
   const safe = s=>String(s).replace(/[^A-Za-z0-9]+/g,"_").replace(/^_|_$/g,"");
   xlsxDownload(wb, `hasil_emisi_${safe(p)}_${safe(from)}-${safe(to)}.xlsx`);
 }
+/* ---------------- Cetak / PDF ---------------- */
 // Halaman cetak app ini menyembunyikan .app seluruhnya (lihat @media print di style.css) dan hanya
-// mencetak #printGuideArea, jadi ringkasan dashboard disalin ke sana sebagai laporan A4 lanskap.
+// mencetak #printGuideArea, jadi laporan disusun ulang di sana. Dialog cetak memungkinkan memilih
+// ukuran kertas, orientasi, beberapa parameter sekaligus, site (gabungan atau satu bab per site),
+// rentang periode, dan bagian laporan. Setiap kombinasi dihitung dengan builder yang sama seperti
+// di layar dengan cara menyetel filter dashboard sementara, lalu filter dikembalikan seperti semula.
+const HD_PAPER = {A4:[210,297], A3:[297,420], Letter:[215.9,279.4], Legal:[215.9,355.6], F4:[215,330]};
+const HD_PRINT_SECTIONS = [["summary","Executive Summary"],["kpi","KPI"],["trend","Trend per periode"],["dist","Distribution %BM"],["site","Rekap per Site"],["watch","Priority Watchlist"],["heat","Heatmap Site \u00D7 Periode"],["rh","Running Hour"],["detail","Tabel data periode terakhir"]];
+let hdPrintOpts = null;
 function hdPrintDashboard(){
-  const area = document.getElementById("printGuideArea");
-  if(!area) { window.print(); return; }
-  const grab = id=>document.getElementById(id)?.innerHTML || "";
-  const p = document.getElementById("hdFltParameter")?.value || "";
+  const params = hdAllValues("parameter");
+  const emisi = params.filter(hdIsEmisiParam), pendukung = params.filter(p=>!hdIsEmisiParam(p));
+  const sites = hdAllValues("site");
+  const periods = hdSortPeriods(DB.hasilPemantauan.map(r=>r.periode));
+  const o = hdPrintOpts || {
+    paper:"A4", orient:"landscape", params:[document.getElementById("hdFltParameter")?.value].filter(Boolean),
+    sites:[...hdSel.site], group:"all", from:document.getElementById("hdFltPeriodeFrom")?.value, to:document.getElementById("hdFltPeriodeTo")?.value,
+    sections:["summary","kpi","trend","dist","site","watch","heat","rh"]
+  };
+  const chk = (name, val, on, label)=>`<label class="hd-pchk"><input type="checkbox" name="${name}" value="${escHtml(val)}" ${on?"checked":""}><span>${label}</span></label>`;
+  const radio = (name, val, on, label)=>`<label class="hd-pchk"><input type="radio" name="${name}" value="${escHtml(val)}" ${on?"checked":""}><span>${label}</span></label>`;
+  openModal(`<div class="hd-zoom-head"><h3>Print / PDF &middot; susun laporan</h3><button class="btn small" data-action="closeModal">Tutup</button></div>
+    <form class="hd-zoom-body hd-print-form" id="hdPrintForm" onsubmit="return false;">
+      <fieldset><legend>Kertas</legend>
+        <div class="hd-pgrid">${Object.keys(HD_PAPER).map(k=>radio("paper",k,o.paper===k,`${k} <small>${HD_PAPER[k][0]}&times;${HD_PAPER[k][1]} mm</small>`)).join("")}</div>
+        <div class="hd-pgrid">${radio("orient","landscape",o.orient==="landscape","Landscape")}${radio("orient","portrait",o.orient==="portrait","Portrait")}</div>
+      </fieldset>
+      <fieldset><legend>Parameter <small>bisa lebih dari satu, tiap parameter jadi bab sendiri</small></legend>
+        <div class="hd-pgrid">${emisi.map(p=>chk("params",p,o.params.includes(p),escHtml(p))).join("")}</div>
+        <div class="hd-pgrid muted-group">${pendukung.map(p=>chk("params",p,o.params.includes(p),escHtml(p)+" <small>pendukung</small>")).join("")}</div>
+      </fieldset>
+      <fieldset><legend>Site <small>kosong = semua site</small></legend>
+        <div class="hd-pgrid">${sites.map(x=>chk("sites",x,o.sites.includes(x),`<i class="hd-chip-dot" style="background:${hdSiteColor(x)}"></i>${escHtml(x)}`)).join("")}</div>
+        <div class="hd-pgrid">${radio("group","all",o.group==="all","Gabungan, satu bab untuk site terpilih")}${radio("group","site",o.group==="site","Per site, satu bab untuk tiap site")}</div>
+      </fieldset>
+      <fieldset><legend>Periode</legend>
+        <div class="hd-pgrid">
+          <label class="field">Dari <select name="from">${periods.map(x=>`<option ${x===o.from?"selected":""}>${x}</option>`).join("")}</select></label>
+          <label class="field">Sampai <select name="to">${periods.map(x=>`<option ${x===o.to?"selected":""}>${x}</option>`).join("")}</select></label>
+        </div>
+      </fieldset>
+      <fieldset><legend>Bagian laporan</legend>
+        <div class="hd-pgrid">${HD_PRINT_SECTIONS.map(([k,l])=>chk("sections",k,o.sections.includes(k),l)).join("")}</div>
+      </fieldset>
+      <div class="hint">Filter Regulasi dan Kapasitas di dashboard tetap berlaku. Di jendela cetak browser, pilih "Save as PDF" untuk menyimpan sebagai PDF; ukuran kertas sudah otomatis mengikuti pilihan di atas.</div>
+      <div class="hd-print-actions"><span class="hint" id="hdPrintEstimate"></span><button type="button" class="btn primary" data-action="hdPrintRun">Buat &amp; Cetak Laporan</button></div>
+    </form>`, {zoom:true});
+  document.getElementById("modalBox").classList.add("hd-print-dialog");
+  hdPrintEstimate();
+}
+function hdPrintReadForm(){
+  const f = document.getElementById("hdPrintForm"); if(!f) return null;
+  const all = n=>[...f.querySelectorAll(`input[name="${n}"]:checked`)].map(i=>i.value);
+  return {paper: all("paper")[0]||"A4", orient: all("orient")[0]||"landscape", params: all("params"), sites: all("sites"),
+    group: all("group")[0]||"all", from: f.querySelector('[name="from"]').value, to: f.querySelector('[name="to"]').value, sections: all("sections")};
+}
+function hdPrintEstimate(){
+  const o = hdPrintReadForm(), el = document.getElementById("hdPrintEstimate");
+  if(!o || !el) return;
+  const nSites = o.group==="site" ? (o.sites.length || hdAllValues("site").length) : 1;
+  el.textContent = `${o.params.length} parameter \u00D7 ${nSites} bab site = ${o.params.length*nSites} bab, ${o.sections.length} bagian per bab.`;
+}
+document.addEventListener("change", e=>{ if(e.target.closest && e.target.closest("#hdPrintForm")) hdPrintEstimate(); });
+function hdPrintSiteSummary(ctx){
+  if(!ctx.filtered.length) return "";
+  const sites = [...new Set(ctx.filtered.map(r=>r.site))].sort();
+  const rows = sites.map(s=>{
+    const all = ctx.filtered.filter(r=>r.site===s), lastR = ctx.lastRows.filter(r=>r.site===s);
+    const st = hdPeriodStat(all), stL = hdPeriodStat(lastR);
+    const top = lastR.filter(r=>r.resultNumeric!=null).sort((a,b)=>ctx.hasStd ? (b.pctOfStandard||0)-(a.pctOfStandard||0) : b.resultNumeric-a.resultNumeric)[0];
+    return `<tr><td><span class="hd-site"><i style="background:${hdSiteColor(s)}"></i>${escHtml(s)}</span></td>
+      <td class="num">${new Set(lastR.map(r=>r.cerobong)).size}</td>
+      ${ctx.hasStd?`<td class="num">${hdPct(st.compliance, st.compliance===100?0:1)}</td><td class="num">${st.exceed}</td><td class="num">${stL.warn}</td><td class="num">${hdPct(stL.avgPct)}</td>`:`<td class="num">${hdNum(stL.avgVal)}</td>`}
+      <td>${top?`${escHtml(top.cerobong)} <b>${hdNum(top.resultNumeric)}</b>${top.pctOfStandard!=null?` <span class="muted">(${hdPct(top.pctOfStandard,0)} BM)</span>`:""}`:"-"}</td></tr>`;
+  }).join("");
+  return `<div class="tablewrap hd-table-wrap"><table class="hd-table"><thead><tr><th>Site</th><th class="num">Titik diuji ${ctx.last||""}</th>${ctx.hasStd?`<th class="num">Kepatuhan (rentang)</th><th class="num">Exceedance</th><th class="num">Early Warning ${ctx.last||""}</th><th class="num">Rata-rata %BM ${ctx.last||""}</th>`:`<th class="num">Rata-rata ${ctx.last||""}</th>`}<th>Tertinggi ${ctx.last||""} (${escHtml(ctx.unit)})</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function hdPrintDetailTable(ctx){
+  const rows = ctx.lastRows.slice().sort((a,b)=>a.site.localeCompare(b.site) || (b.resultNumeric??-1)-(a.resultNumeric??-1));
+  if(!rows.length) return "";
+  return `<table class="hd-table hd-print-detail"><thead><tr><th>Site</th><th>Titik</th><th>Jenis sumber</th><th>Sampling</th><th class="num">Hasil</th><th class="num">BM</th><th class="num">%BM</th><th class="num">RH semester</th><th>Status</th></tr></thead><tbody>${rows.map(r=>{
+    const badge = HASIL_STATUS_BADGE[r.statusBakuMutu] || HASIL_STATUS_BADGE.not_evaluated, rh = hdRhSemester(r.cerobong, r.periode);
+    return `<tr><td>${escHtml(r.site)}</td><td>${escHtml(r.cerobong)}</td><td>${escHtml(r.namaSumber||"")}</td><td>${escHtml(r.dateOfSampling||"-")}</td><td class="num">${escHtml(r.resultRaw)} ${escHtml(r.unit)}</td><td class="num">${r.standard??"-"}</td><td class="num">${r.pctOfStandard!=null?hdPct(r.pctOfStandard):"-"}</td><td class="num">${rh!=null?hdNum(rh,0):"-"}</td><td><span class="badge ${badge[0]}">${badge[1]}</span></td></tr>`;
+  }).join("")}</tbody></table>`;
+}
+function hdPrintRun(){
+  const o = hdPrintReadForm();
+  if(!o) return;
+  if(!o.params.length){ toast("Pilih minimal satu parameter.", "warn"); return; }
+  if(!o.sections.length){ toast("Pilih minimal satu bagian laporan.", "warn"); return; }
+  if(hasilPeriodParts(o.from).order > hasilPeriodParts(o.to).order){ toast("Periode 'Dari' harus sebelum 'Sampai'.", "warn"); return; }
+  hdPrintOpts = o;
+  // Simpan state filter dashboard, susun laporan, lalu kembalikan.
+  const els = {p:document.getElementById("hdFltParameter"), f:document.getElementById("hdFltPeriodeFrom"), t:document.getElementById("hdFltPeriodeTo")};
+  const saved = {p:els.p.value, f:els.f.value, t:els.t.value, site:new Set(hdSel.site), cerobong:new Set(hdSel.cerobong), trend:hdTrendMode, heat:hdHeatMode, gran:hdRhGran, rhAll:hdRhShowAll};
+  const siteGroups = o.group==="site" ? (o.sites.length ? o.sites : hdAllValues("site")).map(x=>[x]) : [o.sites];
+  const sec = k=>o.sections.includes(k);
   const block = (title, html)=> html ? `<section class="hd-print-block"><h3>${title}</h3>${html}</section>` : "";
-  area.innerHTML = `<div class="hd-print">
-    <header class="hd-print-head"><div><h1>Dashboard Hasil Emisi &middot; ${escHtml(p)}</h1><div class="sub">${escHtml(hdScopeDescription())}</div></div><div class="sub">Dicetak ${new Date().toLocaleString("id-ID")}</div></header>
-    ${grab("hdInsight")}
-    <div class="hd-kpis">${grab("hdStats")}</div>
-    ${block("Trend Hasil per Periode", grab("hdTrendChart")+`<div class="legend">${grab("hdTrendLegend")}</div>`)}
-    <div class="hd-print-2">${block("Distribution terhadap Baku Mutu", grab("hdDistChart"))}${block("Heatmap", grab("hdHeatmap"))}</div>
-    ${block("Priority Watchlist", grab("hdWatchlist"))}
-    ${block("Running Hour Trend per Site", grab("hdRhTrend")+`<div class="legend">${grab("hdRhTrendLegend")}</div>`)}
-    ${block("Engine Utilization", grab("hdRhTable"))}
-  </div>`;
-  if(typeof setPrintOrientation==="function") setPrintOrientation("landscape", 10);
-  window.print();
+  let chapters = [];
+  try{
+    hdSel.cerobong.clear(); hdTrendMode = null; hdHeatMode = "site"; hdRhGran = "semester"; hdRhShowAll = false;
+    els.f.value = o.from; els.t.value = o.to;
+    o.params.forEach(param=>{
+      siteGroups.forEach(group=>{
+        els.p.value = param;
+        hdSel.site = new Set(group);
+        const filtered = hasilDashboardFiltered(), all = hasilDashboardFilteredAllParams();
+        const periods = hdSortPeriods(filtered.map(r=>r.periode));
+        const ctx = hdBuildContext(filtered, all, periods);
+        const siteLabel = group.length ? (group.length===1 ? `Site ${group[0]}` : `Site ${group.join(", ")}`) : "Semua site";
+        if(!filtered.length){ chapters.push(`<section class="hd-print-chapter"><header class="hd-print-head"><div><h1>${escHtml(param)} &middot; ${escHtml(siteLabel)}</h1><div class="sub">${o.from} sampai ${o.to}</div></div></header><div class="hd-empty">Tidak ada data untuk kombinasi ini.</div></section>`); return; }
+        const tr = sec("trend") ? buildHdTrend(ctx) : null, hm = sec("heat") ? buildHdHeatmap(ctx) : null;
+        const rt = sec("rh") ? buildHdRhTrend(ctx) : null, rtab = sec("rh") ? buildHdRhTable(ctx) : null;
+        chapters.push(`<section class="hd-print-chapter">
+          <header class="hd-print-head"><div><h1>${escHtml(param)} &middot; ${escHtml(siteLabel)}</h1><div class="sub">Periode ${o.from} sampai ${o.to} &middot; ${filtered.length} baris data &middot; ${escHtml(hdScopeDescription())}</div></div><div class="sub">Dashboard Hasil Emisi</div></header>
+          ${sec("summary") ? buildHdInsight(ctx) : ""}
+          ${sec("kpi") ? `<div class="hd-kpis">${buildHdKpis(ctx)}</div>` : ""}
+          ${tr ? block("Trend Hasil per Periode", tr.svg+`<div class="legend">${tr.legend}</div>`) : ""}
+          <div class="hd-print-2">${sec("dist") ? block("Distribution terhadap Baku Mutu", buildHdDistribution(ctx)) : ""}${hm ? block(`Heatmap ${hm.title}`, hm.html) : ""}</div>
+          ${sec("site") ? block("Rekap per Site", hdPrintSiteSummary(ctx)) : ""}
+          ${sec("watch") ? block("Priority Watchlist", buildHdWatchlist(ctx)) : ""}
+          ${rt ? block("Running Hour per Site", rt.svg+`<div class="legend">${rt.legend}</div>`) : ""}
+          ${rtab ? block("Engine Utilization", rtab.html) : ""}
+          ${sec("detail") ? block(`Data ${ctx.last||""}`, hdPrintDetailTable(ctx)) : ""}
+        </section>`);
+      });
+    });
+  }finally{
+    els.p.value = saved.p; els.f.value = saved.f; els.t.value = saved.t;
+    hdSel.site = saved.site; hdSel.cerobong = saved.cerobong; hdTrendMode = saved.trend; hdHeatMode = saved.heat; hdRhGran = saved.gran; hdRhShowAll = saved.rhAll;
+    renderHasilDashboard();
+  }
+  const [w,h] = HD_PAPER[o.paper] || HD_PAPER.A4;
+  const [pw,ph] = o.orient==="landscape" ? [Math.max(w,h),Math.min(w,h)] : [Math.min(w,h),Math.max(w,h)];
+  let styleEl = document.getElementById("printOrientationStyle");
+  if(!styleEl){ styleEl = document.createElement("style"); styleEl.id = "printOrientationStyle"; document.head.appendChild(styleEl); }
+  styleEl.textContent = `@page{size:${pw}mm ${ph}mm;margin:10mm;}`;
+  document.getElementById("printGuideArea").innerHTML = `<div class="hd-print ${o.orient} paper-${o.paper}">${chapters.join("")}</div>`;
+  closeModal();
+  setTimeout(()=>window.print(), 60);
 }
 function hdJumpTo(id){
   const el = document.getElementById(id);

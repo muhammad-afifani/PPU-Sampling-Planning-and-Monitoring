@@ -260,9 +260,10 @@ function openModal(html, opts){
   // di style.css) — dipakai opt-in per modal krn modal lain (form sederhana dll) masih mengandalkan
   // .modal bawaan (overflow-y:auto di elemen itu sendiri), bukan body scroll terpisah.
   document.getElementById("modalBox").classList.toggle("scrollbody", !!(opts&&opts.scrollBody));
+  document.getElementById("modalBox").classList.toggle("zoom", !!(opts&&opts.zoom));
   document.getElementById("overlay").classList.add("show");
 }
-function closeModal(){ document.getElementById("overlay").classList.remove("show"); document.getElementById("modalBox").innerHTML=""; document.getElementById("modalBox").classList.remove("wide","scrollbody"); }
+function closeModal(){ document.getElementById("overlay").classList.remove("show"); document.getElementById("modalBox").innerHTML=""; document.getElementById("modalBox").classList.remove("wide","scrollbody","zoom","hd-print-dialog"); }
 document.getElementById("overlay").addEventListener("click", e=>{ if(e.target.id==="overlay") closeModal(); });
 // Bayangan "masih ada konten di atas/bawah" utk elemen body yang scroll sendiri di dalam modal
 // (lihat .has-more-above/.has-more-below di style.css) — supaya user tidak perlu menebak apakah

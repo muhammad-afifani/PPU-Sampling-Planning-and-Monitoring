@@ -138,6 +138,7 @@ const ACTIONS = {
   hdPickCerobong:(t)=>hdTogglePickCerobong(t.dataset.val),
   hdExportFiltered:()=>hdExportFiltered(),
   hdPrintDashboard:()=>hdPrintDashboard(),
+  hdPrintRun:()=>hdPrintRun(),
   hdJump:(t)=>hdJumpTo(t.dataset.target),
   hdToggleCerobongPanel:()=>{
     hdCerobongPanelOpen = !hdCerobongPanelOpen;
@@ -174,6 +175,12 @@ const ACTIONS = {
   simSetParam:(t)=>simSetParam(t.dataset.val),
   simPreset:(t)=>simApplyPreset(t.dataset.val),
   simToggleAll:()=>{ simShowAll = !simShowAll; hdRunSimulation(); },
+  simShowFilter:(t)=>{ simShowFilter = t.dataset.val; simShowAll = false; hdRunSimulation(); },
+  simSiteToggle:(t)=>{ const v = t.dataset.val; if(!v) simSiteShow.clear(); else if(simSiteShow.has(v)) simSiteShow.delete(v); else simSiteShow.add(v); hdRunSimulation(); },
+  simManualToggle:(t)=>{ const v = t.dataset.val; if(simManual.has(v)) simManual.delete(v); else simManual.add(v); hdRunSimulation(); },
+  simManualPreset:(t)=>{ simManual.clear(); if(t.dataset.val==="ever" && simLast) simLast.engines.filter(e=>e.exceedCount>0).forEach(e=>simManual.add(e.cerobong)); hdRunSimulation(); },
+  simSetDriverScope:(t)=>{ simDriverScope = t.dataset.val; hdRunSimulation(); },
+  simExportXlsx:()=>simExportXlsx(),
   simChip:(t)=>{
     const field = t.dataset.field, val = t.dataset.val;
     if(!val){ simSel[field].clear(); } else if(simSel[field].has(val)){ simSel[field].delete(val); } else { simSel[field].add(val); }
@@ -184,11 +191,15 @@ const ACTIONS = {
   simSetTrendMode:(t)=>{ simTrendMode = t.dataset.mode; hdRunSimulation(); },
   // Menampilkan salinan isi chart pada modal yang lebih lebar, dipakai sebagai fungsi memperbesar
   // tampilan chart tanpa perlu membuat ulang logika chart di tempat lain.
+  // Viewer "Perbesar": modal hampir layar penuh dengan header tetap dan body yang scroll sendiri,
+  // supaya chart lebar tidak mengecil dan tabel panjang tidak terpotong tanpa bisa di-scroll
+  // (versi lama: .modal max 900px + wadah 75vh di dalam flex, sehingga isi bisa menyusut/terpotong).
   hdZoomChart:(t)=>{
     const src = document.getElementById(t.dataset.target);
     if(!src) return;
     const title = t.dataset.title || "";
-    openModal(`<h3>${escHtml(title)}</h3><div style="max-height:75vh;overflow:auto;">${src.innerHTML}</div><div class="actions"><button class="btn" data-action="closeModal">Tutup</button></div>`, {wide:true});
+    openModal(`<div class="hd-zoom-head"><h3>${escHtml(title)}</h3><button class="btn small" data-action="closeModal">Tutup</button></div><div class="hd-zoom-body">${src.innerHTML}</div>`, {zoom:true});
+    document.querySelectorAll("#modalBox .hd-zoom-body [id]:not(marker)").forEach(el=>el.removeAttribute("id"));
   },
   setMasterView:(t)=>{ masterView = t.dataset.view; save2LocalUiState(); renderMaster(); },
   expandAllMaster:()=>{

@@ -425,7 +425,7 @@ function buildHasilDonutChart(filtered){
   // KPI Compliance Rate di atas. Dulu dibagi total semua status, jadi data "belum dievaluasi" ikut
   // menurunkan persentase dan angkanya tidak cocok dengan KPI.
   const comp = withStd.length ? Math.round(ok/withStd.length*1000)/10 : null;
-  const svg = `<svg viewBox="0 0 220 220" style="width:200px;height:200px;display:block;margin:0 auto;" role="img" aria-label="Compliance ${comp==null?"-":comp+"%"}">
+  const svg = `<svg class="hd-donut" viewBox="0 0 220 220" style="width:200px;height:200px;display:block;margin:0 auto;" role="img" aria-label="Compliance ${comp==null?"-":comp+"%"}">
     ${paths}
     <text x="110" y="106" text-anchor="middle" font-size="26" font-weight="800" fill="var(--heading)">${comp==null?"-":String(comp).replace(".",",")+"%"}</text>
     <text x="110" y="126" text-anchor="middle" font-size="11" fill="var(--gray-500)">${comp==null?"tanpa baku mutu":"compliant"}</text>
