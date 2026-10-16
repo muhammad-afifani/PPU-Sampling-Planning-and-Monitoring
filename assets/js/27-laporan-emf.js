@@ -544,28 +544,63 @@ function emfBuildAmbienBlocks(site, period){
   });
   return out;
 }
+// Peruntukan kawasan pemantauan kebisingan per site (KepMenLH 48/1996). Default Industri (70 dB(A));
+// BPN (kompleks perumahan/permukiman) memakai baku Perumahan dan Permukiman 55 dB(A).
+const EMF_NOISE_KAWASAN = {
+  default:{nama:"Industri", baku:70, full:false},
+  BPN:{nama:"Perumahan dan Permukiman", baku:55, full:true}
+};
+function emfNoiseKawasan(site){ return EMF_NOISE_KAWASAN[site] || EMF_NOISE_KAWASAN.default; }
+const EMF_NOISE_BM = [
+  ["h","a.","Peruntukan Kawasan"],
+  ["Perumahan dan Permukiman","55"],["Perdagangan dan Jasa","70"],["Perkantoran dan Perdagangan","65"],["Ruang Terbuka Hijau","50"],
+  ["Industri","70"],["Pemerintahan dan Fasilitas Umum","60"],["Rekreasi","70"],
+  ["Spesial",""],["Bandar Udara *",""],["Stasiun Kereta Api *",""],["Pelabuhan Laut","70"],["Cagar Budaya","60"],
+  ["h","b.","Lingkungan Kegiatan"],
+  ["Rumah Sakit atau sejenisnya","55"],["Sekolah atau sejenisnya","55"],["Tempat Ibadah atau sejenisnya","55"]
+];
+function emfNoiseBmTable(highlight){
+  const nb = "\u00A0\u00A0\u00A0\u00A0";
+  const rows = EMF_NOISE_BM.map(x=>{
+    if(x[0]==="h") return [C(x[1]+" "+x[2], {cs:2, bold:true})];
+    const hl = x[0]===highlight;
+    return [C(nb+x[0], hl?{bold:true}:{}), C(x[1]?emfVal(x[1]):"", {align:"center", bold:hl})];
+  });
+  return {columns:[{l:"Peruntukan Kawasan",w:68},{l:"Tingkat Kebisingan (dB(A))",w:32}], rows};
+}
 function emfNoiseHourOrder(h){ const m = /^L\s*(\d+)/i.exec(h.label||""); return m ? Number(m[1]) : 99; }
 function emfBuildKebisinganBlocks(site, period){
   const out = [];
   const recs = emfAmbRecords("kebisingan", site, period);
   const hasPoints = emfAmbPointsOf(site, "kebisingan").length>0;
   if(!recs.length && !hasPoints) return out;
-  const baku = (recs.find(r=>r.baku!=null)||{}).baku || 70;
+  const kaw = emfNoiseKawasan(site);
+  const baku = kaw.baku;
   if(emfState.includeRef){
-    out.push(emfBlock({key:"bm-kebisingan", ref:true, sheet:"BM Kebisingan", caption:"Baku Mutu dan Frekuensi Pemantauan Kebisingan", subcaption:EMF_REG.kebisingan,
-      tables:[{columns:[{l:"Peruntukan Kawasan",w:40},{l:"Tingkat Kebisingan (dB(A))",w:30},{l:"Frekuensi Pemantauan",w:30}],
-        rows:[[C("Industri"), C(emfVal(baku), {align:"center"}), C("1 x 6 bulan", {align:"center"})]]}],
-      notes:["Faktor toleransi: + 3 dB(A)."]}));
+    const rencana = {columns:[{l:"Berlaku untuk PHM",w:40},{l:"Level Kebisingan (dB(A))",w:30},{l:"Frekuensi Pemantauan",w:30}],
+      rows:[[C(kaw.nama), C(emfVal(baku), {align:"center"}), C("1 x 6 bulan", {align:"center"})]]};
+    if(kaw.full){
+      out.push(emfBlock({key:"bm-kebisingan", ref:true, sheet:"BM Kebisingan", caption:"Baku Mutu dan Frekuensi Pemantauan Kebisingan", subcaption:EMF_REG.kebisingan,
+        tables:[emfNoiseBmTable(kaw.nama)],
+        notes:["Catatan:", "* Disesuaikan dengan ketentuan Menteri Perhubungan", "* Faktor toleransi: + 3 dB(A)"]}));
+      out.push(emfBlock({key:"rencana-kebisingan", ref:true, sheet:"Rencana Kebisingan", caption:"Rencana Pemantauan Kebisingan",
+        tables:[rencana], notes:["Catatan:", "* Faktor toleransi: + 3 dB(A)"]}));
+    } else {
+      out.push(emfBlock({key:"bm-kebisingan", ref:true, sheet:"BM Kebisingan", caption:"Baku Mutu dan Frekuensi Pemantauan Kebisingan", subcaption:EMF_REG.kebisingan,
+        tables:[rencana], notes:["Faktor toleransi: + 3 dB(A)."]}));
+    }
   }
   if(!recs.length){ out.push(emfEmptyBlock("Tingkat Kebisingan", site, period, "kebisingan")); return out; }
   emfGroupByTitik(recs).forEach(group=>{
     const r = group[0];
     const name = emfAmbTitikName(r);
-    const b = r.baku!=null ? r.baku : baku;
+    const b = baku;
+    const okLSM = Number(r.lSiangMalam) <= b;
+    const stat = kaw.full || r.baku!==baku ? (isNaN(Number(r.lSiangMalam)) ? r.statusBakuMutu : (okLSM?"ok":"exceed")) : r.statusBakuMutu;
     const main = [
       [C("L Siang (LS) — 06.00–22.00"), C(emfVal(r.lSiang), {align:"center"}), C("–", {align:"center"}), C(r.metode||"–", {align:"center", rs:3}), C("–", {align:"center"})],
       [C("L Malam (LM) — 22.00–06.00"), C(emfVal(r.lMalam), {align:"center"}), C("–", {align:"center"}), C("–", {align:"center"})],
-      [C("L Siang-Malam (LSM)", {bold:true}), C(emfVal(r.lSiangMalam), {align:"center", bold:true}), C(emfVal(b)+" (+3)", {align:"center"}), emfStatusOf(r.statusBakuMutu)]
+      [C("L Siang-Malam (LSM)", {bold:true}), C(emfVal(r.lSiangMalam), {align:"center", bold:true}), C(emfVal(b)+" (+3)", {align:"center"}), emfStatusOf(stat)]
     ];
     const hours = (r.hourly||[]).slice().sort((x,y)=>emfNoiseHourOrder(x)-emfNoiseHourOrder(y));
     const tables = [{columns:[{l:"Parameter",w:34},{l:"Hasil (dB(A))",w:16},{l:"Baku Mutu (dB(A))",w:16},{l:"Metode",w:18},{l:"Status",w:16}], rows:main}];
@@ -584,9 +619,9 @@ function emfBuildKebisinganBlocks(site, period){
       for(let c=0;c<4;c++) hc.push({l:"Waktu",w:14}, {l:"dB(A)",w:11});
       tables.push({subcaption:"Data pengukuran tingkat kebisingan per jam (Leq 10 menit)", columns:hc, rows:hrows});
     }
-    const ok = r.statusBakuMutu!=="exceed";
+    const ok = stat!=="exceed";
     out.push(emfBlock({res:true, sheet:"Kebisingan "+name, caption:`Tingkat Kebisingan di ${name}`, subcaption:emfLocLine(site, name, [r.tanggal]), tables,
-      summary:`Tingkat kebisingan siang-malam (LSM) di ${name} pada ${emfPeriodText(period)} sebesar ${emfVal(r.lSiangMalam)} dB(A), ${ok?"memenuhi":"melebihi"} baku mutu kawasan industri ${emfVal(b)} dB(A) berdasarkan ${EMF_REG.kebisingan}.`}));
+      summary:`Tingkat kebisingan siang-malam (LSM) di ${name} pada ${emfPeriodText(period)} sebesar ${emfVal(r.lSiangMalam)} dB(A), ${ok?"memenuhi":"melebihi"} baku mutu kawasan ${kaw.nama.toLowerCase()} ${emfVal(b)} dB(A) berdasarkan ${EMF_REG.kebisingan}.`}));
   });
   return out;
 }
@@ -735,8 +770,10 @@ function emfNarrateAmbient(site, period, blocks, cat){
       `Hal ini merupakan kewajiban dari PT Pertamina Hulu Mahakam untuk melakukan pemantauan udara ambien di wilayah ${emfJoinNames(names)} sesuai dengan parameter pada {{T:bm-ambien|PP No. 22 Tahun 2021 Lampiran VII}}. Pada ${P}, pemantauan dilakukan oleh petugas pengambil contoh (PPC) dari ${lab}${dt?` yang dilaksanakan pada tanggal ${dt}`:""}. ${emfAnalisisText()} Hasil analisis kualitas udara ambien pada ${P} ditunjukkan pada tabel berikut.`];
   } else if(cat==="kebisingan"){
     intro = [{h:"Kebisingan"}, "Baku mutu pemantauan kebisingan mengacu kepada Keputusan Menteri Negara Lingkungan Hidup No. 48 Tahun 1996."];
-    if(names.length) loc = [`Lokasi pemantauan kebisingan adalah di ${emfLocPhrase(site, names)}.`,
-      `Tingkat kebisingan pada ${emfJoinNames(names)} mengacu kepada kategori Industri berdasarkan Keputusan Menteri Negara Lingkungan Hidup No. 48 Tahun 1996.${dt?` Pemantauan dilakukan pada tanggal ${dt}.`:""} ${emfAnalisisText()} Hasil dari analisis untuk tingkat kebisingan pada ${P} ditunjukkan pada tabel berikut.`];
+    if(names.length) loc = (names.length>1
+      ? ["Lokasi pemantauan kebisingan adalah:", {li:names.map(n=>{ const c = emfCoordOf(site, n); return `- ${n}${c?` (${c.ls} – ${c.bt})`:""}`; })}]
+      : [`Lokasi pemantauan kebisingan adalah di ${emfLocPhrase(site, names)}.`]).concat([
+      `Tingkat kebisingan pada ${emfJoinNames(names)} mengacu kepada kategori ${emfNoiseKawasan(site).nama} berdasarkan Keputusan Menteri Negara Lingkungan Hidup No. 48 Tahun 1996.${dt?` Pemantauan dilakukan pada tanggal ${dt}.`:""} ${emfAnalisisText()} Hasil dari analisis untuk tingkat kebisingan pada ${P} ditunjukkan pada tabel berikut.`]);
   } else if(cat==="kebauan"){
     const over = emfOverCompliance(site, ["kebauan"]);
     intro = [{h:"Kebauan"}].concat(over?["Bukan komitmen Persetujuan Lingkungan PHM (melebihi ketaatan)."]:[],
