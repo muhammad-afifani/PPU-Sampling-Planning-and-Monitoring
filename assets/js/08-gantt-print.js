@@ -656,7 +656,7 @@ function buildDayGridView(rows){
   const allDates = rows.flatMap(r=>[r.start,r.end]);
   const minDate = allDates.reduce((a,b)=>a<b?a:b), maxDate = allDates.reduce((a,b)=>a>b?a:b);
   const totalDays = daysBetweenInclusive(minDate, maxDate);
-  document.getElementById("ganttMeta").innerHTML = `Periode jadwal: <b>${minDate}</b> &rarr; <b>${maxDate}</b> (${totalDays} hari) &middot; ${rows.length} baris site &middot; tarik (drag) kotak berwarna ke tanggal lain untuk menggeser jadwal.`;
+  document.getElementById("ganttMeta").innerHTML = `<b>${minDate}</b> &rarr; <b>${maxDate}</b> &middot; ${totalDays} hari &middot; ${rows.length} site &middot; tarik kotak berwarna ke tanggal lain untuk menggeser jadwal`;
 
   const asgByRow = new Map(rows.map(r=>[r, (r.batch && r.rowIdx!=null) ? dailyAssignmentForRow(r.batch, r) : {}]));
   const today = todayStr();
@@ -732,8 +732,8 @@ function buildDayGridView(rows){
     // manapun digeser drag-drop, tidak perlu disinkronkan manual.
     const nextRow = (r.batch && r.rowIdx!=null) ? r.batch.schedule[r.rowIdx+1] : null;
     const transitionDate = nextRow ? nextRow.start : null;
-    const transitionInfoLine = nextRow ? `<br><span style="color:#c98a1a;">&#8594; Pindah ke ${escHtml(nextRow.site)}: mulai ${nextRow.start} <span class="muted" style="font-size:10px;">(tarik &#8594; di kalender utk geser)</span></span>${r.ignoreCrewChange?` <span class="badge b-amber" style="font-size:9px;padding:0 5px;" title="Diatur lewat tombol Adjust — tanggal pindah boleh jatuh tepat di hari crew change ${escHtml(r.site)}">Crew change diabaikan</span>`:""}` : "";
-    html += `<tr><td class="dg-td-label dg-col-sticky" draggable="${r.batch?"true":"false"}" data-batch-id="${r.batch?r.batch.id:""}" data-row-idx="${r.rowIdx}"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${dragHandle}<b>${escHtml(r.site)}</b>${adjustBtn}${dayDetailBtn}${progressBadge}${excludedBadge}</div><div class="sub">${escHtml(r.batchName)} &middot; ${r.workDays} hari kerja${r.bufferDays?" + "+r.bufferDays+" buffer":""} &middot; ${r.start} &rarr; ${r.end}${r.adjustNote?`<br><span style="color:#a02a24;">&#9998; ${escHtml(r.adjustNote)}</span>`:""}${transitionInfoLine}</div></td>`;
+    const transitionInfoLine = nextRow ? `<br><span class="dg-next" title="Tarik kotak &#8594; di kalender untuk menggeser tanggal pindah">&#8594; Pindah ke <b>${escHtml(nextRow.site)}</b> &middot; ${scFmtLongDate(nextRow.start)}</span>${r.ignoreCrewChange?` <span class="badge b-amber" style="font-size:9px;padding:0 5px;" title="Diatur lewat tombol Adjust — tanggal pindah boleh jatuh tepat di hari crew change ${escHtml(r.site)}">Crew change diabaikan</span>`:""}` : "";
+    html += `<tr><td class="dg-td-label dg-col-sticky" draggable="${r.batch?"true":"false"}" data-batch-id="${r.batch?r.batch.id:""}" data-row-idx="${r.rowIdx}"><div class="dg-label-top">${dragHandle}<span class="dg-site-dot" style="--site-c:${(typeof HASIL_SITE_COLORS!=="undefined" && HASIL_SITE_COLORS[r.site])||"#7f8fa0"};"></span><b>${escHtml(r.site)}</b>${progressBadge}${excludedBadge}<span class="dg-label-actions">${adjustBtn}${dayDetailBtn}</span></div><div class="sub" title="${escHtml(r.batchName)} · ${r.start} → ${r.end}">${escHtml(r.batchName)} &middot; ${r.workDays} hari kerja${r.bufferDays?" + "+r.bufferDays+" buffer":""}<br><span class="dg-range">${scFmtShortDate(r.start)} &rarr; ${scFmtShortDate(r.end)}</span>${r.adjustNote?`<br><span style="color:#a02a24;">&#9998; ${escHtml(r.adjustNote)}</span>`:""}${transitionInfoLine}</div></td>`;
     for(let i=0;i<totalDays;i++){
       const dt = addDays(minDate,i);
       const inRange = dt>=r.start && dt<=r.end;
@@ -756,7 +756,8 @@ function buildDayGridView(rows){
           html += `<td class="dg-day-cell dg-empty dg-transition${isToday?" dg-today-col":""}${ccEmpty?" dg-cc-empty":""}" draggable="true" data-batch-id="${r.batch.id}" data-row-idx="${r.rowIdx}" data-date="${dt}" title="${escHtml(title)}"><span class="dg-transition-arrow">&#8594;</span></td>`;
         } else {
           const title = ccEmpty ? `${r.site} — ${dt} (hari crew change)` : "";
-          html += `<td class="dg-day-cell dg-empty${isToday?" dg-today-col":""}${ccEmpty?" dg-cc-empty":""}" data-date="${dt}" title="${escHtml(title)}"></td>`;
+          const dowE = dayOfWeek(dt);
+          html += `<td class="dg-day-cell dg-empty${(dowE===0||dowE===6)?" dg-we":""}${isToday?" dg-today-col":""}${ccEmpty?" dg-cc-empty":""}" data-date="${dt}" title="${escHtml(title)}"></td>`;
         }
       } else {
         const a = asg[dt] || {points:[], isBuffer:false};
@@ -791,12 +792,13 @@ function buildDayGridView(rows){
     html += `<td class="dg-td-detail">${pillsHtml || "-"}</td></tr>`;
   });
   html += `</tbody></table></div>`;
-  html += `<div class="legend" style="margin-top:12px;">
+  html += `<div class="legend gn-legend">
     <span class="item"><span class="sw" style="background:#0ea5a0"></span> Sampling Emisi</span>
     <span class="item"><span class="sw" style="background:#3d78c9"></span> Sampling Ambient</span>
-    <span class="item"><span class="sw" style="background:#0ea5a0;opacity:.5;"></span> Hari Buffer (pudar)</span>
-    <span class="item"><span class="sw" style="background:var(--surface-card);box-shadow:inset 0 0 0 2px #e0554f;"></span> Hari Crew Change (info — larangan cuma berlaku utk BERANGKAT dari site itu, datang tetap aman)</span>
-    <span class="item"><span class="sw" style="background:#fdf3e3;box-shadow:inset 0 0 0 2px #c98a1a;"></span> &#8594; Pindah ke Site Berikutnya</span>
+    <span class="item"><span class="sw dg-sw-buffer"></span> Hari buffer</span>
+    <span class="item"><span class="sw dg-sw-cc"></span> Hari crew change <span class="muted">(larangan hanya utk BERANGKAT dari site itu)</span></span>
+    <span class="item"><span class="sw dg-sw-tr">&#8594;</span> Pindah ke site berikutnya</span>
+    <span class="item"><span class="sw dg-sw-today"></span> Hari ini</span>
   </div>`;
   return html;
 }
@@ -1142,10 +1144,40 @@ function renderGanttCrewChangeInfo(batches){
   if(!el) return;
   const sites = [...new Set(batches.flatMap(b=>(b.schedule||[]).map(r=>r.site)))].sort();
   if(!sites.length){ el.innerHTML = ""; return; }
-  el.innerHTML = `<b>Hari Crew Change per Site:</b> ` + sites.map(s=>{
+  el.innerHTML = `<span class="gn-cc-lbl">Crew change</span>` + sites.map(s=>{
     const day = DB.siteRules[s] ? DB.siteRules[s].crewChangeDay : "";
-    return `${escHtml(s)}: <b style="${day===""||day==null?"":"color:#a02a24;"}">${day===""||day==null?"tidak diatur":DOW_LABEL[Number(day)]}</b>`;
-  }).join(" &middot; ") + ` <span class="muted">(ubah di Aturan Site &amp; Rute)</span>`;
+    const none = day===""||day==null;
+    return `<span class="gn-cc-chip${none?" none":""}"><span class="dg-site-dot" style="--site-c:${(typeof HASIL_SITE_COLORS!=="undefined" && HASIL_SITE_COLORS[s])||"#7f8fa0"};"></span>${escHtml(s)} <b>${none?"—":DOW_LABEL[Number(day)]}</b></span>`;
+  }).join("") + ` <span class="hint" style="margin:0;">ubah di Aturan Site &amp; Rute</span>`;
+}
+// Strip KPI ringkas di atas Jadwal Harian — dihitung dari batch yg sedang tampil (sumber data sama dgn
+// badge "x/y selesai" & "dikeluarkan" di tiap baris site), murni tampilan.
+function renderGanttKpis(batches){
+  const el = document.getElementById("ganttKpis");
+  if(!el) return;
+  const rows = batches.flatMap(b=>(b.schedule||[]).map(r=>({r,b})));
+  if(!rows.length){ el.innerHTML = ""; return; }
+  const starts = rows.map(x=>x.r.start).filter(Boolean), ends = rows.map(x=>x.r.end).filter(Boolean);
+  const minD = starts.reduce((a,c)=>a<c?a:c), maxD = ends.reduce((a,c)=>a>c?a:c);
+  let active=0, done=0, excl=0;
+  rows.forEach(({r,b})=>{
+    const pts = allPointsForSite(b, r.site);
+    const ex = b.excluded||[];
+    pts.forEach(p=>{ if(ex.includes(p.id)) excl++; else { active++; if(p.status==="done") done++; } });
+  });
+  const today = todayStr();
+  const nowRow = rows.find(x=>x.r.start<=today && x.r.end>=today);
+  const nextRow = rows.filter(x=>x.r.start>today).sort((a,c)=>a.r.start.localeCompare(c.r.start))[0];
+  const pct = active ? Math.round(done/active*100) : 0;
+  const tile = (lbl,val,sub,tone,bar)=>`<div class="dp-kpi ${tone||""}"><div class="dp-kpi-lbl">${lbl}</div><div class="dp-kpi-val">${val}</div>${bar!=null?`<div class="dp-kpi-bar"><i style="width:${bar}%"></i></div>`:""}<div class="dp-kpi-sub">${sub}</div></div>`;
+  const fmt = d=>scFmtShortDate(d);
+  el.innerHTML =
+    tile("Periode", `${daysBetweenInclusive(minD,maxD)}<small> hari</small>`, `${fmt(minD)} &rarr; ${fmt(maxD)} ${maxD.slice(0,4)}`, "") +
+    tile("Site", new Set(rows.map(x=>x.r.site)).size, `${batches.length} batch tampil`, "teal") +
+    tile("Titik aktif", active, excl ? `${excl} dikeluarkan dari batch` : "tidak ada yang dikeluarkan", "blue") +
+    tile("Selesai", `${done}<small>/${active}</small>`, `${pct}% sudah disampling`, "good", pct) +
+    tile("Sedang berjalan", nowRow ? escHtml(nowRow.r.site) : "—", nowRow ? `${fmt(nowRow.r.start)} &rarr; ${fmt(nowRow.r.end)}` : "tidak ada site aktif hari ini", nowRow ? "warn" : "") +
+    tile("Berikutnya", nextRow ? escHtml(nextRow.r.site) : "—", nextRow ? `mulai ${scFmtLongDate(nextRow.r.start)}` : "semua site sudah dimulai", "");
 }
 function renderGantt(){
   refreshGanttBatchSelect();
@@ -1155,7 +1187,10 @@ function renderGantt(){
   let batches = view==="overlay" ? DB.batches : DB.batches.filter(b=>b.team===view);
   if(batchId) batches = batches.filter(b=>b.id===batchId);
   renderGanttCrewChangeInfo(batches);
+  renderGanttKpis(batches);
   const mode = document.getElementById("ganttMode").value;
+  const barLegend = document.getElementById("ganttBarLegend");
+  if(barLegend) barLegend.style.display = mode==="bar" ? "" : "none";
   if(mode==="bar"){
     document.getElementById("ganttWrap").innerHTML = buildGanttSVG(batches);
   } else {
