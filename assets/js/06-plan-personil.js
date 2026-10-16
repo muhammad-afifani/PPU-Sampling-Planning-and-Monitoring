@@ -74,62 +74,67 @@ function renderRencana(){
   const doneCount = wajibPts.filter(p=>periodOfPointStatus(p,period).startsWith("done")).length;
   const emgTrigCount = wajibPts.filter(p=>isEmergencyEngine(p)).length;
   const belumCount = wajibPts.filter(p=>periodOfPointStatus(p,period)==="pending").length;
-  document.getElementById("rcStats").innerHTML = `
-    <div class="stat"><div class="num">${wajibPts.length}</div><div class="lbl">Total Wajib Pantau ${escHtml(period)}</div></div>
-    <div class="stat good"><div class="num">${doneCount}</div><div class="lbl">Sudah/Pernah Dipantau</div></div>
-    <div class="stat warn"><div class="num">${belumCount}</div><div class="lbl">Belum Direncanakan</div></div>
-    <div class="stat ${emgTrigCount?"bad":""}"><div class="num">${emgTrigCount}</div><div class="lbl">Termasuk Emergency (RH&gt;200j)</div></div>
-  `;
-
-  // Resume Titik Emisi vs Ambient — dihitung dari `rows`, set yang SAMA dipakai tabel di bawah
-  // (sudah kena filter periode+site+cari), jadi otomatis ikut berubah begitu filter di atas
-  // diganti. Angka besar (kartu .stat, bukan bar tipis) + rincian per site supaya langsung
-  // kebaca tanpa harus menyipitkan mata.
+  const schedCount = wajibPts.filter(p=>periodOfPointStatus(p,period)==="scheduled-period").length;
   const rcEmisiCount = rows.filter(p=>p.kategori==="emisi").length;
   const rcAmbientCount = rows.length - rcEmisiCount;
-  const rcSites = [...new Set(rows.map(p=>p.site))].sort();
-  document.getElementById("rcGroupBars").innerHTML = `
-    <div class="grid cols-2" style="margin-bottom:12px;">
-      <div class="stat"><div class="num">${rcEmisiCount}</div><div class="lbl">Titik Emisi</div></div>
-      <div class="stat"><div class="num">${rcAmbientCount}</div><div class="lbl">Titik Ambient (Ambient/Kebisingan/Kebauan/Getaran)</div></div>
-    </div>
-    <div class="tablewrap"><table>
-      <thead><tr><th>Site</th><th style="text-align:right;">Emisi</th><th style="text-align:right;">Ambient</th><th style="text-align:right;">Total</th></tr></thead>
-      <tbody>${rcSites.map(s=>{
-        const sp = rows.filter(p=>p.site===s);
-        const e = sp.filter(p=>p.kategori==="emisi").length;
-        const a = sp.length - e;
-        return `<tr><td>${escHtml(s)}</td><td style="text-align:right;">${e}</td><td style="text-align:right;">${a}</td><td style="text-align:right;"><b>${sp.length}</b></td></tr>`;
-      }).join("") || `<tr><td colspan="4" class="hint" style="padding:10px;">Tidak ada titik wajib pantau yang cocok filter saat ini.</td></tr>`}</tbody>
-    </table></div>`;
+  const tile = (lbl, val, sub, tone)=>`<div class="dp-kpi ${tone||""}"><span class="dp-kpi-lbl">${lbl}</span><span class="dp-kpi-val">${val}</span><span class="dp-kpi-sub">${sub}</span></div>`;
+  document.getElementById("rcStats").innerHTML =
+      tile(`Wajib pantau ${escHtml(period)}`, wajibPts.length, `${rcEmisiCount} emisi &middot; ${rcAmbientCount} lingkungan pada filter ini`, "teal")
+    + tile("Sudah / pernah dipantau", doneCount, wajibPts.length ? `${Math.round(doneCount/wajibPts.length*100)}% dari titik wajib` : "-", "good")
+    + tile("Terjadwal periode ini", schedCount, "sudah masuk jadwal batch", "blue")
+    + tile("Belum direncanakan", belumCount, "perlu dibuatkan batch", belumCount ? "warn" : "")
+    + tile("Emergency (RH &gt; 200 j)", emgTrigCount, "Emergency Engine yang jadi wajib", emgTrigCount ? "bad" : "")
+    + tile("Site", new Set(rows.map(p=>p.site)).size, "site dengan titik wajib pada filter ini", "");
 
-  document.getElementById("rcTable").innerHTML = `
-    <thead><tr><th style="width:26px;"></th><th>Site</th><th>Nama Titik</th><th>Grup</th><th>Dasar Wajib</th><th>Status</th><th>Progress Periode Ini</th></tr></thead>
-    <tbody>${rows.map(p=>{
-      const chk = existingChecks.has(p.id) ? existingChecks.get(p.id) : true;
-      const reason = wajibReason(p, period);
-      const dasar = reason.type==="emergency-triggered" ? `Emergency (RH ${reason.rh}j &gt;200j)` : "Reguler";
-      return `<tr>
-        <td><input type="checkbox" class="rcChk" data-id="${p.id}" ${chk?"checked":""}></td>
-        <td>${p.site}</td>
-        <td><b>${escHtml(p.nama)}</b></td>
-        <td class="muted" style="font-size:11.5px;">${escHtml(subgroupOf(p))}</td>
-        <td class="muted" style="font-size:11.5px;">${dasar}</td>
-        <td>${pointStatusBadge(p)}</td>
-        <td>${rencanaProgressBadge(p, period)}</td>
-      </tr>`;
-    }).join("") || `<tr><td colspan="7" class="hint" style="padding:14px;">Tidak ada titik wajib pantau yang cocok dengan filter untuk periode ini.</td></tr>`}</tbody>`;
+  // Daftar wajib per site lalu per grup sumber — gaya visual sama dengan Database Titik Pantau.
+  // Semua baris SELALU dirender (tanpa collapse) karena centang .rcChk dibaca langsung dari DOM
+  // oleh sendPlanToBatch & oleh render berikutnya (existingChecks).
+  const cnt = document.getElementById("rcCount"); if(cnt) cnt.textContent = `${rows.length} titik`;
+  const bySite = {};
+  rows.forEach(p=>{ (bySite[p.site]=bySite[p.site]||[]).push(p); });
+  const siteOrder = Object.keys(bySite).sort((a,b)=>{ const ia=MASTER_SITE_ORDER.indexOf(a), ib=MASTER_SITE_ORDER.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
+  document.getElementById("rcTree").innerHTML = siteOrder.length ? siteOrder.map(s=>{
+    const sp = bySite[s];
+    const e = sp.filter(p=>p.kategori==="emisi").length, amb = sp.length-e;
+    const done = sp.filter(p=>periodOfPointStatus(p,period).startsWith("done")).length;
+    const prog = sp.length ? Math.round(done/sp.length*100) : 0;
+    const allChecked = sp.every(p=>existingChecks.has(p.id) ? existingChecks.get(p.id) : true);
+    const bySub = {};
+    sp.forEach(p=>{ const sg = subgroupOf(p); (bySub[sg]=bySub[sg]||[]).push(p); });
+    const subs = Object.keys(bySub).sort((a,b)=>subgroupOrderIdx(bySub[a][0])-subgroupOrderIdx(bySub[b][0]));
+    return `<div class="tree-site dp-site" style="--site-c:${(typeof HASIL_SITE_COLORS!=="undefined" && HASIL_SITE_COLORS[s])||"#7f8fa0"};">
+      <div class="tree-head dp-site-head">
+        <label class="dp-site-chk" title="Centang / kosongkan semua titik ${escHtml(s)}"><input type="checkbox" data-action="rcPickSite" data-site="${escHtml(s)}" ${allChecked?"checked":""}></label>
+        <span class="dp-site-dot" aria-hidden="true"></span><b class="dp-site-name">${escHtml(s)}</b>
+        <span class="dp-pills"><span class="dp-pill">${sp.length} titik</span><span class="dp-pill">${e} emisi</span><span class="dp-pill">${amb} lingkungan</span></span>
+        <span class="spacer"></span>
+        <span class="dp-prog" title="${done} dari ${sp.length} titik sudah/pernah dipantau"><span class="dp-prog-bar"><i style="width:${prog}%"></i></span><span class="dp-prog-lbl">${done}/${sp.length} dipantau</span></span>
+      </div>
+      ${subs.map(sg=>{
+        const grpColor = typeof dashGrpVisual==="function" ? dashGrpVisual(sg).color : "var(--gray-500)";
+        return `<div class="tree-sub dp-sub" style="--grp-c:${grpColor};">
+          <div class="tree-subhead dp-sub-head" style="cursor:default;"><span class="dp-grp-bar" aria-hidden="true"></span>${escHtml(sg)} <span class="dp-count">${bySub[sg].length} titik</span></div>
+          <table class="tree-table dp-table"><thead><tr><th style="width:34px;"></th><th>Nama titik</th><th style="width:210px;">Dasar wajib</th><th style="width:150px;">Status</th><th style="width:230px;">Progress periode ini</th></tr></thead>
+          <tbody>${bySub[sg].map(p=>{
+            const chk = existingChecks.has(p.id) ? existingChecks.get(p.id) : true;
+            const reason = wajibReason(p, period);
+            const dasar = reason.type==="emergency-triggered" ? `<span class="badge b-red">Emergency &middot; RH ${reason.rh} j &gt; 200 j</span>` : `<span class="muted">Reguler</span>`;
+            const tag = p.kategori==="emisi" ? (p.kategoriSumber?`<span class="badge b-gray" style="margin-left:6px;font-size:9.5px;">${escHtml(p.kategoriSumber)}</span>`:"") : `<span class="badge ${NONEMISI_BADGE[p.kategori]||"b-gray"}" style="margin-left:6px;font-size:9.5px;">${escHtml(NONEMISI_LABEL[p.kategori]||p.kategori)}</span>`;
+            return `<tr>
+              <td><input type="checkbox" class="rcChk" data-id="${p.id}" data-site="${escHtml(p.site)}" ${chk?"checked":""}></td>
+              <td><b>${escHtml(p.nama)}</b>${tag}</td>
+              <td>${dasar}</td>
+              <td>${pointStatusBadge(p)}</td>
+              <td>${rencanaProgressBadge(p, period)}</td>
+            </tr>`;
+          }).join("")}</tbody></table>
+        </div>`;
+      }).join("")}
+    </div>`;
+  }).join("") : `<div class="hint" style="padding:16px;">Tidak ada titik wajib pantau yang cocok dengan filter untuk periode ini.</div>`;
 
   renderRencanaCards(period, site, search);
-
-  document.getElementById("rcExemptTable").innerHTML = `
-    <thead><tr><th>Site</th><th>Nama Titik</th><th>Kategori Sumber</th><th style="text-align:right;">RH Trailing 12 Bln</th><th>Ambang</th></tr></thead>
-    <tbody>${exemptEmg.map(p=>{
-      const rh = wajibReason(p, period).rh;
-      return `<tr><td>${p.site}</td><td>${escHtml(p.nama)}</td><td class="muted">${escHtml(p.kategoriSumber||"-")}</td>
-        <td style="text-align:right;">${rh==null?"tidak ada data":rh+" jam"}</td>
-        <td class="muted">&le; 200 jam/tahun</td></tr>`;
-    }).join("") || `<tr><td colspan="5" class="hint" style="padding:14px;">Tidak ada Emergency Engine yang cocok filter, atau semuanya sudah di atas ambang.</td></tr>`}</tbody>`;
+  void exemptEmg; // daftar Emergency yang belum wajib tidak lagi ditampilkan (permintaan user); logika wajib tetap sama
 }
 document.getElementById("rcPeriode").addEventListener("change", renderRencana);
 document.getElementById("rcFltSite").addEventListener("change", renderRencana);
@@ -166,12 +171,13 @@ function renderRencanaCards(period, site, search){
     const bySub = {};
     sitePts.forEach(p=>{ const sg=subgroupOf(p); (bySub[sg]=bySub[sg]||[]).push(p); });
     const subs = Object.keys(bySub).sort((a,b)=>subgroupOrderIdx(bySub[a][0])-subgroupOrderIdx(bySub[b][0]));
-    return `<div class="card" style="margin-bottom:10px;">
-      <h3 style="margin-bottom:8px;">${s}</h3>
-      ${subs.map(sg=>`<div style="margin-bottom:8px;">
-        <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;">${escHtml(sg)} <span style="font-weight:400;">(${bySub[sg].length})</span></div>
+    const wajibN = sitePts.filter(p=>effectiveWajib(p, period)).length;
+    return `<div class="dp-site dp-cardsite" style="--site-c:${(typeof HASIL_SITE_COLORS!=="undefined" && HASIL_SITE_COLORS[s])||"#7f8fa0"};">
+      <div class="dp-cardsite-head"><span class="dp-site-dot" aria-hidden="true"></span><b class="dp-site-name">${escHtml(s)}</b><span class="dp-pills"><span class="dp-pill">${sitePts.length} titik</span><span class="dp-pill wajib">${wajibN} wajib</span></span></div>
+      <div class="dp-cardsite-body">${subs.map(sg=>`<div class="dp-cardgrp" style="--grp-c:${typeof dashGrpVisual==="function" ? dashGrpVisual(sg).color : "var(--gray-500)"};">
+        <div class="dp-cardgrp-title"><span class="dp-grp-bar" aria-hidden="true"></span>${escHtml(sg)} <span class="dp-count">${bySub[sg].length}</span></div>
         <div>${bySub[sg].map(p=>rencanaPillHtml(p, period)).join("")}</div>
-      </div>`).join("")}
+      </div>`).join("")}</div>
     </div>`;
   }).join("") || "<div class='hint' style='padding:14px;'>Tidak ada titik yang cocok filter.</div>";
 }
@@ -350,9 +356,18 @@ function batchesForPersonil(personilId){
     .filter(b=>(b.assignedPersonil||[]).some(a=>a.id===personilId))
     .map(b=>({batch:b, lead:b.assignedPersonil.find(a=>a.id===personilId).lead}));
 }
-// Role/status-kelengkapan/nama-atau-kontak — dibaca langsung dari toolbar filter (pola sama dgn
+// Batch/role/status-kelengkapan/nama-atau-kontak — dibaca langsung dari toolbar filter (pola sama dgn
 // renderMaster() di 05-master-data.js), murni penyaring TAMPILAN, tidak menyentuh DB.personil.
 function personilMatchesFilter(p){
+  const bSel = document.getElementById("pzFltBatch");
+  const bv = bSel ? bSel.value : "";
+  if(bv){
+    const asg = batchesForPersonil(p.id);
+    if(bv==="__any" && !asg.length) return false;
+    if(bv==="__none" && asg.length) return false;
+    if(bv==="__lead" && !asg.some(a=>a.lead)) return false;
+    if(!bv.startsWith("__") && !asg.some(a=>a.batch.id===bv)) return false;
+  }
   const role = document.getElementById("pzFltRole").value;
   if(role && p.role!==role) return false;
   const kelengkapan = document.getElementById("pzFltKelengkapan").value;
@@ -365,7 +380,115 @@ function personilMatchesFilter(p){
   if(q && !(p.nama.toLowerCase().includes(q) || (p.telepon||"").toLowerCase().includes(q))) return false;
   return true;
 }
+// Opsi filter Batch diisi ulang tiap render (batch bisa ditambah/dihapus di Perencanaan Batch);
+// pilihan yang sedang aktif dipertahankan selama batch-nya masih ada.
+function fillPersonilBatchFilter(){
+  const sel = document.getElementById("pzFltBatch");
+  if(!sel) return;
+  const cur = sel.value;
+  const opt = (v,l)=>`<option value="${escHtml(v)}">${escHtml(l)}</option>`;
+  const grp = (team,label)=>{
+    const bs = DB.batches.filter(b=>team==="emisi" ? b.team==="emisi" : b.team!=="emisi");
+    return bs.length ? `<optgroup label="${label}">${bs.map(b=>opt(b.id, `${b.name} (${(b.assignedPersonil||[]).length} org)`)).join("")}</optgroup>` : "";
+  };
+  sel.innerHTML = opt("","Semua personil") + opt("__any","Sudah ditugaskan di batch") + opt("__none","Belum ditugaskan") + opt("__lead","Ketua Tim") + grp("emisi","Batch Emisi") + grp("ambient","Batch Ambient / Lainnya");
+  sel.value = [...sel.options].some(o=>o.value===cur) ? cur : "";
+}
+// Status 1 item dokumen utk chip di kartu personil — aturan sama persis dgn kolom tabel di bawah.
+function personilDocStatus(p, it){
+  const rec = p.items[it]||{};
+  if(personilItemNA(p, it)) return {cls:"na", text:"N/A", tip:`Tidak wajib untuk role ${p.role}`};
+  if(it===PERSONIL_NUMBER_FIELD) return rec.exp ? {cls:"ok", text:"No. "+rec.exp, tip:"No. "+rec.exp} : {cls:"bad", text:"Kosong", tip:"Belum diisi"};
+  if(PERSONIL_DATED[it]){
+    if(!rec.exp) return {cls:"bad", text:"Kosong", tip:"Belum diisi"};
+    const days = Math.round((new Date(rec.exp)-new Date())/86400000);
+    if(days<0) return {cls:"bad", text:"Expired", tip:`Expired sejak ${rec.exp}`};
+    if(days<=30) return {cls:"soon", text:`${days} hr lagi`, tip:`Berlaku s.d. ${rec.exp}`};
+    return {cls:"ok", text:"s.d. "+rec.exp, tip:`Berlaku s.d. ${rec.exp}`};
+  }
+  return rec.ada ? {cls:"ok", text:"Ada", tip:"Ada"} : {cls:"bad", text:"Tidak ada", tip:"Tidak ada"};
+}
+const PZ_ROLE_COLORS = {"PPC Emisi":"#2a5ea8","PPC Ambient":"#1c8a5a","Observer":"#b7791f"};
+let pzTabState = "roster", pzViewState = "card";
+function pzInitials(nama){
+  const w = String(nama||"?").trim().split(/\s+/).filter(Boolean);
+  return ((w[0]||"?")[0] + (w.length>1 ? w[w.length-1][0] : "")).toUpperCase();
+}
+function pzApplyTabView(){
+  document.querySelectorAll("#page-personil .dp-tab").forEach(b=>b.classList.toggle("active", b.dataset.tab===pzTabState));
+  document.querySelectorAll("#page-personil .dp-tabpanel").forEach(el=>{ el.hidden = el.dataset.tabpanel!==pzTabState; });
+  const fb = document.getElementById("pzFilterBar");
+  if(fb) fb.style.display = (pzTabState==="roster"||pzTabState==="alokasi") ? "" : "none";
+  const seg = document.getElementById("pzViewSeg");
+  if(seg){
+    seg.style.display = pzTabState==="roster" ? "" : "none";
+    seg.querySelectorAll(".btn").forEach(b=>b.classList.toggle("primary", b.dataset.view===pzViewState));
+  }
+  const cards = document.getElementById("personilCards"), tw = document.getElementById("personilTableWrap");
+  if(cards) cards.style.display = pzViewState==="card" ? "" : "none";
+  if(tw) tw.style.display = pzViewState==="table" ? "" : "none";
+}
+function pzTab(tab){ pzTabState = tab; pzApplyTabView(); }
+function pzView(view){ pzViewState = view; pzApplyTabView(); }
+function renderPersonilCards(rows){
+  const el = document.getElementById("personilCards");
+  if(!el) return;
+  const bv = (document.getElementById("pzFltBatch")||{}).value || "";
+  if(!rows.length){
+    el.innerHTML = DB.personil.length
+      ? `<div class="pz-empty">Tidak ada personil yang cocok dengan filter.</div>`
+      : `<div class="pz-empty">Belum ada data personil. <button class="btn small primary" data-action="addPersonil">+ Tambah Personil</button> atau Import Excel.</div>`;
+    return;
+  }
+  el.innerHTML = rows.map(p=>{
+    const pct = completenessPct(p);
+    const pctC = pct===100 ? "#2f9e67" : pct>=70 ? "#d08a1e" : "#d64545";
+    const roleC = PZ_ROLE_COLORS[p.role] || "#6b7a8c";
+    const docs = PERSONIL_ITEMS.map(it=>({it, st:personilDocStatus(p, it)}));
+    const nBad = docs.filter(d=>d.st.cls==="bad").length, nSoon = docs.filter(d=>d.st.cls==="soon").length;
+    const asg = batchesForPersonil(p.id);
+    return `<article class="pz-card" style="--role-c:${roleC};">
+      <header class="pz-card-head">
+        <div class="pz-avatar">${escHtml(pzInitials(p.nama))}</div>
+        <div class="pz-id">
+          <div class="pz-name" title="${escHtml(p.nama)}">${escHtml(p.nama)}</div>
+          <div class="pz-meta"><span class="pz-role-pill">${escHtml(p.role||"-")}</span>${p.telepon?`<span class="pz-phone">${escHtml(p.telepon)}</span>`:""}</div>
+        </div>
+        <div class="pz-ring" style="--pct:${pct};--ring-c:${pctC};" title="Kelengkapan ${pct}%"><span>${pct}<small>%</small></span></div>
+      </header>
+      <div class="pz-docs">${docs.map(d=>`<span class="pz-doc ${d.st.cls}" title="${escHtml(PERSONIL_LABELS[d.it])}: ${escHtml(d.st.tip)}"><b>${escHtml(PERSONIL_LABELS[d.it])}</b>${d.st.cls==="ok"||d.st.cls==="na"?"":`<em>${escHtml(d.st.text)}</em>`}</span>`).join("")}</div>
+      <div class="pz-status">${nBad||nSoon ? `${nBad?`<span class="pz-flag bad">${nBad} dokumen expired/kosong</span>`:""}${nSoon?`<span class="pz-flag soon">${nSoon} segera expired</span>`:""}` : `<span class="pz-flag ok">Dokumen lengkap &amp; berlaku</span>`}</div>
+      <div class="pz-batches"><span class="pz-sec-lbl">Batch</span>${asg.length ? asg.map(a=>`<span class="pz-batch${a.batch.id===bv?" hit":""}${a.lead?" lead":""}" title="${escHtml(a.batch.name)}${a.lead?" (Ketua Tim)":""}">${a.lead?"&#9733; ":""}${escHtml(a.batch.name)}</span>`).join("") : `<span class="muted pz-none">Belum ditugaskan</span>`}</div>
+      <footer class="pz-card-foot">
+        ${p.dokumentasiLink ? `<a href="${escHtml(p.dokumentasiLink)}" target="_blank" rel="noopener noreferrer" class="btn small ghost">Dokumentasi &#8599;</a>` : `<span class="muted pz-none">Tanpa link dokumentasi</span>`}
+        <span class="spacer"></span>
+        <button class="btn small" data-action="editPersonil" data-id="${p.id}">Edit</button>
+        <button class="btn small danger" data-action="deletePersonil" data-id="${p.id}">Hapus</button>
+      </footer>
+    </article>`;
+  }).join("");
+}
+function renderPersonilKpis(rows){
+  const el = document.getElementById("pzKpis");
+  if(!el) return;
+  const tile = (lbl,val,sub,tone)=>`<div class="dp-kpi ${tone||""}"><div class="dp-kpi-lbl">${lbl}</div><div class="dp-kpi-val">${val}</div><div class="dp-kpi-sub">${sub}</div></div>`;
+  const n = rows.length;
+  const full = rows.filter(p=>completenessPct(p)===100).length;
+  const bad = rows.filter(p=>PERSONIL_ITEMS.some(it=>personilDocStatus(p,it).cls==="bad")).length;
+  const soon = rows.filter(p=>PERSONIL_ITEMS.some(it=>personilDocStatus(p,it).cls==="soon")).length;
+  const asg = rows.filter(p=>batchesForPersonil(p.id).length).length;
+  const lead = rows.filter(p=>batchesForPersonil(p.id).some(a=>a.lead)).length;
+  const byRole = PERSONIL_ROLES.map(r=>`${rows.filter(p=>p.role===r).length} ${r.replace("PPC ","")}`).join(" &middot; ");
+  el.innerHTML =
+    tile("Personil", n===DB.personil.length ? n : `${n}<small> / ${DB.personil.length}</small>`, byRole, "teal") +
+    tile("Lengkap 100%", full, n ? `${Math.round(full/n*100)}% dari yang tampil` : "-", "good") +
+    tile("Dokumen bermasalah", bad, "ada item expired atau kosong", bad ? "bad" : "") +
+    tile("Segera expired", soon, "ada item &le; 30 hari lagi", soon ? "warn" : "") +
+    tile("Ditugaskan", asg, `${n-asg} belum di batch manapun`, "blue") +
+    tile("Ketua Tim", lead, "ditunjuk di Perencanaan Batch", "");
+}
 function renderPersonil(){
+  fillPersonilBatchFilter();
   // Nama & Role dibekukan (sticky) horizontal — tabel ini lebar (10 kolom dokumen + dst), tanpa ini
   // dua kolom identitas itu ikut hilang begitu discroll ke kanan, jadi susah tahu baris siapa yang
   // lagi dilihat. Pola & lebar sama dgn .dg-col-sticky di Gantt (kolom Site).
@@ -402,7 +525,13 @@ function renderPersonil(){
   }).join("") : `<tr><td colspan="${colCount}" class="muted" style="text-align:center;padding:22px;">Tidak ada personil yang cocok dengan pencarian/filter.</td></tr>`}</tbody>`;
   const countEl = document.getElementById("personilCount");
   if(countEl) countEl.textContent = rows.length===DB.personil.length ? `${DB.personil.length} personil` : `${rows.length} dari ${DB.personil.length} personil ditampilkan`;
+  renderPersonilKpis(rows);
+  renderPersonilCards(rows);
+  const tabN = (id,v)=>{ const e=document.getElementById(id); if(e) e.textContent = v; };
+  tabN("pzTabNRoster", DB.personil.length);
+  tabN("pzTabNPpu", typeof ensurePersonilPpuArr==="function" ? ensurePersonilPpuArr().length : "");
   renderPersonilAlokasi();
+  pzApplyTabView();
 }
 // Timeline "personil X pindah dari site A (tgl) ke site B (tgl)" — dihitung dari batch yang sudah
 // ditunjuk (assignedPersonil, lihat Perencanaan Batch) beserta jadwal per-site batch itu
@@ -410,9 +539,11 @@ function renderPersonil(){
 function renderPersonilAlokasi(){
   const el = document.getElementById("personilAlokasi");
   if(!el) return;
-  const rows = DB.personil.map(p=>{
+  const bSel = document.getElementById("pzFltBatch");
+  const onlyBatch = bSel && bSel.value && !bSel.value.startsWith("__") ? bSel.value : "";
+  const rows = DB.personil.filter(personilMatchesFilter).map(p=>{
     const items = [];
-    batchesForPersonil(p.id).forEach(({batch, lead})=>{
+    batchesForPersonil(p.id).filter(a=>!onlyBatch || a.batch.id===onlyBatch).forEach(({batch, lead})=>{
       (batch.schedule||[]).forEach(row=>{
         items.push({site: row.site, start: row.start, end: row.end, batchName: batch.name, team: batch.team, lead});
       });
@@ -420,10 +551,12 @@ function renderPersonilAlokasi(){
     items.sort((a,b)=> (a.start||"").localeCompare(b.start||""));
     return {p, items};
   }).filter(r=>r.items.length);
+  const nEl = document.getElementById("pzTabNAlokasi");
+  if(nEl) nEl.textContent = rows.length;
 
   el.innerHTML = rows.length ? rows.map(r=>`
     <div class="pal-card">
-      <div class="pal-name"><b>${escHtml(r.p.nama)}</b> <span class="muted" style="font-weight:400;">(${escHtml(r.p.role)})</span></div>
+      <div class="pal-name"><span class="pz-avatar sm" style="--role-c:${PZ_ROLE_COLORS[r.p.role]||"#6b7a8c"};">${escHtml(pzInitials(r.p.nama))}</span><b>${escHtml(r.p.nama)}</b> <span class="muted" style="font-weight:400;">${escHtml(r.p.role)}</span></div>
       <div class="pal-stepper">
         ${r.items.map((it,i)=>`
           ${i>0?`<span class="pal-connector">${msIcon("chevron-right",14)}</span>`:""}
@@ -433,9 +566,11 @@ function renderPersonilAlokasi(){
           </div>`).join("")}
       </div>
     </div>`).join("")
-    : "<div class='hint' style='padding:10px;'>Belum ada personil yang ditugaskan ke batch manapun — tunjuk dulu di Perencanaan Batch.</div>";
+    : (DB.personil.some(p=>batchesForPersonil(p.id).length)
+      ? "<div class='hint' style='padding:10px;'>Tidak ada alokasi yang cocok dengan filter.</div>"
+      : "<div class='hint' style='padding:10px;'>Belum ada personil yang ditugaskan ke batch manapun — tunjuk dulu di Perencanaan Batch.</div>");
 }
-["pzFltRole","pzFltKelengkapan","pzFltSearch"].forEach(id=>{
+["pzFltBatch","pzFltRole","pzFltKelengkapan","pzFltSearch"].forEach(id=>{
   document.addEventListener("input", e=>{ if(e.target.id===id) renderPersonil(); });
   document.addEventListener("change", e=>{ if(e.target.id===id) renderPersonil(); });
 });
@@ -660,3 +795,10 @@ function renderEnvSupervisor(){
     }).join("")}</tbody>` : "<div class='hint' style='padding:10px;'>Belum ada site terdaftar di Database Titik Pantau.</div>";
 }
 
+// Sinkronkan checkbox header site Plan Pemantauan saat centang per titik diubah manual.
+document.addEventListener("change", e=>{
+  if(!e.target.classList || !e.target.classList.contains("rcChk")) return;
+  const site = e.target.dataset.site;
+  const head = document.querySelector(`#rcTree input[data-action="rcPickSite"][data-site="${CSS.escape(site)}"]`);
+  if(head) head.checked = [...document.querySelectorAll(`.rcChk[data-site="${CSS.escape(site)}"]`)].every(c=>c.checked);
+});

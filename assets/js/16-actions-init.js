@@ -14,6 +14,10 @@ const ACTIONS = {
   openPeriodModal, savePeriod,
   rcPickAll:()=>{ document.querySelectorAll(".rcChk").forEach(c=>c.checked=true); },
   rcPickNone:()=>{ document.querySelectorAll(".rcChk").forEach(c=>c.checked=false); },
+  // Checkbox di header site Plan Pemantauan: centang/kosongkan semua .rcChk site itu sekaligus.
+  rcPickSite:(t)=>{ document.querySelectorAll(`.rcChk[data-site="${CSS.escape(t.dataset.site)}"]`).forEach(c=>c.checked=t.checked); },
+  pzTab:(t)=>pzTab(t.dataset.tab),
+  pzView:(t)=>pzView(t.dataset.view),
   sendPlanToBatch:(t)=>sendPlanToBatch(t.dataset.team),
   printRencanaExport, doPrintRencanaExport,
   setRcView:(t)=>{

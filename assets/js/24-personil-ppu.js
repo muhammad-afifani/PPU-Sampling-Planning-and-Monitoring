@@ -141,6 +141,8 @@ function renderPersonilPPU(){
     }).join("") : `<tr><td colspan="10" class="muted" style="text-align:center;padding:20px;">${all.length?"Tidak ada personil yang cocok dengan filter.":'Belum ada data personil kompetensi PPU. Klik "+ Tambah Personil PPU" utk mulai.'}</td></tr>`}</tbody>`;
   const countEl = document.getElementById("ppuCount");
   if(countEl) countEl.textContent = rows.length===all.length ? `${all.length} personil` : `${rows.length} dari ${all.length} personil ditampilkan`;
+  const tabN = document.getElementById("pzTabNPpu");
+  if(tabN) tabN.textContent = all.length;
 }
 ["ppuFltKualifikasi","ppuFltSite","ppuFltSearch"].forEach(id=>{
   document.addEventListener("input", e=>{ if(e.target.id===id) renderPersonilPPU(); });

@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202610161000">
+<link rel="stylesheet" href="assets/css/style.css?v=202610162200">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -220,18 +220,22 @@
     </div>
 
     <!-- MASTER DATA -->
-    <div class="page" id="page-master">
+    <div class="page dp-page" id="page-master">
       <div class="stickytop">
       <div class="pagehead"><div><h2>Database Titik Pantau</h2><div class="desc">Daftar sumber emisi, ambient, kebisingan, kebauan &amp; getaran</div></div>
-        <div class="toolbar">
+        <div class="toolbar dp-actions">
           <button class="btn primary" data-action="addPoint">+ Tambah Titik</button>
-          <button class="btn" data-action="importPointsXlsx">Import Excel</button>
-          <button class="btn" data-action="exportPointsXlsx">Export Excel</button>
-          <button class="btn ghost" data-action="verifyAllVisible" title="Tandai semua titik yang tampil (sesuai filter) sebagai sudah dicek">&#10003; Tandai Tampil Sudah Dicek</button>
-          <button class="btn ghost" data-action="clearStaleVisible" title="Hapus tanda kuning 'berubah sejak dicek' pada titik yang tampil (sesuai filter) — tanggal verifikasi terakhir tidak diubah, cuma tandanya yang dihilangkan">&#10005; Hapus Tanda Berubah</button>
+          <span class="dp-btn-group">
+            <button class="btn" data-action="importPointsXlsx">Import Excel</button>
+            <button class="btn" data-action="exportPointsXlsx">Export Excel</button>
+          </span>
+          <span class="dp-btn-group">
+            <button class="btn ghost" data-action="verifyAllVisible" title="Tandai semua titik yang tampil (sesuai filter) sebagai sudah dicek">&#10003; Tandai Tampil Sudah Dicek</button>
+            <button class="btn ghost" data-action="clearStaleVisible" title="Hapus tanda kuning 'berubah sejak dicek' pada titik yang tampil (sesuai filter) — tanggal verifikasi terakhir tidak diubah, cuma tandanya yang dihilangkan">&#10005; Hapus Tanda Berubah</button>
+          </span>
         </div>
       </div>
-      <div class="toolbar card" style="padding:12px 14px;">
+      <div class="toolbar card dp-filter">
         <div class="field"><label>Site</label><select id="fltSite"><option value="">Semua</option></select></div>
         <div class="field"><label>Kategori</label><select id="fltKategori"><option value="">Semua</option><option value="emisi">Emisi</option><option value="ambient">Ambient</option><option value="kebisingan">Kebisingan</option><option value="kebauan">Kebauan</option><option value="getaran">Getaran</option></select></div>
         <div class="field"><label>Status</label><select id="fltStatus"><option value="">Semua</option><option value="pending">Hold / Tidak Dipantau</option><option value="scheduled">Scheduled</option><option value="done">Done</option><option value="failed">Gagal / Batch Lanjut</option></select></div>
@@ -241,9 +245,12 @@
         <div class="spacer"></div>
         <div class="field"><label>Cari Titik</label><div class="search-wrap"><span class="search-ico">&#128269;</span><input type="text" id="fltSearch" placeholder="nama titik, site, atau kategori..."></div></div>
       </div>
-      <div class="tree-toolbar">
-        <button class="btn small" data-action="setMasterView" data-view="tree" id="btnViewTree">Tampilan Kategori (Tree)</button>
-        <button class="btn small" data-action="setMasterView" data-view="flat" id="btnViewFlat">Tampilan Tabel Datar</button>
+      <div class="tree-toolbar dp-viewbar">
+        <span class="dp-seg" role="group" aria-label="Tampilan">
+          <button class="btn small" data-action="setMasterView" data-view="tree" id="btnViewTree">Per Kategori (Tree)</button>
+          <button class="btn small" data-action="setMasterView" data-view="flat" id="btnViewFlat">Tabel Datar</button>
+        </span>
+        <span class="dp-viewbar-count" id="masterCountTop"></span>
         <span class="spacer"></span>
         <span id="masterTreeControls" style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn small ghost" data-action="expandSitesOnlyMaster" title="Buka header site saja (level 1), jenis sumber di dalamnya tetap ciut">Buka Level Site</button>
@@ -255,62 +262,53 @@
         </span>
       </div>
       </div>
+      <div class="dp-kpis" id="masterKpis"></div>
       <div id="masterTreeWrap"></div>
       <div id="masterFlatWrap" style="display:none;">
-        <div class="tablewrap"><table id="masterTable"></table></div>
+        <div class="tablewrap"><table id="masterTable" class="dp-table"></table></div>
       </div>
       <div class="hint" id="masterCount"></div>
     </div>
 
     <!-- PLAN PEMANTAUAN PER PERIODE -->
-    <div class="page" id="page-rencana">
+    <div class="page dp-page" id="page-rencana">
       <div class="stickytop">
-      <div class="pagehead"><div><h2>Plan Pemantauan per Periode</h2><div class="desc">Pilih semester untuk menampilkan seluruh titik yang wajib dipantau pada periode tersebut (termasuk Emergency Engine yang melewati ambang RH &gt; 200 jam/tahun), kemudian kirim ke Perencanaan Batch</div></div></div>
-      <div class="toolbar card" style="padding:12px 14px;">
+      <div class="pagehead"><div><h2>Plan Pemantauan per Periode</h2><div class="desc">Seluruh titik yang wajib dipantau pada semester terpilih (termasuk Emergency Engine dengan RH 12 bulan &gt; 200 jam), siap dikirim ke Perencanaan Batch.</div></div>
+        <div class="toolbar dp-actions">
+          <button class="btn" data-action="printRencanaExport" title="Daftar sumber emisi &amp; titik ambient per site, discope ke Periode/Site yang sedang difilter. Bisa pilih wajib saja atau semua titik.">&#128438; Cetak Daftar Titik Pantau (A4)</button>
+        </div>
+      </div>
+      <div class="toolbar card dp-filter">
         <div class="field"><label>Periode</label><select id="rcPeriode"></select></div>
         <div class="field"><label>Site</label><select id="rcFltSite"><option value="">Semua</option></select></div>
         <div class="field"><label>Cari Titik</label><div class="search-wrap"><span class="search-ico">&#128269;</span><input type="text" id="rcFltSearch" placeholder="nama titik..."></div></div>
-        <div class="spacer"></div>
-        <div class="hint" style="max-width:320px;align-self:center;">Emergency Engine baru wajib dipantau kalau RH 12 bulan sebelum periode ini &gt; 200 jam.</div>
+        <div class="hint dp-filter-note">Emergency Engine baru wajib dipantau kalau RH 12 bulan sebelum periode ini &gt; 200 jam.</div>
       </div>
-      <div class="tree-toolbar">
-        <button class="btn small" data-action="setRcView" data-view="table" id="btnRcTable">Tampilan Tabel</button>
-        <button class="btn small" data-action="setRcView" data-view="card" id="btnRcCard">Tampilan Kartu per Site</button>
-        <span class="hint" style="align-self:center;margin-left:6px;">Kartu per site menampilkan SEMUA titik (bukan cuma yang wajib) — abu-abu = tidak wajib periode ini. Klik kartu untuk edit di Database Titik Pantau.</span>
+      <div class="tree-toolbar dp-viewbar">
+        <span class="dp-seg" role="group" aria-label="Tampilan">
+          <button class="btn small" data-action="setRcView" data-view="table" id="btnRcTable">Daftar Wajib per Site</button>
+          <button class="btn small" data-action="setRcView" data-view="card" id="btnRcCard">Kartu Semua Titik</button>
+        </span>
+        <span class="hint" style="margin:0;">Kartu menampilkan SEMUA titik (abu-abu putus-putus = tidak wajib periode ini). Klik kartu untuk edit di Database Titik Pantau.</span>
       </div>
       </div>
-      <div class="grid cols-4" id="rcStats" style="margin-bottom:16px;"></div>
-      <div class="card">
-        <h3>Resume Titik Pantau Emisi &amp; Ambient</h3>
-        <div class="hint" style="margin-bottom:8px;">Mengikuti filter Periode/Site/Cari Titik di atas — total titik wajib pantau, dan rinciannya per site.</div>
-        <div id="rcGroupBars"></div>
-      </div>
-      <div class="card" id="rcTableCard">
-        <div class="toolbar">
-          <h3 style="margin:0;">Titik Wajib Dipantau</h3>
+      <div class="dp-kpis" id="rcStats"></div>
+      <div class="card dp-listcard" id="rcTableCard">
+        <div class="dp-listhead">
+          <h3>Titik Wajib Dipantau</h3><span class="dp-count" id="rcCount"></span>
           <span class="spacer"></span>
           <button class="btn small ghost" data-action="rcPickAll">Centang Semua</button>
           <button class="btn small ghost" data-action="rcPickNone">Kosongkan</button>
         </div>
-        <div class="tablewrap"><table id="rcTable"></table></div>
-        <div class="toolbar" style="margin-top:12px;">
-          <span class="hint" style="max-width:420px;">Centang titik yang mau langsung dikirim ke batch baru. Titik yang tidak dicentang tetap bisa ditambah manual nanti di Perencanaan Batch.</span>
+        <div id="rcTree"></div>
+        <div class="dp-sendbar">
+          <span class="hint" style="margin:0;max-width:520px;">Centang titik yang mau langsung dikirim ke batch baru (centang di header site untuk memilih satu site sekaligus). Titik yang tidak dicentang tetap bisa ditambah manual di Perencanaan Batch.</span>
           <span class="spacer"></span>
           <button class="btn primary" data-action="sendPlanToBatch" data-team="emisi">+ Batch Emisi dari Terpilih</button>
           <button class="btn primary" data-action="sendPlanToBatch" data-team="ambient">+ Batch Ambient dari Terpilih</button>
         </div>
       </div>
       <div id="rcCardWrap" style="display:none;"></div>
-      <div class="card">
-        <h3>Emergency Engine — Tidak Wajib Periode Ini</h3>
-        <div class="hint" style="margin-bottom:10px;">Transparansi ambang: RH trailing 12 bulan &le; 200 jam, jadi belum wajib dipantau periode ini.</div>
-        <div class="tablewrap"><table id="rcExemptTable"></table></div>
-      </div>
-      <div class="card">
-        <h3>Daftar Titik Pantau per Periode (Cetak A4)</h3>
-        <div class="hint" style="margin-bottom:10px;">Daftar sumber emisi &amp; titik ambient (Ambient/Kebisingan/Kebauan/Getaran) per site, serinci Database Titik Pantau, discope ke Periode/Site yang sedang difilter di atas. Pilih mau cetak yang wajib dipantau periode ini saja, atau semua titik lengkap dengan status wajib/tidaknya masing-masing.</div>
-        <button class="btn primary" data-action="printRencanaExport">Cetak Daftar Titik Pantau (A4)</button>
-      </div>
     </div>
 
     <!-- ROADMAP WAJIB PANTAU -->
@@ -436,59 +434,77 @@
     </div>
 
     <!-- PERSONIL -->
-    <div class="page" id="page-personil">
+    <div class="page dp-page" id="page-personil">
       <div class="stickytop">
-      <div class="pagehead"><div><h2>Personil</h2><div class="desc">Basis data personil beserta kelengkapan dokumen: Petugas PPC &amp; Observer, Personil Kompetensi PPU, dan ENV Site Supervisor. Untuk menentukan personil yang bertugas pada tiap batch (termasuk Ketua Tim), buka Perencanaan Batch.</div></div>
-        <div class="toolbar">
+      <div class="pagehead"><div><h2>Personil</h2><div class="desc">Basis data personil beserta kelengkapan dokumen. Penugasan per batch (termasuk Ketua Tim) diatur di Perencanaan Batch.</div></div>
+        <div class="toolbar dp-actions">
+          <span class="dp-btn-group">
+            <button class="btn" data-action="importPersonilXlsx">Import Excel</button>
+            <button class="btn" data-action="exportPersonilXlsx">Export Excel</button>
+            <button class="btn" data-action="printPersonilRoster" title="Ringkasan nama, role, kelengkapan dokumen beserta tanggal kedaluwarsa, plus QR code ke folder dokumentasi (isi lewat Link Dokumentasi di form Edit Personil).">&#128438; Cetak Kelengkapan (A4)</button>
+          </span>
+          <button class="btn" data-action="goToPage" data-page="planner">Perencanaan Batch &rarr;</button>
           <button class="btn primary" data-action="addPersonil">+ Tambah Personil</button>
-          <button class="btn" data-action="importPersonilXlsx">Import Excel</button>
-          <button class="btn" data-action="exportPersonilXlsx">Export Excel</button>
-          <button class="btn" data-action="goToPage" data-page="planner">Buka Perencanaan Batch &rarr;</button>
         </div>
       </div>
-      <div class="toolbar card" style="padding:12px 14px;">
+      <div class="dp-tabs" role="tablist" aria-label="Bagian halaman Personil">
+        <button class="dp-tab active" data-action="pzTab" data-tab="roster" role="tab">Petugas PPC &amp; Observer <span class="dp-tab-n" id="pzTabNRoster"></span></button>
+        <button class="dp-tab" data-action="pzTab" data-tab="alokasi" role="tab">Alokasi &amp; Jadwal Pindah <span class="dp-tab-n" id="pzTabNAlokasi"></span></button>
+        <button class="dp-tab" data-action="pzTab" data-tab="ppu" role="tab">Kompetensi PPU <span class="dp-tab-n" id="pzTabNPpu"></span></button>
+        <button class="dp-tab" data-action="pzTab" data-tab="env" role="tab">ENV Site Supervisor</button>
+      </div>
+      <div class="toolbar card dp-filter" id="pzFilterBar">
+        <div class="field"><label>Batch</label><select id="pzFltBatch"><option value="">Semua personil</option></select></div>
         <div class="field"><label>Role</label><select id="pzFltRole"><option value="">Semua</option><option>PPC Emisi</option><option>PPC Ambient</option><option>Observer</option></select></div>
         <div class="field"><label>Kelengkapan</label><select id="pzFltKelengkapan"><option value="">Semua</option><option value="lengkap">Lengkap (100%)</option><option value="belum">Belum Lengkap (&lt;100%)</option></select></div>
         <div class="spacer"></div>
         <div class="field"><label>Cari Personil</label><div class="search-wrap"><span class="search-ico">&#128269;</span><input type="text" id="pzFltSearch" placeholder="nama atau nomor telepon..."></div></div>
-      </div>
-      </div>
-      <h3 style="margin:14px 0 6px;">Petugas PPC &amp; Observer</h3>
-      <div class="alert-box alert-info"><span class="ms-icon" data-icon="info" data-size="16"></span><div>Kelengkapan dihitung dari 10 item: KTP, MCU, SPK, Medpass, CLSR, Sertifikat PPC Udara, Foto Background Biru, BOSIET/BST, Vaksin Booster 3, PTS ID. Item bertanggal dianggap tidak valid jika sudah lewat tanggal expired.</div></div>
-      <div class="tablewrap"><table id="personilTable"></table></div>
-      <div class="hint" id="personilCount" style="margin-bottom:16px;"></div>
-      <div class="card">
-        <div class="toolbar" style="padding:0;margin-bottom:10px;"><h3 style="margin:0;">Personil Kompetensi PPU (Manager Energi / Penanggung Jawab PPU / Operator PPU)</h3><span class="spacer"></span>
-          <button class="btn small primary" data-action="addPersonilPpu">+ Tambah Personil PPU</button>
-          <button class="btn small ghost" data-action="importPersonilPpuXlsx">Import Excel</button>
-          <button class="btn small ghost" data-action="exportPersonilPpuXlsx">Export Excel</button>
+        <div class="dp-seg" id="pzViewSeg" style="align-self:flex-end;">
+          <button class="btn primary" data-action="pzView" data-view="card">Kartu</button>
+          <button class="btn" data-action="pzView" data-view="table">Tabel</button>
         </div>
-        <div class="hint" style="margin-bottom:10px;">Registri sertifikasi kompetensi PPU per personil (terpisah dari roster PPC &amp; Observer di atas) — nomor sertifikat, masa berlaku, LSP penerbit, site penugasan, dan lampiran scan sertifikat (PDF/gambar).</div>
-        <div class="toolbar" style="padding:8px 0;">
-          <div class="field"><label>Kualifikasi</label><select id="ppuFltKualifikasi"><option value="">Semua</option><option>Manager Energi</option><option>Penanggung Jawab PPU</option><option>Operator PPU</option></select></div>
-          <div class="field"><label>Site</label><select id="ppuFltSite"><option value="">Semua Site</option></select></div>
-          <div class="spacer"></div>
-          <div class="field"><label>Cari Personil</label><div class="search-wrap"><span class="search-ico">&#128269;</span><input type="text" id="ppuFltSearch" placeholder="nama..."></div></div>
+      </div>
+      </div>
+
+      <div class="dp-tabpanel" data-tabpanel="roster">
+        <div class="dp-kpis" id="pzKpis"></div>
+        <div class="dp-viewbar-count" id="personilCount" style="margin:0 2px 8px;"></div>
+        <div class="pz-grid" id="personilCards"></div>
+        <div class="tablewrap pz-tablewrap" id="personilTableWrap" style="display:none;"><table id="personilTable" class="dp-table"></table></div>
+        <div class="hint pz-legend">Kelengkapan dihitung dari 10 item: KTP, MCU, SPK, Medpass, CLSR, Sertifikat PPC Udara, Foto Background Biru, BOSIET/BST, Vaksin Booster 3, PTS ID. Item bertanggal dianggap tidak valid jika sudah lewat tanggal expired. Sertifikat PPC tidak wajib (N/A) untuk role Observer.
+          <span class="pz-legend-keys"><span class="pz-doc ok">Berlaku</span><span class="pz-doc soon">&le; 30 hari</span><span class="pz-doc bad">Expired / kosong</span><span class="pz-doc na">N/A</span></span></div>
+      </div>
+
+      <div class="dp-tabpanel" data-tabpanel="alokasi" hidden>
+        <div class="card dp-listcard">
+          <div class="dp-listhead"><h3>Alokasi Site &amp; Jadwal Pindah per Personil</h3><span class="hint" style="margin:0;">Dari penugasan &amp; jadwal di Perencanaan Batch, urut dari yang paling awal. Ikut filter Batch/Role/Cari di atas.</span></div>
+          <div id="personilAlokasi" class="pz-alokasi"></div>
         </div>
-        <div class="tablewrap"><table id="ppuTable"></table></div>
-        <div class="hint" id="ppuCount" style="margin-top:6px;"></div>
       </div>
-      <div class="card">
-        <h3>ENV Site Supervisor</h3>
-        <div class="hint" style="margin-bottom:10px;">Satu ENV Site Supervisor per site — namanya tersedia utk dipakai sbg penandatangan PHM di draft Berita Acara/CoA saat site itu dipilih (tombol "Pakai nama ini" di halaman Berita Acara).</div>
-        <div class="tablewrap"><table id="envSupervisorTable"></table></div>
+
+      <div class="dp-tabpanel" data-tabpanel="ppu" hidden>
+        <div class="card dp-listcard">
+          <div class="dp-listhead"><h3>Personil Kompetensi PPU</h3><span class="hint" style="margin:0;">Manager Energi / Penanggung Jawab PPU / Operator PPU</span><span class="spacer"></span>
+            <button class="btn small ghost" data-action="importPersonilPpuXlsx">Import Excel</button>
+            <button class="btn small ghost" data-action="exportPersonilPpuXlsx">Export Excel</button>
+            <button class="btn small primary" data-action="addPersonilPpu">+ Tambah Personil PPU</button>
+          </div>
+          <div class="toolbar dp-filter dp-filter-flat">
+            <div class="field"><label>Kualifikasi</label><select id="ppuFltKualifikasi"><option value="">Semua</option><option>Manager Energi</option><option>Penanggung Jawab PPU</option><option>Operator PPU</option></select></div>
+            <div class="field"><label>Site</label><select id="ppuFltSite"><option value="">Semua Site</option></select></div>
+            <div class="spacer"></div>
+            <div class="field"><label>Cari Personil</label><div class="search-wrap"><span class="search-ico">&#128269;</span><input type="text" id="ppuFltSearch" placeholder="nama..."></div></div>
+            <span class="dp-viewbar-count" id="ppuCount" style="align-self:center;"></span>
+          </div>
+          <div class="tablewrap pz-flat-wrap"><table id="ppuTable" class="dp-table"></table></div>
+          <div class="hint dp-rules-note">Registri sertifikasi kompetensi PPU (terpisah dari roster PPC &amp; Observer): nomor sertifikat, masa berlaku, LSP penerbit, site penugasan, dan lampiran scan sertifikat (PDF/gambar).</div>
+        </div>
       </div>
-      <div class="card">
-        <h3>Alokasi Site &amp; Jadwal Pindah per Personil</h3>
-        <div class="hint" style="margin-bottom:10px;">Site mana saja tiap personil ditugaskan (dari Perencanaan Batch) beserta tanggal-tanggal perpindahannya, diurut dari yang paling awal.</div>
-        <div id="personilAlokasi"></div>
-      </div>
-      <div class="card">
-        <h3>Kelengkapan Data Personil (Cetak A4 / Excel)</h3>
-        <div class="hint" style="margin-bottom:10px;">Ringkasan nama, role, dan kelengkapan dokumen tiap personil (termasuk tanggal kedaluwarsa tiap item) — dilengkapi QR code &amp; tautan ke folder dokumentasi (isi lewat "Link Dokumentasi" di form Edit Personil) supaya ENV site bisa langsung scan/buka untuk verifikasi saat mengatur persiapan dan perizinan akses site. Personil tanpa Link Dokumentasi tetap tampil, kolom itu cuma kosong. Butuh format yang bisa langsung diedit (mis. di Excel)? Gunakan "Export Excel" — satu kolom per item, isinya tanggal/status polos tanpa format tambahan.</div>
-        <div class="toolbar">
-          <button class="btn primary" data-action="printPersonilRoster">Cetak Kelengkapan Data Personil (A4)</button>
-          <button class="btn" data-action="exportPersonilXlsx">Export Excel</button>
+
+      <div class="dp-tabpanel" data-tabpanel="env" hidden>
+        <div class="card dp-listcard">
+          <div class="dp-listhead"><h3>ENV Site Supervisor</h3><span class="hint" style="margin:0;">Satu per site. Tersimpan otomatis dan dipakai sebagai penandatangan PHM di draft Berita Acara/CoA (tombol "Pakai nama ini").</span></div>
+          <div class="pz-flat-wrap"><table id="envSupervisorTable" class="dp-table pz-env-table"></table></div>
         </div>
       </div>
     </div>
@@ -510,34 +526,32 @@
     </div>
 
     <!-- RULES -->
-    <div class="page" id="page-rules">
+    <div class="page dp-page" id="page-rules">
       <div class="stickytop">
-      <div class="pagehead"><div><h2>Aturan Site &amp; Rute</h2><div class="desc">Hari crew change, hari terhold, rasio hari/titik, dan urutan rute per tim</div></div></div>
+      <div class="pagehead"><div><h2>Aturan Site &amp; Rute</h2><div class="desc">Urutan rute per tim, hari crew change, rasio titik per hari, izin masuk site, dan hari terhold.</div></div></div>
       </div>
-      <div class="grid cols-2">
-        <div class="card">
-          <h3>Rute Ambient (Tim Ambient)</h3>
-          <ul class="route-list" id="routeAmbient"></ul>
-        </div>
-        <div class="card">
-          <h3>Rute Emisi (Tim Emisi)</h3>
-          <ul class="route-list" id="routeEmisi"></ul>
+      <div class="card dp-rules-routes">
+        <div class="dp-listhead dp-listhead-flat"><h3>Urutan Rute</h3><span class="hint" style="margin:0;">Tarik baris atau pakai panah untuk mengubah urutan. Tanggal muncul otomatis bila batch periode aktif sudah dijadwalkan.</span></div>
+        <div class="dp-route-cols">
+          <div class="dp-route-col"><div class="dp-route-title"><span class="dp-route-tag amb">Tim Ambient</span></div><ul class="route-list dp-route-list" id="routeAmbient"></ul></div>
+          <div class="dp-route-col"><div class="dp-route-title"><span class="dp-route-tag emi">Tim Emisi</span></div><ul class="route-list dp-route-list" id="routeEmisi"></ul></div>
         </div>
       </div>
-      <details class="card collapse-section" open>
-        <summary>Pengaturan per Site</summary>
-        <div class="grid cols-3" id="siteRuleCards"></div>
-      </details>
-      <div class="card">
-        <h3>Hari Terhold / Blocked Date per Site</h3>
-        <div class="toolbar">
+      <div class="card dp-listcard">
+        <div class="dp-listhead"><h3>Pengaturan per Site</h3><span class="hint" style="margin:0;">Perubahan tersimpan otomatis.</span></div>
+        <div id="siteRuleCards"></div>
+        <div class="hint dp-rules-note"><b>Izin masuk (H-)</b> dihitung mundur dari tanggal mulai kedatangan tim di site, dan muncul otomatis di Panduan Sampling A4. Isi lebih besar untuk site yang proses izinnya lama. <b>Flare 1 hari</b>: semua titik Flare di site itu dianggap selesai dalam 1 hari, tidak dihitung per titik terhadap rasio emisi.</div>
+      </div>
+      <div class="card dp-listcard">
+        <div class="dp-listhead"><h3>Hari Terhold / Blocked Date</h3></div>
+        <div class="toolbar dp-blk-form">
           <div class="field"><label>Site</label><select id="blkSite"></select></div>
           <div class="field"><label>Mulai</label><input type="date" id="blkStart"></div>
           <div class="field"><label>Selesai</label><input type="date" id="blkEnd"></div>
-          <div class="field"><label>Alasan</label><input type="text" id="blkReason" placeholder="mis. shutdown, cuti bersama"></div>
+          <div class="field" style="flex:1 1 220px;"><label>Alasan</label><input type="text" id="blkReason" placeholder="mis. shutdown, cuti bersama"></div>
           <button class="btn primary" data-action="addBlocked" style="align-self:flex-end;">+ Tambah</button>
         </div>
-        <div class="tablewrap"><table id="blockedTable"></table></div>
+        <div class="dp-blk-table"><table id="blockedTable" class="dp-table"></table></div>
       </div>
     </div>
 
@@ -1896,40 +1910,40 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202610161000"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202610161000"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202610162200"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202610162200"></script>
 
-<script src="assets/data/default-data.js?v=202610161000"></script>
-<script src="assets/data/brand-assets.js?v=202610161000"></script>
-<script src="assets/data/travel-routes.js?v=202610161000"></script>
-<script src="assets/js/00-icons.js?v=202610161000"></script>
-<script src="assets/js/01-state.js?v=202610161000"></script>
-<script src="assets/js/02-nav-util.js?v=202610161000"></script>
-<script src="assets/js/03-period-logic.js?v=202610161000"></script>
-<script src="assets/js/04-dashboard.js?v=202610161000"></script>
-<script src="assets/js/05-master-data.js?v=202610161000"></script>
-<script src="assets/js/06-plan-personil.js?v=202610161000"></script>
-<script src="assets/js/07-rules-planner.js?v=202610161000"></script>
-<script src="assets/js/08-gantt-print.js?v=202610161000"></script>
-<script src="assets/js/09-tracking-map.js?v=202610161000"></script>
-<script src="assets/js/10-running-hour.js?v=202610161000"></script>
-<script src="assets/js/11-berita-acara.js?v=202610161000"></script>
-<script src="assets/js/12-data-page.js?v=202610161000"></script>
-<script src="assets/js/13-hasil-db.js?v=202610161000"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202610161000"></script>
-<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610161000"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202610161000"></script>
-<script src="assets/js/16-actions-init.js?v=202610161000"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202610161000"></script>
-<script src="assets/js/18-model-dispersi.js?v=202610161000"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202610161000"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202610161000"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202610161000"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202610161000"></script>
-<script src="assets/js/23-budget-proyeksi.js?v=202610161000"></script>
-<script src="assets/js/24-personil-ppu.js?v=202610161000"></script>
-<script src="assets/js/25-access-gate.js?v=202610161000"></script>
-<script src="assets/js/26-laboratorium.js?v=202610161000"></script>
-<script src="assets/js/27-laporan-emf.js?v=202610161000"></script>
+<script src="assets/data/default-data.js?v=202610162200"></script>
+<script src="assets/data/brand-assets.js?v=202610162200"></script>
+<script src="assets/data/travel-routes.js?v=202610162200"></script>
+<script src="assets/js/00-icons.js?v=202610162200"></script>
+<script src="assets/js/01-state.js?v=202610162200"></script>
+<script src="assets/js/02-nav-util.js?v=202610162200"></script>
+<script src="assets/js/03-period-logic.js?v=202610162200"></script>
+<script src="assets/js/04-dashboard.js?v=202610162200"></script>
+<script src="assets/js/05-master-data.js?v=202610162200"></script>
+<script src="assets/js/06-plan-personil.js?v=202610162200"></script>
+<script src="assets/js/07-rules-planner.js?v=202610162200"></script>
+<script src="assets/js/08-gantt-print.js?v=202610162200"></script>
+<script src="assets/js/09-tracking-map.js?v=202610162200"></script>
+<script src="assets/js/10-running-hour.js?v=202610162200"></script>
+<script src="assets/js/11-berita-acara.js?v=202610162200"></script>
+<script src="assets/js/12-data-page.js?v=202610162200"></script>
+<script src="assets/js/13-hasil-db.js?v=202610162200"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202610162200"></script>
+<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610162200"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202610162200"></script>
+<script src="assets/js/16-actions-init.js?v=202610162200"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202610162200"></script>
+<script src="assets/js/18-model-dispersi.js?v=202610162200"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202610162200"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202610162200"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202610162200"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202610162200"></script>
+<script src="assets/js/23-budget-proyeksi.js?v=202610162200"></script>
+<script src="assets/js/24-personil-ppu.js?v=202610162200"></script>
+<script src="assets/js/25-access-gate.js?v=202610162200"></script>
+<script src="assets/js/26-laboratorium.js?v=202610162200"></script>
+<script src="assets/js/27-laporan-emf.js?v=202610162200"></script>
 </body>
 </html>
