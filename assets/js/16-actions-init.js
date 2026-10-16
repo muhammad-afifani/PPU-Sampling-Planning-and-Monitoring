@@ -181,13 +181,7 @@ const ACTIONS = {
   simManualPreset:(t)=>{ simManual.clear(); if(t.dataset.val==="ever" && simLast) simLast.engines.filter(e=>e.exceedCount>0).forEach(e=>simManual.add(e.cerobong)); hdRunSimulation(); },
   simSetDriverScope:(t)=>{ simDriverScope = t.dataset.val; hdRunSimulation(); },
   simExportXlsx:()=>simExportXlsx(),
-  simChip:(t)=>{
-    const field = t.dataset.field, val = t.dataset.val;
-    if(!val){ simSel[field].clear(); } else if(simSel[field].has(val)){ simSel[field].delete(val); } else { simSel[field].add(val); }
-    simRenderScopeChips();
-    simRenderCerobongChecklist();
-    simScheduleRun();
-  },
+  simMsToggle:(t)=>{ const f = t.dataset.field; simMsSetOpen(simMsOpen===f ? null : f); },
   simSetTrendMode:(t)=>{ simTrendMode = t.dataset.mode; hdRunSimulation(); },
   // Menampilkan salinan isi chart pada modal yang lebih lebar, dipakai sebagai fungsi memperbesar
   // tampilan chart tanpa perlu membuat ulang logika chart di tempat lain.

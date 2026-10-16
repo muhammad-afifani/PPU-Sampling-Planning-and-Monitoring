@@ -1663,10 +1663,16 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 /* Tables */
 .hd-table-wrap{max-height:none;border-radius:10px;}
 .hd-table{font-size:12.5px;}
-.hd-table th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--gray-500);font-weight:700;text-align:left;white-space:nowrap;}
-.hd-table td,.hd-table th{padding:9px 10px;border-bottom:1px solid var(--gray-200);vertical-align:middle;}
+/* Judul kolom seragam di SEMUA tabel dashboard: satu keluarga huruf (UI, bukan mono), satu ukuran,
+   satu warna terang di atas latar navy. Kolom angka hanya meratakan teks ke kanan; font monospace
+   khusus sel data (td), bukan judul kolom. */
+.hd-table thead th,.hd-table th{font-family:var(--font-ui);font-size:11px;font-weight:700;line-height:1.3;letter-spacing:.04em;text-transform:uppercase;color:#dbe6f0;background:var(--navy-900);text-align:left;white-space:normal;vertical-align:bottom;padding:10px 10px;border-bottom:0;}
+.hd-table thead th.num{text-align:right;}
+.hd-table td{padding:9px 10px;border-bottom:1px solid var(--gray-200);vertical-align:middle;}
+.hd-table thead th[title]{cursor:help;text-decoration:underline dotted rgba(219,230,240,.55);text-underline-offset:3px;}
+.hd-table tfoot td{font-size:12.5px;}
 .hd-table tbody tr:hover td{background:color-mix(in srgb, var(--teal-500) 6%, transparent);}
-.hd-table .num{text-align:right;font-family:var(--font-mono);white-space:nowrap;}
+.hd-table td.num{text-align:right;font-family:var(--font-mono);white-space:nowrap;}
 .hd-table .strong{font-weight:700;color:var(--heading);}
 .hd-rank{font-family:var(--font-mono);color:var(--gray-500);width:28px;}
 .hd-cell-main{display:flex;flex-direction:column;min-width:0;}
@@ -1778,7 +1784,8 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 .hd-tag.amber{background:color-mix(in srgb, #f5d9ad 30%, var(--surface-card));border-color:color-mix(in srgb, #e8b56f 55%, var(--surface-card));color:var(--hd-warn-text);}
 
 .sim-shell{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start;margin-bottom:18px;}
-.sim-panel{flex:1 1 320px;max-width:400px;min-width:0;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:var(--hd-radius);overflow:hidden;}
+.sim-panel{flex:1 1 320px;max-width:400px;min-width:0;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:var(--hd-radius);overflow:visible;}
+.sim-step:first-child{border-radius:var(--hd-radius) var(--hd-radius) 0 0;}
 @media(max-width:1100px){.sim-panel{max-width:none;}}
 .sim-step-opt{font-size:11px;font-weight:600;color:var(--gray-500);text-transform:none;}
 .sim-result{flex:999 1 560px;min-width:0;}
@@ -1808,8 +1815,8 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 .sim-ref{font-size:12px;color:var(--gray-700);line-height:1.5;}
 .sim-ref b{color:var(--heading);}
 .sim-ref .warn{color:var(--hd-warn-text);}
-.sim-presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;}
-.sim-presets button{display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 4px;border-radius:9px;border:1px solid var(--gray-300);background:var(--surface-card);color:var(--heading);font:inherit;font-size:12px;font-weight:700;cursor:pointer;min-height:44px;}
+.sim-presets{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;}
+.sim-presets button{display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 2px;border-radius:9px;border:1px solid var(--gray-300);background:var(--surface-card);color:var(--heading);font:inherit;font-size:11px;font-weight:700;cursor:pointer;min-height:44px;white-space:nowrap;}
 .sim-presets button span{font-family:var(--font-mono);font-size:10.5px;font-weight:500;color:var(--gray-500);}
 .sim-presets button:hover{border-color:#d97706;}
 .sim-presets button.on{background:#d97706;border-color:#d97706;color:#fff;}
@@ -1917,6 +1924,7 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 .hd-print .hd-print-2{margin-bottom:0;}
 .hd-print .hd-table{font-size:10.5px;}
 .hd-print .hd-table td,.hd-print .hd-table th{padding:5px 7px;}
+.hd-print .hd-table th{font-size:9px;}
 .hd-print .hd-print-detail{font-size:9.5px;}
 .hd-print .hd-print-detail tr{break-inside:avoid;}
 .hd-print .hd-table-wrap,.hd-print .tablewrap{max-height:none;overflow:visible;border:0;}
@@ -1930,3 +1938,20 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 .hd-print .hd-chart{max-height:95mm;width:auto;max-width:100%;display:block;margin:0 auto;}
 .hd-print-block{break-inside:avoid;}
 .hd-pchk .hd-chip-dot{margin-right:2px;}
+
+/* Dropdown centang di panel simulasi */
+.sim-step .xsel{max-width:none;}
+.sim-step .xsel-panel{min-width:0;padding:6px;}
+.sim-step .xsel-list{max-height:260px;}
+.xsel-opt span{flex:1;min-width:0;}
+.xsel-opt em{font-style:normal;font-family:var(--font-mono);font-size:11px;color:var(--gray-500);}
+.xsel-opt.xsel-all{border-bottom:1px solid var(--gray-200);border-radius:5px 5px 0 0;margin-bottom:2px;font-weight:700;}
+.sim-step .xsel-opt{padding:7px 8px;font-size:12.5px;min-height:34px;}
+.sim-r-help{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px;padding:12px 16px;margin-bottom:12px;border:1px solid var(--gray-200);border-left:4px solid var(--teal-500);border-radius:10px;background:var(--surface-card);font-size:12.5px;line-height:1.55;color:var(--gray-700);}
+.sim-r-help b{color:var(--heading);}
+@media(max-width:900px){.sim-r-help{grid-template-columns:1fr;}}
+.field .xsel-opt,.sim-step .field .xsel-opt{text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:500;color:var(--gray-900);}
+.field .xsel-opt.xsel-all{font-weight:700;color:var(--heading);}
+.hd-table th .lc{text-transform:none;}
+.sim-driver-table td:nth-child(3),.sim-driver-table td:nth-child(4){white-space:nowrap;}
+.sim-driver-table .sim-rbar{width:96px;}
