@@ -118,7 +118,7 @@ function renderRoadmapPantau(){
   });
   const grandTotal = periods.map(per=> sites.reduce((a,s)=>a+((recap[s]&&recap[s][per])||0),0));
   document.getElementById("rmRecapTable").innerHTML = `
-    <thead><tr><th>Site</th>${periods.map(per=>`<th style="text-align:center;${per===nowPeriodStr?"background:var(--teal-100);color:#0b6b66;":""}">${escHtml(per)}</th>`).join("")}<th style="text-align:center;">Total</th></tr></thead>
+    <thead><tr><th>Site</th>${periods.map(per=>`<th style="text-align:center;${per===nowPeriodStr?"background:var(--teal-500);color:#fff;":""}">${escHtml(per)}</th>`).join("")}<th style="text-align:center;">Total</th></tr></thead>
     <tbody>${sites.map(s=>{
       const rowTotal = periods.reduce((a,per)=>a+((recap[s]&&recap[s][per])||0),0);
       return `<tr><td><span class="pal-site-pill" style="--site-c:${HASIL_SITE_COLORS[s]||"#7f8fa0"};">${escHtml(s)}</span></td>
@@ -138,7 +138,7 @@ function renderRoadmapPantau(){
   // sekarang/depan, lihat roadmapDuePeriods), kosong = tidak wajib periode itu & belum ada hasil.
   document.getElementById("rmDetailTable").innerHTML = `
     <thead><tr><th>Site</th><th style="min-width:170px;">Titik</th><th>Kategori</th><th>Keterangan</th><th>Pemantauan Terakhir</th>
-      ${periods.map(per=>`<th style="text-align:center;min-width:44px;${per===nowPeriodStr?"background:var(--teal-100);color:#0b6b66;":""}">${escHtml(per)}</th>`).join("")}</tr></thead>
+      ${periods.map(per=>`<th style="text-align:center;min-width:44px;${per===nowPeriodStr?"background:var(--teal-500);color:#fff;":""}">${escHtml(per)}</th>`).join("")}</tr></thead>
     <tbody>${pts.map(p=>{
       const due = dueMap.get(p.id)||new Set();
       const actual = actualMap.get(p.id)||new Set();

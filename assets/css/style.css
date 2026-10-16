@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&display=swap');
 :root{
+  --tbl-head-bg:#1c3150; --tbl-head-fg:#dbe6f0;
   --navy-950:#0a1628; --navy-900:#0d1f38; --navy-800:#12294a; --navy-700:#1a3a63;
   --navy-600:#254d7f; --teal-500:#0ea5a0; --teal-400:#2dd4c8; --teal-100:#d9f7f3;
   --amber-500:#e8a33d; --red-500:#e0554f; --green-500:#3fb27f; --gray-100:#f4f6f8;
@@ -553,7 +554,7 @@ table{width:100%;border-collapse:collapse;font-size:12.5px;}
 thead th{text-align:left;background:var(--navy-900);color:#dbe6f0;font-weight:600;padding:8px 9px;position:sticky;top:0;white-space:nowrap;}
 /* :where() = spesifisitas 0, jadi aturan kelas spesifik (.hd-table, .dsm, .daygrid, dst) tetap menang.
    Area cetak & tabel gaya dokumen (.pg-*, border="1" Laporan EMF) dikecualikan: tampilan cetak tetap. */
-thead th:not(:where(#printGuideArea th, .pg-table th, .pg-ba-table th, .pg-gantt th, .pg-dokfoto-table th, table[border="1"] th)){background:var(--gray-100);color:var(--gray-500);font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:9px 10px;vertical-align:bottom;border-bottom:1px solid var(--gray-200);box-shadow:inset 0 -1px 0 var(--gray-200);}
+thead th:not(:where(#printGuideArea th, .pg-table th, .pg-ba-table th, .pg-gantt th, .pg-dokfoto-table th, table[border="1"] th)){background:var(--tbl-head-bg);color:var(--tbl-head-fg);font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:9px 10px;vertical-align:bottom;border-bottom:0;box-shadow:none;}
 thead th:not(:where(#printGuideArea th, .pg-table th, .pg-ba-table th, .pg-gantt th, .pg-dokfoto-table th, table[border="1"] th)) :is(div,small,span:not(.badge)){text-transform:none;letter-spacing:0;}
 tbody td{padding:8px 10px;border-bottom:1px solid var(--gray-200);vertical-align:middle;}
 tbody tr:hover{background:color-mix(in srgb, var(--teal-500) 5%, var(--surface-card));}
@@ -1104,13 +1105,13 @@ textarea.mono{font-family:var(--font-mono);font-size:11.5px;}
    schedule span visible at once (no month pagination) with drag-to-reschedule. */
 .daygrid-scroll{overflow-x:auto;padding-bottom:8px;border:1px solid var(--gray-200);border-radius:10px;}
 table.daygrid{border-collapse:separate;border-spacing:3px;min-width:max-content;background:var(--gray-100);}
-.dg-th-label{text-align:left;font-size:11.5px;font-weight:700;color:var(--heading);min-width:190px;padding:8px 10px;white-space:nowrap;vertical-align:middle;}
-table.daygrid thead th{background:var(--surface-card);border-bottom:0;box-shadow:none;border-radius:5px;}
-.dg-th-month{text-align:center;font-size:10.5px;font-weight:800;color:#0b6b66;background:var(--teal-100) !important;padding:4px 0;letter-spacing:.03em;border-radius:4px;white-space:nowrap;}
+.dg-th-label{text-align:left;font-size:11.5px;font-weight:700;color:var(--tbl-head-fg);min-width:190px;padding:8px 10px;white-space:nowrap;vertical-align:middle;}
+table.daygrid thead th{background:var(--tbl-head-bg);border-bottom:0;box-shadow:none;border-radius:5px;}
+.dg-th-month{text-align:center;font-size:10.5px;font-weight:800;color:#7ae8de;background:#173d4f !important;padding:4px 0;letter-spacing:.03em;border-radius:4px;white-space:nowrap;}
 .dg-th-date{text-align:center;width:30px;min-width:30px;padding:5px 0 !important;line-height:1.15;vertical-align:middle !important;}
-.dg-th-date .dow{display:block;font-size:8px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.02em;}
-.dg-th-date .dd{display:block;font-size:11.5px;font-weight:700;color:var(--heading);}
-.dg-th-date.weekend{background:var(--gray-200) !important;}
+.dg-th-date .dow{display:block;font-size:8px;font-weight:700;color:#8fa5bd;text-transform:uppercase;letter-spacing:.02em;}
+.dg-th-date .dd{display:block;font-size:11.5px;font-weight:700;color:#fff;}
+.dg-th-date.weekend{background:#2b4468 !important;}
 .dg-th-date.weekend .dd{opacity:.6;}
 .dg-th-date.today{background:var(--teal-500) !important;border-radius:5px;}
 .dg-th-date.today .dd{color:#04211f;}
@@ -1125,7 +1126,7 @@ thead .dg-col-sticky{z-index:3;}
    pas persis di tepi kanan Nama, tidak peduli isi kolom lain. */
 .pz-nama{position:sticky;left:0;z-index:2;min-width:280px;max-width:280px;width:280px;background:var(--surface-card);box-shadow:2px 0 3px -2px rgba(0,0,0,.15);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .pz-role{position:sticky;left:280px;z-index:2;min-width:100px;max-width:100px;width:100px;background:var(--surface-card);box-shadow:2px 0 3px -2px rgba(0,0,0,.15);}
-thead .pz-nama,thead .pz-role{z-index:3;background:var(--gray-100);box-shadow:none;}
+thead .pz-nama,thead .pz-role{z-index:3;background:var(--tbl-head-bg);box-shadow:none;}
 /* Baris sub-teks (telepon di kolom Nama, "s.d. tanggal" di kolom dokumen bertanggal) SELALU
    dirender (walau kosong, lihat renderPersonil) dgn min-height tetap di sini — supaya tinggi baris
    tabel Personil konsisten, tidak loncat2 cuma krn satu personil kebetulan punya telepon/tanggal
@@ -2031,8 +2032,8 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 
 /* Tabel ringan (bukan header navy) untuk tabel di dalam kartu site & tabel datar */
 .dp-table{width:100%;border-collapse:collapse;}
-.dp-table thead th{background:var(--gray-100) !important;color:var(--gray-500) !important;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:8px 12px;border-bottom:1px solid var(--gray-200);white-space:nowrap;vertical-align:bottom;}
-.dp-table thead th .th-help{border-bottom-color:var(--gray-500);}
+.dp-table thead th{background:var(--tbl-head-bg) !important;color:var(--tbl-head-fg) !important;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:8px 12px;border-bottom:1px solid var(--gray-200);white-space:nowrap;vertical-align:bottom;}
+.dp-table thead th .th-help{border-bottom-color:rgba(219,230,240,.6);}
 .dp-table thead th div{text-transform:none;letter-spacing:0;}
 .dp-table td{padding:9px 12px;border-bottom:1px solid var(--gray-200);font-size:12.5px;vertical-align:middle;}
 .tree-table.dp-table td{padding:9px 12px;}
@@ -2213,7 +2214,7 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 /* Input di dalam sel tabel (mis. Hari Kerja/Buffer di Jadwal per Site) — senada dgn input form lain */
 tbody td > input[type="number"],tbody td > input[type="text"],tbody td > input[type="date"],tbody td > select{border:1px solid var(--gray-300);border-radius:7px;padding:4px 8px;min-height:30px;background:var(--surface-card);color:var(--ms-text);font:inherit;font-size:12.5px;}
 tbody td > input[type="number"]:focus,tbody td > input[type="text"]:focus,tbody td > select:focus{outline:2px solid color-mix(in srgb, var(--teal-500) 45%, transparent);outline-offset:0;border-color:var(--teal-500);}
-:root[data-theme="dark"] .dg-th-month{color:var(--teal-400);background:color-mix(in srgb, var(--teal-500) 22%, var(--surface-card)) !important;}
+:root[data-theme="dark"] .dg-th-month{color:#7ae8de;background:#1b4658 !important;}
 /* Kartu angka .stat lama (Dashboard, Running Hour, Dashboard Ambient, AQI, Dispersi) diseragamkan
    dgn KPI baru (.dp-kpi): label di atas angka, tanpa garis navy tebal, warna nada sama. */
 .stat{display:flex;flex-direction:column;gap:4px;padding:13px 15px !important;border-radius:12px;box-shadow:none;}
@@ -2228,3 +2229,7 @@ tbody td > input[type="number"]:focus,tbody td > input[type="text"]:focus,tbody 
 :root[data-theme="dark"] .stat.good .num{color:#5fd39a;}
 :root[data-theme="dark"] .stat.bad .num{color:#ff8a80;}
 :root[data-theme="dark"] .stat.warn .num{color:#f0a565;}
+
+/* Header tabel gelap (token sama dgn header site Database Titik Pantau) */
+:root[data-theme="dark"]{--tbl-head-bg:#223a5c;}
+thead th a{color:#7ae8de;}
