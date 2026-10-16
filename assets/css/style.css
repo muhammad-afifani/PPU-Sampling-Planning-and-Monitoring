@@ -1434,8 +1434,8 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
 /* Rekap Kelengkapan Foto — chip klik-utk-filter (bukan cuma angka statis), imbang dgn pola chip
    filter status yg dipakai di tempat lain (mis. .navbtn/site pill). Warna per status: abu (semua),
    hijau (final), kuning (ada foto tp belum final), merah (belum ada foto sama sekali). */
-.dokfoto-recap{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px 0;}
-.dokfoto-recap-chip{border:1.5px solid var(--gray-300);border-radius:20px;background:#fff;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--gray-600);}
+.dokfoto-recap{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:0;margin-top:6px;}
+.dokfoto-recap-chip{border:1.5px solid var(--gray-300);border-radius:20px;background:#fff;padding:2px 10px;font-size:11.5px;font-weight:600;cursor:pointer;color:var(--gray-600);}
 .dokfoto-recap-chip b{font-weight:800;}
 .dokfoto-recap-chip.active{border-color:currentColor;}
 .dokfoto-recap-chip.all.active{background:var(--gray-100);color:var(--gray-800);}
@@ -1452,36 +1452,40 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
    kategori foto, cepat sekali jadi sangat panjang) — lihat dokFotoExpanded (17-dokumentasi-foto.js)
    yang menjaga status buka/tutup tiap titik tetap awet lintas render ulang (tambah/hapus foto). */
 .dokfoto-point-card{padding:0;}
-.dokfoto-point-summary{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;list-style:none;cursor:pointer;user-select:none;padding:15px 18px;}
+.dokfoto-point-summary{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;list-style:none;cursor:pointer;user-select:none;padding:8px 12px;}
 .dokfoto-point-summary::-webkit-details-marker{display:none;}
 .dokfoto-point-chevron{display:inline-block;margin-right:7px;color:var(--gray-500);transition:transform .15s ease;}
 .dokfoto-point-card:not([open]) .dokfoto-point-chevron{transform:rotate(-90deg);}
-.dokfoto-point-title{font-size:14.5px;display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
-.dokfoto-point-sub{font-size:11.5px;color:var(--gray-500);margin-top:3px;margin-left:19px;}
-.dokfoto-point-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.dokfoto-point-title{font-size:13px;display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
+.dokfoto-point-sub{font-size:11px;color:var(--gray-500);margin-top:1px;margin-left:18px;}
+.dokfoto-point-actions{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.dokfoto-point-actions .btn.small{padding:3px 9px;font-size:11px;}
+.dokfoto-point-actions .badge{font-size:10.5px;}
 /* Tombol Download/Cetak ikut dalam <summary> — stopPropagation lewat CSS tidak bisa, jadi klik-nya
    ditangani di JS (lihat listener "click" di 17-dokumentasi-foto.js: tombol data-action di dalam
    summary sengaja TIDAK memicu toggle buka/tutup <details> krn actions didaftarkan lewat delegasi
    dokumen biasa, bukan lewat summary's default toggle behavior). */
-.dokfoto-point-card[open] .dokfoto-point-summary{border-bottom:1px solid var(--gray-200);margin-bottom:16px;}
-.dokfoto-point-body{padding:0 18px 18px;}
-.dokfoto-cat{margin-bottom:22px;}
-.dokfoto-cat:last-child{margin-bottom:0;}
-.dokfoto-cat-label{font-size:12.5px;font-weight:700;color:var(--gray-700);margin-bottom:10px;padding-left:9px;border-left:3px solid var(--teal-400);}
+.dokfoto-point-card[open] .dokfoto-point-summary{border-bottom:1px solid var(--gray-200);margin-bottom:10px;}
+.dokfoto-point-body{padding:0 12px 12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px;}
+.dokfoto-cat{display:flex;flex-direction:column;gap:6px;background:var(--gray-50,#f8f9fa);border:1px solid var(--gray-200);border-radius:9px;padding:8px 9px;min-width:0;}
+.dokfoto-cat-label{font-size:11.5px;font-weight:700;color:var(--gray-700);padding-left:8px;border-left:3px solid var(--teal-400);line-height:1.3;}
+.dokfoto-cat-count{font-weight:500;color:var(--gray-500);font-size:10.5px;margin-left:4px;}
+.dokfoto-point-count{font-size:10.5px;font-weight:600;color:var(--teal-600,#0d8a7a);background:var(--teal-100,#e0f5f3);border-radius:10px;padding:0 7px;line-height:17px;}
+.dokfoto-point-count.zero{color:var(--gray-500);background:var(--gray-100);}
 /* TIDAK ada crop/cover di sini — tiap foto ditampilkan APA ADANYA (width penuh kolom grid, height
    otomatis ikut rasio asli foto): potrait jadi tinggi, lanskap jadi pendek, tidak ada yg terpotong.
    align-items:start supaya baris berisi campuran tinggi tetap rapi (tidak saling stretch). */
-.dokfoto-thumbgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;align-items:start;}
-.dokfoto-thumb{position:relative;border-radius:9px;overflow:hidden;border:1px solid var(--gray-200);background:var(--gray-100);box-shadow:0 1px 3px rgba(0,0,0,.07);}
+.dokfoto-thumbgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));gap:6px;align-items:start;}
+.dokfoto-thumb{position:relative;border-radius:7px;overflow:hidden;border:1px solid var(--gray-200);background:var(--gray-100);box-shadow:0 1px 3px rgba(0,0,0,.07);}
 .dokfoto-thumb img{width:100%;height:auto;display:block;cursor:zoom-in;}
 /* Tombol hapus SELALU tampil (bukan cuma :hover) — target utama tools ini dipakai lewat HP di
    lapangan, yang tidak punya konsep hover sama sekali. */
-.dokfoto-thumb-del{position:absolute;top:7px;right:7px;width:27px;height:27px;border-radius:50%;border:none;background:rgba(10,15,25,.62);color:#fff;font-size:13.5px;line-height:27px;text-align:center;cursor:pointer;padding:0;}
+.dokfoto-thumb-del{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(10,15,25,.62);color:#fff;font-size:12.5px;line-height:22px;text-align:center;cursor:pointer;padding:0;}
 .dokfoto-thumb-del:hover{background:rgba(10,15,25,.9);}
-.dokfoto-thumb-edit{position:absolute;top:7px;left:7px;width:27px;height:27px;border-radius:50%;border:none;background:rgba(10,15,25,.62);color:#fff;font-size:12px;line-height:27px;text-align:center;cursor:pointer;padding:0;}
+.dokfoto-thumb-edit{position:absolute;top:4px;left:4px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(10,15,25,.62);color:#fff;font-size:11px;line-height:22px;text-align:center;cursor:pointer;padding:0;}
 .dokfoto-thumb-edit:hover{background:rgba(10,15,25,.9);}
-.dokfoto-thumb-badge{position:absolute;bottom:7px;left:7px;background:rgba(13,138,122,.85);color:#fff;font-size:11px;line-height:1;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
-.dokfoto-add-btn{border:1.5px dashed var(--gray-300);border-radius:9px;background:transparent;color:var(--gray-500);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;padding:10px;line-height:1.4;min-height:140px;}
+.dokfoto-thumb-badge{position:absolute;bottom:4px;left:4px;background:rgba(13,138,122,.85);color:#fff;font-size:11px;line-height:1;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+.dokfoto-add-btn{border:1.5px dashed var(--gray-300);border-radius:7px;background:transparent;color:var(--gray-500);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;padding:6px;line-height:1.3;min-height:44px;}
 .dokfoto-add-btn:hover{border-color:var(--teal-500);color:var(--teal-500);}
 /* Cetak Lampiran Foto (format Data Pendukung/Lampiran SIMPEL PPU) — reuse .pg-batch (page-break per
    titik) & .pg-ba-meta (tabel field:value) dari Berita Acara supaya visual dokumen cetak konsisten
@@ -1500,11 +1504,12 @@ td[data-date].dragover{outline:2px dashed var(--teal-500);outline-offset:-2px;}
    Word yang akan ditempel), lebar konten ~17 cm spt A4 portrait supaya yang terlihat di layar
    mendekati hasil paste di Word. Style tabel/teksnya sendiri inline (lihat EMF_CSS di
    27-laporan-emf.js) agar ikut terbawa saat disalin, CSS di sini cuma utk wadah & tombol. */
-.emf-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+.emf-tabs{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
+.emf-tabs .chip-toggle{padding:3px 10px;font-size:11.5px;}
 .chip-toggle:disabled{opacity:.55;cursor:not-allowed;transform:none;}
 .chip-toggle:disabled:hover{border-color:var(--gray-300);color:var(--gray-700);}
-.emf-opts{display:flex;flex-direction:column;gap:3px;align-self:center;}
-.emf-coverage{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:0 0 10px;}
+.emf-opts{display:flex;flex-direction:column;gap:5px;margin-top:2px;}
+.emf-coverage{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin:0;}
 .emf-cov-title{font-size:12px;font-weight:800;color:var(--heading);margin-right:4px;}
 .emf-cov-item{font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:14px;border:1px solid var(--gray-200);background:var(--surface-card);}
 .emf-cov-item.ok{border-color:color-mix(in srgb, var(--green-500) 45%, var(--gray-200));color:#1c7a4f;}
@@ -2287,3 +2292,44 @@ table.daygrid{background:transparent !important;border-spacing:3px 4px !importan
 .dg-td-label .dg-next{color:#b07612;font-weight:600;}
 .dg-td-label .dg-next b{font-size:inherit !important;color:inherit !important;}
 :root[data-theme="dark"] .dg-td-label .dg-next{color:#f0b565;}
+
+/* Dokumentasi Foto — header ringkas: judul + aksi sebaris, filter sebaris, rekap sebaris */
+.dokfoto-head{margin-top:-16px;padding-top:12px;padding-bottom:8px;}
+.dokfoto-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.dokfoto-bar-title{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;min-width:0;}
+.dokfoto-bar-title h2{margin:0;font-size:17px;}
+.dokfoto-bar-title .muted{font-size:11px;cursor:help;}
+.dokfoto-bar-actions{margin:0;gap:6px;}
+.dokfoto-filters{display:flex;align-items:flex-end;gap:8px 10px;flex-wrap:wrap;margin-top:6px;}
+.dokfoto-filters .field{margin:0;}
+.dokfoto-filters .field label{font-size:10.5px;margin-bottom:2px;}
+.dokfoto-filters select{padding:3px 6px;font-size:12px;min-width:0;}
+.dokfoto-filters-btns{display:flex;gap:5px;}
+.dokfoto-storage{margin:0;font-size:11px;}
+@media (max-width:700px){
+  .dokfoto-point-body{grid-template-columns:1fr;}
+  .dokfoto-bar-title .muted{display:none;}
+  .dokfoto-head{position:static;}
+}
+
+/* Laporan EMF & EMP — panel kontrol di kiri (sticky), preview Word melebar di kanan & tidak terhalang
+   header. Di layar sempit panel turun ke atas preview (tidak sticky). */
+.emf-layout{display:grid;grid-template-columns:268px minmax(0,1fr);gap:16px;align-items:start;}
+.emf-side{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:2px 4px 12px 0;scrollbar-width:thin;}
+.emf-side-head h2{margin:0;font-size:16px;line-height:1.25;}
+.emf-side-desc{font-size:11px;color:var(--gray-500);margin-top:6px;line-height:1.4;cursor:help;}
+.emf-side-actions{display:flex;flex-direction:column;gap:6px;}
+.emf-side-actions .btn{width:100%;justify-content:center;}
+.emf-side-actions-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.emf-side-card{background:var(--surface-card,#fff);border:1px solid var(--gray-200);border-radius:10px;padding:10px 11px;display:flex;flex-direction:column;gap:8px;}
+.emf-side-card .field{margin:0;}
+.emf-side-card .field label{font-size:10.5px;margin-bottom:2px;}
+.emf-side-card select,.emf-side-card input[type=text],.emf-side-card input[type=number]{width:100%;box-sizing:border-box;}
+.emf-side .checkline{font-size:11.5px;line-height:1.3;align-items:flex-start;}
+.emf-side-hint{font-size:11px;color:var(--gray-500);line-height:1.45;}
+.emf-main{min-width:0;}
+.emf-main .emf-paper{max-width:900px;margin-left:auto;margin-right:auto;}
+@media (max-width:1100px){
+  .emf-layout{grid-template-columns:1fr;}
+  .emf-side{position:static;max-height:none;overflow:visible;}
+}

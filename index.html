@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202610171100">
+<link rel="stylesheet" href="assets/css/style.css?v=202610181200">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -744,7 +744,7 @@
     <div class="page" id="page-beritaacara">
       <div class="stickytop">
       <div class="pagehead"><div><h2 id="baPageTitle">Berita Acara Pengambilan Contoh Uji Udara Emisi</h2><div class="desc">Disusun otomatis dari data titik &amp; status sampling per site, siap cetak/export PDF, mengikuti format Berita Acara yang sudah berjalan. Berita Acara Emisi dan Ambient dipisah sesuai Tim yang dipilih, tidak digabung dalam satu dokumen.</div></div>
-        <div class="toolbar"><button class="btn primary" data-action="printBeritaAcara">Cetak / Export PDF</button></div>
+        <div class="toolbar"><button class="btn" data-action="exportBeritaAcaraWord" title="Unduh sebagai file Word (.doc) — logo, tabel &amp; tanda tangan ikut, bisa diedit lagi di Word">Export Word (.doc)</button><button class="btn primary" data-action="printBeritaAcara">Cetak / Export PDF</button></div>
       </div>
       <div class="toolbar card" style="padding:12px 14px;">
         <div class="field"><label>Tim</label><select id="baTeam"><option value="emisi">Emisi</option><option value="ambient">Ambient (Udara Ambien, Kebisingan, Kebauan, Getaran)</option></select></div>
@@ -786,31 +786,33 @@
 
     <!-- DOKUMENTASI FOTO SAMPLING -->
     <div class="page" id="page-dokumentasi">
-      <div class="stickytop">
-      <div class="pagehead"><div><h2>Dokumentasi Foto Sampling</h2><div class="desc">Lampiran foto per titik mengikuti format "Data Pendukung/Lampiran SIMPEL PPU": Petugas Laboratorium/PPC, Peralatan Sampling, Aktivitas Sampling (boleh lebih dari 1 foto tiap kategori), dan bukti screenshot BA yang sudah ditandatangani. Foto ikut tersimpan &amp; ter-backup lewat Export/Import Semua Data (JSON) di halaman Data.</div></div>
-        <div class="toolbar">
-          <button class="btn primary" data-action="printAllVisibleDokFotoLampiran">Cetak Semua yang Tampil (PDF)</button>
-          <button class="btn" data-action="exportDokFotoOnly" title="Export foto sesuai filter Tim/Batch/Site/Status saat ini — utk dibagi ke orang lain / digabung lagi belakangan, tidak menyertakan data lain">Export Foto Saja</button>
-          <button class="btn ghost" data-action="triggerImportDokFotoOnly" title="Import file Export Foto Saja — MENGGABUNGKAN foto baru, tidak menimpa/menghapus data lain">Import Foto Saja</button>
-        </div>
-      </div>
-      <div class="toolbar card" style="padding:12px 14px;">
-        <div class="field"><label>Tim</label><select id="dokTeam"><option value="">Semua</option><option value="emisi">Emisi</option><option value="ambient">Ambient</option></select></div>
-        <div class="field"><label>Batch</label><select id="dokBatch"><option value="">Semua</option></select></div>
-        <div class="field"><label>Site</label><select id="dokSite"><option value="">Semua</option></select></div>
-        <div class="field"><label>Status</label><select id="dokStatus">
-          <option value="">Semua</option>
-          <option value="final">Sudah Final</option>
-          <option value="notfinal">Ada Foto (Belum Final)</option>
-          <option value="empty">Belum Ada Foto</option>
-        </select></div>
-        <div class="field"><label>&nbsp;</label><div style="display:flex;gap:8px;"><button class="btn small ghost" data-action="expandAllDokFoto">Buka Semua</button><button class="btn small ghost" data-action="collapseAllDokFoto">Tutup Semua</button></div></div>
-        <span class="spacer"></span>
-        <div class="hint" style="margin:0;">Total penyimpanan foto saat ini: <b id="dokFotoStorageSize">0 KB</b> (tersimpan di IndexedDB, kapasitas jauh lebih besar drpd penyimpanan data teks aplikasi)</div>
-      </div>
-      <div id="dokFotoRecap" class="dokfoto-recap"></div>
-      </div>
-      <div id="dokFotoList" class="dokfoto-list"></div>
+       <div class="stickytop dokfoto-head">
+       <div class="dokfoto-bar">
+         <div class="dokfoto-bar-title"><h2>Dokumentasi Foto Sampling</h2><span class="muted" title="Lampiran foto per titik mengikuti format Data Pendukung/Lampiran SIMPEL PPU: Petugas Laboratorium/PPC, Peralatan Sampling, Aktivitas Sampling (boleh &gt;1 foto per kategori), dan bukti screenshot BA yang sudah ditandatangani. Foto ikut ter-backup lewat Export/Import Semua Data (JSON).">Lampiran SIMPEL PPU &middot; foto ikut ter-backup di Export Semua Data</span></div>
+         <div class="toolbar dokfoto-bar-actions">
+           <button class="btn small primary" data-action="printAllVisibleDokFotoLampiran" title="Cetak lampiran semua titik yang tampil (PDF lewat dialog cetak)">Cetak PDF</button>
+           <button class="btn small" data-action="exportAllVisibleDokFotoLampiranWord" title="Export lampiran semua titik yang tampil ke Word (.doc)">Export Word</button>
+           <button class="btn small" data-action="exportDokFotoOnly" title="Export foto sesuai filter Tim/Batch/Site/Status saat ini — utk dibagi ke orang lain / digabung lagi belakangan, tidak menyertakan data lain">Export Foto</button>
+           <button class="btn small ghost" data-action="triggerImportDokFotoOnly" title="Import file Export Foto Saja — MENGGABUNGKAN foto baru, tidak menimpa/menghapus data lain">Import Foto</button>
+         </div>
+       </div>
+       <div class="dokfoto-filters">
+         <div class="field"><label>Tim</label><select id="dokTeam"><option value="">Semua</option><option value="emisi">Emisi</option><option value="ambient">Ambient</option></select></div>
+         <div class="field"><label>Batch</label><select id="dokBatch"><option value="">Semua</option></select></div>
+         <div class="field"><label>Site</label><select id="dokSite"><option value="">Semua</option></select></div>
+         <div class="field"><label>Status</label><select id="dokStatus">
+           <option value="">Semua</option>
+           <option value="final">Sudah Final</option>
+           <option value="notfinal">Ada Foto (Belum Final)</option>
+           <option value="empty">Belum Ada Foto</option>
+         </select></div>
+         <div class="dokfoto-filters-btns"><button class="btn small ghost" data-action="expandAllDokFoto">Buka Semua</button><button class="btn small ghost" data-action="collapseAllDokFoto">Tutup Semua</button></div>
+         <span class="spacer"></span>
+         <div class="hint dokfoto-storage" title="Foto tersimpan di IndexedDB, kapasitas jauh lebih besar drpd penyimpanan data teks aplikasi">Penyimpanan foto: <b id="dokFotoStorageSize">0 KB</b></div>
+       </div>
+       <div id="dokFotoRecap" class="dokfoto-recap"></div>
+       </div>
+       <div id="dokFotoList" class="dokfoto-list"></div>
     </div>
 
     <!-- RUNNING HOUR DETAIL -->
@@ -1451,32 +1453,40 @@
 
     <!-- LAPORAN EMF & EMP -->
     <div class="page" id="page-laporanemf">
-      <div class="stickytop">
-      <div class="pagehead"><div><h2>Laporan EMF &amp; EMP</h2><div class="desc">Tabel siap salin ke Word untuk laporan Environmental Monitoring Feedback (EMF) per site &amp; semester — disusun otomatis dari Database Titik Pantau, Database Hasil Emisi &amp; Database Hasil Ambient. Sumber emisi yang tidak dipantau tetap dicantumkan beserta alasannya.</div>
-        <div class="emf-tabs"><button type="button" class="chip-toggle active">EMF — Hasil Pemantauan</button><button type="button" class="chip-toggle" disabled title="Laporan EMP (rencana pemantauan) dibangun di tahap berikutnya">EMP — Rencana Pemantauan (menyusul)</button></div></div>
-        <div class="toolbar">
-          <button class="btn" data-action="emfExportXlsx">Export Excel</button>
-          <button class="btn" data-action="emfDownloadDoc">Download Word (.doc)</button>
-          <button class="btn primary" data-action="emfCopyAll">Salin Semua Tabel ke Word</button>
-        </div>
-      </div>
-      <div class="toolbar card" style="padding:12px 14px;">
-        <div class="field"><label>Site</label><select id="emfSite"></select></div>
-        <div class="field"><label>Periode</label><select id="emfPeriod"></select></div>
-        <div class="field"><label>No. Tabel Awal</label><input type="number" id="emfStartNo" min="1" value="16" style="width:84px;"></div>
-        <div class="field"><label>Lab Pelaksana (narasi)</label><input type="text" id="emfLab" placeholder="mis. Sucofindo" style="width:130px;"></div>
-        <div class="field"><label>Kota Lab</label><input type="text" id="emfLabCity" placeholder="mis. Balikpapan" style="width:110px;"></div>
-        <div class="emf-opts">
-          <label class="checkline"><input type="checkbox" id="emfNarrative" checked> Sertakan narasi (paragraf pengantar, tanggal sampling &amp; kesimpulan)</label>
-          <label class="checkline"><input type="checkbox" id="emfIncludeRef" checked> Tabel referensi (baku mutu &amp; daftar sumber emisi)</label>
-          <label class="checkline"><input type="checkbox" id="emfIncludeSupport" checked> Parameter pendukung (O₂, CO₂, laju alir, suhu gas)</label>
-          <label class="checkline"><input type="checkbox" id="emfIdNumber" checked> Format angka Indonesia (koma desimal)</label>
-        </div>
-      </div>
-      </div>
-      <div id="emfCoverage"></div>
-      <div class="hint" style="margin:0 0 10px;">Arahkan kursor ke sebuah tabel lalu klik <b>Salin ke Word</b> untuk menyalin 1 tabel (narasi pengantar, judul, tabel, catatan &amp; kalimat kesimpulan ikut), atau <b>Salin Semua Tabel ke Word</b> di atas. Nomor tabel berurutan mulai dari "No. Tabel Awal" — sesuaikan dengan nomor di laporanmu.</div>
-      <div id="emfReport"></div>
+       <div class="emf-layout">
+         <aside class="emf-side">
+           <div class="emf-side-head">
+             <h2>Laporan EMF &amp; EMP</h2>
+             <div class="emf-tabs"><button type="button" class="chip-toggle active">EMF</button><button type="button" class="chip-toggle" disabled title="Laporan EMP (rencana pemantauan) dibangun di tahap berikutnya">EMP (menyusul)</button></div>
+             <div class="emf-side-desc" title="Tabel siap salin ke Word untuk laporan Environmental Monitoring Feedback (EMF) per site &amp; semester — disusun otomatis dari Database Titik Pantau, Database Hasil Emisi &amp; Database Hasil Ambient. Sumber emisi yang tidak dipantau tetap dicantumkan beserta alasannya.">Tabel siap salin ke Word, disusun dari Database Titik Pantau &amp; Hasil.</div>
+           </div>
+           <div class="emf-side-actions">
+             <button class="btn primary" data-action="emfCopyAll">Salin Semua Tabel ke Word</button>
+             <div class="emf-side-actions-row">
+               <button class="btn small" data-action="emfDownloadDoc">Word (.doc)</button>
+               <button class="btn small" data-action="emfExportXlsx">Excel</button>
+             </div>
+           </div>
+           <div class="emf-side-card">
+             <div class="field"><label>Site</label><select id="emfSite"></select></div>
+             <div class="field"><label>Periode</label><select id="emfPeriod"></select></div>
+             <div class="field"><label>No. Tabel Awal</label><input type="number" id="emfStartNo" min="1" value="16"></div>
+             <div class="field"><label>Lab Pelaksana (narasi)</label><input type="text" id="emfLab" placeholder="mis. Sucofindo"></div>
+             <div class="field"><label>Kota Lab</label><input type="text" id="emfLabCity" placeholder="mis. Balikpapan"></div>
+             <div class="emf-opts">
+               <label class="checkline"><input type="checkbox" id="emfNarrative" checked> Sertakan narasi (pengantar, tanggal sampling &amp; kesimpulan)</label>
+               <label class="checkline"><input type="checkbox" id="emfIncludeRef" checked> Tabel referensi (baku mutu &amp; daftar sumber)</label>
+               <label class="checkline"><input type="checkbox" id="emfIncludeSupport" checked> Parameter pendukung (O₂, CO₂, laju alir, suhu gas)</label>
+               <label class="checkline"><input type="checkbox" id="emfIdNumber" checked> Format angka Indonesia (koma desimal)</label>
+             </div>
+           </div>
+           <div id="emfCoverage"></div>
+           <div class="emf-side-hint">Arahkan kursor ke sebuah tabel lalu klik <b>Salin ke Word</b> untuk menyalin 1 tabel (narasi, judul, tabel, catatan &amp; kesimpulan ikut). Nomor tabel berurutan mulai dari "No. Tabel Awal".</div>
+         </aside>
+         <main class="emf-main">
+           <div id="emfReport"></div>
+         </main>
+       </div>
     </div>
 
     <!-- LOKASI PETA -->
@@ -1913,40 +1923,41 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202610171100"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202610171100"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202610181200"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202610181200"></script>
 
-<script src="assets/data/default-data.js?v=202610171100"></script>
-<script src="assets/data/brand-assets.js?v=202610171100"></script>
-<script src="assets/data/travel-routes.js?v=202610171100"></script>
-<script src="assets/js/00-icons.js?v=202610171100"></script>
-<script src="assets/js/01-state.js?v=202610171100"></script>
-<script src="assets/js/02-nav-util.js?v=202610171100"></script>
-<script src="assets/js/03-period-logic.js?v=202610171100"></script>
-<script src="assets/js/04-dashboard.js?v=202610171100"></script>
-<script src="assets/js/05-master-data.js?v=202610171100"></script>
-<script src="assets/js/06-plan-personil.js?v=202610171100"></script>
-<script src="assets/js/07-rules-planner.js?v=202610171100"></script>
-<script src="assets/js/08-gantt-print.js?v=202610171100"></script>
-<script src="assets/js/09-tracking-map.js?v=202610171100"></script>
-<script src="assets/js/10-running-hour.js?v=202610171100"></script>
-<script src="assets/js/11-berita-acara.js?v=202610171100"></script>
-<script src="assets/js/12-data-page.js?v=202610171100"></script>
-<script src="assets/js/13-hasil-db.js?v=202610171100"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202610171100"></script>
-<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610171100"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202610171100"></script>
-<script src="assets/js/16-actions-init.js?v=202610171100"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202610171100"></script>
-<script src="assets/js/18-model-dispersi.js?v=202610171100"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202610171100"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202610171100"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202610171100"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202610171100"></script>
-<script src="assets/js/23-budget-proyeksi.js?v=202610171100"></script>
-<script src="assets/js/24-personil-ppu.js?v=202610171100"></script>
-<script src="assets/js/25-access-gate.js?v=202610171100"></script>
-<script src="assets/js/26-laboratorium.js?v=202610171100"></script>
-<script src="assets/js/27-laporan-emf.js?v=202610171100"></script>
+<script src="assets/data/default-data.js?v=202610181200"></script>
+<script src="assets/data/brand-assets.js?v=202610181200"></script>
+<script src="assets/data/travel-routes.js?v=202610181200"></script>
+<script src="assets/js/00-icons.js?v=202610181200"></script>
+<script src="assets/js/01-state.js?v=202610181200"></script>
+<script src="assets/js/02-nav-util.js?v=202610181200"></script>
+<script src="assets/js/03-period-logic.js?v=202610181200"></script>
+<script src="assets/js/04-dashboard.js?v=202610181200"></script>
+<script src="assets/js/05-master-data.js?v=202610181200"></script>
+<script src="assets/js/06-plan-personil.js?v=202610181200"></script>
+<script src="assets/js/07-rules-planner.js?v=202610181200"></script>
+<script src="assets/js/08-gantt-print.js?v=202610181200"></script>
+<script src="assets/js/09-tracking-map.js?v=202610181200"></script>
+<script src="assets/js/10-running-hour.js?v=202610181200"></script>
+<script src="assets/js/11-berita-acara.js?v=202610181200"></script>
+<script src="assets/js/12-data-page.js?v=202610181200"></script>
+<script src="assets/js/13-hasil-db.js?v=202610181200"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202610181200"></script>
+<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610181200"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202610181200"></script>
+<script src="assets/js/16-actions-init.js?v=202610181200"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202610181200"></script>
+<script src="assets/js/18-model-dispersi.js?v=202610181200"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202610181200"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202610181200"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202610181200"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202610181200"></script>
+<script src="assets/js/23-budget-proyeksi.js?v=202610181200"></script>
+<script src="assets/js/24-personil-ppu.js?v=202610181200"></script>
+<script src="assets/js/25-access-gate.js?v=202610181200"></script>
+<script src="assets/js/26-laboratorium.js?v=202610181200"></script>
+<script src="assets/js/27-laporan-emf.js?v=202610181200"></script>
+<script src="assets/js/28-word-export.js?v=202610181200"></script>
 </body>
 </html>
