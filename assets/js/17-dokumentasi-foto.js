@@ -636,12 +636,11 @@ function renderDokFotoRecap(){
   const curStatus = document.getElementById("dokStatus").value;
   const chip = (status,label,n,cls)=>`<button type="button" class="dokfoto-recap-chip ${cls}${curStatus===status?" active":""}" data-action="dokFotoFilterStatus" data-status="${status}">${escHtml(label)} <b>${n}</b></button>`;
   host.innerHTML = `
-    <span class="muted" style="font-size:11.5px;font-weight:700;">Rekap Kelengkapan Foto (mengikuti filter Tim/Batch/Site):</span>
     ${chip("", "Semua Titik", counts.total, "all")}
     ${chip("final", "Sudah Final", counts.final, "ok")}
-    ${chip("notfinal", "Ada Foto, Belum Final", counts.notfinal, "warn")}
+    ${chip("notfinal", "Belum Final", counts.notfinal, "warn")}
     ${chip("empty", "Belum Ada Foto", counts.empty, "err")}
-    <button type="button" class="btn small ghost" style="margin-left:auto;" data-action="dokFotoSampledRecapModal">Tabel Rekap vs Status Sampling</button>
+    <button type="button" class="btn small ghost" style="margin-left:auto;" data-action="dokFotoSampledRecapModal" title="Tabel kelengkapan foto per kategori vs status sampling (Tracking BA/CoA)">Rekap vs Status Sampling</button>
   `;
 }
 /* ---------- Tabel rekap: titik yang SUDAH DISAMPLING (Tracking BA/CoA) apakah fotonya sudah lengkap
@@ -861,7 +860,7 @@ function dokFotoThumbHtml(pointId, cat){
   const thumbs = photos.map(ph=>{
     const box = dokFotoBoxHtml(ph, dokFotoUrlFor(ph.id), {
       imgAttrs:`data-action="openDokFotoLightbox" data-point="${pointId}" data-cat="${cat.key}" data-id="${ph.id}" alt="${escHtml(meta.label)}"`,
-      plainImgStyle:"width:100%;height:auto;display:block;cursor:zoom-in;",
+      plainImgStyle:"width:100%;height:auto;max-height:150px;object-fit:contain;display:block;cursor:zoom-in;",
       cropWrapStyle:"cursor:zoom-in;background:var(--gray-200);"
     });
     const cropBadge = dokFotoCropOf(ph) ? `<span class="dokfoto-thumb-badge" title="Sudah di-crop/resize (non-destruktif, foto asli tetap utuh &amp; bisa diubah lagi)">&#9986;</span>` : "";
@@ -874,7 +873,7 @@ function dokFotoThumbHtml(pointId, cat){
     </div>`;
   }).join("");
   return `<div class="dokfoto-cat">
-    <div class="dokfoto-cat-label">${escHtml(meta.label)} <span class="muted" style="font-weight:400;">(${photos.length} foto)</span></div>
+    <div class="dokfoto-cat-label">${escHtml(meta.label)} <span class="dokfoto-cat-count">${photos.length} foto</span></div>
     <div class="dokfoto-thumbgrid">
       ${thumbs}
       <button class="dokfoto-add-btn" data-action="triggerAddDokFoto" data-point="${pointId}" data-cat="${cat.key}">+ Tambah Foto</button>
@@ -899,6 +898,11 @@ document.getElementById("dokFotoList").addEventListener("toggle", e=>{
 document.getElementById("dokFotoList").addEventListener("click", e=>{
   if(e.target.closest(".dokfoto-point-actions")) e.preventDefault();
 });
+function dokFotoCountBadge(pointId){
+  const d = ensureDokFoto(pointId);
+  const n = DOKFOTO_CATEGORIES.reduce((a,c)=>a+(d[c.key]||[]).length, 0);
+  return `<span class="dokfoto-point-count${n?"":" zero"}" title="Total foto titik ini">${n} foto</span>`;
+}
 function dokFotoPointCardHtml(p){
   const t = ensureTracking(p.id);
   const statusLabel = t.samplingStatus ? (SAMPLING_STATUS_LABELS[t.samplingStatus]||t.samplingStatus) : "Belum diisi statusnya";
@@ -911,13 +915,14 @@ function dokFotoPointCardHtml(p){
   return `<details class="card dokfoto-point-card" data-point-id="${p.id}" ${isOpen?"open":""}>
     <summary class="dokfoto-point-summary">
       <div>
-        <div class="dokfoto-point-title"><span class="dokfoto-point-chevron">&#9662;</span><b>${cap.title}</b></div>
+        <div class="dokfoto-point-title"><span class="dokfoto-point-chevron">&#9662;</span><b>${cap.title}</b>${dokFotoCountBadge(p.id)}</div>
         <div class="dokfoto-point-sub">${cap.sub}</div>
       </div>
       <div class="dokfoto-point-actions">
         ${finalBtn}
-        <button class="btn small ghost" data-action="downloadDokFotoAll" data-point="${p.id}" title="Download semua foto titik ini">Download Foto</button>
-        <button class="btn small" data-action="printSingleDokFotoLampiran" data-point="${p.id}" title="Cetak lampiran SIMPEL PPU titik ini">Cetak PDF</button>
+        <button class="btn small ghost" data-action="downloadDokFotoAll" data-point="${p.id}" title="Download semua foto titik ini">Foto</button>
+        <button class="btn small" data-action="printSingleDokFotoLampiran" data-point="${p.id}" title="Cetak lampiran SIMPEL PPU titik ini (PDF)">PDF</button>
+        <button class="btn small" data-action="exportSingleDokFotoLampiranWord" data-point="${p.id}" title="Export lampiran SIMPEL PPU titik ini ke Word (.doc)">Word</button>
         <span class="badge ${t.samplingStatus==="sampled"?"b-green":"b-teal"}">${escHtml(statusLabel)}</span>
       </div>
     </summary>

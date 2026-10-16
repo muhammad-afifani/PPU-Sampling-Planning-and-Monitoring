@@ -277,7 +277,7 @@ function printRencanaExport(){
     <div class="field" style="margin-top:10px;"><label>Orientasi Kertas</label>
       <select id="rpOrientation"><option value="landscape">Lanskap (Landscape) &mdash; disarankan, kolomnya cukup banyak</option><option value="portrait">Potret (Portrait)</option></select>
     </div>
-    <div class="actions"><button class="btn ghost" data-action="closeModal">Batal</button><button class="btn primary" data-action="doPrintRencanaExport">Cetak</button></div>
+    <div class="actions"><button class="btn ghost" data-action="closeModal">Batal</button><button class="btn" data-action="doExportRencanaWord">Export Word (.doc)</button><button class="btn primary" data-action="doPrintRencanaExport">Cetak / PDF</button></div>
   `);
 }
 function doPrintRencanaExport(){
