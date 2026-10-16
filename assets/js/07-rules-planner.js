@@ -36,10 +36,11 @@ function renderRouteList(containerId, listKey){
   const team = listKey==="routeEmisi" ? "emisi" : (listKey==="routeAmbient" ? "ambient" : null);
   el.innerHTML = DB[listKey].map((s,i)=>{
     const prev = siteSchedulePreview(s, team);
+    const siteC = (typeof HASIL_SITE_COLORS!=="undefined" && HASIL_SITE_COLORS[s]) || "#7f8fa0";
     return `
     <li draggable="true" data-list="${listKey}" data-idx="${i}">
       <span class="route-drag-handle" title="Tarik untuk urutkan">&#8942;&#8942;</span>
-      <span><b>${i+1}.</b> ${escHtml(s)}${prev?`<div class="muted" style="font-size:10px;margin-top:2px;">&#128197; ${prev.start} &rarr; ${prev.end} <span style="opacity:.75;">(${escHtml(prev.batchName)})</span></div>`:""}</span>
+      <span class="route-main"><span class="route-num">${i+1}</span><span class="route-dot" style="background:${siteC}" aria-hidden="true"></span><b class="route-site">${escHtml(s)}</b>${prev?`<span class="route-date" title="${escHtml(prev.batchName)}">${prev.start} &rarr; ${prev.end}</span>`:`<span class="route-date muted">belum dijadwalkan</span>`}</span>
       <span class="rbtns">
         <button class="btn small ghost" data-action="moveRoute" data-list="${listKey}" data-idx="${i}" data-dir="-1">&#8593;</button>
         <button class="btn small ghost" data-action="moveRoute" data-list="${listKey}" data-idx="${i}" data-dir="1">&#8595;</button>
@@ -94,25 +95,27 @@ function renderRules(){
   renderRouteList("routeAmbient","routeAmbient");
   renderRouteList("routeEmisi","routeEmisi");
 
-  document.getElementById("siteRuleCards").innerHTML = allSites().map(s=>{
-    const r = ensureSiteRule(s);
-    const hasFlare = DB.points.some(p=>p.site===s && p.kategori==="emisi" && normKS(p.kategoriSumber)==="FLARE");
-    return `<div class="card" style="padding:12px 14px;margin-bottom:0;">
-      <h3 style="margin-bottom:10px;">${s}</h3>
-      <div class="field"><label>Hari Crew Change</label><select data-action="setCrewDay" data-site="${s}">
-        <option value="" ${r.crewChangeDay===""?"selected":""}>Tidak ada</option>
-        ${DOW_LABEL.map((d,i)=>`<option value="${i}" ${String(r.crewChangeDay)===String(i)?"selected":""}>${d}</option>`).join("")}
-      </select></div>
-      <div class="grid cols-2" style="margin-top:8px;">
-        <div class="field"><label>Rasio Emisi (titik/hari)</label><input type="number" min="0.5" step="0.5" value="${r.ratioEmisi}" data-action="setRatio" data-site="${s}" data-field="ratioEmisi"></div>
-        <div class="field"><label>Rasio Ambient (titik/hari)</label><input type="number" min="0.5" step="0.5" value="${r.ratioAmbient}" data-action="setRatio" data-site="${s}" data-field="ratioAmbient"></div>
-      </div>
-      <div class="field" style="margin-top:8px;"><label>Ajukan Izin Masuk Site (H-berapa)</label><input type="number" min="0" step="1" value="${r.permitLeadDays!=null?r.permitLeadDays:2}" data-action="setPermitLeadDays" data-site="${s}"></div>
-      <div class="hint" style="margin-top:2px;">Dihitung mundur dari tanggal mulai kedatangan tim di site ini, muncul otomatis di Panduan Sampling A4 (cetak) — berjaga kalau jadwal ternyata maju lebih cepat. Boleh beda tiap site.</div>
-      <div class="field" style="margin-top:8px;"><label>Catatan Transport</label><input type="text" value="${escHtml(r.transport||"")}" data-action="setTransport" data-site="${s}" placeholder="mis. darat, seatruck, offshore"></div>
-      ${hasFlare ? `<label class="checkline" style="margin-top:10px;"><input type="checkbox" data-action="setFlareOneDay" data-site="${s}" ${r.flareOneDay?"checked":""}> Semua titik Flare di site ini selesai dalam 1 hari (tidak dihitung per titik terhadap Rasio Emisi)</label>` : ""}
-    </div>`;
-  }).join("");
+  // Satu baris per site (tabel ringkas) menggantikan kartu besar per site; atribut data-action /
+  // data-site / data-field input TIDAK berubah, jadi handler "change" di 16-actions-init.js tetap sama.
+  document.getElementById("siteRuleCards").innerHTML = `<div class="dp-rules-wrap"><table class="dp-table dp-rules-table">
+    <thead><tr><th>Site</th><th>Hari crew change</th><th>Rasio emisi<br><span>titik/hari</span></th><th>Rasio ambient<br><span>titik/hari</span></th><th>Izin masuk<br><span>H-berapa</span></th><th>Catatan transport</th><th>Flare 1 hari</th></tr></thead>
+    <tbody>${allSites().map(s=>{
+      const r = ensureSiteRule(s);
+      const hasFlare = DB.points.some(p=>p.site===s && p.kategori==="emisi" && normKS(p.kategoriSumber)==="FLARE");
+      const siteC = (typeof HASIL_SITE_COLORS!=="undefined" && HASIL_SITE_COLORS[s]) || "#7f8fa0";
+      return `<tr>
+        <td><span class="dp-site-cell"><span class="route-dot" style="background:${siteC}" aria-hidden="true"></span><b>${s}</b></span></td>
+        <td><select data-action="setCrewDay" data-site="${s}" aria-label="Hari crew change ${s}">
+          <option value="" ${r.crewChangeDay===""?"selected":""}>Tidak ada</option>
+          ${DOW_LABEL.map((d,i)=>`<option value="${i}" ${String(r.crewChangeDay)===String(i)?"selected":""}>${d}</option>`).join("")}
+        </select></td>
+        <td><input class="dp-num" type="number" min="0.5" step="0.5" value="${r.ratioEmisi}" data-action="setRatio" data-site="${s}" data-field="ratioEmisi" aria-label="Rasio emisi ${s}"></td>
+        <td><input class="dp-num" type="number" min="0.5" step="0.5" value="${r.ratioAmbient}" data-action="setRatio" data-site="${s}" data-field="ratioAmbient" aria-label="Rasio ambient ${s}"></td>
+        <td><input class="dp-num" type="number" min="0" step="1" value="${r.permitLeadDays!=null?r.permitLeadDays:2}" data-action="setPermitLeadDays" data-site="${s}" aria-label="Izin masuk H-berapa ${s}"></td>
+        <td><input class="dp-text" type="text" value="${escHtml(r.transport||"")}" data-action="setTransport" data-site="${s}" placeholder="mis. darat, seatruck, offshore" aria-label="Catatan transport ${s}"></td>
+        <td>${hasFlare ? `<label class="dp-switch" title="Semua titik Flare di site ini selesai dalam 1 hari"><input type="checkbox" data-action="setFlareOneDay" data-site="${s}" ${r.flareOneDay?"checked":""}><span>Ya</span></label>` : `<span class="muted">-</span>`}</td>
+      </tr>`;
+    }).join("")}</tbody></table></div>`;
 
   const blkSel = document.getElementById("blkSite");
   blkSel.innerHTML = allSites().map(s=>`<option value="${s}">${s}</option>`).join("");
@@ -120,9 +123,9 @@ function renderRules(){
   let blkRows=[];
   allSites().forEach(s=>{ (DB.siteRules[s].blocked||[]).forEach((b,i)=>blkRows.push({site:s, idx:i, ...b})); });
   document.getElementById("blockedTable").innerHTML = `
-    <thead><tr><th>Site</th><th>Mulai</th><th>Selesai</th><th>Alasan</th><th>Aksi</th></tr></thead>
-    <tbody>${blkRows.map(b=>`<tr><td>${b.site}</td><td>${b.start}</td><td>${b.end}</td><td>${escHtml(b.reason)}</td>
-      <td><button class="btn small danger" data-action="removeBlocked" data-site="${b.site}" data-idx="${b.idx}">Hapus</button></td></tr>`).join("")}</tbody>`;
+    <thead><tr><th>Site</th><th>Mulai</th><th>Selesai</th><th>Alasan</th><th></th></tr></thead>
+    <tbody>${blkRows.length ? blkRows.map(b=>`<tr><td><b>${b.site}</b></td><td>${b.start}</td><td>${b.end}</td><td>${escHtml(b.reason)}</td>
+      <td class="dp-row-actions"><button class="btn small danger" data-action="removeBlocked" data-site="${b.site}" data-idx="${b.idx}">Hapus</button></td></tr>`).join("") : `<tr><td colspan="5" class="muted" style="padding:14px;">Belum ada hari terhold.</td></tr>`}</tbody>`;
 }
 
 /* =========================================================

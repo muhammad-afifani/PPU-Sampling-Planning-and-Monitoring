@@ -299,10 +299,16 @@ function renderMasterTree(rows){
     const siteGroups = groupPointsForDisplay(sitePts);
     const doneCount = siteGroups.filter(g=>g.every(p=>p.status==="done")).length;
     const wajibCount = siteGroups.filter(g=>g.some(p=>effectiveWajib(p))).length;
-    html += `<div class="tree-site">
-      <div class="tree-head" data-action="toggleMasterGroup" data-key="${escHtml(site)}">
-        <span class="tree-caret">${expanded?"&#9660;":"&#9654;"}</span>
-        <b>${site}</b> <span class="muted" style="color:#9db3c9;">— ${siteGroups.length} titik · ${wajibCount} wajib · ${doneCount} selesai</span>
+    // Progres = titik WAJIB yang semua parameternya sudah done, dibanding total titik wajib site ini.
+    const wajibDone = siteGroups.filter(g=>g.some(p=>effectiveWajib(p)) && g.every(p=>p.status==="done")).length;
+    const prog = wajibCount ? Math.round(wajibDone/wajibCount*100) : 0;
+    html += `<div class="tree-site dp-site" style="--site-c:${(typeof HASIL_SITE_COLORS!=="undefined" && HASIL_SITE_COLORS[site])||"#7f8fa0"};">
+      <div class="tree-head dp-site-head" data-action="toggleMasterGroup" data-key="${escHtml(site)}">
+        <span class="tree-caret">${expanded?"&#9662;":"&#9656;"}</span>
+        <span class="dp-site-dot" aria-hidden="true"></span><b class="dp-site-name">${site}</b>
+        <span class="dp-pills"><span class="dp-pill">${siteGroups.length} titik</span><span class="dp-pill wajib">${wajibCount} wajib</span><span class="dp-pill done">${doneCount} selesai</span></span>
+        <span class="spacer"></span>
+        <span class="dp-prog" title="${wajibDone} dari ${wajibCount} titik wajib sudah selesai"><span class="dp-prog-bar"><i style="width:${prog}%"></i></span><span class="dp-prog-lbl">${wajibDone}/${wajibCount} wajib selesai</span></span>
       </div>`;
     if(expanded){
       const bySub = {};
@@ -317,13 +323,14 @@ function renderMasterTree(rows){
         // Dihitung sekali di sini (dipakai jumlah di judul subgrup MAUPUN baris tabel di bawah)
         // supaya angkanya konsisten walau subgrup lagi diciutkan/dibuka.
         const ptGroups = groupPointsForDisplay(pts);
-        html += `<div class="tree-sub">
-          <div class="tree-subhead" data-action="toggleMasterGroup" data-key="${escHtml(subKey)}">
-            <span class="tree-caret">${subExpanded?"&#9660;":"&#9654;"}</span>
-            ${escHtml(sg)} <span class="muted">(${ptGroups.length} titik)</span>
+        const grpColor = typeof dashGrpVisual==="function" ? dashGrpVisual(sg).color : "var(--gray-500)";
+        html += `<div class="tree-sub dp-sub" style="--grp-c:${grpColor};">
+          <div class="tree-subhead dp-sub-head" data-action="toggleMasterGroup" data-key="${escHtml(subKey)}">
+            <span class="tree-caret">${subExpanded?"&#9662;":"&#9656;"}</span>
+            <span class="dp-grp-bar" aria-hidden="true"></span>${escHtml(sg)} <span class="dp-count">${ptGroups.length} titik</span>
           </div>`;
         if(subExpanded){
-          html += `<table class="tree-table"><thead><tr>
+          html += `<table class="tree-table dp-table"><thead><tr>
             <th style="width:26px;">Progres</th><th>Nama / Spesifikasi</th><th>Parameter Wajib Pantau</th>
             <th style="width:90px;">${rhColumnLabel(currentPeriodStr())}</th><th style="width:150px;">Status</th><th style="width:150px;white-space:nowrap;">Prediksi</th><th style="width:130px;">${VERIF_TH_HTML}</th><th style="width:120px;"></th>
           </tr></thead><tbody>`;
@@ -345,7 +352,7 @@ function renderMasterTree(rows){
                 <td>${wajibBadgeHtml(p0)}</td>
                 <td style="white-space:nowrap;">${prediksiCellHtml(p0)}</td>
                 <td>${verifyCellHtml(p0)}</td>
-                <td style="text-align:right;white-space:nowrap;">
+                <td class="dp-row-actions">
                   <button class="btn small" data-action="editPoint" data-id="${p0.id}">Edit</button> <button class="btn small danger" data-action="deletePoint" data-id="${p0.id}">Hapus</button>
                 </td>
               </tr>`;
@@ -370,7 +377,7 @@ function renderMasterTree(rows){
                 <td>${wajibBadgeHtml(p)}</td>
                 <td style="white-space:nowrap;">${prediksiCellHtml(p)}</td>
                 <td>${verifyCellHtml(p)}</td>
-                <td style="text-align:right;white-space:nowrap;">
+                <td class="dp-row-actions">
                   <button class="btn small" data-action="editPoint" data-id="${p.id}">Edit</button> <button class="btn small danger" data-action="deletePoint" data-id="${p.id}">Hapus</button>
                 </td>
               </tr>`;
@@ -490,6 +497,26 @@ function renderMaster(){
   document.getElementById("masterCount").innerHTML = `${groupPointsForDisplay(rows).length} dari ${groupPointsForDisplay(DB.points).length} titik ditampilkan &middot; `
     + `<b>${verifiedCount}</b> dari ${DB.points.length} parameter sudah dicek`
     + (staleCount ? ` &middot; <span style="color:var(--amber-500);font-weight:700;">${staleCount} berubah sejak terakhir dicek</span>` : "");
+  // Ringkasan di atas (murni tampilan, dihitung dari baris yang sedang difilter — sama dengan isi tabel).
+  const top = document.getElementById("masterCountTop");
+  if(top) top.textContent = `${groupPointsForDisplay(rows).length} dari ${groupPointsForDisplay(DB.points).length} titik`;
+  const kpiEl = document.getElementById("masterKpis");
+  if(kpiEl){
+    const groups = groupPointsForDisplay(rows);
+    const wajibG = groups.filter(g=>g.some(p=>effectiveWajib(p)));
+    const doneG = wajibG.filter(g=>g.every(p=>p.status==="done")).length;
+    const schedG = groups.filter(g=>g.some(p=>p.status==="scheduled")).length;
+    const holdG = groups.filter(g=>g.every(p=>p.status==="pending")).length;
+    const unver = rows.filter(p=>verifyStatus(p)!=="verified").length;
+    const pct = wajibG.length ? Math.round(doneG/wajibG.length*100) : 0;
+    const tile = (lbl, val, sub, tone, bar)=>`<div class="dp-kpi ${tone||""}"><span class="dp-kpi-lbl">${lbl}</span><span class="dp-kpi-val">${val}</span>${bar!=null?`<span class="dp-kpi-bar"><i style="width:${bar}%"></i></span>`:""}<span class="dp-kpi-sub">${sub}</span></div>`;
+    kpiEl.innerHTML = tile("Total titik", groups.length, `${rows.filter(p=>p.kategori==="emisi").length} parameter emisi &middot; ${rows.filter(p=>p.kategori!=="emisi").length} lingkungan`)
+      + tile("Wajib pantau", wajibG.length, `periode ${escHtml(currentPeriodStr())}`, "teal")
+      + tile("Selesai", `${doneG}<small>/${wajibG.length}</small>`, `${pct}% titik wajib selesai`, "good", pct)
+      + tile("Terjadwal", schedG, "ada parameter berstatus Scheduled", "blue")
+      + tile("Hold", holdG, "seluruh parameter belum dijadwalkan", "")
+      + tile("Belum / perlu dicek ulang", unver, staleCount ? `${staleCount} berubah sejak dicek` : "verifikasi parameter", unver ? "warn" : "good");
+  }
   }catch(err){
     console.error("renderMaster error:", err);
     toast("Gagal menampilkan Database Titik Pantau: "+err.message,"err");
