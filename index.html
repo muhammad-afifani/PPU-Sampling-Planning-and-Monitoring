@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202610181200">
+<link rel="stylesheet" href="assets/css/style.css?v=202610191200">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -870,7 +870,7 @@
         <button type="button" data-action="hdJump" data-target="hdSecTrend">Trend &amp; Distribution</button>
         <button type="button" data-action="hdJump" data-target="hdSecWatch">Watchlist &amp; Heatmap</button>
         <button type="button" data-action="hdJump" data-target="hdSecRh">Running Hour</button>
-        <button type="button" data-action="hdJump" data-target="hdSecEngine">Engine Scorecard</button>
+        <button type="button" data-action="hdJump" data-target="hdSecEngine"><span class="hd-Noun">Engine</span> Scorecard</button>
         <button type="button" data-action="hdJump" data-target="hdSecCompare">Comparison &amp; Correlation</button>
         <button type="button" data-action="hdJump" data-target="hdSecData">Detail Data</button>
         <button type="button" data-action="hdJump" data-target="hdSecSim">Simulasi BM</button>
@@ -925,7 +925,7 @@
         <div class="cardhead">
           <div>
             <h3>Priority Watchlist</h3>
-            <div class="hint hd-sub" id="hdWatchSub">Titik dengan persentase baku mutu tertinggi pada periode terakhir, dibandingkan periode sebelumnya di titik yang sama. Klik nama titik untuk drill-down ke Engine Comparison dan Multi-Parameter Profile.</div>
+            <div class="hint hd-sub" id="hdWatchSub">Titik dengan persentase baku mutu tertinggi pada periode terakhir, dibandingkan periode sebelumnya di titik yang sama. Klik nama titik untuk drill-down ke <span class="hd-Noun">Engine</span> Comparison dan Multi-Parameter Profile.</div>
           </div>
           <button class="btn small ghost" data-action="hdZoomChart" data-target="hdWatchlist" data-title="Priority Watchlist">Perbesar</button>
         </div>
@@ -1003,8 +1003,8 @@
       <div class="card">
         <div class="cardhead">
           <div>
-            <h3>Engine Trend Scorecard <span class="muted" id="hdScoreParamLabel" style="text-transform:none;font-weight:400;"></span></h3>
-            <div class="hint hd-sub">Trend tiap engine atau titik sepanjang rentang periode aktif. Garis merah putus-putus adalah baku mutu titik tersebut. Klik kartu untuk membandingkannya di grafik Trend dan Comparison.</div>
+            <h3><span class="hd-Noun">Engine</span> Trend Scorecard <span class="muted" id="hdScoreParamLabel" style="text-transform:none;font-weight:400;"></span></h3>
+            <div class="hint hd-sub">Trend tiap <span class="hd-noun">engine</span> atau titik sepanjang rentang periode aktif. Garis merah putus-putus adalah baku mutu titik tersebut. Klik kartu untuk membandingkannya di grafik Trend dan Comparison.</div>
           </div>
         </div>
         <div class="hd-seg" id="hdScoreSortToggle"></div>
@@ -1015,7 +1015,7 @@
       <div id="hdSecCompare" class="hd-anchor"></div>
       <div class="hd-row">
         <div class="card hd-col-half">
-          <div class="cardhead"><div><h3>Engine Comparison <span class="muted" style="text-transform:none;font-weight:400;">, parameter: <span id="hdCompareParamLabel"></span></span></h3><div class="hint hd-sub">Perbandingan langsung antar titik yang dicentang pada filter Titik atau Cerobong (atau diklik di Watchlist dan Scorecard), pada periode terakhir. Pilih Nilai Nominal atau % Baku Mutu.</div></div><button class="btn small ghost" data-action="hdZoomChart" data-target="hdCompareChartWrap" data-title="Engine Comparison">Perbesar</button></div>
+          <div class="cardhead"><div><h3><span class="hd-Noun">Engine</span> Comparison <span class="muted" style="text-transform:none;font-weight:400;">, parameter: <span id="hdCompareParamLabel"></span></span></h3><div class="hint hd-sub">Perbandingan langsung antar titik yang dicentang pada filter Titik atau Cerobong (atau diklik di Watchlist dan Scorecard), pada periode terakhir. Pilih Nilai Nominal atau % Baku Mutu.</div></div><button class="btn small ghost" data-action="hdZoomChart" data-target="hdCompareChartWrap" data-title="Engine Comparison">Perbesar</button></div>
           <div id="hdCompareModeToggle" style="margin-bottom:8px;"></div>
           <div id="hdCompareChartWrap"><div id="hdCompareChart"></div><div class="hint" id="hdCompareUnitNote" style="margin-top:6px;"></div></div>
         </div>
@@ -1029,7 +1029,7 @@
         <div class="hint" style="margin-top:-6px;">Parameter emisi jarang berdiri sendiri. Apabila NOx naik bersamaan dengan Gas Temperatur, itu petunjuk kuat bahwa penyebabnya adalah suhu pembakaran yang naik, bukan kebetulan. Menumpuk dua tren dalam satu grafik jauh lebih cepat dibandingkan membandingkan dua grafik terpisah.</div>
         <div class="hint" id="hdCorrScopeNote" style="margin-top:4px;font-style:italic;"></div>
         <div class="field" style="margin:8px 0 4px;max-width:440px;">
-          <label>Titik atau Engine Khusus untuk Korelasi, opsional dan independen dari filter di atas</label>
+          <label>Titik atau <span class="hd-Noun">Engine</span> Khusus untuk Korelasi, opsional dan independen dari filter di atas</label>
           <div class="xsel" id="hdCorrCerobongXsel">
             <button type="button" class="xsel-btn" data-action="hdCorrToggleCerobongPanel"><span id="hdCorrCerobongBtnLabel">Ikuti filter dashboard di atas</span> <span>&#9662;</span></button>
             <div class="xsel-panel" id="hdCorrCerobongPanel" style="display:none;">
@@ -1393,11 +1393,23 @@
     </div>
 
     <!-- DASHBOARD HASIL AMBIENT -->
-    <div class="page" id="page-ambiendashboard">
-      <div class="stickytop">
-      <div class="pagehead"><div><h2>Dashboard Hasil Ambient</h2><div class="desc">Analitik hasil pemantauan udara ambien, kebisingan, kebauan &amp; getaran terhadap baku mutu dan kriteria yang berlaku</div></div></div>
-      <div class="chipbar" id="ambDashCategoryTabs" style="margin:10px 0;"></div>
-      </div>
+    <div class="page amb-dash" id="page-ambiendashboard">
+      <section class="hd-hero" aria-label="Dashboard Hasil Ambient">
+        <div class="hd-hero-top">
+          <div class="hd-hero-title">
+            <div class="hd-eyebrow">Hasil Pemantauan <span aria-hidden="true">/</span> Lingkungan</div>
+            <h2>Dashboard Hasil Ambient</h2>
+            <p id="ambHeroDesc"></p>
+          </div>
+          <div class="hd-hero-actions">
+            <span class="hd-fresh" id="ambHeroMeta"></span>
+            <button type="button" class="hd-btn-outline" data-action="exportAmbienXlsx" title="Unduh seluruh data hasil ambient">Export Excel</button>
+            <button type="button" class="hd-btn-solid" data-action="goToPage" data-page="ambiendb">Database Hasil Ambient</button>
+          </div>
+        </div>
+        <div class="hd-tabs" id="ambDashCategoryTabs" role="tablist" aria-label="Kategori"></div>
+      </section>
+      <nav class="hd-secnav" id="ambSecNav" aria-label="Bagian dashboard"></nav>
       <div id="ambDashBody"></div>
     </div>
 
@@ -1421,30 +1433,37 @@
     </div>
 
     <!-- MODEL AQI/ISPU AMBIENT -->
-    <div class="page" id="page-aqiispu">
-      <div class="stickytop">
-      <div class="pagehead"><div><h2>Model AQI/ISPU Ambient</h2><div class="desc">Indeks kualitas udara dari data Database Hasil Ambient (kategori Udara Ambien) — pilih standar AQI (metodologi US EPA, dipakai IQAir secara global) atau ISPU (Indonesia), lengkap rating kategori &amp; visual per tanggal sampling.</div></div>
-        <div class="toolbar">
-          <button class="btn ghost" data-action="aqiIspuInfoModal" title="Metodologi, tabel breakpoint &amp; sumber regulasi">&#8505;&#65039; Info &amp; Referensi</button>
-        </div>
-      </div>
-      <div class="toolbar card" style="padding:12px 14px;">
-        <div>
-          <div class="hint" style="margin:0 0 6px;text-transform:uppercase;letter-spacing:.02em;">Standar Indeks</div>
-          <div style="display:flex;gap:0;border:1.5px solid var(--gray-300);border-radius:16px;overflow:hidden;">
-            <button type="button" class="chip-toggle" id="aqiIspuStdAqiBtn" data-action="aqiIspuSetStandard" data-std="aqi" style="border-radius:0;border:none;">AQI (IQAir / US EPA)</button>
-            <button type="button" class="chip-toggle" id="aqiIspuStdIspuBtn" data-action="aqiIspuSetStandard" data-std="ispu" style="border-radius:0;border:none;">ISPU (Indonesia)</button>
+    <div class="page aqi-page" id="page-aqiispu">
+      <section class="hd-hero aqi-hero" aria-label="Model AQI/ISPU">
+        <div class="hd-hero-top">
+          <div class="hd-hero-title">
+            <div class="hd-eyebrow">Kualitas Udara <span aria-hidden="true">/</span> Indeks</div>
+            <h2>Model AQI / ISPU Ambient</h2>
+            <p>Indeks kualitas udara dari hasil sampling Udara Ambien: AQI (US EPA, dipakai IQAir) atau ISPU (Indonesia), dengan pembanding model global CAMS.</p>
+          </div>
+          <div class="hd-hero-actions">
+            <div class="aqi-std" role="group" aria-label="Standar indeks">
+              <button type="button" class="aqi-std-btn" id="aqiIspuStdAqiBtn" data-action="aqiIspuSetStandard" data-std="aqi">AQI US</button>
+              <button type="button" class="aqi-std-btn" id="aqiIspuStdIspuBtn" data-action="aqiIspuSetStandard" data-std="ispu">ISPU</button>
+            </div>
+            <button type="button" class="hd-btn-outline" data-action="aqiIspuInfoModal" title="Metodologi, tabel breakpoint &amp; sumber regulasi">Info &amp; Referensi</button>
           </div>
         </div>
-        <div class="field"><label>Site</label><select id="aqiIspuFltSite"><option value="">Semua</option></select></div>
-        <div class="field"><label>Dari Periode</label><select id="aqiIspuFltFrom"><option value="">Awal</option></select></div>
-        <div class="field"><label>Sampai Periode</label><select id="aqiIspuFltTo"><option value="">Akhir</option></select></div>
+        <div id="aqiScaleBar"></div>
+      </section>
+      <div class="card amb-filter">
+        <div class="amb-filter-fields">
+          <div class="field"><label>Site</label><select id="aqiIspuFltSite"><option value="">Semua</option></select></div>
+          <div class="field"><label>Dari periode</label><select id="aqiIspuFltFrom"><option value="">Awal</option></select></div>
+          <div class="field"><label>Sampai periode</label><select id="aqiIspuFltTo"><option value="">Akhir</option></select></div>
+          <div class="hint amb-scope">Indeks = sub-indeks tertinggi dari PM2.5, PM10, O₃, NO₂, SO₂ dan CO pada satu titik dalam satu periode.</div>
+        </div>
       </div>
-      </div>
+      <div id="aqiIspuTop"></div>
       <div class="card">
-        <h3>Peta Sebaran Kualitas Udara <span class="muted" style="text-transform:none;font-weight:400;">— indeks per titik pada periode terpilih, klik titik untuk rincian sub-indeks</span></h3>
-        <div class="field" style="max-width:280px;margin-bottom:10px;"><label>Periode di Peta</label><select id="aqiIspuMapPeriodeSel"></select></div>
-        <div id="aqiIspuMap" style="height:440px;border-radius:10px;overflow:hidden;border:1px solid var(--gray-200);"></div>
+        <div class="cardhead"><div><h3>Peta Sebaran Kualitas Udara</h3><div class="hint hd-sub">Indeks per titik pada periode terpilih. Klik lingkaran untuk rincian sub-indeks.</div></div>
+          <div class="field" style="min-width:180px;margin:0;"><label>Periode di peta</label><select id="aqiIspuMapPeriodeSel"></select></div></div>
+        <div id="aqiIspuMap" style="height:440px;border-radius:12px;overflow:hidden;border:1px solid var(--gray-200);"></div>
         <div class="legend" id="aqiIspuMapLegend" style="margin-top:8px;"></div>
         <div class="hint" id="aqiIspuMapNote"></div>
       </div>
@@ -1923,41 +1942,41 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202610181200"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202610181200"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202610191200"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202610191200"></script>
 
-<script src="assets/data/default-data.js?v=202610181200"></script>
-<script src="assets/data/brand-assets.js?v=202610181200"></script>
-<script src="assets/data/travel-routes.js?v=202610181200"></script>
-<script src="assets/js/00-icons.js?v=202610181200"></script>
-<script src="assets/js/01-state.js?v=202610181200"></script>
-<script src="assets/js/02-nav-util.js?v=202610181200"></script>
-<script src="assets/js/03-period-logic.js?v=202610181200"></script>
-<script src="assets/js/04-dashboard.js?v=202610181200"></script>
-<script src="assets/js/05-master-data.js?v=202610181200"></script>
-<script src="assets/js/06-plan-personil.js?v=202610181200"></script>
-<script src="assets/js/07-rules-planner.js?v=202610181200"></script>
-<script src="assets/js/08-gantt-print.js?v=202610181200"></script>
-<script src="assets/js/09-tracking-map.js?v=202610181200"></script>
-<script src="assets/js/10-running-hour.js?v=202610181200"></script>
-<script src="assets/js/11-berita-acara.js?v=202610181200"></script>
-<script src="assets/js/12-data-page.js?v=202610181200"></script>
-<script src="assets/js/13-hasil-db.js?v=202610181200"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202610181200"></script>
-<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610181200"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202610181200"></script>
-<script src="assets/js/16-actions-init.js?v=202610181200"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202610181200"></script>
-<script src="assets/js/18-model-dispersi.js?v=202610181200"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202610181200"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202610181200"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202610181200"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202610181200"></script>
-<script src="assets/js/23-budget-proyeksi.js?v=202610181200"></script>
-<script src="assets/js/24-personil-ppu.js?v=202610181200"></script>
-<script src="assets/js/25-access-gate.js?v=202610181200"></script>
-<script src="assets/js/26-laboratorium.js?v=202610181200"></script>
-<script src="assets/js/27-laporan-emf.js?v=202610181200"></script>
-<script src="assets/js/28-word-export.js?v=202610181200"></script>
+<script src="assets/data/default-data.js?v=202610191200"></script>
+<script src="assets/data/brand-assets.js?v=202610191200"></script>
+<script src="assets/data/travel-routes.js?v=202610191200"></script>
+<script src="assets/js/00-icons.js?v=202610191200"></script>
+<script src="assets/js/01-state.js?v=202610191200"></script>
+<script src="assets/js/02-nav-util.js?v=202610191200"></script>
+<script src="assets/js/03-period-logic.js?v=202610191200"></script>
+<script src="assets/js/04-dashboard.js?v=202610191200"></script>
+<script src="assets/js/05-master-data.js?v=202610191200"></script>
+<script src="assets/js/06-plan-personil.js?v=202610191200"></script>
+<script src="assets/js/07-rules-planner.js?v=202610191200"></script>
+<script src="assets/js/08-gantt-print.js?v=202610191200"></script>
+<script src="assets/js/09-tracking-map.js?v=202610191200"></script>
+<script src="assets/js/10-running-hour.js?v=202610191200"></script>
+<script src="assets/js/11-berita-acara.js?v=202610191200"></script>
+<script src="assets/js/12-data-page.js?v=202610191200"></script>
+<script src="assets/js/13-hasil-db.js?v=202610191200"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202610191200"></script>
+<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610191200"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202610191200"></script>
+<script src="assets/js/16-actions-init.js?v=202610191200"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202610191200"></script>
+<script src="assets/js/18-model-dispersi.js?v=202610191200"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202610191200"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202610191200"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202610191200"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202610191200"></script>
+<script src="assets/js/23-budget-proyeksi.js?v=202610191200"></script>
+<script src="assets/js/24-personil-ppu.js?v=202610191200"></script>
+<script src="assets/js/25-access-gate.js?v=202610191200"></script>
+<script src="assets/js/26-laboratorium.js?v=202610191200"></script>
+<script src="assets/js/27-laporan-emf.js?v=202610191200"></script>
+<script src="assets/js/28-word-export.js?v=202610191200"></script>
 </body>
 </html>

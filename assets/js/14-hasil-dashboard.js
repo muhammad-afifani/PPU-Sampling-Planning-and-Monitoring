@@ -161,7 +161,7 @@ function renderHdFilterBar(){
           ${kapasitasList.map(k=>`<option value="${escHtml(k)}">${escHtml(k)}</option>`).join("")}
         </select></div>
         <div class="field" style="min-width:220px;">
-          <label>Titik atau Engine, centang untuk membandingkan</label>
+          <label>Titik atau <span class="hd-Noun">Engine</span>, centang untuk membandingkan</label>
           <div class="xsel" id="hdCerobongXsel">
             <button type="button" class="xsel-btn" data-action="hdToggleCerobongPanel"><span id="hdCerobongBtnLabel">Semua titik, tidak difilter</span> <span>&#9662;</span></button>
             <div class="xsel-panel" id="hdCerobongPanel" style="display:none;">
@@ -259,7 +259,7 @@ function hdRenderEngineCounts(filteredAllParams){
   });
   const total = seen.size;
   const perSite = Object.entries(bySite).sort((a,b)=>b[1]-a[1]).map(([s,n])=>`<span class="hd-engine-count-badge">${escHtml(s)}: ${n}</span>`).join("");
-  document.getElementById("hdEngineCounts").innerHTML = `<span class="hd-engine-count-badge total">Total ${total} titik/engine</span>${perSite}`;
+  document.getElementById("hdEngineCounts").innerHTML = `<span class="hd-engine-count-badge total">Total ${total} titik/${hdUnitNoun()}</span>${perSite}`;
 }
 function renderHasilDashboard(){
   const {sites, periods} = renderHdFilterBar();
@@ -275,6 +275,7 @@ function renderHasilDashboard(){
 
   document.getElementById("hdFilterSummary").textContent = `Menampilkan ${filtered.length} baris data ${parameter} (dari total ${DB.hasilPemantauan.length} baris) sesuai kombinasi filter aktif.`;
   hdRenderEngineCounts(filteredAllParams);
+  hdApplyUnitNoun();
 
   // Overview, Trend, Distribution, Watchlist, Heatmap, Running Hour, Scorecard (14b-hasil-dashboard-analytics.js)
   const ctx = hdBuildContext(filtered, filteredAllParams, periodsInScope);
