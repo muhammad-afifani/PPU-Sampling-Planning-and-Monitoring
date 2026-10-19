@@ -331,7 +331,7 @@ function labKpisHtml(labs){
     hdKpi({label:"Laboratorium Mitra", icon:HD_IC.db, value:all.length, foot:`${all.filter(l=>l.scopeEmisi).length} lingkup emisi &middot; ${all.filter(l=>l.scopeAmbien).length} lingkup ambien`}),
     hdKpi({label:"Akreditasi KAN Berlaku", icon:HD_IC.shield, tone: kan.expired?"bad":kan.soon?"warn":kan.valid.length?"good":"", value:kan.valid.length, suffix:` / ${all.length}`, foot:docFoot(kan)}),
     hdKpi({label:"Registrasi KLH Berlaku", icon:HD_IC.shield, tone: klh.expired?"bad":klh.soon?"warn":klh.valid.length?"good":"", value:klh.valid.length, suffix:` / ${all.length}`, foot:docFoot(klh)}),
-    hdKpi({label:"Parameter Pemantauan Tercakup", icon:HD_IC.gauge, tone: covered.length<cat.length?"warn":"good", value:covered.length, suffix:` / ${cat.length}`, foot:`${cat.length-covered.length} parameter belum ada lab yang mengerjakan`}),
+    hdKpi({label:"Parameter Tercakup", icon:HD_IC.gauge, tone: covered.length<cat.length?"warn":"good", value:covered.length, suffix:` / ${cat.length}`, foot:`${cat.length-covered.length} parameter belum ada lab yang mengerjakan`}),
     hdKpi({label:"Tercakup KAN + KLH", icon:HD_IC.spark, value:pct(full.length,cat.length)+"%", foot:`${full.length} parameter diuji lab dgn akreditasi KAN &amp; registrasi KLH berlaku`}),
     hdKpi({label:"Analisis di Lab Lain", icon:HD_IC.trend, value:sub, suffix:" parameter", foot: sub?"disubkontrakkan ke laboratorium lain (lihat matriks)":"semua parameter dianalisis di lab sendiri"})
   ].join("");
