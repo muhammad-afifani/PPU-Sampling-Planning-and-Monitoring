@@ -2333,3 +2333,101 @@ table.daygrid{background:transparent !important;border-spacing:3px 4px !importan
   .emf-layout{grid-template-columns:1fr;}
   .emf-side{position:static;max-height:none;overflow:visible;}
 }
+/* =========================================================
+   Dashboard Hasil Ambient & Model AQI/ISPU — memakai komponen hd-* yg sama dgn Dashboard Hasil Emisi
+========================================================= */
+#page-ambiendashboard,#page-aqiispu{--hd-ink:#0f1b2d;--hd-warn:#c2620a;--hd-warn-text:#9a4a06;--hd-bad:#b42318;--hd-good:#146c43;--hd-radius:14px;}
+:root[data-theme="dark"] #page-ambiendashboard,:root[data-theme="dark"] #page-aqiispu{--hd-warn-text:#f0a565;--hd-good:#5fd39a;--hd-bad:#ff8a80;}
+#page-ambiendashboard .card,#page-aqiispu .card{border-radius:var(--hd-radius);}
+#page-ambiendashboard .cardhead,#page-aqiispu .cardhead{gap:14px;margin-bottom:12px;}
+#page-ambiendashboard .cardhead h3,#page-aqiispu .cardhead h3{margin:0;}
+#page-ambiendashboard .hd-sub,#page-aqiispu .hd-sub{margin-top:4px;max-width:880px;}
+#page-ambiendashboard .field select{max-width:100%;}
+.amb-filter{padding:12px 16px !important;margin-bottom:14px;}
+.amb-filter-fields{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
+.amb-filter-fields .field select{min-height:36px;border-radius:8px;min-width:150px;}
+.amb-scope{margin:0 0 8px auto !important;font-size:12px;}
+.amb-param-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-200);}
+.amb-param-lbl{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gray-500);}
+.amb-param-row .hd-seg-group{flex-wrap:wrap;}
+.amb-insight-list{margin:6px 0 0;padding-left:18px;line-height:1.6;font-size:13px;color:var(--gray-700);}
+.amb-insight-list li{margin:2px 0;}
+.amb-insight-list b.bad{color:var(--hd-bad);}
+.amb-snap td,.amb-snap th{white-space:nowrap;}
+.amb-snap .hd-link{font-weight:700;text-align:left;}
+.amb-profile-sel{max-width:520px;margin-bottom:10px;}
+.amb-profile-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px;}
+.amb-profile-stats div{background:var(--gray-100);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;}
+.amb-profile-stats span{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--gray-500);}
+.amb-profile-stats b{font-size:20px;color:var(--heading);font-variant-numeric:tabular-nums;}
+.amb-profile-stats small{font-size:10.5px;color:var(--gray-500);}
+.amb-vib-site{display:grid;grid-template-columns:70px 1fr 64px;align-items:center;gap:10px;margin:8px 0;font-size:12px;}
+.amb-vib-site .hd-stack{margin:0;}
+.amb-vib-site small{color:var(--gray-500);text-align:right;}
+/* Model AQI/ISPU — gaya kartu IQAir */
+.aqi-hero{padding-bottom:22px !important;}
+.aqi-std{display:inline-flex;padding:3px;border-radius:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);}
+.aqi-std-btn{border:0;background:transparent;color:#c3cee0;font:inherit;font-size:13px;font-weight:700;padding:8px 14px;border-radius:8px;cursor:pointer;}
+.aqi-std-btn.active{background:#fff;color:#0f1b2d;}
+.aqi-scale{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:3px;margin-top:20px;border-radius:10px;overflow:hidden;}
+.aqi-scale-seg{padding:8px 10px;display:flex;flex-direction:column;gap:1px;min-width:0;}
+.aqi-scale-seg b{font-size:12px;font-family:var(--font-mono);}
+.aqi-scale-seg span{font-size:10.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.92;}
+.aqi-pill{display:inline-flex;align-items:center;justify-content:center;min-width:38px;padding:3px 8px;border-radius:8px;font-family:var(--font-mono);font-weight:800;font-size:12.5px;}
+.aqi-pill.sm{min-width:30px;padding:1px 6px;font-size:11px;border-radius:6px;}
+.aqi-main{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:18px;margin-bottom:18px;}
+@media(max-width:1100px){.aqi-main{grid-template-columns:1fr;}}
+.aqi-main-left{display:flex;flex-direction:column;gap:12px;min-width:0;}
+.aqi-main-right{margin:0 !important;}
+.aqi-now{background:var(--aqi-c);color:var(--aqi-t);border-radius:16px;padding:18px 20px;box-shadow:0 10px 26px -18px rgba(0,0,0,.5);position:relative;overflow:hidden;}
+.aqi-now::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.18),transparent 55%);pointer-events:none;}
+.aqi-now-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;position:relative;z-index:1;}
+.aqi-now-eyebrow{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.9;}
+.aqi-now-head select{max-width:100%;background:rgba(255,255,255,.22);color:inherit;border:1px solid rgba(255,255,255,.35);border-radius:8px;padding:5px 8px;font:inherit;font-size:12.5px;font-weight:600;}
+.aqi-now-head select option{color:#0f1b2d;background:#fff;}
+.aqi-now-main{display:flex;align-items:center;gap:18px;margin:16px 0 12px;position:relative;z-index:1;}
+.aqi-now-num{font-size:64px;font-weight:800;line-height:.95;font-variant-numeric:tabular-nums;display:flex;flex-direction:column;}
+.aqi-now-num small{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.85;margin-top:4px;}
+.aqi-now-cat{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
+.aqi-now-cat b{font-size:20px;line-height:1.2;}
+.aqi-now-cat span{font-size:13px;opacity:.92;}
+.aqi-face{width:64px;height:64px;flex-shrink:0;}
+.aqi-now-foot{font-size:12px;opacity:.9;padding-top:10px;border-top:1px solid rgba(255,255,255,.3);position:relative;z-index:1;}
+.aqi-advice{display:flex;gap:12px;background:var(--surface-card);border:1px solid var(--gray-200);border-left:4px solid var(--aqi-c);border-radius:14px;padding:14px 16px;font-size:13px;}
+.aqi-advice ul{margin:6px 0 0;padding-left:18px;line-height:1.55;color:var(--gray-700);}
+.aqi-advice-ic svg{width:22px;height:22px;fill:none;stroke:var(--aqi-c);stroke-width:2;}
+.aqi-pol-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;}
+.aqi-pol{border:1px solid var(--gray-200);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;background:var(--surface-card);}
+.aqi-pol.dom{border-color:var(--heading);box-shadow:inset 0 0 0 1px var(--heading);}
+.aqi-pol-head{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--gray-700);}
+.aqi-pol-val{font-size:24px;font-weight:800;color:var(--heading);font-variant-numeric:tabular-nums;}
+.aqi-pol-val small{font-size:11px;font-weight:600;color:var(--gray-500);margin-left:4px;}
+.aqi-pol-bar{height:6px;border-radius:3px;background:var(--gray-200);overflow:hidden;}
+.aqi-pol-bar i{display:block;height:100%;}
+.aqi-pol-foot{font-size:11px;color:var(--gray-500);}
+.aqi-pol-foot b.warn{color:var(--hd-warn-text);}
+.aqi-rank{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;max-height:520px;overflow:auto;}
+.aqi-rank li{display:grid;grid-template-columns:26px 1fr auto;align-items:center;gap:10px;padding:8px 8px;border-radius:10px;}
+.aqi-rank li:hover,.aqi-rank li.on{background:var(--gray-100);}
+.aqi-rank-n{font-family:var(--font-mono);font-size:12px;color:var(--gray-500);text-align:right;}
+.aqi-rank-name{border:0;background:transparent;text-align:left;padding:0;cursor:pointer;font:inherit;color:inherit;display:flex;flex-direction:column;gap:2px;min-width:0;}
+.aqi-rank-name b{font-size:13px;color:var(--heading);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.aqi-rank-name small{font-size:11px;color:var(--gray-500);}
+.aqi-cmp-bar{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.aqi-cmp-bar .spacer{flex:1;}
+.aqi-live-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;}
+.aqi-live{border-radius:12px;padding:10px 12px;background:color-mix(in srgb, var(--aqi-c) 16%, var(--surface-card));border:1px solid color-mix(in srgb, var(--aqi-c) 45%, var(--gray-200));}
+.aqi-live-top{display:flex;justify-content:space-between;align-items:center;}
+.aqi-live-num{font-family:var(--font-mono);font-weight:800;font-size:20px;background:var(--aqi-c);color:var(--aqi-t);padding:2px 9px;border-radius:8px;}
+.aqi-live-cat{font-size:12px;font-weight:700;color:var(--heading);margin-top:6px;}
+.aqi-live-sub{font-size:11px;color:var(--gray-500);margin-top:2px;}
+.aqi-cmp{margin-top:16px;padding-top:14px;border-top:1px solid var(--gray-200);}
+.aqi-cmp-head{margin-bottom:8px;font-size:13px;}
+.aqi-stackrow{display:grid;grid-template-columns:62px 1fr 56px;gap:10px;align-items:center;margin:8px 0;font-size:12px;}
+.aqi-stackrow .hd-stack{margin:0;height:14px;}
+.aqi-stack-p{font-weight:700;color:var(--heading);}
+.aqi-stackrow small{color:var(--gray-500);text-align:right;}
+@media(max-width:760px){.aqi-scale{grid-auto-flow:row;}.aqi-now-num{font-size:48px;}}
+.dp-table thead th span:not(.badge),.hd-table thead th span:not(.badge){text-transform:none;letter-spacing:0;}
+.aqi-cmp .dp-table td,.aqi-cmp .dp-table th{padding:8px 10px;}
+.aqi-cmp .dp-table{font-size:12.5px;}

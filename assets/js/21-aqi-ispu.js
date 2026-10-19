@@ -168,10 +168,10 @@ function aqiIspuBuildTrendTable(events, periods){
     ${periods.map(p=>{
       const ev = r.byPeriode[p];
       if(!ev) return `<td class="muted" style="text-align:center;">-</td>`;
-      return `<td style="text-align:center;"><span class="badge" style="background:${ev.category.color};color:${ev.category.text};" title="${escHtml(ev.tanggal||"")} — ${escHtml(ev.category.name)} — parameter dominan ${AQIISPU_POLLUTANT_LABEL[ev.dominant]||ev.dominant}">${ev.index}</span></td>`;
+      return `<td style="text-align:center;"><span class="aqi-pill" style="background:${ev.category.color};color:${ev.category.text};" title="${escHtml(ev.tanggal||"")} — ${escHtml(ev.category.name)} — parameter dominan ${AQIISPU_POLLUTANT_LABEL[ev.dominant]||ev.dominant}">${ev.index}</span></td>`;
     }).join("")}
   </tr>`).join("");
-  return `<div class="tablewrap"><table style="font-size:11.5px;">
+  return `<div class="tablewrap"><table class="dp-table" style="font-size:11.5px;">
     <thead><tr><th>Titik</th><th>Site</th>${headerHtml}</tr></thead>
     <tbody>${rowsHtml}</tbody>
   </table></div>`;
@@ -260,9 +260,220 @@ function aqiIspuPopulateFilters(sites, periods){
   const curTo = toSel.value || aqiIspuFlt.to;
   toSel.innerHTML = '<option value="">Akhir</option>'+periods.map(p=>`<option value="${p}" ${curTo===p?"selected":""}>${p}</option>`).join("");
 }
+/* ---------- Tampilan gaya IQAir: panel indeks, polutan, rekomendasi, peringkat, tren ---------- */
+// Pedoman WHO 2021 (rata-rata 24 jam; O3 8 jam) — hanya pembanding "x kali pedoman" seperti IQAir.
+const AQI_WHO_GUIDE = {"PM2.5":15, "PM10":45, "NOx":25, "SO2":40, "CO":4000, "O3":100};
+const AQI_POLLUTANT_NAME = {"PM2.5":"Partikulat halus (PM2.5)", "PM10":"Partikulat (PM10)", "NOx":"Nitrogen dioksida (NO₂)", "SO2":"Sulfur dioksida (SO₂)", "CO":"Karbon monoksida (CO)", "O3":"Ozon (O₃)"};
+const AQI_POLLUTANT_ORDER = ["PM2.5","PM10","O3","NOx","SO2","CO"];
+const AQI_ADVICE = [
+  ["Kualitas udara baik. Aman untuk aktivitas di luar ruangan.", "Buka jendela untuk sirkulasi udara bersih."],
+  ["Kualitas udara dapat diterima. Kelompok sangat sensitif sebaiknya membatasi aktivitas berat di luar ruangan.", "Pantau kondisi bila ada gejala pernapasan."],
+  ["Kelompok sensitif (anak, lansia, penderita asma/jantung) kurangi aktivitas berat di luar ruangan.", "Pertimbangkan masker saat di luar ruangan."],
+  ["Semua orang sebaiknya mengurangi aktivitas di luar ruangan dan memakai masker.", "Tutup jendela, gunakan pembersih udara bila tersedia."],
+  ["Hindari aktivitas di luar ruangan. Kelompok sensitif tetap di dalam ruangan.", "Wajib masker; tutup jendela dan gunakan pembersih udara."],
+  ["Kondisi darurat kesehatan: tetap di dalam ruangan.", "Hindari seluruh aktivitas fisik di luar ruangan."]
+];
+let aqiSelKey = "";
+const aqiStdLabel = ()=> aqiIspuStandard==="ispu" ? "ISPU" : "AQI US";
+const aqiCats = ()=> aqiIspuStandard==="ispu" ? ISPU_CATEGORIES : AQI_CATEGORIES;
+function aqiCatIdx(index){ const cs = aqiCats(); const c = aqiIspuCategoryFor(index, aqiIspuStandard); return Math.max(0, cs.indexOf(c)); }
+function aqiFaceSvg(level, color){
+  // Wajah sederhana gaya IQAir: senyum (baik) sampai cemberut (buruk).
+  const mouth = ["M20 38 Q32 48 44 38","M21 40 Q32 45 43 40","M21 42 L43 42","M21 44 Q32 38 43 44","M20 46 Q32 36 44 46","M20 47 Q32 34 44 47"][Math.min(5,level)];
+  return `<svg class="aqi-face" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="29" fill="rgba(255,255,255,.18)" stroke="currentColor" stroke-width="2.5"/><circle cx="23" cy="26" r="3.2" fill="currentColor"/><circle cx="41" cy="26" r="3.2" fill="currentColor"/><path d="${mouth}" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`;
+}
+function aqiScaleBarHtml(){
+  return `<div class="aqi-scale">${aqiCats().map(c=>`<div class="aqi-scale-seg" style="background:${c.color};color:${c.text}"><b>${c.lo}–${c.hi===500?"500+":c.hi}</b><span>${escHtml(c.name)}</span></div>`).join("")}</div>`;
+}
+function aqiPillHtml(index){
+  const c = aqiIspuCategoryFor(index, aqiIspuStandard);
+  return `<span class="aqi-pill" style="background:${c.color};color:${c.text}" title="${escHtml(c.name)}">${index}</span>`;
+}
+function aqiNowPanel(ev, options){
+  const c = ev.category, lvl = aqiCatIdx(ev.index);
+  const domConc = ev.params[ev.dominant];
+  return `<div class="aqi-now" style="--aqi-c:${c.color};--aqi-t:${c.text}">
+    <div class="aqi-now-head"><span class="aqi-now-eyebrow">Indeks kualitas udara &middot; ${aqiStdLabel()}</span>
+      <select id="aqiSelTitik" aria-label="Pilih titik">${options.map(o=>`<option value="${escHtml(o.key)}" ${o.key===aqiSelKey?"selected":""}>${escHtml(o.label)}</option>`).join("")}</select></div>
+    <div class="aqi-now-main">
+      <div class="aqi-now-num">${ev.index}<small>${aqiStdLabel()}</small></div>
+      <div class="aqi-now-cat"><b>${escHtml(c.name)}</b><span>Polutan utama: ${escHtml(AQIISPU_POLLUTANT_LABEL[ev.dominant]||ev.dominant)} ${domConc!=null?`&middot; ${hdNum(domConc)} µg/m³`:""}</span></div>
+      ${aqiFaceSvg(lvl)}
+    </div>
+    <div class="aqi-now-foot">${escHtml(ev.titik)} &middot; ${escHtml(ev.site)} &middot; ${escHtml(ev.tanggal||"-")} &middot; ${escHtml(ev.periode)}</div>
+  </div>`;
+}
+function aqiPollutantGrid(ev){
+  return `<div class="aqi-pol-grid">${AQI_POLLUTANT_ORDER.filter(pk=>ev.params[pk]!=null).map(pk=>{
+    const conc = ev.params[pk], sub = ev.subIdx[pk];
+    const c = sub!=null ? aqiIspuCategoryFor(sub, aqiIspuStandard) : null;
+    const who = AQI_WHO_GUIDE[pk] ? conc/AQI_WHO_GUIDE[pk] : null;
+    return `<div class="aqi-pol ${pk===ev.dominant?"dom":""}">
+      <div class="aqi-pol-head"><span>${escHtml(AQI_POLLUTANT_NAME[pk]||pk)}</span>${sub!=null?`<span class="aqi-pill sm" style="background:${c.color};color:${c.text}">${sub}</span>`:""}</div>
+      <div class="aqi-pol-val">${hdNum(conc)}<small>µg/m³</small></div>
+      <div class="aqi-pol-bar"><i style="width:${Math.min(100,(sub||0)/300*100).toFixed(1)}%;background:${c?c.color:"#7f8fa0"}"></i></div>
+      <div class="aqi-pol-foot">${who!=null?`${who>=1?`<b class="warn">${hdNum(who,1)}×</b>`:`${hdNum(who,2)}×`} pedoman WHO 24 jam`:"&nbsp;"}${pk===ev.dominant?` &middot; <b>dominan</b>`:""}</div>
+    </div>`;
+  }).join("")}</div>`;
+}
+function aqiAdviceHtml(ev){
+  const lvl = Math.min(AQI_ADVICE.length-1, aqiCatIdx(ev.index));
+  const [a,b] = AQI_ADVICE[lvl];
+  const c = ev.category;
+  return `<div class="aqi-advice" style="--aqi-c:${c.color}">
+    <div class="aqi-advice-ic">${HD_IC.shield}</div>
+    <div><b>Rekomendasi kesehatan &middot; ${escHtml(c.name)}</b><ul><li>${a}</li><li>${b}</li></ul>
+    <div class="hint" style="margin:4px 0 0;">Indeks dihitung dari sekali sampling lab (bukan pemantauan kontinu), jadi menggambarkan kondisi saat pengambilan contoh.</div></div>
+  </div>`;
+}
+function aqiRankingHtml(events, period){
+  const rows = events.filter(e=>e.periode===period).sort((a,b)=>b.index-a.index);
+  if(!rows.length) return hdEmpty("Tidak ada data pada periode ini.");
+  return `<ol class="aqi-rank">${rows.map((e,i)=>`<li class="${(e.site+"::"+e.titik)===aqiSelKey?"on":""}">
+    <span class="aqi-rank-n">${i+1}</span>
+    <button type="button" class="aqi-rank-name" data-action="aqiPickTitik" data-key="${escHtml(e.site+"::"+e.titik)}"><b>${escHtml(e.titik)}</b><small><span class="hd-site"><i style="background:${hdSiteColor(e.site)}"></i>${escHtml(e.site)}</span> &middot; dominan ${escHtml(AQIISPU_POLLUTANT_LABEL[e.dominant]||e.dominant)}</small></button>
+    ${aqiPillHtml(e.index)}
+  </li>`).join("")}</ol>`;
+}
+// Tren indeks per site (maks per periode) dengan latar pita warna kategori — gaya grafik riwayat IQAir.
+function aqiTrendSvg(events, periods){
+  const sites = [...new Set(events.map(e=>e.site))].sort();
+  if(!periods.length || !sites.length) return hdEmpty("Tidak ada data.");
+  const series = sites.map(s=>({key:s, color:hdSiteColor(s), values: periods.map(p=>{ const v = events.filter(e=>e.site===s && e.periode===p).map(e=>e.index); return v.length?Math.max(...v):null; })})).filter(s=>s.values.some(v=>v!=null));
+  const dataMax = Math.max(...series.flatMap(s=>s.values.filter(v=>v!=null)), 60);
+  const cats = aqiCats();
+  const capCat = cats.find(c=>dataMax<=c.hi) || cats[cats.length-1];
+  const yMax = Math.min(500, capCat.hi===500?500:capCat.hi + 0);
+  const W=780, H=300, padL=44, padR=110, padT=14, padB=34, plotW=W-padL-padR, plotH=H-padT-padB, n=periods.length;
+  const x = i=>padL+(n<=1?plotW/2:i/(n-1)*plotW), y = v=>padT+plotH-Math.min(v,yMax)/yMax*plotH;
+  let svg = `<svg class="hd-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Tren indeks ${aqiStdLabel()} per site">`;
+  cats.forEach(c=>{ if(c.lo>yMax) return; const y0 = y(Math.min(c.hi,yMax)), y1 = y(c.lo); svg += `<rect x="${padL}" y="${y0.toFixed(1)}" width="${plotW}" height="${(y1-y0).toFixed(1)}" fill="${c.color}" opacity=".13"/><text x="${padL+6}" y="${(y0+12).toFixed(1)}" class="hd-axis" opacity=".8">${escHtml(c.name.split(" (")[0])}</text>`; });
+  for(let g=0; g<=4; g++){ const v = yMax*g/4, yy = y(v); svg += `<line x1="${padL}" y1="${yy.toFixed(1)}" x2="${W-padR}" y2="${yy.toFixed(1)}" class="hd-grid"/><text x="${padL-8}" y="${(yy+4).toFixed(1)}" text-anchor="end" class="hd-axis">${Math.round(v)}</text>`; }
+  periods.forEach((p,i)=>{ svg += `<text x="${x(i).toFixed(1)}" y="${H-12}" text-anchor="middle" class="hd-axis ${i===n-1?"strong":""}">${p}</text>`; });
+  series.forEach(s=>{
+    const pts = s.values.map((v,i)=>v==null?null:[i,v]).filter(Boolean);
+    for(let k=1;k<pts.length;k++){ const [i0,v0]=pts[k-1],[i1,v1]=pts[k]; svg += `<line x1="${x(i0).toFixed(1)}" y1="${y(v0).toFixed(1)}" x2="${x(i1).toFixed(1)}" y2="${y(v1).toFixed(1)}" stroke="${s.color}" stroke-width="2.4" stroke-linecap="round"/>`; }
+    pts.forEach(([i,v])=>{ const c = aqiIspuCategoryFor(v, aqiIspuStandard); svg += `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="5" fill="${c.color}" stroke="${s.color}" stroke-width="2"><title>${escHtml(s.key)} · ${periods[i]}: ${v} (${escHtml(c.name)})</title></circle>`; });
+  });
+  const labels = series.map(s=>{ const pts = s.values.map((v,i)=>v==null?null:[i,v]).filter(Boolean); const lv = pts[pts.length-1][1]; return {s, y:y(lv), v:lv}; }).sort((a,b)=>a.y-b.y);
+  for(let i=1;i<labels.length;i++) if(labels[i].y-labels[i-1].y<14) labels[i].y = labels[i-1].y+14;
+  const ov = labels.length ? labels[labels.length-1].y-(padT+plotH) : 0; if(ov>0) labels.forEach(l=>{ l.y -= ov; });
+  labels.forEach(l=>{ svg += `<text x="${W-padR+10}" y="${(l.y+4).toFixed(1)}" class="hd-end-label" fill="${l.s.color}">${escHtml(l.s.key)} ${l.v}</text>`; });
+  svg += `</svg>`;
+  return svg + `<div class="legend">${series.map(s=>`<span class="item"><span class="sw" style="background:${s.color}"></span>${escHtml(s.key)}</span>`).join("")}<span class="item muted">Nilai = indeks tertinggi antar titik di site tsb pada periode itu. Latar = pita kategori.</span></div>`;
+}
+function aqiPeriodStackHtml(events, periods){
+  const cats = aqiCats();
+  return periods.map(p=>{
+    const ev = events.filter(e=>e.periode===p), tot = ev.length;
+    if(!tot) return "";
+    const cnt = {}; ev.forEach(e=>{ cnt[e.category.name] = (cnt[e.category.name]||0)+1; });
+    return `<div class="aqi-stackrow"><span class="aqi-stack-p">${p}</span><div class="hd-stack">${cats.filter(c=>cnt[c.name]).map(c=>`<i style="width:${(cnt[c.name]/tot*100).toFixed(1)}%;background:${c.color}" title="${escHtml(c.name)}: ${cnt[c.name]}"></i>`).join("")}</div><small>${tot} titik</small></div>`;
+  }).join("") + `<div class="legend" style="margin-top:10px;">${cats.map(c=>`<span class="item"><span class="sw" style="background:${c.color}"></span>${escHtml(c.name)}</span>`).join("")}</div>`;
+}
+
+/* ---------- Pembanding model global: CAMS (Copernicus) via Open-Meteo Air Quality API ----------
+   Open data (CC BY 4.0), tanpa API key, bisa dipanggil langsung dari browser. Ini data MODEL
+   (grid global ±40 km), bukan stasiun pemantau — dipakai sbg pembanding/konteks, bukan pengganti
+   hasil laboratorium. WAQI/aqicn & IQAir API butuh token pribadi sehingga tidak dipakai di sini. */
+const AQI_OM_URL = "https://air-quality-api.open-meteo.com/v1/air-quality";
+const AQI_OM_MAP = {"PM2.5":"pm2_5", "PM10":"pm10", "CO":"carbon_monoxide", "NOx":"nitrogen_dioxide", "SO2":"sulphur_dioxide", "O3":"ozone"};
+let aqiOm = {curStatus:"idle", cur:{}, curAt:null, curErr:"", ev:{}};
+function aqiSiteCoord(site){
+  const pts = Object.entries(DB.pointCoords||{}).filter(([k])=>k.startsWith(site+"::")).map(([,v])=>v).filter(v=>Array.isArray(v));
+  if(!pts.length) return null;
+  return [pts.reduce((a,p)=>a+p[0],0)/pts.length, pts.reduce((a,p)=>a+p[1],0)/pts.length];
+}
+function aqiEventCoord(ev){ return (DB.pointCoords||{})[ev.site+"::"+ev.titik] || aqiSiteCoord(ev.site); }
+async function aqiOmLoadCurrent(force){
+  if(aqiOm.curStatus==="loading" || (aqiOm.curStatus==="ok" && !force)) return;
+  const sites = [...new Set((DB.hasilAmbien.ambien||[]).map(r=>r.site))].sort().map(s=>({s, c:aqiSiteCoord(s)})).filter(x=>x.c);
+  if(!sites.length){ aqiOm.curStatus = "error"; aqiOm.curErr = "Belum ada koordinat titik ambient."; aqiRenderCompare(); return; }
+  aqiOm.curStatus = "loading"; aqiRenderCompare();
+  const vars = ["us_aqi","pm2_5","pm10","carbon_monoxide","nitrogen_dioxide","sulphur_dioxide","ozone"].join(",");
+  const url = `${AQI_OM_URL}?latitude=${sites.map(x=>x.c[0].toFixed(4)).join(",")}&longitude=${sites.map(x=>x.c[1].toFixed(4)).join(",")}&current=${vars}&timezone=Asia%2FMakassar`;
+  try{
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    let js = await res.json();
+    if(!Array.isArray(js)) js = [js];
+    aqiOm.cur = {};
+    sites.forEach((x,i)=>{ if(js[i] && js[i].current) aqiOm.cur[x.s] = js[i].current; });
+    aqiOm.curAt = new Date(); aqiOm.curStatus = "ok";
+  }catch(e){ aqiOm.curStatus = "error"; aqiOm.curErr = "Tidak bisa memuat data model ("+(e.message||e)+"). Pastikan perangkat terhubung internet."; }
+  aqiRenderCompare();
+}
+async function aqiOmLoadEvent(ev){
+  const key = ev.site+"::"+ev.titik+"::"+ev.periode;
+  if(aqiOm.ev[key] && aqiOm.ev[key].status!=="error") return;
+  const c = aqiEventCoord(ev);
+  const date = String(ev.tanggal||"").slice(0,10);
+  if(!c || !/^\d{4}-\d{2}-\d{2}$/.test(date)){ aqiOm.ev[key] = {status:"error", err:"Titik ini belum punya koordinat atau tanggal sampling."}; aqiRenderCompare(); return; }
+  aqiOm.ev[key] = {status:"loading"}; aqiRenderCompare();
+  const url = `${AQI_OM_URL}?latitude=${c[0].toFixed(4)}&longitude=${c[1].toFixed(4)}&hourly=${Object.values(AQI_OM_MAP).join(",")}&start_date=${date}&end_date=${date}&timezone=Asia%2FMakassar`;
+  try{
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const js = await res.json();
+    const h = js.hourly||{};
+    const mean = {};
+    Object.entries(AQI_OM_MAP).forEach(([pk,v])=>{ const a = (h[v]||[]).filter(x=>x!=null); mean[pk] = a.length ? a.reduce((s,x)=>s+x,0)/a.length : null; });
+    aqiOm.ev[key] = {status:"ok", mean, date};
+  }catch(e){ aqiOm.ev[key] = {status:"error", err:"Tidak bisa memuat data model ("+(e.message||e)+")."}; }
+  aqiRenderCompare();
+}
+let aqiCompareEv = null;
+function aqiRenderCompare(){
+  const el = document.getElementById("aqiCompareWrap");
+  if(!el) return;
+  // A. Kondisi terkini per site (model).
+  let cur;
+  if(aqiOm.curStatus==="loading") cur = `<div class="hint" style="padding:10px 0;">Memuat data model terkini&hellip;</div>`;
+  else if(aqiOm.curStatus==="error") cur = `<div class="hint" style="padding:10px 0;color:var(--hd-bad);">${escHtml(aqiOm.curErr)}</div>`;
+  else if(aqiOm.curStatus==="ok"){
+    cur = `<div class="aqi-live-grid">${Object.entries(aqiOm.cur).map(([s,v])=>{
+      const conc = {"PM2.5":v.pm2_5, "PM10":v.pm10, "CO":v.carbon_monoxide, "NOx":v.nitrogen_dioxide, "SO2":v.sulphur_dioxide, "O3":v.ozone};
+      const ev = aqiIspuComputeEvent({params:Object.fromEntries(Object.entries(conc).filter(([,x])=>x!=null))}, aqiIspuStandard);
+      if(!ev) return "";
+      return `<div class="aqi-live" style="--aqi-c:${ev.category.color};--aqi-t:${ev.category.text}">
+        <div class="aqi-live-top"><span class="hd-site"><i style="background:${hdSiteColor(s)}"></i>${escHtml(s)}</span><span class="aqi-live-num">${ev.index}</span></div>
+        <div class="aqi-live-cat">${escHtml(ev.category.name)}</div>
+        <div class="aqi-live-sub">PM2.5 ${hdNum(v.pm2_5)} &middot; PM10 ${hdNum(v.pm10)} µg/m³ &middot; dominan ${escHtml(AQIISPU_POLLUTANT_LABEL[ev.dominant]||ev.dominant)}</div>
+      </div>`;
+    }).join("")}</div><div class="hint" style="margin:6px 0 0;">Diperbarui ${aqiOm.curAt?aqiOm.curAt.toLocaleString("id-ID",{dateStyle:"medium",timeStyle:"short"}):"-"} &middot; indeks ${aqiStdLabel()} dihitung dari konsentrasi model dengan rumus yang sama dengan hasil lab.</div>`;
+  } else cur = `<div class="hint" style="padding:10px 0;">Klik "Muat kondisi terkini" untuk mengambil data model.</div>`;
+  // B. Hasil sampling vs model pada tanggal sampling (titik terpilih).
+  let cmp = "";
+  const ev = aqiCompareEv;
+  if(ev){
+    const key = ev.site+"::"+ev.titik+"::"+ev.periode, st = aqiOm.ev[key];
+    let body;
+    if(!st) body = `<button class="btn small primary" data-action="aqiOmLoadEvent">Bandingkan dengan model pada ${escHtml(String(ev.tanggal||"").slice(0,10))}</button>`;
+    else if(st.status==="loading") body = `<div class="hint">Memuat data model untuk tanggal sampling&hellip;</div>`;
+    else if(st.status==="error") body = `<div class="hint" style="color:var(--hd-bad);">${escHtml(st.err)}</div> <button class="btn small" data-action="aqiOmLoadEvent">Coba lagi</button>`;
+    else {
+      const modelEv = aqiIspuComputeEvent({params:Object.fromEntries(Object.entries(st.mean).filter(([pk,x])=>x!=null && ev.params[pk]!=null))}, aqiIspuStandard);
+      body = `<div class="tablewrap"><table class="dp-table"><thead><tr><th>Polutan</th><th class="num">Lab <span>(µg/m³)</span></th><th class="num">Model CAMS <span>(µg/m³, rerata 24 jam)</span></th><th class="num">Selisih</th><th>Indeks lab</th><th>Indeks model</th></tr></thead><tbody>
+        ${AQI_POLLUTANT_ORDER.filter(pk=>ev.params[pk]!=null).map(pk=>{
+          const lab = ev.params[pk], mod = st.mean[pk];
+          const sl = aqiIspuSubIndex(pk, lab, aqiIspuStandard), sm = mod!=null ? aqiIspuSubIndex(pk, mod, aqiIspuStandard) : null;
+          const d = mod!=null && mod>0 ? (lab-mod)/mod*100 : null;
+          return `<tr><td><b>${escHtml(AQIISPU_POLLUTANT_LABEL[pk]||pk)}</b></td><td class="num">${hdNum(lab)}</td><td class="num">${mod!=null?hdNum(mod):"-"}</td><td class="num">${d==null?"-":hdSignedPct(d)}</td><td>${sl!=null?aqiPillHtml(sl):"-"}</td><td>${sm!=null?aqiPillHtml(sm):"-"}</td></tr>`;
+        }).join("")}
+        <tr><td colspan="4"><b>Indeks akhir</b> <span class="muted">(sub-indeks tertinggi)</span></td><td>${aqiPillHtml(ev.index)} <small class="muted">${escHtml(AQIISPU_POLLUTANT_LABEL[ev.dominant]||ev.dominant)}</small></td><td>${modelEv?aqiPillHtml(modelEv.index)+` <small class="muted">${escHtml(AQIISPU_POLLUTANT_LABEL[modelEv.dominant]||modelEv.dominant)}</small>`:"-"}</td></tr>
+      </tbody></table></div>
+      <div class="hint">Model = rata-rata 24 jam CAMS pada koordinat titik, ${escHtml(st.date)} (WITA). Hasil lab adalah pengukuran lokal; perbedaan besar wajar karena model beresolusi kasar dan tidak menangkap sumber lokal.</div>`;
+    }
+    cmp = `<div class="aqi-cmp"><div class="aqi-cmp-head"><b>Hasil sampling vs model</b> <span class="muted">&middot; ${escHtml(ev.titik)} (${escHtml(ev.site)}), ${escHtml(ev.tanggal||"-")}</span></div>${body}</div>`;
+  }
+  el.innerHTML = `<div class="aqi-cmp-bar"><b>Kondisi terkini per site (model)</b><span class="spacer"></span><button class="btn small" data-action="aqiOmLoadCurrent">${aqiOm.curStatus==="ok"?"Muat ulang":"Muat kondisi terkini"}</button></div>${cur}${cmp}`;
+}
+
+/* ---------- Render halaman ---------- */
 function renderAqiIspu(){
   document.getElementById("aqiIspuStdAqiBtn").classList.toggle("active", aqiIspuStandard==="aqi");
   document.getElementById("aqiIspuStdIspuBtn").classList.toggle("active", aqiIspuStandard==="ispu");
+  const scale = document.getElementById("aqiScaleBar"); if(scale) scale.innerHTML = aqiScaleBarHtml();
 
   const allEvents = aqiIspuGroupEvents().map(ev=>aqiIspuComputeEvent(ev, aqiIspuStandard)).filter(Boolean);
   const sites = [...new Set(allEvents.map(e=>e.site))].sort();
@@ -271,93 +482,102 @@ function renderAqiIspu(){
 
   const fromOrder = aqiIspuFlt.from ? hasilPeriodParts(aqiIspuFlt.from).order : -Infinity;
   const toOrder = aqiIspuFlt.to ? hasilPeriodParts(aqiIspuFlt.to).order : Infinity;
-  const filtered = allEvents.filter(ev=>{
-    if(aqiIspuFlt.site && ev.site!==aqiIspuFlt.site) return false;
-    return ev.periodeOrder>=fromOrder && ev.periodeOrder<=toOrder;
-  }).sort((a,b)=>(a.tanggalSort||"").localeCompare(b.tanggalSort||""));
-
-  if(!DB.hasilAmbien.ambien.length){
-    document.getElementById("aqiIspuBody").innerHTML = `<div class="card"><div class="hint" style="padding:14px;">Belum ada data kategori "Udara Ambien" di Database Hasil Ambient — isi atau import data dulu, indeks akan otomatis terhitung dari situ.</div></div>`;
-    return;
+  const filtered = allEvents.filter(ev=>(!aqiIspuFlt.site || ev.site===aqiIspuFlt.site) && ev.periodeOrder>=fromOrder && ev.periodeOrder<=toOrder)
+    .sort((a,b)=>(a.tanggalSort||"").localeCompare(b.tanggalSort||""));
+  const top = document.getElementById("aqiIspuTop"), body = document.getElementById("aqiIspuBody");
+  if(!DB.hasilAmbien.ambien.length || !filtered.length){
+    top.innerHTML = hdEmpty(DB.hasilAmbien.ambien.length ? "Tidak ada data pada filter ini." : `Belum ada data kategori "Udara Ambien" di Database Hasil Ambient — isi atau import data dulu, indeks akan otomatis terhitung dari situ.`);
+    body.innerHTML = ""; return;
   }
+  const fPeriods = [...new Set(filtered.map(e=>e.periode))].sort((a,b)=>hasilPeriodParts(a).order-hasilPeriodParts(b).order);
+  const last = fPeriods[fPeriods.length-1];
+  const lastEvents = filtered.filter(e=>e.periode===last).sort((a,b)=>b.index-a.index);
+  if(!lastEvents.some(e=>(e.site+"::"+e.titik)===aqiSelKey)) aqiSelKey = lastEvents[0] ? lastEvents[0].site+"::"+lastEvents[0].titik : "";
+  const sel = lastEvents.find(e=>(e.site+"::"+e.titik)===aqiSelKey) || lastEvents[0];
+  aqiCompareEv = sel;
+  const options = lastEvents.map(e=>({key:e.site+"::"+e.titik, label:`${e.titik} (${e.site}) — ${e.index}`}));
 
-  const goodN = filtered.filter(ev=>ev.index<=50).length;
-  const badN = filtered.filter(ev=>ev.index>100).length;
-  const avgIndex = filtered.length ? Math.round(filtered.reduce((a,b)=>a+b.index,0)/filtered.length) : null;
-  const worst = filtered.length ? filtered.reduce((a,b)=> b.index>a.index?b:a) : null;
+  // KPI
+  const per = fPeriods.map(p=>{ const ev = filtered.filter(e=>e.periode===p); return {p, avg: hdMean(ev.map(e=>e.index)), good: ev.length?ev.filter(e=>e.index<=50).length/ev.length*100:null, bad: ev.filter(e=>e.index>100).length}; });
+  const lastPer = per[per.length-1], prevPer = per.length>1 ? per[per.length-2] : null;
+  const domCnt = {}; lastEvents.forEach(e=>{ domCnt[e.dominant]=(domCnt[e.dominant]||0)+1; });
+  const domTop = Object.entries(domCnt).sort((a,b)=>b[1]-a[1])[0];
+  const worst = filtered.reduce((a,b)=>b.index>a.index?b:a);
+  const badAll = filtered.filter(e=>e.index>100);
+  const kpis = [
+    hdKpi({label:`Rata-rata ${aqiStdLabel()}`, icon:HD_IC.gauge, value: hdNum(lastPer.avg,0), tone: lastPer.avg<=50?"good":lastPer.avg<=100?"warn":"bad",
+      spark: hdSpark(per.map(x=>x.avg), {color:"var(--heading-2)", label:"Rata-rata indeks per periode"}),
+      foot: prevPer ? `${hdSignedPct((lastPer.avg-prevPer.avg)/prevPer.avg*100)} dibanding ${prevPer.p}` : `${last}`}),
+    hdKpi({label:`Kategori ${aqiCats()[0].name.split(" (")[0]}`, icon:HD_IC.shield, value: hdPct(lastPer.good,0), tone: lastPer.good>=80?"good":"warn",
+      spark: hdSpark(per.map(x=>x.good), {color:"#2f9e67", ref:100}), foot: `${lastEvents.filter(e=>e.index<=50).length} dari ${lastEvents.length} titik &middot; ${last}`}),
+    hdKpi({label: aqiIspuStandard==="ispu"?"Tidak Sehat ke atas":"Unhealthy (SG) ke atas", icon:HD_IC.alert, value: hdNum(badAll.length,0), suffix:" event", tone: badAll.length?"bad":"",
+      spark: hdSpark(per.map(x=>x.bad), {bars:true, color:"#b42318", zero:true}), foot: badAll.length ? `Terakhir: ${escHtml(badAll[badAll.length-1].titik)}, ${badAll[badAll.length-1].periode}` : "Tidak ada event di atas kategori sedang"}),
+    hdKpi({label:"Indeks Tertinggi", icon:HD_IC.trend, value: worst.index, tone: worst.index>100?"bad":worst.index>50?"warn":"",
+      foot: `${escHtml(worst.titik)} (${escHtml(worst.site)}) &middot; ${worst.periode} &middot; ${escHtml(AQIISPU_POLLUTANT_LABEL[worst.dominant]||worst.dominant)}`}),
+    hdKpi({label:"Polutan Dominan", icon:HD_IC.spark, value: domTop?escHtml(AQIISPU_POLLUTANT_LABEL[domTop[0]]||domTop[0]):"-", foot: domTop?`Penentu indeks di ${domTop[1]} dari ${lastEvents.length} titik &middot; ${last}`:"-"}),
+    hdKpi({label:"Titik Dipantau", icon:HD_IC.db, value: lastEvents.length, suffix:" titik", foot: `${new Set(lastEvents.map(e=>e.site)).size} site &middot; ${fPeriods.length} periode pada filter`})
+  ].join("");
 
-  const cats = aqiIspuStandard==="ispu" ? ISPU_CATEGORIES : AQI_CATEGORIES;
-  const catCounts = {}; filtered.forEach(ev=>{ catCounts[ev.category.name]=(catCounts[ev.category.name]||0)+1; });
-  const donutSeg = cats.map(c=>[c.name, catCounts[c.name]||0, c.color]).filter(s=>s[1]>0);
-  const donut = ambBuildDonut(donutSeg, filtered.length?Math.round(goodN/filtered.length*100)+"%":"-", cats[0].name.split(" ")[0]);
+  top.innerHTML = `
+    <div class="hd-kpis">${kpis}</div>
+    <div class="aqi-main">
+      <div class="aqi-main-left">
+        ${aqiNowPanel(sel, options)}
+        ${aqiAdviceHtml(sel)}
+      </div>
+      <div class="card aqi-main-right">
+        <div class="cardhead"><div><h3>Polutan Udara</h3><div class="hint hd-sub">Konsentrasi tiap polutan pada ${escHtml(sel.titik)}, sub-indeks ${aqiStdLabel()}, dan perbandingan terhadap pedoman WHO 2021.</div></div></div>
+        ${aqiPollutantGrid(sel)}
+      </div>
+    </div>
+    <div class="hd-row">
+      <div class="card hd-col-side aqi-rank-card">
+        <div class="cardhead"><div><h3>Peringkat Titik &middot; ${last}</h3><div class="hint hd-sub">Dari indeks tertinggi. Klik nama titik untuk melihat detailnya di atas.</div></div></div>
+        ${aqiRankingHtml(filtered, last)}
+      </div>
+      <div class="card hd-col-wide">
+        <div class="cardhead"><div><h3>Pembanding Model Global &middot; CAMS</h3><div class="hint hd-sub">Data terbuka Copernicus Atmosphere Monitoring Service via Open-Meteo (CC BY 4.0), tanpa API key. Ini data <b>model</b> (grid ±40 km), bukan stasiun pemantau — gunakan sebagai konteks, bukan pengganti hasil laboratorium.</div></div></div>
+        <div id="aqiCompareWrap"></div>
+      </div>
+    </div>`;
 
-  const lastPeriod = periods[periods.length-1];
-  const rankRows = filtered.filter(ev=>ev.periode===lastPeriod).sort((a,b)=>b.index-a.index).slice(0,15)
-    .map(ev=>({titik:ev.titik, index:ev.index, standard:aqiIspuStandard}));
+  body.innerHTML = `
+    <div class="hd-row">
+      <div class="card hd-col-wide">
+        <div class="cardhead"><div><h3>Tren Indeks ${aqiStdLabel()} per Site</h3><div class="hint hd-sub">Indeks tertinggi tiap site per periode, dengan latar pita kategori.</div></div>
+          <button class="btn small ghost" data-action="hdZoomChart" data-target="aqiTrendWrap" data-title="Tren Indeks per Site">Perbesar</button></div>
+        <div id="aqiTrendWrap">${aqiTrendSvg(filtered, fPeriods)}</div>
+      </div>
+      <div class="card hd-col-side">
+        <div class="cardhead"><div><h3>Komposisi Kategori per Periode</h3><div class="hint hd-sub">Proporsi titik di tiap kategori ${aqiStdLabel()}.</div></div></div>
+        ${aqiPeriodStackHtml(filtered, fPeriods)}
+      </div>
+    </div>
+    <div class="card">
+      <div class="cardhead"><div><h3>Riwayat Seluruh Titik</h3><div class="hint hd-sub">Indeks tiap titik per semester; baca satu baris ke kanan untuk melihat tren. Arahkan kursor ke angka untuk tanggal &amp; polutan dominan.</div></div></div>
+      ${aqiIspuBuildTrendTable(filtered, fPeriods)}
+    </div>
+    <div class="card">
+      <div class="cardhead"><div><h3>Rincian Event Sampling</h3><div class="hint hd-sub">1 event = 1 titik dalam 1 periode, gabungan semua parameter yang diukur. Urut tanggal terbaru.</div></div></div>
+      <div class="tablewrap"><table>${aqiIspuBuildTable(filtered.slice().sort((a,b)=>(b.tanggalSort||"").localeCompare(a.tanggalSort||"")).slice(0,200))}</table></div>
+    </div>`;
+  aqiRenderCompare();
+  if(aqiOm.curStatus==="idle") aqiOmLoadCurrent();
 
-  const detail = filtered.slice().sort((a,b)=>(b.tanggalSort||"").localeCompare(a.tanggalSort||"")).slice(0,200);
-  const stdLabel = aqiIspuStandard==="ispu" ? "ISPU" : "AQI";
-  const trendPeriods = [...new Set(filtered.map(e=>e.periode))].sort((a,b)=>hasilPeriodParts(a).order-hasilPeriodParts(b).order);
-
-  // Peta selalu pakai HANYA data pada filter Site aktif (tapi TIDAK ikut filter Dari/Sampai Periode
-  // — peta punya selector periode sendiri) supaya bisa lihat sebaran periode manapun tanpa perlu
-  // ubah filter atas dulu.
+  // Peta (elemen statis di markup supaya instance Leaflet tidak hilang saat render ulang)
   const mapScope = allEvents.filter(ev=> !aqiIspuFlt.site || ev.site===aqiIspuFlt.site);
   const mapPeriods = [...new Set(mapScope.map(e=>e.periode))].sort((a,b)=>hasilPeriodParts(a).order-hasilPeriodParts(b).order);
   const mapPeriode = (aqiIspuMapPeriode && mapPeriods.includes(aqiIspuMapPeriode)) ? aqiIspuMapPeriode : mapPeriods[mapPeriods.length-1];
   const mapEvents = mapScope.filter(ev=>ev.periode===mapPeriode);
-  const mapPeriodeSel = document.getElementById("aqiIspuMapPeriodeSel");
-  mapPeriodeSel.innerHTML = mapPeriods.map(p=>`<option value="${p}" ${p===mapPeriode?"selected":""}>${p}</option>`).join("");
-
-  document.getElementById("aqiIspuBody").innerHTML = `
-    <div class="grid cols-4" style="margin-bottom:16px;">
-      <div class="stat"><div class="num">${filtered.length}</div><div class="lbl">Event Sampling Terfilter</div></div>
-      <div class="stat ${avgIndex==null?'':(avgIndex<=50?'good':avgIndex<=100?'warn':'bad')}"><div class="num">${avgIndex!=null?avgIndex:"-"}</div><div class="lbl">Rata Rata Indeks ${stdLabel}</div></div>
-      <div class="stat ${filtered.length && goodN/filtered.length>=0.8?'good':'warn'}"><div class="num">${filtered.length?Math.round(goodN/filtered.length*100)+"%":"-"}</div><div class="lbl">Proporsi Kategori Terbaik</div></div>
-      <div class="stat ${badN>0?'bad':'good'}"><div class="num">${badN}</div><div class="lbl">Event ${aqiIspuStandard==="ispu"?"Tidak Sehat+":"Unhealthy+"}</div></div>
-    </div>
-    <div class="card">
-      <h3>Riwayat Seluruh Titik <span class="muted" style="text-transform:none;font-weight:400;">— tren indeks ${stdLabel} tiap titik per semester</span></h3>
-      <div class="hint" style="margin-top:-6px;margin-bottom:8px;">Baca 1 baris ke kanan untuk lihat tren naik/turun tiap titik antar periode. Arahkan kursor ke tiap angka untuk detail tanggal &amp; parameter dominan.</div>
-      ${aqiIspuBuildTrendTable(filtered, trendPeriods)}
-      ${aqiIspuLegendHtml(aqiIspuStandard)}
-    </div>
-    <div class="grid cols-2">
-      <div class="card"><h3>Distribusi Kategori ${stdLabel}</h3>
-        <div>${donut.svg}</div><div class="legend">${donut.legend}</div>
-      </div>
-      <div class="card"><h3>Peringkat Titik Berdasarkan Indeks ${stdLabel} <span class="muted" style="text-transform:none;font-weight:400;">(periode terakhir: ${lastPeriod||"-"})</span></h3>
-        ${aqiIspuBuildRankChart(rankRows)}
-      </div>
-    </div>
-    ${worst ? `<div class="card"><h3>Kondisi Terburuk pada Filter Ini</h3>
-      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-        <span class="badge" style="background:${worst.category.color};color:${worst.category.text};font-size:13px;padding:6px 12px;">${escHtml(worst.category.name)}</span>
-        <div style="font-size:13px;">
-          <b>${escHtml(worst.titik)}</b> (${worst.site}) — ${worst.tanggal||"-"} (${worst.periode})<br>
-          <span class="muted">Indeks ${stdLabel}: <b>${worst.index}</b> — parameter dominan ${AQIISPU_POLLUTANT_LABEL[worst.dominant]||worst.dominant}</span>
-        </div>
-      </div>
-    </div>` : ""}
-    <div class="card"><h3>Rincian Event Sampling</h3>
-      <div class="tablewrap"><table>${aqiIspuBuildTable(detail)}</table></div>
-      <div class="hint">Menampilkan ${detail.length} dari ${filtered.length} event sampling (1 event = 1 titik + 1 tanggal, gabungan semua parameter yang diukur hari itu), urut tanggal terbaru.</div>
-    </div>
-  `;
-
+  document.getElementById("aqiIspuMapPeriodeSel").innerHTML = mapPeriods.map(p=>`<option value="${p}" ${p===mapPeriode?"selected":""}>${p}</option>`).join("");
   aqiIspuInitMap();
   document.getElementById("aqiIspuMapLegend").innerHTML = aqiIspuLegendHtml(aqiIspuStandard);
   const noteEl = document.getElementById("aqiIspuMapNote");
-  if(typeof L==="undefined"){
-    noteEl.textContent = "";
-  } else if(!mapEvents.length){
-    noteEl.textContent = "Tidak ada event sampling pada periode/site ini.";
-  } else {
-    const mappedN = aqiIspuDrawMapMarkers(mapEvents);
-    const missingN = mapEvents.length - mappedN;
-    noteEl.textContent = missingN>0
-      ? `${mappedN} dari ${mapEvents.length} titik tampil di peta (${missingN} titik belum punya koordinat, tetap ada di tabel rincian di bawah).`
-      : `${mappedN} titik ditampilkan untuk periode ${mapPeriode}.`;
+  if(typeof L==="undefined") noteEl.textContent = "";
+  else if(!mapEvents.length) noteEl.textContent = "Tidak ada event sampling pada periode/site ini.";
+  else {
+    const mappedN = aqiIspuDrawMapMarkers(mapEvents), missingN = mapEvents.length-mappedN;
+    noteEl.textContent = missingN>0 ? `${mappedN} dari ${mapEvents.length} titik tampil di peta (${missingN} titik belum punya koordinat).` : `${mappedN} titik ditampilkan untuk periode ${mapPeriode}.`;
   }
 }
 function aqiIspuInfoModal(){
@@ -412,7 +632,13 @@ function aqiIspuInfoModal(){
 document.addEventListener("change", e=>{
   if(e.target.id==="aqiIspuMapPeriodeSel"){ aqiIspuMapPeriode = e.target.value; renderAqiIspu(); }
 });
+document.addEventListener("change", e=>{
+  if(e.target.id==="aqiSelTitik"){ aqiSelKey = e.target.value; renderAqiIspu(); }
+});
 Object.assign(ACTIONS, {
   aqiIspuInfoModal,
-  aqiIspuSetStandard:(t)=>{ aqiIspuStandard = t.dataset.std; renderAqiIspu(); }
+  aqiIspuSetStandard:(t)=>{ aqiIspuStandard = t.dataset.std; renderAqiIspu(); },
+  aqiPickTitik:(t)=>{ aqiSelKey = t.dataset.key; renderAqiIspu(); document.getElementById("aqiIspuTop")?.scrollIntoView({behavior:"smooth", block:"start"}); },
+  aqiOmLoadCurrent:()=>aqiOmLoadCurrent(true),
+  aqiOmLoadEvent:()=>{ if(aqiCompareEv) aqiOmLoadEvent(aqiCompareEv); }
 });

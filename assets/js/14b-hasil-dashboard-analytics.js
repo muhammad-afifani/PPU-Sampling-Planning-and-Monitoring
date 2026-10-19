@@ -93,6 +93,20 @@ function hdScopeEngines(){
   return [...map.values()];
 }
 
+// Istilah unit yg ditampilkan: "flare" bila cakupan filter (jenis sumber terpilih, atau seluruh titik
+// pada cakupan) hanya berisi Flare (parameter Opasitas), selain itu "engine". Murni label tampilan.
+function hdUnitNoun(cap){
+  let onlyFlare;
+  if(hdSel.sumber.size) onlyFlare = [...hdSel.sumber].every(s=>/flare/i.test(s));
+  else { const e = hdScopeEngines(); onlyFlare = e.length>0 && e.every(x=>/flare/i.test(x.sumber||"")); }
+  const w = onlyFlare ? "flare" : "engine";
+  return cap ? w.charAt(0).toUpperCase()+w.slice(1) : w;
+}
+function hdApplyUnitNoun(){
+  const n = hdUnitNoun(false), N = hdUnitNoun(true);
+  document.querySelectorAll(".hd-noun").forEach(e=>{ e.textContent = n; });
+  document.querySelectorAll(".hd-Noun").forEach(e=>{ e.textContent = N; });
+}
 /* ---------------- Konteks render ---------------- */
 function hdBuildContext(filtered, filteredAllParams, periodsInScope){
   const parameter = document.getElementById("hdFltParameter")?.value || "";
@@ -333,13 +347,13 @@ function hdTopEngines(ctx, n){
 }
 function buildHdTrend(ctx){
   const mode = hdTrendResolvedMode(ctx);
-  const toggle = hdSeg("hdSetTrendMode", mode, [["site","Per Site"],["engine","Per Engine"],["max","Max per Site"]].concat(ctx.hasStd?[["pct","% Baku Mutu"]]:[]));
+  const toggle = hdSeg("hdSetTrendMode", mode, [["site","Per Site"],["engine","Per "+hdUnitNoun(true)],["max","Max per Site"]].concat(ctx.hasStd?[["pct","% Baku Mutu"]]:[]));
   if(!ctx.parameter || !ctx.periods.length) return {toggle, svg: hdEmpty("Pilih parameter untuk melihat trend."), legend:""};
   if(!ctx.numeric.length) return {toggle, svg: hdEmpty("Tidak ada data terukur untuk parameter ini pada filter saat ini."), legend:""};
   let keys, keyFn, colorFn, agg = "mean", valFn = r=>r.resultNumeric, autoNote = "";
   if(mode==="engine"){
     keys = hdSel.cerobong.size ? [...hdSel.cerobong].filter(c=>ctx.numeric.some(r=>r.cerobong===c)) : hdTopEngines(ctx, 8);
-    if(!hdSel.cerobong.size) autoNote = "8 engine dengan hasil terakhir tertinggi. Centang titik di filter atau klik di Scorecard untuk memilih sendiri.";
+    if(!hdSel.cerobong.size) autoNote = "8 "+hdUnitNoun()+" dengan hasil terakhir tertinggi. Centang titik di filter atau klik di Scorecard untuk memilih sendiri.";
     keyFn = r=>r.cerobong; colorFn = (k,i)=>HD_PALETTE[i%HD_PALETTE.length];
   }else{
     const sites = [...new Set(ctx.numeric.map(r=>r.site))].sort();
@@ -507,7 +521,7 @@ function buildHdWatchlist(ctx){
     </tr>`;
   }).join("");
   return `<div class="tablewrap hd-table-wrap"><table class="hd-table">
-    <thead><tr><th>#</th><th>Titik atau engine</th><th>Site</th><th class="num">Hasil</th><th>${ctx.hasStd?"% baku mutu":"Relatif"}</th><th class="num">vs ${ctx.prev||"-"}</th><th class="num">RH semester</th><th>Sampling</th><th>Status</th></tr></thead>
+    <thead><tr><th>#</th><th>Titik atau ${hdUnitNoun()}</th><th>Site</th><th class="num">Hasil</th><th>${ctx.hasStd?"% baku mutu":"Relatif"}</th><th class="num">vs ${ctx.prev||"-"}</th><th class="num">RH semester</th><th>Sampling</th><th>Status</th></tr></thead>
     <tbody>${body}</tbody></table></div>
     <div class="hint">${ctx.hasStd?"Penanda putih pada batang adalah ambang Early Warning 70% BM. ":""}Kenaikan terhadap periode sebelumnya diberi warna jingga, penurunan hijau. RH semester dari data Running Hour bulanan.</div>`;
 }
@@ -523,7 +537,7 @@ function hdHeatColor(p){
   return ["#eef6f5","#0f1b2d"];
 }
 function buildHdHeatmap(ctx){
-  const toggle = hdSeg("hdSetHeatMode", hdHeatMode, [["site","Site × Periode"],["engine","Engine × Periode"]]);
+  const toggle = hdSeg("hdSetHeatMode", hdHeatMode, [["site","Site × Periode"],["engine",hdUnitNoun(true)+" × Periode"]]);
   if(!ctx.periods.length || !ctx.numeric.length) return {toggle, html: hdEmpty("Tidak ada data terukur untuk heatmap."), title:"", sub:""};
   const keys = hdHeatMode==="engine" ? hdTopEngines(ctx, 15) : [...new Set(ctx.numeric.map(r=>r.site))].sort();
   const keyFn = hdHeatMode==="engine" ? (r=>r.cerobong) : (r=>r.site);
@@ -554,9 +568,9 @@ function buildHdHeatmap(ctx){
   const legend = ctx.hasStd ? `<div class="hd-heat-legend"><span>% BM</span>${[["<25",10],["25–40",30],["40–55",45],["55–70",60],["70–100",80],[">100",120]].map(([l,p])=>{ const [bg,fg]=hdHeatColor(p); return `<i style="background:${bg};color:${fg}">${l}</i>`; }).join("")}<i class="empty">tanpa data</i></div>`
     : `<div class="hint">Parameter pendukung: warna menunjukkan posisi nilai di antara terendah (${hdNum(gMin)}) dan tertinggi (${hdNum(gMax)}) ${escHtml(ctx.unit)} pada filter ini.</div>`;
   const sub = hdHeatMode==="engine"
-    ? `15 engine dengan hasil terakhir tertinggi. Nilai rata-rata dalam ${escHtml(ctx.unit)}${ctx.hasStd?", warna menunjukkan % baku mutu":""}.`
+    ? `15 ${hdUnitNoun()} dengan hasil terakhir tertinggi. Nilai rata-rata dalam ${escHtml(ctx.unit)}${ctx.hasStd?", warna menunjukkan % baku mutu":""}.`
     : `Rata-rata ${escHtml(ctx.parameter)} per site dalam ${escHtml(ctx.unit)}${ctx.hasStd?", warna menunjukkan % baku mutu":""}. &Delta; = perubahan periode pertama ke terakhir.`;
-  return {toggle, title: hdHeatMode==="engine"?"Engine × Periode":"Site × Periode", sub,
+  return {toggle, title: hdHeatMode==="engine"?hdUnitNoun(true)+" × Periode":"Site × Periode", sub,
     html:`<div class="tablewrap hd-table-wrap"><table class="hd-heat">${head}${body}</table></div>${legend}`};
 }
 
