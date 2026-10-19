@@ -4,8 +4,12 @@
 function refreshTrackingBatchSelect(){
   const team = document.getElementById("trkTeam").value;
   const sel = document.getElementById("trkBatch");
+  const cur = sel.value;
   const list = team? DB.batches.filter(b=>b.team===team) : DB.batches;
-  sel.innerHTML = `<option value="">Semua</option>`+list.map(b=>`<option value="${b.id}">${b.name}</option>`).join("");
+  sel.innerHTML = `<option value="">Semua</option>`+list.map(b=>`<option value="${b.id}">${escHtml(b.name)}</option>`).join("");
+  // Pilihan batch sebelumnya dipertahankan — dulu innerHTML di atas mereset ke "Semua" tiap render,
+  // jadi filter Batch tidak pernah bertahan.
+  if(list.some(b=>b.id===cur)) sel.value = cur;
 }
 // Diisi sekali (bukan tiap render, beda dgn batch di atas) — daftar site jarang berubah dalam satu
 // sesi, sama seperti pola filter Site di halaman Plan Pemantauan.
@@ -55,6 +59,7 @@ function ensureTracking(id){
   if(t.samplingStatus===undefined) t.samplingStatus = "";
   if(t.samplingNote===undefined) t.samplingNote = "";
   if(!t.dates) t.dates = {};
+  if(t.trkNote===undefined) t.trkNote = "";
   return t;
 }
 // KOM di-key per (periode,site) — BUKAN per batch — supaya batch Emisi & Ambient yang mengunjungi

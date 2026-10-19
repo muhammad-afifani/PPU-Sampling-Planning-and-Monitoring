@@ -224,7 +224,7 @@ function renderBeritaAcara(){
   const team = document.getElementById("baTeam").value;
   document.getElementById("baIncludeKebauanWrap").style.display = team==="ambient" ? "flex" : "none";
   const includeKebauan = document.getElementById("baIncludeKebauan").checked;
-  document.getElementById("baPageTitle").textContent = team==="emisi" ? "Berita Acara Pengambilan Contoh Uji Udara Emisi" : "Berita Acara Pengukuran Kualitas Udara Ambien & Kebisingan";
+  document.getElementById("baPageTitle").textContent = team==="emisi" ? "Detail Berita Acara Emisi" : "Detail Berita Acara Ambient";
   if(!document.getElementById("baNamaPhm").dataset.touched){
     document.getElementById("baNamaPhm").value = cfg[team].namaPhm;
     document.getElementById("baJabatanPhm").value = cfg[team].jabatanPhm;
@@ -262,16 +262,49 @@ function renderBeritaAcara(){
   }
   const pts = site ? baFilteredPoints(site, team, includeKebauan) : [];
   const titikHeader = team==="emisi" ? "Sumber Emisi (Titik Sampling)" : "Titik Sampling";
+  // Tabel editor ringkas (No, Titik+kategori, Status) — kolom Lokasi/Kewajiban sudah terlihat di
+  // pratinjau kertas di sebelahnya, jadi tidak diulang di sini supaya kolom Status cukup lebar.
   document.getElementById("baPreviewTable").innerHTML = pts.length ? `
-    <thead><tr><th style="width:34px;">No</th><th>Lokasi</th><th>Kategori</th><th>${titikHeader}</th><th>Kewajiban Pemantauan</th><th>Status Pemantauan</th></tr></thead>
+    <thead><tr><th style="width:34px;">No</th><th>${titikHeader}</th><th style="min-width:170px;">Status Pemantauan</th></tr></thead>
     <tbody>${pts.map((p,i)=>`<tr>
       <td>${i+1}</td>
-      <td>Lapangan ${escHtml(site)}</td>
-      <td>${escHtml(baKategoriLabelFor(p))}</td>
-      <td>${escHtml(p.nama)}</td>
-      <td style="text-align:center;">${frekuensiTextFor(p)}</td>
-      <td><input type="text" class="baStatusInput" data-point-id="${p.id}" data-batch-id="${batchId}" value="${escHtml(baStatusFor(p, batchId))}" placeholder="(kosong, isi manual)" style="width:100%;min-width:180px;border:1px solid var(--gray-300);border-radius:4px;padding:4px 6px;font:inherit;"></td>
+      <td><b>${escHtml(p.nama)}</b><div class="muted" style="font-size:10.5px;">${escHtml(baKategoriLabelFor(p))} &middot; ${frekuensiTextFor(p)}</div></td>
+      <td><input type="text" class="baStatusInput" data-point-id="${p.id}" data-batch-id="${batchId}" value="${escHtml(baStatusFor(p, batchId))}" placeholder="(kosong, isi manual)" style="width:100%;border:1px solid var(--gray-300);border-radius:6px;padding:5px 7px;font:inherit;font-size:12px;background:var(--surface-card);color:var(--ms-text);"></td>
     </tr>`).join("")}</tbody>` : "<div class='hint' style='padding:10px;'>Pilih Tim, Batch, dan Site yang sudah punya jadwal untuk melihat pratinjau.</div>";
+  baRenderPaper();
+}
+/* ---------- Pratinjau kertas (sebelum export Word/PDF) ----------
+   Memakai HTML yang SAMA dgn cetak/PDF (buildBeritaAcaraHtml), ditaruh di lembar A4 (794px = 210mm)
+   yang diskalakan muat ke lebar kolom. Garis putus-putus = perkiraan batas halaman. */
+let baZoom = "fit";
+function baFitPaper(){
+  const wrap = document.getElementById("baPaperWrap"), paper = document.getElementById("baPaper");
+  if(!wrap || !paper) return;
+  const PAD = 28;  // padding kiri+kanan .ba-paper-wrap
+  const scale = baZoom==="fit" ? Math.min(1, ((wrap.clientWidth||794+PAD)-PAD)/794) : 1;
+  paper.style.transform = scale===1 ? "" : `scale(${scale})`;
+  wrap.style.height = baZoom==="fit" ? (Math.ceil(paper.offsetHeight*scale)+PAD)+"px" : "";
+  wrap.classList.toggle("zoom100", baZoom!=="fit");
+}
+function baRenderPaper(){
+  const paper = document.getElementById("baPaper");
+  if(!paper) return;
+  const html = buildBeritaAcaraHtml();
+  paper.innerHTML = html || `<div class="ba-paper-empty">Pilih Tim, Batch, dan Site yang sudah punya jadwal &amp; titik untuk melihat pratinjau Berita Acara.</div>`;
+  const hint = document.getElementById("baPaperHint");
+  const d = html ? baCollectData() : null;
+  if(hint) hint.textContent = d ? `${d.total} titik · ${d.groups.length} kategori · Lapangan ${d.site}` : "";
+  baFitPaper();
+  // Logo/pita dimuat asinkron — ukur ulang tinggi lembar setelah gambar selesai.
+  paper.querySelectorAll("img").forEach(img=>{ if(!img.complete) img.addEventListener("load", baFitPaper, {once:true}); });
+}
+let baPaperTimer = null;
+function baSchedulePaper(){ clearTimeout(baPaperTimer); baPaperTimer = setTimeout(baRenderPaper, 120); }
+window.addEventListener("resize", ()=>{ if(document.getElementById("baPaper") && document.getElementById("trkPaneBa").style.display!=="none") baFitPaper(); });
+function baSetZoom(t){
+  baZoom = t.dataset.val;
+  document.querySelectorAll("#baZoomSeg button").forEach(b=>b.classList.toggle("on", b.dataset.val===baZoom));
+  baFitPaper();
 }
 // Kolom Status Pemantauan di pratinjau BA bisa diketik manual — override disimpan per (batch,
 // titik) di b.baStatusOverrides & dibaca balik oleh baStatusFor (menang duluan dari semua logika
@@ -285,6 +318,7 @@ document.addEventListener("change", e=>{
     if(val) b.baStatusOverrides[e.target.dataset.pointId] = val;
     else delete b.baStatusOverrides[e.target.dataset.pointId];
     save();
+    baSchedulePaper();
   }
 });
 ["baTeam"].forEach(id=>document.getElementById(id).addEventListener("change", ()=>{
@@ -309,9 +343,13 @@ document.getElementById("baIncludeKebauan").addEventListener("change", renderBer
     const cfg = ensureBaConfig();
     const map = {baNamaPhm:"namaPhm", baJabatanPhm:"jabatanPhm", baNamaLabPerusahaan:"labPerusahaan", baNamaLab:"namaLab", baJabatanLab:"jabatanLab", baFooterNote:"footerNote"};
     if(map[id]){ cfg[team][map[id]] = e.target.value; save(); }
+    baSchedulePaper();
   });
 });
-function buildBeritaAcaraHtml(){
+// Satu sumber data utk SEMUA keluaran Berita Acara (pratinjau layar, cetak/PDF, Word .docx) — dulu
+// tiap keluaran menyusun datanya sendiri dari form, jadi pratinjau & file Word gampang berbeda dari
+// hasil cetak. Mengembalikan null kalau site/titik belum ada.
+function baCollectData(){
   const team = document.getElementById("baTeam").value;
   const includeKebauan = document.getElementById("baIncludeKebauan").checked;
   const batchId = document.getElementById("baBatch").value;
@@ -319,45 +357,56 @@ function buildBeritaAcaraHtml(){
   if(!site) return null;
   const pts = baFilteredPoints(site, team, includeKebauan);
   if(!pts.length) return null;
-  const tanggalPelaksanaan = document.getElementById("baTanggalPelaksanaan").value;
-  const tempatTanggal = document.getElementById("baTempatTanggal").value;
-  const footerNote = document.getElementById("baFooterNote").value.trim();
-  const namaPhm = document.getElementById("baNamaPhm").value;
-  const jabatanPhm = document.getElementById("baJabatanPhm").value;
-  const labPerusahaan = document.getElementById("baNamaLabPerusahaan").value;
-  const namaLab = document.getElementById("baNamaLab").value;
-  const jabatanLab = document.getElementById("baJabatanLab").value;
   const kt = ketuaTimInfo(batchId);
-  const titikHeader = team==="emisi" ? "Sumber Emisi (Titik Sampling)" : "Titik Sampling";
-
   // Dikelompokkan per Kategori (jenis sumber emisi/ambient) — baris judul kelompok memisahkan
-  // tiap kategori dgn jelas tanpa perlu bikin tabel terpisah-pisah (yang bikin thead/tfoot cetak
-  // per halaman jadi ribet). Nomor urut tetap berjalan menerus dari 1 spt contoh BA yang sudah ada.
+  // tiap kategori dgn jelas tanpa perlu bikin tabel terpisah-pisah. Nomor urut tetap berjalan
+  // menerus dari 1 spt contoh BA yang sudah ada. Kategori berisi titik wajib pantau didahulukan
+  // drpd yg seluruhnya tidak-wajib, lalu diurutkan sesuai BA_KATEGORI_PRIORITY (Turbin/Flare/Gas
+  // Booster/H2S dulu), sisanya alfabetis sbg fallback stabil.
   const grouped = {};
   pts.forEach(p=>{ const k = baKategoriLabelFor(p); (grouped[k]=grouped[k]||[]).push(p); });
-  // Kategori berisi titik wajib pantau didahulukan drpd yg seluruhnya tidak-wajib, lalu di dalam
-  // tiap kelompok itu diurutkan sesuai BA_KATEGORI_PRIORITY (Turbin/Flare/Gas Booster/H2S dulu),
-  // sisanya alfabetis sbg fallback stabil — bukan alfabetis polos spt sebelumnya (yg bikin
-  // "Diesel Engine..." nongol duluan drpd Flare/Turbin walau itu yg jadi fokus pemantauan).
   const kategoriList = Object.keys(grouped).sort((a,b)=>{
     const ra = baKategoriSortRank(a, grouped[a]), rb = baKategoriSortRank(b, grouped[b]);
     if(ra[0]!==rb[0]) return ra[0]-rb[0];
     if(ra[1]!==rb[1]) return ra[1]-rb[1];
     return a.localeCompare(b);
   });
-  let rows = "", rowNum = 0;
-  kategoriList.forEach(kat=>{
-    rows += `<tr class="pg-ba-kategori-row"><td colspan="6">${escHtml(kat)}</td></tr>`;
-    grouped[kat].forEach(p=>{
-      rowNum++;
-      const status = baStatusFor(p, batchId);
+  let n = 0;
+  const groups = kategoriList.map(kat=>({
+    kategori: kat,
+    rows: grouped[kat].map(p=>({no: ++n, lokasi: `Lapangan ${site}`, kategori: kat, titik: p.nama, frekuensi: frekuensiTextFor(p), statusHtml: baStatusFor(p, batchId)}))
+  }));
+  return {
+    team, includeKebauan, batchId, site, total: pts.length,
+    judul: baTitleFor(team, includeKebauan),
+    intro: `Dengan ini menyatakan, bahwa telah dilakukan pengukuran ${team==="emisi"?"emisi dari sumber tidak bergerak":"kualitas lingkungan"} dalam rangka Kegiatan Pengendalian Pencemaran ${team==="emisi"?"Udara":"Lingkungan"}, pada:`,
+    tanggalPelaksanaan: document.getElementById("baTanggalPelaksanaan").value,
+    tempatTanggal: document.getElementById("baTempatTanggal").value,
+    footerNote: document.getElementById("baFooterNote").value.trim(),
+    namaPhm: document.getElementById("baNamaPhm").value,
+    jabatanPhm: document.getElementById("baJabatanPhm").value,
+    labPerusahaan: document.getElementById("baNamaLabPerusahaan").value,
+    namaLab: document.getElementById("baNamaLab").value,
+    jabatanLab: document.getElementById("baJabatanLab").value,
+    ketua: kt,
+    titikHeader: team==="emisi" ? "Sumber Emisi (Titik Sampling)" : "Titik Sampling",
+    groups
+  };
+}
+function buildBeritaAcaraHtml(){
+  const d = baCollectData();
+  if(!d) return null;
+  let rows = "";
+  d.groups.forEach(g=>{
+    rows += `<tr class="pg-ba-kategori-row"><td colspan="6">${escHtml(g.kategori)}</td></tr>`;
+    g.rows.forEach(r=>{
       rows += `<tr>
-        <td>${rowNum}</td>
-        <td>Lapangan ${escHtml(site)}</td>
-        <td>${escHtml(kat)}</td>
-        <td>${escHtml(p.nama)}</td>
-        <td style="text-align:center;">${frekuensiTextFor(p)}</td>
-        <td>${status||"&nbsp;"}</td>
+        <td>${r.no}</td>
+        <td>${escHtml(r.lokasi)}</td>
+        <td>${escHtml(r.kategori)}</td>
+        <td>${escHtml(r.titik)}</td>
+        <td style="text-align:center;">${r.frekuensi}</td>
+        <td>${r.statusHtml||"&nbsp;"}</td>
       </tr>`;
     });
   });
@@ -365,13 +414,12 @@ function buildBeritaAcaraHtml(){
   // Kepala dokumen (logo+judul+pembuka) SENGAJA di luar <table class="pg-ba-page"> supaya jadi
   // konten alir biasa yang cuma tampil SEKALI di halaman pertama — tidak ikut terulang di halaman
   // ke-2 dst (sesuai revisi: teks "BERITA ACARA...dst" hanya boleh muncul di awal dokumen).
-  // .pg-ba-page sendiri kini cuma punya <tfoot> (pita merah, murni dekoratif) yg diulang browser
+  // .pg-ba-page sendiri cuma punya <tfoot> (pita merah, murni dekoratif) yg diulang browser
   // di SETIAP halaman cetak kalau <tbody>-nya (tabel titik sampling) meluber >1 halaman — header
   // kolom tabel (No/Lokasi/Kategori/dst) tetap terulang sendiri krn itu <thead> milik .pg-ba-table
   // yang nested di dalam tbody, terpisah dari mekanisme ini. Blok tanda tangan dibungkus 1 div
   // page-break-inside:avoid supaya "Demikian...” s/d nama terang tidak pernah terpotong tanggung
-  // di sambungan halaman — kalau tidak muat di sisa halaman berjalan, browser otomatis dorong
-  // seluruh blok itu ke halaman baru.
+  // di sambungan halaman.
   return `<div class="pg-batch pg-ba">
     <div class="pg-ba-header-once">
       <div class="pg-ba-logos">
@@ -380,36 +428,36 @@ function buildBeritaAcaraHtml(){
       </div>
       <div class="pg-ba-title">
         <h1>BERITA ACARA</h1>
-        <div class="sub">${baTitleFor(team, includeKebauan)}</div>
+        <div class="sub">${d.judul}</div>
       </div>
-      <div class="pg-ba-intro">Dengan ini menyatakan, bahwa telah dilakukan pengukuran ${team==="emisi"?"emisi dari sumber tidak bergerak":"kualitas lingkungan"} dalam rangka Kegiatan Pengendalian Pencemaran ${team==="emisi"?"Udara":"Lingkungan"}, pada:</div>
-      <table class="pg-ba-meta"><tr><td style="width:150px;">Hari / Tanggal</td><td style="width:14px;">:</td><td>${escHtml(tanggalPelaksanaan)}</td></tr>
-      <tr><td>Lokasi</td><td>:</td><td>Lapangan ${escHtml(site)} PT Pertamina Hulu Mahakam</td></tr>
-      ${kt ? `<tr><td>Ketua Tim Sampling</td><td>:</td><td>${escHtml(kt.nama)} (${escHtml(kt.role)})</td></tr>` : ""}</table>
+      <div class="pg-ba-intro">${d.intro}</div>
+      <table class="pg-ba-meta"><tr><td style="width:150px;">Hari / Tanggal</td><td style="width:14px;">:</td><td>${escHtml(d.tanggalPelaksanaan)}</td></tr>
+      <tr><td>Lokasi</td><td>:</td><td>Lapangan ${escHtml(d.site)} PT Pertamina Hulu Mahakam</td></tr>
+      ${d.ketua ? `<tr><td>Ketua Tim Sampling</td><td>:</td><td>${escHtml(d.ketua.nama)} (${escHtml(d.ketua.role)})</td></tr>` : ""}</table>
       <div class="pg-ba-intro">Adapun titik lokasi yang dilakukan pengukuran adalah sebagai berikut:</div>
     </div>
     <table class="pg-ba-page">
       <tfoot><tr><td><img class="pg-ba-footer-band" src="${FOOTER_BAND_B64}" alt=""></td></tr></tfoot>
       <tbody><tr><td>
         <table class="pg-ba-table">
-          <thead><tr><th style="width:28px;">No.</th><th>Lokasi</th><th>Kategori</th><th>${titikHeader}</th><th style="width:80px;">Kewajiban Pemantauan</th><th style="width:140px;">Status Pemantauan</th></tr></thead>
+          <thead><tr><th style="width:28px;">No.</th><th>Lokasi</th><th>Kategori</th><th>${d.titikHeader}</th><th style="width:80px;">Kewajiban Pemantauan</th><th style="width:140px;">Status Pemantauan</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
-        ${footerNote ? `<div class="pg-ba-foot-note">${escHtml(footerNote)}</div>` : ""}
+        ${d.footerNote ? `<div class="pg-ba-foot-note">${escHtml(d.footerNote)}</div>` : ""}
       </td></tr></tbody>
     </table>
     <div class="pg-ba-closing-block">
       <div class="pg-ba-closing">Demikian Berita Acara ini dibuat untuk dipergunakan sebagaimana mestinya.</div>
-      <div style="text-align:right;margin-top:6px;">${escHtml(tempatTanggal)}</div>
+      <div style="text-align:right;margin-top:6px;">${escHtml(d.tempatTanggal)}</div>
       <div style="text-align:center;margin-top:22px;">Mengetahui,</div>
       <table class="pg-ba-sign"><tr>
-        <td style="width:50%;">PT Pertamina Hulu Mahakam, ${escHtml(site)}</td>
-        <td style="width:50%;">${escHtml(labPerusahaan)}</td>
+        <td style="width:50%;">PT Pertamina Hulu Mahakam, ${escHtml(d.site)}</td>
+        <td style="width:50%;">${escHtml(d.labPerusahaan)}</td>
       </tr>
       <tr><td class="sign-space"></td><td class="sign-space"></td></tr>
       <tr>
-        <td><div class="sign-name">${escHtml(namaPhm)}</div><div>${escHtml(jabatanPhm)}</div></td>
-        <td><div class="sign-name">${escHtml(namaLab)}</div><div>${escHtml(jabatanLab)}</div></td>
+        <td><div class="sign-name">${escHtml(d.namaPhm)}</div><div>${escHtml(d.jabatanPhm)}</div></td>
+        <td><div class="sign-name">${escHtml(d.namaLab)}</div><div>${escHtml(d.jabatanLab)}</div></td>
       </tr></table>
     </div>
   </div>`;
@@ -451,4 +499,3 @@ async function printBeritaAcara(){
   window.print();
   document.title = originalTitle;
 }
-

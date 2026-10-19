@@ -8,6 +8,9 @@
 hydrateIcons();
 
 function showPage(p){
+  // Berita Acara sudah digabung ke halaman Tracking BA/CoA (tab "Berita Acara") — alamat lama
+  // tetap bekerja & langsung membuka tab itu.
+  if(p==="beritaacara"){ p = "tracking"; if(typeof trkTab!=="undefined") trkTab = "ba"; }
   document.querySelectorAll(".page").forEach(el=>el.classList.remove("active"));
   document.querySelectorAll(".navbtn").forEach(el=>el.classList.remove("active"));
   document.getElementById("page-"+p).classList.add("active");
@@ -126,7 +129,6 @@ function renderPage(p){
   if(p==="riwayat") renderRiwayat();
   if(p==="lokasi") renderMap();
   if(p==="data") renderDataStatus();
-  if(p==="beritaacara") renderBeritaAcara();
   if(p==="dokumentasi") renderDokumentasiFoto();
   if(p==="dispersi") renderDispersi();
   syncStickyOffset(p);

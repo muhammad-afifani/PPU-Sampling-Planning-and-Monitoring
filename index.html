@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202610191900">
+<link rel="stylesheet" href="assets/css/style.css?v=202610192100">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -82,7 +82,6 @@
         <button type="button" class="navgroup-head"><span>Eksekusi &amp; Monitoring</span><span class="ms-icon navgroup-chevron" data-icon="chevron-down" data-size="13"></span></button>
         <div class="navgroup-items">
           <button class="navbtn" data-page="tracking" data-group="exec" data-label="Tracking BA / CoA" title="Tracking BA / CoA"><span class="navbtn-icon ms-icon" data-icon="clipboard-check"></span><span class="label">Tracking BA / CoA</span></button>
-          <button class="navbtn" data-page="beritaacara" data-group="exec" data-label="Berita Acara" title="Berita Acara"><span class="navbtn-icon ms-icon" data-icon="file-text"></span><span class="label">Berita Acara</span></button>
           <button class="navbtn" data-page="dokumentasi" data-group="exec" data-label="Dokumentasi Foto Sampling" title="Dokumentasi Foto Sampling"><span class="navbtn-icon ms-icon" data-icon="camera"></span><span class="label">Dokumentasi Foto Sampling</span></button>
           <button class="navbtn" data-page="runninghour" data-group="exec" data-label="Running Hour Detail" title="Running Hour Detail"><span class="navbtn-icon ms-icon" data-icon="gauge"></span><span class="label">Running Hour Detail</span></button>
         </div>
@@ -724,90 +723,121 @@
     </div>
 
     <!-- TRACKING -->
-    <div class="page" id="page-tracking">
-      <div class="stickytop">
-      <div class="pagehead"><div><h2>Tracking BA / Draft CoA / SHU</h2><div class="desc">Dibagi menjadi 2 tahap: eksekusi sampling di lapangan, dilanjutkan dengan dokumentasi dan pelaporan hingga SIMPEL PPU</div></div>
-        <div class="toolbar">
-          <button class="btn" data-action="exportTrackingXlsx">Export Tracking (Excel)</button>
-          <button class="btn ghost" data-action="importTrackingXlsx">Import Tracking (Excel)</button>
-          <button class="btn primary" data-action="goToPage" data-page="beritaacara">Buka Berita Acara</button>
+    <div class="page trk-page" id="page-tracking">
+      <section class="hd-hero trk-hero" aria-label="Tracking BA / CoA">
+        <div class="hd-hero-top">
+          <div class="hd-hero-title">
+            <div class="hd-eyebrow">Eksekusi &amp; Monitoring <span aria-hidden="true">/</span> Dokumen Hasil Sampling</div>
+            <h2>Tracking BA / CoA</h2>
+            <p>Pantau tiap engine dari sampling di lapangan, Berita Acara ditandatangani, draft SHU/CoA, SHU asli terbit, sampai input SIMPEL PPU. Berita Acara disusun dan diekspor dari halaman yang sama.</p>
+          </div>
+          <div class="hd-hero-actions">
+            <button type="button" class="hd-btn-outline" data-action="exportTrackingXlsx">Export Excel</button>
+            <button type="button" class="hd-btn-outline" data-action="importTrackingXlsx">Import Excel</button>
+            <button type="button" class="hd-btn-outline" data-action="exportMomPdf" title="Minutes of Meeting KOM + catatan sampling, mengikuti filter di bawah">Export MoM (PDF)</button>
+          </div>
         </div>
-      </div>
-      <div class="toolbar card" style="padding:12px 14px;">
+        <div class="hd-tabs" id="trkTabs" role="tablist" aria-label="Bagian Tracking"></div>
+      </section>
+
+      <div class="card trk-filter" id="trkFilterBar">
         <div class="field"><label>Tim</label><select id="trkTeam"><option value="">Semua</option><option value="emisi">Emisi</option><option value="ambient">Ambient</option></select></div>
         <div class="field"><label>Batch</label><select id="trkBatch"><option value="">Semua</option></select></div>
         <div class="field"><label>Site</label><select id="trkFltSite"><option value="">Semua</option></select></div>
         <div class="field"><label>Status</label><select id="trkStatus"><option value="">Semua</option><option value="ontrack">On Track</option><option value="overdue">Overdue</option><option value="done">Selesai</option></select></div>
+        <span class="spacer"></span>
+        <span class="hd-tag" id="trkFilterCount"></span>
+        <button type="button" class="btn small ghost" data-action="trkResetFilter">Reset filter</button>
       </div>
-      </div>
-      <details class="card collapse-section" open>
-        <summary>KOM (Kick Off Meeting) per Site</summary>
-        <div class="toolbar" style="margin-bottom:10px;">
-          <span class="hint" style="max-width:480px;">Export MoM mengikuti filter Tim/Batch/Site/Status di atas — kosongkan Site utk semua site sekaligus.</span>
-          <span class="spacer"></span>
-          <button class="btn ghost" data-action="exportMomPdf">Export MoM (PDF)</button>
-        </div>
-        <div class="tablewrap"><table id="komSiteTable"></table></div>
-      </details>
-      <div class="reg-divider">Tahap 1, Sampling Emisi di Lapangan</div>
-      <div class="card">
-        <div class="hint" style="margin-top:-6px;">Isi tanggal aktual saat titik ini benar benar disampling. Untuk titik yang sudah direncanakan pada batch ini tetapi ternyata belum dapat disampling, pilih status "Direncanakan Batch Berikutnya" dan tuliskan catatannya (misalnya nomor batch tujuan). Untuk titik yang tidak disampling karena sebab lain (perbaikan, tidak beroperasi, dan sejenisnya), pilih "Tidak Disampling, Sebab Lain" dan isi catatannya. Status ini yang nantinya dipakai untuk menyusun Berita Acara per site.</div>
-        <div class="toolbar" style="margin-bottom:10px;">
-          <span class="hint" style="max-width:480px;">Reset berlaku utk semua baris yang sedang tampil (ikut filter Tim/Batch/Site/Status di atas) — kosongkan Site utk reset per site, atau semua filter utk reset semua data.</span>
-          <span class="spacer"></span>
-          <button class="btn danger" data-action="resetSamplingRecordsBulk">Reset Semua yang Tampil</button>
-        </div>
-        <div class="tablewrap"><table id="samplingEmisiTable"></table></div>
-      </div>
-      <div class="reg-divider">Tahap 2, Dokumen dan Pelaporan sampai SIMPEL PPU</div>
-      <div class="card">
-        <div class="hint" style="margin-top:-6px;">Bagian ini terpisah dari eksekusi sampling di atas, dan cuma relevan untuk titik yang statusnya sudah "Sudah Disampling" pada Tahap 1.</div>
-        <div class="tablewrap"><table id="trackingTable"></table></div>
-      </div>
-    </div>
 
-    <!-- BERITA ACARA -->
-    <div class="page" id="page-beritaacara">
-      <div class="stickytop">
-      <div class="pagehead"><div><h2 id="baPageTitle">Berita Acara Pengambilan Contoh Uji Udara Emisi</h2><div class="desc">Disusun otomatis dari data titik &amp; status sampling per site, siap cetak/export PDF, mengikuti format Berita Acara yang sudah berjalan. Berita Acara Emisi dan Ambient dipisah sesuai Tim yang dipilih, tidak digabung dalam satu dokumen.</div></div>
-        <div class="toolbar"><button class="btn" data-action="exportBeritaAcaraWord" title="Unduh sebagai file Word (.doc) — logo, tabel &amp; tanda tangan ikut, bisa diedit lagi di Word">Export Word (.doc)</button><button class="btn primary" data-action="printBeritaAcara">Cetak / Export PDF</button></div>
-      </div>
-      <div class="toolbar card" style="padding:12px 14px;">
-        <div class="field"><label>Tim</label><select id="baTeam"><option value="emisi">Emisi</option><option value="ambient">Ambient (Udara Ambien, Kebisingan, Kebauan, Getaran)</option></select></div>
-        <div class="field"><label>Batch</label><select id="baBatch"></select></div>
-        <div class="field"><label>Site</label><select id="baSite"></select></div>
-        <label class="checkline" id="baIncludeKebauanWrap" style="align-self:flex-end;padding-bottom:8px;display:none;"><input type="checkbox" id="baIncludeKebauan" checked> Sertakan Kebauan &amp; Getaran</label>
-      </div>
-      </div>
-      <div class="card">
-        <h3>Detail Berita Acara</h3>
-        <div class="hint" id="baKetuaTimHint" style="margin-bottom:10px;"></div>
-        <div class="grid cols-2">
-          <div class="field"><label>Hari / Tanggal Pelaksanaan</label><input type="text" id="baTanggalPelaksanaan" placeholder="mis. Rabu, 18 Februari s.d. Jumat 20 Februari 2026"></div>
-          <div class="field"><label>Tempat &amp; Tanggal Penandatanganan</label><input type="text" id="baTempatTanggal" placeholder="mis. Lapangan SPS PHM, 21 Februari 2026"></div>
+      <!-- PAPAN STATUS -->
+      <div class="trk-pane" id="trkPaneBoard">
+        <div id="trkKpis" class="hd-kpis trk-kpis"></div>
+        <div class="card trk-funnel-card">
+          <div class="cardhead"><div><h3>Posisi Engine di Alur Dokumen</h3><div class="hint hd-sub">Klik salah satu tahap untuk menyaring engine yang sedang berada di tahap itu. Tahap = langkah terakhir yang sudah selesai berurutan.</div></div>
+            <span id="trkStageChip"></span></div>
+          <div id="trkFunnel"></div>
         </div>
-        <div class="grid cols-2" style="margin-top:10px;">
-          <div>
-            <div class="muted" style="font-weight:700;font-size:12px;margin-bottom:6px;">Pihak PT Pertamina Hulu Mahakam</div>
-            <div class="field"><label>Nama / Jabatan Penandatangan</label><input type="text" id="baNamaPhm" placeholder="mis. Guntur Darja Wijaya / Zam Faisal"></div>
-            <div class="hint" id="baEnvSupervisorHint" style="margin-top:4px;"></div>
-            <div class="field" style="margin-top:8px;"><label>Jabatan</label><input type="text" id="baJabatanPhm" placeholder="mis. Environment Supervisor SPS"></div>
-          </div>
-          <div>
-            <div class="muted" style="font-weight:700;font-size:12px;margin-bottom:6px;">Pihak Laboratorium (mis. Sucofindo)</div>
-            <div class="field"><label>Nama Perusahaan Lab</label><input type="text" id="baNamaLabPerusahaan" placeholder="mis. PT Sucofindo"></div>
-            <div class="field" style="margin-top:8px;"><label>Nama / Jabatan Penandatangan</label><input type="text" id="baNamaLab" placeholder="mis. Rafles Sadrah Ginting"></div>
-            <div class="field" style="margin-top:8px;"><label>Jabatan</label><input type="text" id="baJabatanLab" placeholder="mis. Ketua Tim Pemantauan Emisi"></div>
+        <div class="trk-viewbar">
+          <div class="hd-seg-group" id="trkViewSeg" role="group" aria-label="Tampilan"></div>
+          <span class="hint" id="trkViewHint" style="margin:0;"></span>
+        </div>
+        <div id="trkBoardBody"></div>
+      </div>
+
+      <!-- SAMPLING LAPANGAN -->
+      <div class="trk-pane" id="trkPaneSampling">
+        <div class="card">
+          <div class="cardhead"><div><h3>Sampling Emisi di Lapangan</h3><div class="hint hd-sub">Isi tanggal aktual saat titik benar-benar disampling. Untuk titik yang sudah direncanakan pada batch ini tetapi belum dapat disampling, pilih "Direncanakan Batch Berikutnya" dan tuliskan catatannya (mis. nomor batch tujuan). Untuk sebab lain (perbaikan, tidak beroperasi), pilih "Tidak Disampling, Sebab Lain". Status ini dipakai menyusun Berita Acara per site.</div></div>
+            <button class="btn small danger" data-action="resetSamplingRecordsBulk" title="Berlaku untuk semua baris yang sedang tampil (ikut filter di atas)">Reset yang Tampil</button></div>
+          <div id="trkSamplingSummary" class="trk-chips"></div>
+          <div class="tablewrap"><table id="samplingEmisiTable"></table></div>
+        </div>
+      </div>
+
+      <!-- BERITA ACARA -->
+      <div class="trk-pane" id="trkPaneBa">
+        <div class="card ba-selbar">
+          <div class="field"><label>Tim</label><select id="baTeam"><option value="emisi">Emisi</option><option value="ambient">Ambient (Udara Ambien, Kebisingan, Kebauan, Getaran)</option></select></div>
+          <div class="field"><label>Batch</label><select id="baBatch"></select></div>
+          <div class="field"><label>Site</label><select id="baSite"></select></div>
+          <label class="checkline" id="baIncludeKebauanWrap" style="align-self:flex-end;padding-bottom:8px;display:none;"><input type="checkbox" id="baIncludeKebauan" checked> Sertakan Kebauan &amp; Getaran</label>
+          <span class="spacer"></span>
+          <div class="ba-actions">
+            <button class="hd-btn-outline ba-btn" data-action="exportBeritaAcaraWord" title="Unduh file Word (.docx) asli: tabel mengalir antar halaman, judul kolom diulang, pita merah di tiap halaman">Export Word (.docx)</button>
+            <button class="hd-btn-solid ba-btn" data-action="printBeritaAcara" title="Cetak atau simpan sebagai PDF lewat dialog cetak browser">Cetak / PDF</button>
           </div>
         </div>
-        <div class="field" style="margin-top:10px;"><label>Catatan Kaki Cetak (opsional)</label><textarea id="baFooterNote" rows="2" placeholder="mis. Akan dipantau ketika running hour memenuhi ambang wajib pantau Emergency Engine."></textarea></div>
-        <div class="hint" style="margin-top:8px;">Data pengisi/tanda tangan/catatan kaki disimpan otomatis per Tim supaya tidak perlu diketik ulang tiap ganti site/batch. Catatan kaki dikosongkan = tidak ada catatan kaki di hasil cetak.</div>
+        <div class="ba-grid">
+          <div class="ba-left">
+            <div class="card">
+              <div class="cardhead"><div><h3 id="baPageTitle">Detail Berita Acara</h3></div></div>
+              <div class="hint" id="baKetuaTimHint" style="margin-bottom:10px;"></div>
+              <div class="grid cols-2">
+                <div class="field"><label>Hari / Tanggal Pelaksanaan</label><input type="text" id="baTanggalPelaksanaan" placeholder="mis. Rabu, 18 Februari s.d. Jumat 20 Februari 2026"></div>
+                <div class="field"><label>Tempat &amp; Tanggal Penandatanganan</label><input type="text" id="baTempatTanggal" placeholder="mis. Lapangan SPS PHM, 21 Februari 2026"></div>
+              </div>
+              <div class="ba-sign-grid">
+                <div class="ba-party">
+                  <div class="ba-party-head">Pihak PT Pertamina Hulu Mahakam</div>
+                  <div class="field"><label>Nama Penandatangan</label><input type="text" id="baNamaPhm" placeholder="mis. Guntur Darja Wijaya / Zam Faisal"></div>
+                  <div class="hint" id="baEnvSupervisorHint" style="margin-top:4px;"></div>
+                  <div class="field" style="margin-top:8px;"><label>Jabatan</label><input type="text" id="baJabatanPhm" placeholder="mis. Environment Supervisor SPS"></div>
+                </div>
+                <div class="ba-party">
+                  <div class="ba-party-head">Pihak Laboratorium</div>
+                  <div class="field"><label>Nama Perusahaan Lab</label><input type="text" id="baNamaLabPerusahaan" placeholder="mis. PT Sucofindo"></div>
+                  <div class="field" style="margin-top:8px;"><label>Nama Penandatangan</label><input type="text" id="baNamaLab" placeholder="mis. Rafles Sadrah Ginting"></div>
+                  <div class="field" style="margin-top:8px;"><label>Jabatan</label><input type="text" id="baJabatanLab" placeholder="mis. Ketua Tim Pemantauan Emisi"></div>
+                </div>
+              </div>
+              <div class="field" style="margin-top:10px;"><label>Catatan Kaki Cetak (opsional)</label><textarea id="baFooterNote" rows="2" placeholder="mis. Akan dipantau ketika running hour memenuhi ambang wajib pantau Emergency Engine."></textarea></div>
+              <div class="hint" style="margin-top:8px;">Isian penandatangan &amp; catatan kaki tersimpan otomatis per Tim, jadi tidak perlu diketik ulang saat ganti site/batch.</div>
+            </div>
+            <div class="card">
+              <div class="cardhead"><div><h3>Tabel Titik &amp; Status Pemantauan</h3><div class="hint hd-sub">Seluruh titik terdaftar di site ini, dengan status mengikuti tab <b>Sampling Lapangan</b>. Kolom Status bisa diketik manual (menang atas perhitungan otomatis; kosongkan untuk kembali otomatis). Pratinjau di kanan ikut berubah.</div></div></div>
+              <div class="tablewrap"><table id="baPreviewTable"></table></div>
+            </div>
+          </div>
+          <div class="ba-right">
+            <div class="card ba-previewcard">
+              <div class="cardhead"><div><h3>Pratinjau Berita Acara</h3><div class="hint hd-sub" id="baPaperHint"></div></div>
+                <div class="hd-seg-group" id="baZoomSeg" role="group" aria-label="Zoom pratinjau"><button type="button" class="on" data-action="baSetZoom" data-val="fit">Pas lebar</button><button type="button" data-action="baSetZoom" data-val="100">100%</button></div></div>
+              <div class="ba-paper-wrap" id="baPaperWrap"><div class="ba-paper pg-print-sheet" id="baPaper"></div></div>
+              <div class="ba-paper-note">Garis putus-putus = perkiraan batas halaman A4. Hasil Word &amp; PDF mengalir otomatis mengikuti jumlah baris.</div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="card">
-        <h3>Pratinjau Tabel Titik Lokasi</h3>
-        <div class="hint" style="margin-top:-6px;">Menampilkan SELURUH titik terdaftar di site ini (bukan cuma yang masuk batch terpilih), dengan status pemantauan mengikuti Tahap 1 Sampling Emisi di halaman Tracking. Untuk mengubah status/tanggal/catatan tiap titik, kembali ke halaman Tracking BA/CoA.</div>
-        <div class="tablewrap"><table id="baPreviewTable"></table></div>
+
+      <!-- KOM -->
+      <div class="trk-pane" id="trkPaneKom">
+        <div class="card">
+          <div class="cardhead"><div><h3>KOM (Kick Off Meeting) per Site</h3><div class="hint hd-sub">Catat KOM sekali per site per periode: tanggal, peserta, dan materi. Catatan saat sampling dari Gantt ikut tampil. Export MoM mengikuti filter Tim/Batch/Site di atas.</div></div></div>
+          <div class="tablewrap"><table id="komSiteTable"></table></div>
+        </div>
       </div>
+
     </div>
 
     <!-- DOKUMENTASI FOTO SAMPLING -->
@@ -1982,41 +2012,43 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202610191900"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202610191900"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202610192100"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202610192100"></script>
 
-<script src="assets/data/default-data.js?v=202610191900"></script>
-<script src="assets/data/brand-assets.js?v=202610191900"></script>
-<script src="assets/data/travel-routes.js?v=202610191900"></script>
-<script src="assets/js/00-icons.js?v=202610191900"></script>
-<script src="assets/js/01-state.js?v=202610191900"></script>
-<script src="assets/js/02-nav-util.js?v=202610191900"></script>
-<script src="assets/js/03-period-logic.js?v=202610191900"></script>
-<script src="assets/js/04-dashboard.js?v=202610191900"></script>
-<script src="assets/js/05-master-data.js?v=202610191900"></script>
-<script src="assets/js/06-plan-personil.js?v=202610191900"></script>
-<script src="assets/js/07-rules-planner.js?v=202610191900"></script>
-<script src="assets/js/08-gantt-print.js?v=202610191900"></script>
-<script src="assets/js/09-tracking-map.js?v=202610191900"></script>
-<script src="assets/js/10-running-hour.js?v=202610191900"></script>
-<script src="assets/js/11-berita-acara.js?v=202610191900"></script>
-<script src="assets/js/12-data-page.js?v=202610191900"></script>
-<script src="assets/js/13-hasil-db.js?v=202610191900"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202610191900"></script>
-<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610191900"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202610191900"></script>
-<script src="assets/js/16-actions-init.js?v=202610191900"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202610191900"></script>
-<script src="assets/js/18-model-dispersi.js?v=202610191900"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202610191900"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202610191900"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202610191900"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202610191900"></script>
-<script src="assets/js/23-budget-proyeksi.js?v=202610191900"></script>
-<script src="assets/js/24-personil-ppu.js?v=202610191900"></script>
-<script src="assets/js/25-access-gate.js?v=202610191900"></script>
-<script src="assets/js/26-laboratorium.js?v=202610191900"></script>
-<script src="assets/js/27-laporan-emf.js?v=202610191900"></script>
-<script src="assets/js/28-word-export.js?v=202610191900"></script>
+<script src="assets/data/default-data.js?v=202610192100"></script>
+<script src="assets/data/brand-assets.js?v=202610192100"></script>
+<script src="assets/data/travel-routes.js?v=202610192100"></script>
+<script src="assets/js/00-icons.js?v=202610192100"></script>
+<script src="assets/js/01-state.js?v=202610192100"></script>
+<script src="assets/js/02-nav-util.js?v=202610192100"></script>
+<script src="assets/js/03-period-logic.js?v=202610192100"></script>
+<script src="assets/js/04-dashboard.js?v=202610192100"></script>
+<script src="assets/js/05-master-data.js?v=202610192100"></script>
+<script src="assets/js/06-plan-personil.js?v=202610192100"></script>
+<script src="assets/js/07-rules-planner.js?v=202610192100"></script>
+<script src="assets/js/08-gantt-print.js?v=202610192100"></script>
+<script src="assets/js/09-tracking-map.js?v=202610192100"></script>
+<script src="assets/js/10-running-hour.js?v=202610192100"></script>
+<script src="assets/js/11-berita-acara.js?v=202610192100"></script>
+<script src="assets/js/12-data-page.js?v=202610192100"></script>
+<script src="assets/js/13-hasil-db.js?v=202610192100"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202610192100"></script>
+<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610192100"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202610192100"></script>
+<script src="assets/js/16-actions-init.js?v=202610192100"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202610192100"></script>
+<script src="assets/js/18-model-dispersi.js?v=202610192100"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202610192100"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202610192100"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202610192100"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202610192100"></script>
+<script src="assets/js/23-budget-proyeksi.js?v=202610192100"></script>
+<script src="assets/js/24-personil-ppu.js?v=202610192100"></script>
+<script src="assets/js/25-access-gate.js?v=202610192100"></script>
+<script src="assets/js/26-laboratorium.js?v=202610192100"></script>
+<script src="assets/js/27-laporan-emf.js?v=202610192100"></script>
+<script src="assets/js/28-word-export.js?v=202610192100"></script>
+<script src="assets/js/29-docx-export.js?v=202610192100"></script>
+<script src="assets/js/30-tracking-board.js?v=202610192100"></script>
 </body>
 </html>
