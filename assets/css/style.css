@@ -2731,3 +2731,11 @@ table.daygrid{background:transparent !important;border-spacing:3px 4px !importan
 .labf-actions{margin:0 !important;padding:12px 24px !important;border-radius:0 0 16px 16px !important;align-items:center;}
 .labf-foot-hint{margin-right:auto;font-size:12px;color:var(--gray-500);}
 @media(max-width:640px){.labf-head{flex-wrap:wrap;padding:14px 16px;}.labf-body{padding:14px;}.labf-foot-hint{display:none;}}
+/* Hero Laboratorium tanpa strip/tab di bawah — beri ruang bawah & jarak baris deskripsi supaya tidak mepet tepi */
+.lab-hero{padding-bottom:26px;}
+.lab-hero .hd-hero-top{align-items:center;gap:18px 28px;}
+.lab-hero .hd-hero-title{flex:1 1 520px;}
+.lab-hero h2{margin:8px 0 10px;}
+.lab-hero p{line-height:1.6;max-width:720px;}
+.lab-hero .hd-hero-actions{flex-shrink:0;}
+.lab-kpis .hd-kpi-label{min-height:2.7em;display:flex;align-items:center;}
