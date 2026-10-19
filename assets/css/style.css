@@ -2336,12 +2336,12 @@ table.daygrid{background:transparent !important;border-spacing:3px 4px !importan
 /* =========================================================
    Dashboard Hasil Ambient & Model AQI/ISPU — memakai komponen hd-* yg sama dgn Dashboard Hasil Emisi
 ========================================================= */
-#page-ambiendashboard,#page-aqiispu{--hd-ink:#0f1b2d;--hd-warn:#c2620a;--hd-warn-text:#9a4a06;--hd-bad:#b42318;--hd-good:#146c43;--hd-radius:14px;}
-:root[data-theme="dark"] #page-ambiendashboard,:root[data-theme="dark"] #page-aqiispu{--hd-warn-text:#f0a565;--hd-good:#5fd39a;--hd-bad:#ff8a80;}
-#page-ambiendashboard .card,#page-aqiispu .card{border-radius:var(--hd-radius);}
-#page-ambiendashboard .cardhead,#page-aqiispu .cardhead{gap:14px;margin-bottom:12px;}
-#page-ambiendashboard .cardhead h3,#page-aqiispu .cardhead h3{margin:0;}
-#page-ambiendashboard .hd-sub,#page-aqiispu .hd-sub{margin-top:4px;max-width:880px;}
+#page-ambiendashboard,#page-aqiispu,#page-dispersi{--hd-ink:#0f1b2d;--hd-warn:#c2620a;--hd-warn-text:#9a4a06;--hd-bad:#b42318;--hd-good:#146c43;--hd-radius:14px;}
+:root[data-theme="dark"] #page-ambiendashboard,:root[data-theme="dark"] #page-aqiispu,:root[data-theme="dark"] #page-dispersi{--hd-warn-text:#f0a565;--hd-good:#5fd39a;--hd-bad:#ff8a80;}
+#page-ambiendashboard .card,#page-aqiispu .card,#page-dispersi .card{border-radius:var(--hd-radius);}
+#page-ambiendashboard .cardhead,#page-aqiispu .cardhead,#page-dispersi .cardhead{gap:14px;margin-bottom:12px;}
+#page-ambiendashboard .cardhead h3,#page-aqiispu .cardhead h3,#page-dispersi .cardhead h3{margin:0;}
+#page-ambiendashboard .hd-sub,#page-aqiispu .hd-sub,#page-dispersi .hd-sub{margin-top:4px;max-width:880px;}
 #page-ambiendashboard .field select{max-width:100%;}
 .amb-filter{padding:12px 16px !important;margin-bottom:14px;}
 .amb-filter-fields{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
@@ -2431,3 +2431,107 @@ table.daygrid{background:transparent !important;border-spacing:3px 4px !importan
 .dp-table thead th span:not(.badge),.hd-table thead th span:not(.badge){text-transform:none;letter-spacing:0;}
 .aqi-cmp .dp-table td,.aqi-cmp .dp-table th{padding:8px 10px;}
 .aqi-cmp .dp-table{font-size:12.5px;}
+
+/* =========================================================
+   MODEL DISPERSI & BEBAN EMISI
+========================================================= */
+.dp-seg .btn.active{background:var(--heading);color:var(--surface-card);box-shadow:0 1px 2px rgba(10,22,40,.18);}
+:root[data-theme="dark"] .dp-seg .btn.active{background:var(--teal-500);color:#fff;}
+.dsp-hero-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin:22px -28px 0;background:rgba(255,255,255,.08);border-top:1px solid rgba(255,255,255,.08);}
+.dsp-hero-steps>div{display:flex;align-items:center;gap:10px;padding:13px 28px;background:#0f1b2d;font-size:12.5px;color:#c3cee0;}
+.dsp-hero-steps b{flex-shrink:0;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:rgba(94,234,212,.14);color:#7fe0d0;font-size:12px;}
+.dsp-controls{padding:16px 18px !important;}
+.dsp-ctrl-row{display:flex;flex-wrap:wrap;gap:12px 22px;align-items:flex-end;}
+.dsp-ctrl-row+.dsp-ctrl-row{margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-200);}
+.dsp-ctrl-row .spacer{flex:1;}
+.dsp-ctrl{display:flex;flex-direction:column;gap:6px;min-width:0;margin:0 !important;}
+.dsp-ctrl.field select{min-width:200px;}
+.dsp-ctrl-lbl{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gray-500);}
+.dsp-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.dsp-chips .chip-toggle{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:4px 12px;font-size:12px;}
+#dispersiCustomWindRow{flex-direction:row;}
+.dsp-kpis{margin-top:14px;}
+@media(min-width:1400px){.dsp-kpis{grid-template-columns:repeat(6,minmax(0,1fr));}}
+.dsp-page .hd-kpi-val{font-size:28px;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+.dsp-mapgrid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(320px,1fr);gap:18px;align-items:start;margin-bottom:18px;}
+.dsp-mapgrid>.card,.dsp-side>.card{margin-bottom:0;}
+@media(max-width:1180px){.dsp-mapgrid{grid-template-columns:1fr;}}
+.dsp-map-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.dsp-map{height:520px;border-radius:12px;overflow:hidden;border:1px solid var(--gray-200);background:var(--gray-100);}
+@media(max-width:760px){.dsp-map{height:380px;}}
+.dsp-plume-status{margin-top:8px;font-size:12px;}
+.dsp-param-desc{margin-top:6px;}
+.dsp-side{display:flex;flex-direction:column;gap:18px;min-width:0;}
+.dsp-wind-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:14px;padding-top:12px;border-top:1px solid var(--gray-200);}
+@media(max-width:1180px) and (min-width:700px){.dsp-side{display:grid;grid-template-columns:1fr 1fr;}}
+@media(max-width:480px){.dsp-wind-grid{grid-template-columns:1fr;}}
+.dsp-mini-lbl{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--gray-500);margin-bottom:6px;}
+.dsp-mini-lbl span{text-transform:none;letter-spacing:0;font-weight:500;}
+/* dampak ambien */
+.dsp-imp-peak{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding-bottom:10px;margin-bottom:6px;border-bottom:1px solid var(--gray-200);}
+.dsp-imp-val{font-size:26px;font-weight:800;color:var(--heading);line-height:1.1;}
+.dsp-imp-val small{font-size:12px;font-weight:600;color:var(--gray-500);}
+.dsp-imp-row{padding:7px 0;}
+.dsp-imp-head{display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:4px;}
+.dsp-imp-foot{font-size:11px;color:var(--gray-500);margin-top:3px;}
+.dsp-details{margin-top:8px;font-size:11.5px;color:var(--gray-700);}
+.dsp-details summary{cursor:pointer;font-weight:700;color:var(--heading-2);font-size:12px;}
+.dsp-details p{margin:6px 0 0;line-height:1.55;}
+/* tabel */
+.dsp-tablewrap{overflow-x:auto;max-height:none;}
+.dsp-tablewrap.dsp-scroll{max-height:70vh;}
+.dsp-table{min-width:760px;}
+.dsp-table td.num,.dsp-table th.num{text-align:right;white-space:nowrap;}
+.dsp-table .mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+.dsp-table .muted,.dsp-page .muted{color:var(--gray-500);}
+.dsp-name{display:flex;align-items:center;gap:8px;min-width:0;}
+.dsp-name>div{display:flex;flex-direction:column;min-width:0;}
+.dsp-name small{font-size:11px;color:var(--gray-500);}
+.dsp-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;display:inline-block;margin-right:2px;}
+.dsp-flag{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:9px;background:color-mix(in srgb, var(--teal-500) 12%, var(--surface-card));color:var(--heading-2);white-space:nowrap;cursor:help;vertical-align:middle;}
+.dsp-flag.warn{background:color-mix(in srgb, #f5d9ad 45%, var(--surface-card));color:var(--hd-warn-text);}
+.dsp-share{display:flex;align-items:center;gap:8px;min-width:120px;}
+.dsp-share .track{position:relative;flex:1;height:8px;border-radius:4px;background:var(--gray-200);overflow:visible;}
+.dsp-share .track i{display:block;height:100%;border-radius:4px;}
+.dsp-share .track b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--gray-500);opacity:.55;border-radius:1px;}
+.dsp-share span{font-family:var(--font-mono);font-size:11.5px;min-width:44px;text-align:right;color:var(--gray-700);}
+.dsp-table tr.dsp-total td{background:color-mix(in srgb, var(--heading) 5%, var(--surface-card));border-top:2px solid var(--gray-300);font-weight:600;}
+.dsp-table tr.dsp-nodata td{color:var(--gray-500);}
+.dsp-table tr.dsp-nodata td{font-size:12px;line-height:1.6;background:color-mix(in srgb, var(--gray-200) 30%, var(--surface-card));}
+.dsp-nodata-list{display:inline-flex;flex-wrap:wrap;gap:4px 12px;margin-left:4px;}
+.dsp-nodata-list>span{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
+.dsp-name small .dsp-flag{margin-left:6px;}
+/* bar list & komposisi */
+.dsp-barlist{display:flex;flex-direction:column;gap:12px;}
+.dsp-barrow-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:12.5px;}
+.dsp-barrow-head>span{display:flex;align-items:center;gap:6px;min-width:0;}
+.dsp-barrow-head small{font-weight:500;}
+.dsp-bar{height:10px;border-radius:5px;background:var(--gray-200);margin:5px 0 4px;overflow:hidden;}
+.dsp-bar i{display:block;height:100%;border-radius:5px;}
+.dsp-barrow-foot{display:flex;justify-content:space-between;font-size:11px;color:var(--gray-500);}
+.dsp-sumtotal{margin-top:14px;padding-top:10px;border-top:1px solid var(--gray-200);font-size:12.5px;font-weight:700;color:var(--heading);text-align:right;}
+.dsp-comp-row{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:4px 0;border-bottom:1px dashed var(--gray-200);}
+.dsp-comp-row .dsp-comp-name{flex:1;min-width:0;}
+.dsp-pareto-note{font-size:12.5px;color:var(--gray-700);margin-bottom:6px;padding:8px 12px;border-radius:10px;background:color-mix(in srgb, var(--teal-500) 8%, var(--surface-card));}
+.dsp-pareto-note b{color:var(--heading);font-size:14px;}
+/* inventaris */
+.dsp-colbtn{border:0;background:transparent;color:inherit;font:inherit;font-weight:700;letter-spacing:inherit;text-transform:inherit;cursor:pointer;padding:2px 6px;border-radius:6px;}
+.dsp-colbtn:hover{background:rgba(255,255,255,.12);}
+.dsp-colbtn.on{background:rgba(255,255,255,.2);box-shadow:inset 0 -2px 0 #7fe0d0;}
+.dsp-heat{background:color-mix(in srgb, var(--c) calc(var(--h) * 34%), var(--surface-card));}
+/* contoh hitung */
+.dsp-steps{display:flex;flex-direction:column;gap:0;border:1px solid var(--gray-200);border-radius:12px;overflow:hidden;}
+.dsp-step{display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--gray-200);}
+.dsp-step:last-child{border-bottom:0;background:color-mix(in srgb, var(--teal-500) 7%, var(--surface-card));}
+.dsp-step-n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--heading);color:var(--surface-card);font-size:12px;font-weight:800;}
+.dsp-step-body{display:flex;flex-direction:column;gap:2px;min-width:0;font-size:12.5px;}
+.dsp-step-body small{color:var(--gray-500);font-size:11.5px;line-height:1.45;}
+.dsp-step-val{font-size:13px;font-weight:700;color:var(--heading);text-align:right;white-space:nowrap;}
+@media(max-width:640px){.dsp-step{grid-template-columns:28px minmax(0,1fr);}.dsp-step-val{grid-column:2;text-align:left;white-space:normal;}}
+.dsp-formula{margin:12px 0 16px;padding:12px 16px;border-radius:10px;background:#0f1b2d;color:#e6edf6;font-family:var(--font-mono);font-size:12.5px;line-height:1.6;}
+.dsp-formula .dsp-flag{font-family:var(--font-ui);}
+.dsp-explain,.dsp-about-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;}
+.dsp-explain>div,.dsp-about-grid>div{padding:12px 14px;border:1px solid var(--gray-200);border-radius:12px;background:color-mix(in srgb, var(--heading) 2%, var(--surface-card));}
+.dsp-explain b,.dsp-about-grid b{font-size:13px;color:var(--heading);}
+.dsp-explain p,.dsp-about-grid p{margin:6px 0 0;font-size:12px;line-height:1.6;color:var(--gray-700);}
+.dsp-table .b-pill{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;}

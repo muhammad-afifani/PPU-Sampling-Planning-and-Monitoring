@@ -280,11 +280,22 @@ function dispersiBebanSinglePeriode(stack, param, periode){
   const flowRec = dispersiFlowRecord(stack.id, periode);
   const Qgs = dispersiEmissionRateGs(concRec, flowRec, param);
   if(Qgs==null) return null;
-  const runningHour = concRec.runningHour!=null ? concRec.runningHour : (flowRec.runningHour!=null ? flowRec.runningHour : null);
+  const labRH = concRec.runningHour!=null ? concRec.runningHour : (flowRec.runningHour!=null ? flowRec.runningHour : null);
+  // Kolom Running Hour hasil uji seharusnya "1 tahun terakhir", tapi sebagian CoA mencatat jam
+  // KUMULATIF (mis. sejak overhaul, s/d 16.000+ jam) — mustahil utk 1 tahun (maks 8.784 jam) dan
+  // membuat beban tahunan membengkak s/d ~2x. Nilai seperti itu diganti log RH bulanan semester
+  // tsb (x2, konvensi tahunan yg sama dgn carry-forward), atau dibatasi 8.760 jam bila log kosong.
+  let runningHour = labRH, rhSource = labRH!=null ? "lab" : null, rhNote = null;
+  if(labRH!=null && labRH>8784){
+    const {sem, tahun} = hasilPeriodParts(periode);
+    const semRH = sem!=null ? semesterRhSum(stack.nama, sem, tahun) : null;
+    if(semRH!=null){ runningHour = semRH*2; rhSource = "bulanan"; rhNote = `RH di hasil uji ${dispersiFmt(labRH,0)} jam (>1 tahun, kemungkinan kumulatif) — diganti log RH bulanan ${periode} (${dispersiFmt(semRH,0)} jam x2).`; }
+    else { runningHour = 8760; rhSource = "batas"; rhNote = `RH di hasil uji ${dispersiFmt(labRH,0)} jam (>1 tahun) — dibatasi 8.760 jam/tahun.`; }
+  }
   const bebanJamKg = Qgs*3.6;
   const bebanTahunKg = runningHour!=null ? bebanJamKg*runningHour : null;
   return {
-    stack, param, periode, concRec, flowRec, Qgs, runningHour, bebanJamKg,
+    stack, param, periode, concRec, flowRec, Qgs, runningHour, labRH, rhSource, rhNote, bebanJamKg,
     bebanBulanKg: bebanTahunKg!=null ? bebanTahunKg/12 : null,
     bebanTahunKg, bebanTahunTon: bebanTahunKg!=null ? bebanTahunKg/1000 : null
   };
@@ -331,6 +342,7 @@ function dispersiBebanCarryForward(stack, param, periode){
     const bebanTahunKg = runningHour!=null ? r.bebanJamKg*runningHour : null;
     return {
       ...r, runningHour, carriedFrom: p.periode,
+      rhSource: targetRH!=null ? "bulanan" : r.rhSource, rhNote: targetRH!=null ? null : r.rhNote,
       bebanBulanKg: bebanTahunKg!=null ? bebanTahunKg/12 : null,
       bebanTahunKg, bebanTahunTon: bebanTahunKg!=null ? bebanTahunKg/1000 : null
     };
@@ -360,7 +372,9 @@ function dispersiBebanForSelection(stack, param, sel){
     bebanBulanKg: avg("bebanBulanKg"),
     bebanTahunKg: avg("bebanTahunKg"),
     bebanTahunTon: avg("bebanTahunTon"),
-    carriedFrom: results[results.length-1].carriedFrom || null
+    carriedFrom: results[results.length-1].carriedFrom || null,
+    rhNotes: results.map(r=>r.rhNote).filter(Boolean),
+    rhSource: results[results.length-1].rhSource
   };
 }
 function dispersiComplianceRow(stack, param, sel){
@@ -1031,28 +1045,39 @@ function dispersiComputePlumeNow(){
 function dispersiSelectedStacks(){
   return dispersiStacks().filter(s=>s.site===dispersiState.site && dispersiState.selectedStackIds && dispersiState.selectedStackIds.has(s.id));
 }
+const DSP_PARAM_COLORS = {"NOx":"#c2620a","SO₂":"#7a4bb8","CO":"#3d78c9","Total Partikulat":"#8a5c11","CO₂":"#465468"};
+function dspDot(color){ return `<span class="dsp-dot" style="background:${color}"></span>`; }
+function dspMassParams(){ return Object.keys(DISPERSI_MASS_PARAMS).filter(p=>!DISPERSI_MASS_PARAMS[p].qualitative); }
+// Hasil beban seluruh titik terpilih utk parameter & seleksi aktif, urut terbesar — dipakai bareng
+// oleh tabel, Pareto, KPI, komposisi & contoh perhitungan (satu sumber angka).
+function dspBebanRows(stacks, param, sel){
+  return stacks.map(s=>({s, b: dispersiBebanForSelection(s, param, sel)})).sort((a,c)=>((c.b&&c.b.bebanTahunKg)||0)-((a.b&&a.b.bebanTahunKg)||0));
+}
 function dispersiBebanRowsHtml(stacks, param, sel){
-  const rows = stacks.map(s=>{
-    const b = dispersiBebanForSelection(s, param, sel);
-    const heightNote = s.stackHeightIsDefault ? " title=\"Tinggi cerobong pakai perkiraan standar jenis sumber (belum diinput manual) — lihat Database Titik Pantau.\"" : "";
-    const nameCell = `<span style="width:8px;height:8px;border-radius:50%;background:${s.tipe.color};display:inline-block;margin-right:5px;"></span>${escHtml(s.nama)}<span${heightNote} style="color:var(--gray-500);">${s.stackHeightIsDefault?" ~":""}</span>`;
-    if(!b){
-      return `<tr><td>${nameCell}</td>
-        <td style="text-align:right;">—</td><td style="text-align:right;">—</td><td style="text-align:right;">—</td><td style="text-align:right;">—</td><td style="text-align:right;">—</td><td style="text-align:right;">—</td></tr>`;
-    }
-    // carriedFrom: engine ini tidak wajib/tidak dijadwalkan sampling PERSIS di periode terpilih
-    // (mis. frekuensi 1x/tahun) — hasil terakhirnya (dari periode carriedFrom) masih dipakai,
-    // BUKAN dikosongkan, karena secara teknis nilai itu masih berlaku sampai jadwal berikutnya.
-    const carryNote = b.carriedFrom ? ` <span title="Belum ada sampling baru di periode ini — memakai hasil terakhir dari ${escHtml(b.carriedFrom)}" style="color:var(--amber-500);font-weight:700;cursor:help;">†</span>` : "";
-    return `<tr><td>${nameCell}${carryNote}</td>
-      <td style="text-align:right;font-family:var(--font-mono);">${b.concLabel} <span style="color:var(--gray-500);">${b.unit}</span></td>
-      <td style="text-align:right;font-family:var(--font-mono);color:var(--gray-700);">${b.flowLabel} m³/s</td>
-      <td style="text-align:right;font-family:var(--font-mono);color:var(--gray-700);">${dispersiFmt(b.runningHour,0)} j</td>
-      <td style="text-align:right;font-family:var(--font-mono);">${dispersiFmt(b.bebanJamKg,3)} kg</td>
-      <td style="text-align:right;font-family:var(--font-mono);font-weight:700;">${dispersiFmt(b.bebanBulanKg,1)} kg</td>
-      <td style="text-align:right;font-family:var(--font-mono);font-weight:700;">${dispersiFmt(b.bebanTahunTon,2)} ton</td></tr>`;
+  const rows = dspBebanRows(stacks, param, sel);
+  const total = rows.reduce((a,r)=>a+((r.b&&r.b.bebanTahunKg)||0),0);
+  const html = rows.map(({s,b})=>{
+    const heightNote = s.stackHeightIsDefault ? ` <span class="muted" title="Tinggi cerobong pakai perkiraan standar jenis sumber (belum diinput manual) — lihat Database Titik Pantau.">~</span>` : "";
+    if(!b) return "";
+    const carryNote = b.carriedFrom ? ` <span class="dsp-flag" title="Belum ada sampling baru di periode ini — memakai hasil terakhir dari ${escHtml(b.carriedFrom)}">&dagger; ${escHtml(b.carriedFrom)}</span>` : "";
+    const nameCell = `<div class="dsp-name">${dspDot(s.tipe.color)}<div><b>${escHtml(s.nama)}${heightNote}</b><small>${escHtml(s.tipe.key)}${carryNote}</small></div></div>`;
+    const rhFlag = b.rhNotes && b.rhNotes.length ? ` <span class="dsp-flag warn" title="${escHtml(b.rhNotes.join(" "))}">RH dikoreksi</span>` : b.rhSource==="bulanan" ? ` <span class="dsp-flag" title="Jam operasi dari log Running Hour bulanan">log bulanan</span>` : "";
+    const share = total>0 && b.bebanTahunKg!=null ? b.bebanTahunKg/total*100 : null;
+    return `<tr><td>${nameCell}</td>
+      <td class="num mono">${b.concLabel} <span class="muted">${escHtml(b.unit||"")}</span></td>
+      <td class="num mono">${b.flowLabel} <span class="muted">m³/s</span></td>
+      <td class="num mono">${dispersiFmt(b.Qgs,3)} <span class="muted">g/s</span></td>
+      <td class="num mono">${dispersiFmt(b.runningHour,0)} <span class="muted">j</span>${rhFlag}</td>
+      <td class="num mono">${dispersiFmt(b.bebanJamKg,3)}</td>
+      <td class="num mono"><b>${dispersiFmt(b.bebanBulanKg,1)}</b></td>
+      <td class="num mono"><b>${dispersiFmt(b.bebanTahunTon,2)}</b></td>
+      <td><div class="dsp-share"><div class="track"><i style="width:${share==null?0:Math.min(100,share).toFixed(1)}%;background:${s.tipe.color}"></i></div><span>${share==null?"-":dispersiFmt(share,1)+"%"}</span></div></td></tr>`;
   }).join("");
-  return rows || `<tr><td colspan="7" style="text-align:center;color:var(--gray-500);padding:14px;">Tidak ada titik terpilih.</td></tr>`;
+  const totalRow = total>0 ? `<tr class="dsp-total"><td><b>Total titik terpilih</b></td><td></td><td></td><td class="num mono">${dispersiFmt(rows.reduce((a,r)=>a+((r.b&&r.b.Qgs)||0),0),3)} <span class="muted">g/s</span></td><td></td><td class="num mono">${dispersiFmt(rows.reduce((a,r)=>a+((r.b&&r.b.bebanJamKg)||0),0),3)}</td><td class="num mono"><b>${dispersiFmt(rows.reduce((a,r)=>a+((r.b&&r.b.bebanBulanKg)||0),0),1)}</b></td><td class="num mono"><b>${dispersiFmt(total/1000,2)}</b></td><td>100%</td></tr>` : "";
+  // Titik tanpa data digabung jadi 1 baris ringkas (dulu 1 baris per titik -> tabel didominasi baris kosong).
+  const noData = rows.filter(r=>!r.b);
+  const noDataRow = noData.length ? `<tr class="dsp-nodata"><td colspan="9"><b>${noData.length} titik</b> belum punya data konsentrasi + laju alir ${escHtml(param)} untuk periode ini (dan tidak ada hasil sebelumnya untuk carry-forward): <span class="dsp-nodata-list">${noData.map(r=>`<span>${dspDot(r.s.tipe.color)}${escHtml(r.s.nama)}</span>`).join("")}</span></td></tr>` : "";
+  return (html + totalRow + noDataRow) || `<tr><td colspan="9" class="muted" style="text-align:center;padding:14px;">Tidak ada titik terpilih.</td></tr>`;
 }
 function dispersiComplianceRowsHtml(stacks, sel){
   const params = Object.keys(DISPERSI_MASS_PARAMS).concat(DISPERSI_COMPLIANCE_EXTRA);
@@ -1061,51 +1086,163 @@ function dispersiComplianceRowsHtml(stacks, sel){
     params.forEach(param=>{
       const c = dispersiComplianceRow(s, param, sel);
       if(!c) return;
-      const carryNote = c.carriedFrom ? ` <span title="Belum ada sampling baru di periode ini — memakai hasil terakhir dari ${escHtml(c.carriedFrom)}" style="color:var(--amber-500);font-weight:700;cursor:help;">†</span>` : "";
-      rows.push(`<tr><td style="font-weight:600;">${escHtml(s.nama)}</td><td style="color:var(--gray-700);">${escHtml(param)}${carryNote}</td>
-        <td style="text-align:right;font-family:var(--font-mono);">${c.hasilLabel} ${c.unit}</td>
-        <td style="text-align:right;font-family:var(--font-mono);color:var(--gray-500);">${c.standardLabel}</td>
-        <td style="text-align:right;font-family:var(--font-mono);color:var(--gray-500);">${c.pctLabel}</td>
+      const carryNote = c.carriedFrom ? ` <span class="dsp-flag" title="Belum ada sampling baru di periode ini — memakai hasil terakhir dari ${escHtml(c.carriedFrom)}">&dagger; ${escHtml(c.carriedFrom)}</span>` : "";
+      const pct = c.rec.pctOfStandard;
+      const zone = typeof hdZoneOf==="function" ? hdZoneOf(pct, c.rec.statusBakuMutu) : null;
+      const barColor = zone && typeof HD_ZONES!=="undefined" ? HD_ZONES[zone].color : "#7f8fa0";
+      rows.push(`<tr><td><div class="dsp-name">${dspDot(s.tipe.color)}<b>${escHtml(s.nama)}</b></div></td><td>${escHtml(param)}${carryNote}</td>
+        <td class="num mono">${c.hasilLabel} <span class="muted">${escHtml(c.unit||"")}</span></td>
+        <td class="num mono muted">${c.standardLabel}</td>
+        <td>${pct!=null?`<div class="dsp-share"><div class="track"><i style="width:${Math.min(100,pct).toFixed(1)}%;background:${barColor}"></i><b style="left:70%"></b></div><span>${c.pctLabel}</span></div>`:`<span class="muted">—</span>`}</td>
         <td><span class="b-pill" style="background:${c.statusBg};color:${c.statusColor};">${c.statusLabel}</span></td></tr>`);
     });
   });
-  return rows.join("") || `<tr><td colspan="6" style="text-align:center;color:var(--gray-500);padding:14px;">Tidak ada data kepatuhan pada titik/periode terpilih.</td></tr>`;
+  return rows.join("") || `<tr><td colspan="6" class="muted" style="text-align:center;padding:14px;">Tidak ada data kepatuhan pada titik/periode terpilih.</td></tr>`;
 }
+// Ringkasan lintas site (per jenis sumber / per site) — daftar batang horizontal + angka & porsi.
 function dispersiSummaryTableHtml(stacks, param, sel, groupKey, labelFn, colorFn){
   const groups = {};
   stacks.forEach(s=>{
     const key = groupKey(s);
-    if(!groups[key]) groups[key] = {key, titik:0, bebanBulan:0, bebanTahunTon:0, color: colorFn?colorFn(s):null};
+    if(!groups[key]) groups[key] = {key, titik:0, total:0, bebanBulan:0, bebanTahunTon:0, color: colorFn?colorFn(s):null};
+    groups[key].total++;
     const b = dispersiBebanForSelection(s, param, sel);
     if(b){ groups[key].titik++; groups[key].bebanBulan += b.bebanBulanKg||0; groups[key].bebanTahunTon += b.bebanTahunTon||0; }
   });
-  const list = Object.values(groups).sort((a,b)=>b.bebanBulan-a.bebanBulan);
-  if(!list.length) return `<div class="hint">Tidak ada data.</div>`;
-  return `<table style="width:100%;border-collapse:collapse;font-size:12px;">
-    <thead><tr><th style="text-align:left;padding:6px 4px;color:var(--gray-500);font-size:10.5px;text-transform:uppercase;">${labelFn.head}</th><th style="text-align:right;padding:6px 4px;color:var(--gray-500);font-size:10.5px;text-transform:uppercase;">Titik</th><th style="text-align:right;padding:6px 4px;color:var(--gray-500);font-size:10.5px;text-transform:uppercase;">kg/bln</th><th style="text-align:right;padding:6px 4px;color:var(--gray-500);font-size:10.5px;text-transform:uppercase;">ton/thn</th></tr></thead>
-    <tbody>${list.map(g=>`<tr style="border-top:1px solid var(--gray-200);"><td style="padding:6px 4px;">${g.color?`<span style="width:8px;height:8px;border-radius:50%;background:${g.color};display:inline-block;margin-right:6px;"></span>`:""}${escHtml(labelFn.row(g.key))}</td><td style="text-align:right;padding:6px 4px;color:var(--gray-700);">${g.titik}</td><td style="text-align:right;padding:6px 4px;font-family:var(--font-mono);">${dispersiFmt(g.bebanBulan,1)}</td><td style="text-align:right;padding:6px 4px;font-family:var(--font-mono);font-weight:700;">${dispersiFmt(g.bebanTahunTon,2)}</td></tr>`).join("")}</tbody></table>`;
+  const list = Object.values(groups).filter(g=>g.titik).sort((a,b)=>b.bebanTahunTon-a.bebanTahunTon);
+  if(!list.length) return `<div class="hint">Tidak ada data beban pada periode ini.</div>`;
+  const sum = list.reduce((a,g)=>a+g.bebanTahunTon,0), max = Math.max(...list.map(g=>g.bebanTahunTon), 1e-9);
+  return `<div class="dsp-barlist">${list.map(g=>{
+    const color = g.color || (typeof hdSiteColor==="function" ? hdSiteColor(g.key) : "#3d78c9");
+    return `<div class="dsp-barrow"><div class="dsp-barrow-head"><span>${dspDot(color)}${escHtml(labelFn.row(g.key))} <small class="muted">${g.titik}/${g.total} titik</small></span><b class="mono">${dispersiFmt(g.bebanTahunTon,2)} <small>ton/thn</small></b></div>
+      <div class="dsp-bar"><i style="width:${(g.bebanTahunTon/max*100).toFixed(1)}%;background:${color}"></i></div>
+      <div class="dsp-barrow-foot"><span>${dispersiFmt(g.bebanBulan,1)} kg/bulan</span><span>${sum>0?dispersiFmt(g.bebanTahunTon/sum*100,1):"0"}% dari total</span></div></div>`;
+  }).join("")}</div><div class="dsp-sumtotal">Total ${dispersiFmt(sum,2)} ton/tahun ${escHtml(param)}</div>`;
 }
+// Tren beban per semester (carry-forward, konsisten dgn tabel beban) ditumpuk per jenis sumber.
 function dispersiTrendHtml(){
   const periods = dispersiPeriodList();
   const stacks = dispersiSelectedStacks();
-  const selectedPeriods = dispersiResolveSelection(dispersiState.sel).periods;
-  const vals = periods.map(({periode})=>stacks.reduce((sum,s)=>{
-    const b = dispersiBebanSinglePeriode(s, dispersiState.param, periode);
-    return sum + (b && b.bebanBulanKg!=null ? b.bebanBulanKg : 0);
-  },0));
-  const maxV = Math.max(1, ...vals);
-  return `<div style="display:flex;align-items:flex-end;gap:16px;height:140px;padding:0 6px;">
-    ${periods.map(({periode},i)=>{
-      const inSel = selectedPeriods.includes(periode);
-      const h = Math.round((vals[i]/maxV)*100)+6;
-      return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;">
-        <div style="font-size:10.5px;color:var(--gray-700);font-family:var(--font-mono);">${dispersiFmt(vals[i],1)}</div>
-        <div style="width:34px;border-radius:5px 5px 0 0;height:${h}px;background:${inSel?"var(--teal-500)":"var(--gray-300)"};"></div>
-        <div style="font-size:10.5px;color:var(--gray-500);">${periode}</div>
-      </div>`;
-    }).join("")}
-  </div>
-  <div class="hint" style="margin-top:6px;">kg/bulan (rata-rata dari beban tahunan) &middot; batang teal = termasuk seleksi periode saat ini. Data sampel per semester (~6 bulan), sesuai kadens sampling aktual — bukan data harian/bulanan kalender asli.</div>`;
+  const param = dispersiState.param;
+  const selectedPeriods = (dispersiResolveSelection(dispersiState.sel)||{periods:[]}).periods;
+  if(!periods.length || !stacks.length) return `<div class="hint">Tidak ada titik terpilih.</div>`;
+  const tipes = [...new Map(stacks.map(s=>[s.tipe.key, s.tipe])).values()];
+  const data = periods.map(({periode})=>{
+    const by = {}; let carried = 0;
+    stacks.forEach(s=>{ const r = dispersiBebanCarryForward(s, param, periode); if(r && r.bebanTahunKg!=null){ by[s.tipe.key] = (by[s.tipe.key]||0) + r.bebanTahunKg/2/1000; if(r.carriedFrom) carried++; } });
+    return {periode, by, total: Object.values(by).reduce((a,b)=>a+b,0), carried};
+  });
+  const maxV = Math.max(...data.map(d=>d.total), 1e-9);
+  const yMax = typeof hdNiceMax==="function" ? hdNiceMax(maxV*1.1) : maxV*1.1;
+  const W=1100, H=300, padL=56, padR=16, padT=26, padB=46, plotW=W-padL-padR, plotH=H-padT-padB;
+  const step = plotW/data.length, bw = Math.min(64, step*0.6);
+  let svg = `<svg class="hd-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Tren beban ${escHtml(param)} per semester">`;
+  for(let g=0; g<=4; g++){ const v = yMax*g/4, y = padT+plotH-(v/yMax)*plotH; svg += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" class="hd-grid"/><text x="${padL-8}" y="${(y+4).toFixed(1)}" text-anchor="end" class="hd-axis">${dispersiFmt(v, v<10?2:1)}</text>`; }
+  data.forEach((d,i)=>{
+    const cx = padL+step*i+step/2, inSel = selectedPeriods.includes(d.periode);
+    let yCur = padT+plotH;
+    tipes.forEach(t=>{ const v = d.by[t.key]||0; if(!v) return; const h = v/yMax*plotH; yCur -= h;
+      svg += `<rect x="${(cx-bw/2).toFixed(1)}" y="${yCur.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${t.color}" stroke="var(--surface-card)" stroke-width="1"><title>${escHtml(d.periode)} · ${escHtml(t.key)}: ${dispersiFmt(v,3)} ton</title></rect>`; });
+    if(d.total>0) svg += `<text x="${cx.toFixed(1)}" y="${(yCur-6).toFixed(1)}" text-anchor="middle" class="hd-axis strong">${dispersiFmt(d.total, d.total<10?2:1)}</text>`;
+    svg += `<text x="${cx.toFixed(1)}" y="${H-24}" text-anchor="middle" class="hd-axis ${inSel?"strong":""}">${escHtml(d.periode)}</text>`;
+    if(d.carried) svg += `<text x="${cx.toFixed(1)}" y="${H-10}" text-anchor="middle" class="hd-axis" opacity=".75">${d.carried}&dagger;</text>`;
+    if(inSel) svg += `<rect x="${(cx-step/2+3).toFixed(1)}" y="${padT-14}" width="${(step-6).toFixed(1)}" height="${plotH+14}" fill="none" stroke="var(--teal-500)" stroke-dasharray="4 4" rx="6"/>`;
+  });
+  svg += `<text x="${padL}" y="12" class="hd-axis">ton ${escHtml(param)} per semester</text></svg>`;
+  const legend = tipes.map(t=>`<span class="item"><span class="sw" style="background:${t.color}"></span>${escHtml(t.key)}</span>`).join("") + `<span class="item muted">Kotak putus-putus = periode terpilih &middot; n&dagger; = jumlah titik carry-forward</span>`;
+  return svg + `<div class="legend">${legend}</div>`;
+}
+function dspParetoHtml(rows, param){
+  const data = rows.filter(r=>r.b && r.b.bebanTahunKg>0).map(r=>({s:r.s, v:r.b.bebanTahunKg/1000}));
+  if(!data.length) return hdEmpty ? hdEmpty("Tidak ada beban terhitung untuk titik terpilih.") : "";
+  const total = data.reduce((a,d)=>a+d.v,0);
+  let cum = 0; data.forEach(d=>{ cum += d.v; d.cum = cum/total*100; });
+  const n80 = data.findIndex(d=>d.cum>=80)+1;
+  const W=780, H=300, padL=54, padR=46, padT=18, padB=86, plotW=W-padL-padR, plotH=H-padT-padB;
+  const yMax = typeof hdNiceMax==="function" ? hdNiceMax(data[0].v*1.08) : data[0].v*1.08;
+  const step = plotW/data.length, bw = Math.max(4, Math.min(42, step*0.7));
+  const x = i=>padL+step*i+step/2, y = v=>padT+plotH-(v/yMax)*plotH, yp = p=>padT+plotH-(p/100)*plotH;
+  let svg = `<svg class="hd-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Pareto beban ${escHtml(param)}">`;
+  for(let g=0; g<=4; g++){ const v = yMax*g/4, yy = y(v); svg += `<line x1="${padL}" y1="${yy.toFixed(1)}" x2="${W-padR}" y2="${yy.toFixed(1)}" class="hd-grid"/><text x="${padL-8}" y="${(yy+4).toFixed(1)}" text-anchor="end" class="hd-axis">${dispersiFmt(v, v<10?2:1)}</text><text x="${W-padR+6}" y="${(yp(g*25)+4).toFixed(1)}" class="hd-axis">${g*25}%</text>`; }
+  if(n80>0){ const xr = padL+step*n80; svg += `<rect x="${padL}" y="${padT}" width="${(xr-padL).toFixed(1)}" height="${plotH}" fill="var(--teal-500)" opacity=".06"/><line x1="${padL}" y1="${yp(80).toFixed(1)}" x2="${W-padR}" y2="${yp(80).toFixed(1)}" stroke="#c2620a" stroke-dasharray="5 4" stroke-width="1.4"/><text x="${W-padR-4}" y="${(yp(80)-6).toFixed(1)}" text-anchor="end" class="hd-warn-label">80% beban</text>`; }
+  data.forEach((d,i)=>{
+    svg += `<rect x="${(x(i)-bw/2).toFixed(1)}" y="${y(d.v).toFixed(1)}" width="${bw.toFixed(1)}" height="${(padT+plotH-y(d.v)).toFixed(1)}" rx="3" fill="${d.s.tipe.color}"><title>${escHtml(d.s.nama)}: ${dispersiFmt(d.v,3)} ton/tahun (${dispersiFmt(d.v/total*100,1)}%, kumulatif ${dispersiFmt(d.cum,1)}%)</title></rect>`;
+    if(data.length<=24) svg += `<text transform="translate(${x(i).toFixed(1)},${padT+plotH+10}) rotate(-38)" text-anchor="end" class="hd-axis">${escHtml(d.s.nama.length>18?d.s.nama.slice(0,17)+"…":d.s.nama)}</text>`;
+  });
+  svg += `<path d="${data.map((d,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${yp(d.cum).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--heading)" stroke-width="2"/>`;
+  data.forEach((d,i)=>{ svg += `<circle cx="${x(i).toFixed(1)}" cy="${yp(d.cum).toFixed(1)}" r="3" fill="var(--heading)"/>`; });
+  svg += `<text x="${padL}" y="12" class="hd-axis">ton/tahun</text><text x="${W-padR}" y="12" text-anchor="end" class="hd-axis">kumulatif</text></svg>`;
+  return `<div class="dsp-pareto-note"><b>${n80}</b> dari ${data.length} titik menyumbang &ge;80% beban ${escHtml(param)} titik terpilih (${dispersiFmt(total,2)} ton/tahun).</div>${svg}`;
+}
+function dspCompositionHtml(rows){
+  const by = {}; rows.forEach(({s,b})=>{ if(b && b.bebanTahunKg>0){ const k = s.tipe.key; by[k] = by[k] || {v:0, color:s.tipe.color, n:0}; by[k].v += b.bebanTahunKg/1000; by[k].n++; } });
+  const seg = Object.entries(by).sort((a,c)=>c[1].v-a[1].v);
+  if(!seg.length) return `<div class="hint">Tidak ada data.</div>`;
+  const total = seg.reduce((a,[,g])=>a+g.v,0);
+  const d = ambBuildDonut(seg.map(([k,g])=>[k, Math.round(g.v*1000)/1000, g.color]), dispersiFmt(total, total<10?2:1), "ton/tahun");
+  return `${d.svg}<div class="dsp-barlist" style="margin-top:8px;">${seg.map(([k,g])=>`<div class="dsp-comp-row">${dspDot(g.color)}<span class="dsp-comp-name">${escHtml(k)} <small class="muted">${g.n} titik</small></span><b class="mono">${dispersiFmt(g.v/total*100,1)}%</b></div>`).join("")}</div>`;
+}
+function dspInventoryHtml(stacks, sel){
+  const params = dspMassParams();
+  const rows = stacks.map(s=>({s, vals: params.map(p=>{ const b = dispersiBebanForSelection(s, p, sel); return b && b.bebanTahunTon!=null ? b.bebanTahunTon : null; })})).filter(r=>r.vals.some(v=>v!=null));
+  if(!rows.length) return `<div class="hint">Tidak ada data beban untuk titik terpilih.</div>`;
+  const totals = params.map((p,i)=>rows.some(r=>r.vals[i]!=null) ? rows.reduce((a,r)=>a+(r.vals[i]||0),0) : null);
+  const maxBy = params.map((p,i)=>Math.max(...rows.map(r=>r.vals[i]||0), 1e-9));
+  rows.sort((a,c)=>(c.vals[0]||0)-(a.vals[0]||0));
+  const head = `<tr><th>Titik</th>${params.map(p=>`<th class="num"><button type="button" class="dsp-colbtn ${p===dispersiState.param?"on":""}" data-action="dispersiSetParam" data-val="${escHtml(p)}">${escHtml(DISPERSI_MASS_PARAMS[p].label)}</button></th>`).join("")}</tr>`;
+  const body = rows.map(r=>`<tr><td><div class="dsp-name">${dspDot(r.s.tipe.color)}<b>${escHtml(r.s.nama)}</b></div></td>${r.vals.map((v,i)=>v==null?`<td class="num muted">—</td>`:`<td class="num mono dsp-heat" style="--h:${(v/maxBy[i]).toFixed(3)};--c:${DSP_PARAM_COLORS[params[i]]||"#3d78c9"}">${dispersiFmt(v, v<1?3:2)}</td>`).join("")}</tr>`).join("");
+  const foot = `<tr class="dsp-total"><td><b>Total (ton/tahun)</b></td>${totals.map(t=>t==null?`<td class="num muted">—</td>`:`<td class="num mono"><b>${dispersiFmt(t, t<1?3:2)}</b></td>`).join("")}</tr>`;
+  return `<div class="tablewrap dsp-tablewrap"><table class="dp-table dsp-table">${`<thead>${head}</thead>`}<tbody>${body}${foot}</tbody></table></div>
+    <div class="hint" style="margin-top:6px;">Intensitas warna sel = besar beban relatif dalam kolom parameter tsb. CO&#8322; dicatat dalam % volume dan dikonversi ke mg/Nm&sup3; (massa molar 44 g/mol) sebelum dihitung bebannya.</div>`;
+}
+function dspCalcHtml(rows, param, sel){
+  const opts = rows.filter(r=>r.b);
+  const intro = `<div class="dsp-explain">
+      <div><b>Apa itu beban emisi?</b><p>Massa pencemar yang dilepas sebuah sumber dalam satuan waktu (kg/jam, ton/tahun). Berbeda dengan <i>konsentrasi</i> (mg/Nm&sup3;) yang hanya menunjukkan kepekatan gas buang: cerobong dengan konsentrasi rendah tetapi laju alir besar dan jam operasi panjang bisa menghasilkan beban jauh lebih besar.</p></div>
+      <div><b>Kenapa penting?</b><p>Beban dipakai untuk inventaris emisi &amp; pelaporan (mis. SIMPEL/PPU, laporan RKL-RPL), menentukan prioritas pengendalian (sumber mana paling berpengaruh), dan untuk CO&#8322; sebagai dasar perhitungan emisi gas rumah kaca.</p></div>
+      <div><b>Asumsi &amp; keterbatasan</b><p>Laju alir (m&sup3;/s aktual) diperlakukan setara Nm&sup3;/s tanpa koreksi suhu/tekanan/O&#8322;; konsentrasi hasil sekali sampling dianggap mewakili seluruh jam operasi; jam operasi dari Running Hour (hasil uji atau log bulanan). Hasil adalah estimasi, bukan pengukuran kontinu (CEMS).</p></div>
+    </div>`;
+  if(!opts.length) return intro + `<div class="hint">Belum ada titik dengan data lengkap untuk contoh perhitungan.</div>`;
+  const cur = opts.find(r=>String(r.s.id)===String(dispersiState.calcStackId)) || opts[0];
+  dispersiState.calcStackId = cur.s.id;
+  const b = cur.b, r = b.latest;
+  const c = dispersiConcMgNm3(r.concRec, param), q = r.flowRec.resultNumeric;
+  const isCO2 = DISPERSI_MASS_PARAMS[param] && DISPERSI_MASS_PARAMS[param].molarMassGMol && r.concRec.unit==="%";
+  const steps = [
+    ["Konsentrasi", isCO2 ? `${dispersiFmt(r.concRec.resultNumeric,2)} % vol &times; 10.000 &times; 44,01 &divide; 22,414` : `hasil uji ${escHtml(r.concRec.periode||"")}`, `${dispersiFmt(c,2)} mg/Nm&sup3;`],
+    ["Laju alir gas buang", `hasil uji "Laju Alir (v)"`, `${dispersiFmt(q,3)} m&sup3;/s`],
+    ["Laju emisi", `${dispersiFmt(c,2)} mg/m&sup3; &times; ${dispersiFmt(q,3)} m&sup3;/s &divide; 1.000`, `${dispersiFmt(r.Qgs,4)} g/s`],
+    ["Beban per jam", `${dispersiFmt(r.Qgs,4)} g/s &times; 3.600 s &divide; 1.000`, `${dispersiFmt(r.bebanJamKg,3)} kg/jam`],
+    ["Jam operasi setahun", r.rhNote ? escHtml(r.rhNote) : r.rhSource==="bulanan" ? "log Running Hour bulanan (semester &times; 2)" : "Running Hour 1 tahun terakhir pada hasil uji", `${dispersiFmt(r.runningHour,0)} jam`],
+    ["Beban per tahun", `${dispersiFmt(r.bebanJamKg,3)} kg/jam &times; ${dispersiFmt(r.runningHour,0)} jam`, `${dispersiFmt(r.bebanTahunKg,1)} kg = <b>${dispersiFmt(r.bebanTahunTon,3)} ton</b>`],
+    ["Beban per bulan / semester", `beban tahunan &divide; 12 / &divide; 2`, `${dispersiFmt(r.bebanBulanKg,1)} kg/bulan &middot; ${dispersiFmt(r.bebanTahunKg!=null?r.bebanTahunKg/2:null,1)} kg/semester`]
+  ];
+  const sel2 = `<div class="field" style="max-width:420px;margin:0 0 12px;"><label>Contoh titik</label><select id="dspCalcSel">${opts.map(o=>`<option value="${o.s.id}" ${o.s.id===cur.s.id?"selected":""}>${escHtml(o.s.nama)} — ${dispersiFmt(o.b.bebanTahunTon,2)} ton/thn</option>`).join("")}</select></div>`;
+  return `${sel2}<div class="dsp-steps">${steps.map(([t,f,v],i)=>`<div class="dsp-step"><span class="dsp-step-n">${i+1}</span><div class="dsp-step-body"><b>${t}</b><small>${f}</small></div><div class="dsp-step-val mono">${v}</div></div>`).join("")}</div>
+    <div class="dsp-formula">Beban (kg/tahun) = C (mg/Nm&sup3;) &times; Q (m&sup3;/s) &times; 3,6 &times; Jam operasi (jam/tahun) &divide; 1.000${r.carriedFrom?` &nbsp;&middot;&nbsp; <span class="dsp-flag">&dagger; konsentrasi &amp; laju alir dari ${escHtml(r.carriedFrom)}</span>`:""}</div>
+    ${intro}`;
+}
+function dspBebanKpisHtml(rows, param, sel){
+  const withB = rows.filter(r=>r.b);
+  if(!withB.length) return "";
+  const tonTotal = withB.reduce((a,r)=>a+(r.b.bebanTahunTon||0),0);
+  const kgJam = withB.reduce((a,r)=>a+(r.b.bebanJamKg||0),0);
+  const top = withB[0];
+  const share = tonTotal>0 ? (top.b.bebanTahunTon||0)/tonTotal*100 : 0;
+  const carried = withB.filter(r=>r.b.carriedFrom).length;
+  const rhFixed = withB.filter(r=>r.b.rhNotes && r.b.rhNotes.length).length;
+  const allSites = dispersiStacks().reduce((a,s)=>{ const b = dispersiBebanForSelection(s, param, sel); return a + ((b&&b.bebanTahunTon)||0); }, 0);
+  const periods = dispersiPeriodList();
+  const trend = periods.map(({periode})=>withB.reduce((a,r)=>{ const x = dispersiBebanCarryForward(r.s, param, periode); return a + ((x&&x.bebanTahunKg)||0)/1000; },0));
+  const k = (o)=>hdKpi(o);
+  return [
+    k({label:`Beban ${escHtml(param)} · ${escHtml(dispersiState.site||"")}`, icon:HD_IC.gauge, value:dispersiFmt(tonTotal, tonTotal<10?2:1), suffix:" ton/thn", spark: hdSpark(trend, {color:"var(--heading-2)", label:"Beban tahunan per periode"}), foot:`${withB.length} titik terpilih &middot; ${dispersiFmt(tonTotal*1000/12,1)} kg/bulan`}),
+    k({label:"Laju Beban Gabungan", icon:HD_IC.trend, value:dispersiFmt(kgJam, kgJam<10?2:1), suffix:" kg/jam", foot:`saat semua titik terpilih beroperasi &middot; ${dispersiFmt(kgJam/3.6,2)} g/s`}),
+    k({label:"Penyumbang Terbesar", icon:HD_IC.alert, tone: share>=50?"warn":"", value: escHtml(top.s.nama.length>16?top.s.nama.slice(0,15)+"…":top.s.nama), foot:`${dispersiFmt(share,1)}% beban &middot; ${dispersiFmt(top.b.bebanTahunTon,2)} ton/thn &middot; ${escHtml(top.s.tipe.key)}`}),
+    k({label:"Porsi terhadap Semua Site", icon:HD_IC.db, value: allSites>0?dispersiFmt(tonTotal/allSites*100,1)+"%":"-", foot:`Total semua site ${dispersiFmt(allSites, allSites<10?2:1)} ton/thn ${escHtml(param)}`}),
+    k({label:"Data Carry-forward", icon:HD_IC.clock, value: carried, suffix:` dari ${withB.length}`, foot: carried?"memakai hasil sampling periode sebelumnya (jadwal 1x/tahun)":"semua titik punya sampling di periode ini"}),
+    k({label:"Koreksi Jam Operasi", icon:HD_IC.shield, tone: rhFixed?"warn":"", value: rhFixed, suffix:" titik", foot: rhFixed?"RH hasil uji >1 tahun (kumulatif) diganti log RH bulanan":"tidak ada RH hasil uji yang janggal"})
+  ].join("");
 }
 // Wind rose SEBENARNYA (polar diagram baku ilmu meteorologi): 8 arah mata angin, tiap "petal"
 // ditumpuk (stacked) per kelas kecepatan angin — bukan cuma 1 batang polos spt sebelumnya. Dibangun
@@ -1186,29 +1323,43 @@ function dispersiWindTrendHtml(history){
 // nilai riil ug/m3 bukan sekadar skala warna) thd baku mutu ambien — mengisi ruang kosong panel
 // Data Angin sekaligus memberi konteks "seberapa besar dampaknya" spt diminta, dgn disclaimer jelas
 // ini estimasi screening (bukan simulasi meteorologi tahunan penuh spt AERMOD regulatory).
+// Faktor konversi waktu rata-rata (screening, US EPA AERSCREEN — flat terrain): puncak model
+// steady-state ~1 jam dikali faktor ini sebelum dibandingkan ke baku mutu ber-periode lebih panjang.
+// Dulu puncak 1 jam mode Live langsung dibandingkan ke baku mutu 24 jam/tahunan -> % baku mutu
+// terlihat 2,5-10x lebih besar dari seharusnya.
+const DISPERSI_AVG_FACTORS = {"1 jam":1, "3 jam":1, "8 jam":0.9, "24 jam":0.6, "1 tahun":0.1};
 function dispersiAmbientImpactHtml(){
-  if(dispersiIsQualitativeMode()) return `<div class="hint">Perbandingan baku mutu ambien tidak berlaku utk mode "${escHtml(dispersiCurrentParamMeta().label)}" (pola relatif, bukan konsentrasi massa) — pilih parameter pencemar bersatuan massa (NOx/SO₂/CO/Partikulat).</div>`;
+  if(dispersiIsQualitativeMode()) return `<div class="hint">Perbandingan baku mutu ambien tidak berlaku utk mode "${escHtml(dispersiCurrentParamMeta().label)}" (pola relatif, bukan konsentrasi massa) — pilih parameter bersatuan massa (NOx/SO₂/CO/Partikulat).</div>`;
   const std = DISPERSI_AMBIENT_STD[dispersiState.param];
-  if(!std) return "";
+  if(!std) return `<div class="hint">${escHtml(dispersiState.param)} tidak memiliki baku mutu udara ambien (bukan pencemar kriteria) — tetap dihitung sebagai beban emisi di bagian Beban Emisi.</div>`;
   const peak = dispersiState.lastPeakConcUgm3;
   if(peak==null) return `<div class="hint">Belum ada plume terhitung pada titik/angin saat ini.</div>`;
+  // Mode Live = 1 kombinasi angin (puncak ~1 jam) -> pakai faktor screening. Mode Periode/Kustom =
+  // grid sudah rata-rata tertimbang frekuensi seluruh jam angin di rentang itu (estimasi rata-rata
+  // periode), jadi dibandingkan apa adanya; utk baku mutu jangka pendek ini cenderung under-estimate.
+  const live = dispersiState.windMode==="live";
   const rows = [];
-  Object.entries(std.pp22||{}).forEach(([period,val])=>rows.push({source:"PP 22/2021 Lampiran VII", period, val}));
+  Object.entries(std.pp22||{}).forEach(([period,val])=>rows.push({source:"PP 22/2021", period, val}));
   Object.entries(std.epa||{}).forEach(([period,val])=>rows.push({source:"US EPA NAAQS", period, val}));
-  return `
-    <div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;letter-spacing:.02em;margin-bottom:3px;">Konsentrasi Puncak Terdekat Sumber &middot; ${escHtml(std.ambientLabel)}</div>
-    <div style="font-family:var(--font-mono);font-size:19px;font-weight:800;color:var(--heading);margin-bottom:4px;">${dispersiFmt(peak,1)} <span style="font-size:11px;font-weight:600;color:var(--gray-500);">µg/m³</span></div>
-    ${std.category?`<div style="font-size:10px;color:var(--gray-500);line-height:1.5;margin-bottom:7px;">${escHtml(std.category)}</div>`:""}
-    <table style="width:100%;border-collapse:collapse;font-size:10.5px;">
-      <thead><tr><th style="text-align:left;padding:2px 4px;color:var(--gray-500);font-weight:600;">Acuan</th><th style="text-align:right;padding:2px 4px;color:var(--gray-500);font-weight:600;">Ambang</th><th style="text-align:right;padding:2px 4px;color:var(--gray-500);font-weight:600;">%</th></tr></thead>
-      <tbody>${rows.map(r=>{
-        const pct = Math.round(peak/r.val*1000)/10;
-        const color = pct>100?"#a02a24":pct>50?"#8a5c11":"#1c7a4f";
-        return `<tr style="border-top:1px solid var(--gray-200);"><td style="padding:2px 4px;">${escHtml(r.source)} <span style="color:var(--gray-500);">(${escHtml(r.period)})</span></td><td style="text-align:right;padding:2px 4px;font-family:var(--font-mono);">${dispersiFmt(r.val,0)}</td><td style="text-align:right;padding:2px 4px;font-family:var(--font-mono);font-weight:700;color:${color};">${dispersiFmt(pct,0)}%</td></tr>`;
-      }).join("")}</tbody>
-    </table>
-    <div class="hint" style="margin-top:6px;">Sumber ambang: <b>PP Nomor 22 Tahun 2021 tentang Penyelenggaraan Perlindungan dan Pengelolaan Lingkungan Hidup, Lampiran VII (Baku Mutu Udara Ambien Nasional)</b>, dan <b>US EPA National Ambient Air Quality Standards (NAAQS)</b> berdasar Clean Air Act (40 CFR Part 50). Nilai TERTINGGI di mana pun dalam tampilan peta saat ini (biasanya persis di dekat cerobong, bukan di lokasi reseptor publik) — estimasi screening 1 kombinasi angin+stabilitas dari mode ${dispersiWindModeLabel(dispersiState.windMode)}, bukan rata-rata 24 jam/tahunan tervalidasi. Kajian AMDAL/kepatuhan resmi perlu simulasi meteorologi per jam min. 1 tahun (AERMOD penuh); silangkan angka baku mutu di atas ke teks resmi PP 22/2021 Lampiran VII sebelum dipakai pelaporan.</div>
-  `;
+  const body = rows.map(r=>{
+    const f = live ? (DISPERSI_AVG_FACTORS[r.period]!=null ? DISPERSI_AVG_FACTORS[r.period] : 1) : 1;
+    const est = peak*f, pct = est/r.val*100;
+    const zone = hdZoneOf(pct, null), color = HD_ZONES[zone].color;
+    return `<div class="dsp-imp-row">
+      <div class="dsp-imp-head"><span><b>${escHtml(r.source)}</b> <small class="muted">${escHtml(r.period)}</small></span><b class="mono" style="color:${color}">${dispersiFmt(pct, pct<10?1:0)}%</b></div>
+      <div class="dsp-share"><div class="track"><i style="width:${Math.min(100,pct).toFixed(1)}%;background:${color}"></i><b style="left:70%"></b></div></div>
+      <div class="dsp-imp-foot mono">${dispersiFmt(est, est<10?2:1)}${live&&f!==1?` <span class="muted">(&times;${String(f).replace(".",",")})</span>`:""} / ${dispersiFmt(r.val,0)} µg/m&sup3;</div>
+    </div>`;
+  }).join("");
+  return `<div class="dsp-imp-peak"><div><div class="dsp-mini-lbl">${live?"Puncak 1 jam":"Puncak rata-rata periode"} &middot; ${escHtml(std.ambientLabel)}</div>
+      <div class="dsp-imp-val mono">${dispersiFmt(peak, peak<10?2:1)} <small>µg/m&sup3;</small></div></div>
+      <span class="dsp-flag">${escHtml(dispersiWindModeLabel(dispersiState.windMode))}</span></div>
+    ${body}
+    <details class="dsp-details"><summary>Cara membaca &amp; sumber ambang</summary>
+      ${std.category?`<p>${escHtml(std.category)}</p>`:""}
+      <p>${live?`Mode Live memodelkan <b>satu</b> kombinasi angin + stabilitas (setara rata-rata ~1 jam). Untuk baku mutu ber-periode lebih panjang, puncak dikonversi dengan faktor screening US EPA AERSCREEN (3 jam &times;1,0 &middot; 8 jam &times;0,9 &middot; 24 jam &times;0,6 &middot; 1 tahun &times;0,1).`:`Mode ${escHtml(dispersiWindModeLabel(dispersiState.windMode))} merata-ratakan sebaran dari seluruh data angin per jam di rentang tersebut (tertimbang frekuensi) — mendekati rata-rata periode, sehingga dibandingkan langsung. Untuk baku mutu 1 jam/8 jam nilai ini cenderung lebih rendah dari puncak sesaat.`}</p>
+      <p>Nilai adalah konsentrasi TERTINGGI di area peta (umumnya dekat cerobong, bukan lokasi reseptor publik). Acuan: PP 22/2021 Lampiran VII (Baku Mutu Udara Ambien Nasional) dan US EPA NAAQS (40 CFR Part 50). Estimasi screening — kajian AMDAL/kepatuhan resmi memerlukan simulasi meteorologi per jam minimal 1 tahun (AERMOD).</p>
+    </details>`;
 }
 function dispersiWindPanelHtml(){
   const s = dispersiState;
@@ -1261,36 +1412,35 @@ function dispersiDashboardStatsHtml(){
   const stacks = dispersiSelectedStacks();
   const totalEmisi = dispersiStacks().filter(s=>s.site===dispersiState.site).length;
   const sel = dispersiResolveSelection(dispersiState.sel);
-  const windNow = dispersiState.windMode==="live"
-    ? (dispersiState.wind.speed!=null ? `${dispersiFmt(dispersiState.wind.speed,1)} m/s, dari ${dispersiCompassLabel(dispersiState.wind.dirFrom)}` : "—")
-    : (dispersiActiveWindAgg().avgSpeed!=null ? `${dispersiFmt(dispersiActiveWindAgg().avgSpeed,1)} m/s, dominan ${dispersiActiveWindAgg().dominantLabel}` : "—");
+  const live = dispersiState.windMode==="live", agg = dispersiActiveWindAgg();
+  const windVal = live ? (dispersiState.wind.speed!=null ? dispersiFmt(dispersiState.wind.speed,1) : "—") : (agg.avgSpeed!=null ? dispersiFmt(agg.avgSpeed,1) : "—");
+  const windFoot = live ? (dispersiState.wind.dirFrom!=null ? `dari ${dispersiCompassLabel(dispersiState.wind.dirFrom)} (${Math.round(dispersiState.wind.dirFrom)}°) &middot; Open-Meteo live` : "menunggu data angin")
+    : (agg.avgSpeed!=null ? `dominan ${escHtml(agg.dominantLabel||"—")} &middot; rata-rata ${escHtml(dispersiWindModeLabel(dispersiState.windMode))}` : "data angin belum dimuat");
+  const stab = (DISPERSI_STABILITY_CLASSES.find(c=>c.key===dispersiState.stability)||{});
+  const tiles = [];
+  const modeLabel = dispersiCurrentParamMeta().label;
   if(dispersiIsQualitativeMode()){
     const withData = stacks.filter(s=>dispersiQgsForStack(s, dispersiState.param, sel)!=null).length;
-    const modeLabel = dispersiCurrentParamMeta().label;
-    return `<div class="grid cols-4">
-      <div class="stat"><div class="num">${withData}/${totalEmisi}</div><div class="lbl">Titik dgn Data &middot; ${escHtml(dispersiState.site||"")}</div></div>
-      <div class="stat"><div class="num">${stacks.length}</div><div class="lbl">Titik Ditampilkan di Peta</div></div>
-      <div class="stat"><div class="num">${escHtml(dispersiState.stability)}</div><div class="lbl">Kelas Stabilitas Atmosfer</div></div>
-      <div class="stat"><div class="num">${dispersiWindModeLabel(dispersiState.windMode)}</div><div class="lbl">Sumber Angin Plume</div></div>
-    </div>
-    <div class="hint" style="margin-top:8px;">Mode ${escHtml(modeLabel)}: pola sebaran relatif, bukan beban pencemar teregulasi. Angin saat ini (${dispersiState.windMode==="live"?"Live":"rata-rata "+dispersiWindModeLabel(dispersiState.windMode)}): <b>${windNow}</b> &middot; Periode data: <b>${escHtml(dispersiSelectionLabel(dispersiState.sel))}</b></div>`;
-  }
-  let withData=0, bebanBulanTotal=0, bebanTahunTotal=0, exceedCount=0;
-  stacks.forEach(s=>{
-    const b = dispersiBebanForSelection(s, dispersiState.param, sel);
-    if(b){ withData++; bebanBulanTotal+=b.bebanBulanKg||0; bebanTahunTotal+=b.bebanTahunTon||0; }
-    Object.keys(DISPERSI_MASS_PARAMS).concat(DISPERSI_COMPLIANCE_EXTRA).forEach(p=>{
-      const c = dispersiComplianceRow(s, p, sel);
-      if(c && c.rec.statusBakuMutu==="exceed") exceedCount++;
+    tiles.push(hdKpi({label:`Titik dgn Data · ${escHtml(dispersiState.site||"")}`, icon:HD_IC.db, value:withData, suffix:` / ${totalEmisi}`, foot:`${stacks.length} titik ditampilkan di peta`}));
+    tiles.push(hdKpi({label:"Mode Tampilan", icon:HD_IC.spark, value:escHtml(hdTrunc(modeLabel,18)), foot:"pola sebaran relatif, bukan beban pencemar"}));
+  } else {
+    let withData=0, bebanBulanTotal=0, bebanTahunTotal=0, exceedCount=0, checked=0;
+    stacks.forEach(s=>{
+      const b = dispersiBebanForSelection(s, dispersiState.param, sel);
+      if(b){ withData++; bebanBulanTotal+=b.bebanBulanKg||0; bebanTahunTotal+=b.bebanTahunTon||0; }
+      Object.keys(DISPERSI_MASS_PARAMS).concat(DISPERSI_COMPLIANCE_EXTRA).forEach(p=>{
+        const c = dispersiComplianceRow(s, p, sel);
+        if(c){ checked++; if(c.rec.statusBakuMutu==="exceed") exceedCount++; }
+      });
     });
-  });
-  return `<div class="grid cols-4">
-    <div class="stat"><div class="num">${withData}/${totalEmisi}</div><div class="lbl">Titik dgn Data Dispersi &middot; ${escHtml(dispersiState.site||"")}</div></div>
-    <div class="stat good"><div class="num">${dispersiFmt(bebanBulanTotal,1)}</div><div class="lbl">Total kg ${escHtml(dispersiState.param)}/bulan (terpilih)</div></div>
-    <div class="stat"><div class="num">${dispersiFmt(bebanTahunTotal,2)}</div><div class="lbl">Total ton ${escHtml(dispersiState.param)}/tahun (terpilih)</div></div>
-    <div class="stat ${exceedCount?"bad":"good"}"><div class="num">${exceedCount}</div><div class="lbl">Parameter Melebihi Baku Mutu</div></div>
-  </div>
-  <div class="hint" style="margin-top:8px;">Angin saat ini (${dispersiState.windMode==="live"?"Live":"rata-rata "+dispersiWindModeLabel(dispersiState.windMode)}): <b>${windNow}</b> &middot; Periode data: <b>${escHtml(dispersiSelectionLabel(dispersiState.sel))}</b></div>`;
+    tiles.push(hdKpi({label:`Titik dgn Data · ${escHtml(dispersiState.site||"")}`, icon:HD_IC.db, value:withData, suffix:` / ${totalEmisi}`, foot:`${stacks.length} titik dipilih di peta`}));
+    tiles.push(hdKpi({label:`Beban ${escHtml(dispersiState.param)} / tahun`, icon:HD_IC.gauge, value:dispersiFmt(bebanTahunTotal, bebanTahunTotal<10?2:1), suffix:" ton", foot:`titik terpilih &middot; ${escHtml(dispersiSelectionLabel(dispersiState.sel))}`}));
+    tiles.push(hdKpi({label:`Beban ${escHtml(dispersiState.param)} / bulan`, icon:HD_IC.trend, value:dispersiFmt(bebanBulanTotal, bebanBulanTotal<100?1:0), suffix:" kg", foot:"rata-rata = beban tahunan &divide; 12"}));
+    tiles.push(hdKpi({label:"Melebihi Baku Mutu", icon:HD_IC.alert, tone: exceedCount?"bad":"good", value:exceedCount, suffix:` / ${checked}`, foot: exceedCount?"hasil uji emisi di atas baku mutu":"semua parameter memenuhi baku mutu"}));
+  }
+  tiles.push(hdKpi({label:"Angin Plume", icon:HD_IC.clock, value:windVal, suffix:" m/s", foot:windFoot}));
+  tiles.push(hdKpi({label:"Stabilitas Atmosfer", icon:HD_IC.shield, value:escHtml(dispersiState.stability||"-"), foot:escHtml((stab.label||"").replace(/^[A-F] — /,"")||"kelas Pasquill-Gifford")+" &middot; Pasquill-Gifford"}));
+  return tiles.join("");
 }
 
 /* ---------- Render halaman ---------- */
@@ -1358,13 +1508,15 @@ function dispersiRenderSidePanels(){
   const windHist = dispersiState.windMode==="live" ? dispersiState.wind.history : dispersiActiveWindAgg().history;
   const windHistLabel = dispersiState.windMode==="live" ? dispersiState.wind.historyLabel : dispersiActiveWindAgg().historyLabel;
   document.getElementById("dispersiWindPanel").innerHTML = dispersiWindPanelHtml();
+  const statsEl = document.getElementById("dispersiStats");
+  if(statsEl) statsEl.innerHTML = dispersiDashboardStatsHtml();
   const roseLabelEl = document.getElementById("dispersiWindRoseLabel");
   if(roseLabelEl) roseLabelEl.textContent = windHistLabel ? " · "+windHistLabel : "";
   document.getElementById("dispersiWindRose").innerHTML = dispersiWindRoseHtml(windHist);
   document.getElementById("dispersiWindTrend").innerHTML = dispersiWindTrendHtml(windHist);
   document.getElementById("dispersiAmbientImpact").innerHTML = dispersiAmbientImpactHtml();
   dispersiRefreshLegend();
-  const naNote = `<tr><td colspan="7" style="text-align:center;color:var(--gray-500);padding:14px;">Tidak berlaku utk mode "${escHtml(dispersiCurrentParamMeta().label)}" (pola relatif) — pilih salah satu parameter bersatuan massa (NOx/SO₂/CO/Partikulat) untuk melihat beban.</td></tr>`;
+  const naNote = `<tr><td colspan="9" class="muted" style="text-align:center;padding:14px;">Tidak berlaku utk mode "${escHtml(dispersiCurrentParamMeta().label)}" (pola relatif) — pilih salah satu parameter bersatuan massa (NOx/SO₂/CO/Partikulat) untuk melihat beban.</td></tr>`;
   document.getElementById("dispersiBebanTable").innerHTML = qualitativeMode ? naNote : dispersiBebanRowsHtml(stacks, dispersiState.param, sel);
   document.getElementById("dispersiComplianceTable").innerHTML = dispersiComplianceRowsHtml(stacks, sel);
   // Kedua tabel ringkasan ini SENGAJA lintas-site (dispersiStacks() penuh, bukan stacks yg
@@ -1375,6 +1527,17 @@ function dispersiRenderSidePanels(){
   document.getElementById("dispersiSummaryTipe").innerHTML = qualitativeMode ? naHint : dispersiSummaryTableHtml(allStacks, dispersiState.param, sel, s=>s.tipe.key, {head:"Jenis Sumber", row:k=>k}, s=>s.tipe.color);
   document.getElementById("dispersiSummarySite").innerHTML = qualitativeMode ? naHint : dispersiSummaryTableHtml(allStacks, dispersiState.param, sel, s=>s.site, {head:"Site", row:k=>k});
   document.getElementById("dispersiTrend").innerHTML = qualitativeMode ? naHint : dispersiTrendHtml();
+  // Blok analitik Beban Emisi (KPI, Pareto, komposisi, inventaris multi-parameter, contoh hitung)
+  // — semuanya dari dspBebanRows yg sama dgn tabel beban supaya angka di tiap panel konsisten.
+  const rows = qualitativeMode ? [] : dspBebanRows(stacks, dispersiState.param, sel);
+  const setHtml = (id, html)=>{ const el = document.getElementById(id); if(el) el.innerHTML = html; };
+  const scopeEl = document.getElementById("dspBebanScope");
+  if(scopeEl) scopeEl.textContent = `${dispersiState.site||"-"} · ${qualitativeMode?dispersiCurrentParamMeta().label:dispersiState.param} · ${dispersiSelectionLabel(dispersiState.sel)}`;
+  setHtml("dspBebanKpis", qualitativeMode ? "" : dspBebanKpisHtml(rows, dispersiState.param, sel));
+  setHtml("dspParetoWrap", qualitativeMode ? naHint : dspParetoHtml(rows, dispersiState.param));
+  setHtml("dspComposition", qualitativeMode ? naHint : dspCompositionHtml(rows));
+  setHtml("dspInventory", dspInventoryHtml(stacks, sel));
+  setHtml("dspCalc", qualitativeMode ? naHint : dspCalcHtml(rows, dispersiState.param, sel));
   dispersiRenderTipeChips();
 }
 function dispersiSetSite(el){
@@ -1395,7 +1558,7 @@ function dispersiSetParam(el){
   document.getElementById("dispersiStats").innerHTML = dispersiDashboardStatsHtml();
 }
 function dispersiOnPeriodeChange(){ dispersiState.sel = document.getElementById("dispersiPeriode").value; dispersiRefreshWind(); dispersiScheduleUpdatePlume(); dispersiRenderSidePanels(); document.getElementById("dispersiStats").innerHTML = dispersiDashboardStatsHtml(); }
-function dispersiOnStabilityChange(){ dispersiState.stability = document.getElementById("dispersiStability").value; dispersiScheduleUpdatePlume(); }
+function dispersiOnStabilityChange(){ dispersiState.stability = document.getElementById("dispersiStability").value; dispersiScheduleUpdatePlume(); document.getElementById("dispersiStats").innerHTML = dispersiDashboardStatsHtml(); }
 function dispersiSetWindModeLive(){ dispersiState.windMode="live"; dispersiRefreshWind(); renderDispersi(); }
 function dispersiSetWindModePeriode(){ dispersiState.windMode="periode"; dispersiRefreshWind(); renderDispersi(); }
 // Mode Kustom SENGAJA tidak langsung fetch spt Live/Periode di atas (belum tentu ada rentang
@@ -1526,8 +1689,9 @@ function buildDispersiReportXlsx(selectedPeriods, selectedParams){
           "Tanggal Sampling Asli (kalau Carry Forward)": r.carriedFrom||"",
           "Konsentrasi": r.concRec.resultNumeric, "Satuan Konsentrasi": r.concRec.unit||"",
           "Laju Alir (m3/s)": r.flowRec.resultNumeric,
-          "Jam Operasi Semester (jam)": r.runningHour,
+          "Jam Operasi Semester (jam)": r.runningHour!=null ? r.runningHour/2 : null,
           "Jam Operasi per Bulan (jam)": r.runningHour!=null ? r.runningHour/12 : null,
+          "Sumber Jam Operasi": r.rhSource==="bulanan" ? "Log RH bulanan" : r.rhSource==="batas" ? "Dibatasi 8.760 jam/thn" : "Hasil uji (CoA)",
           "Beban Semester (kg)": bebanSemesterKg,
           "Beban Semester (ton)": bebanSemesterKg!=null ? bebanSemesterKg/1000 : null,
         });
@@ -1665,12 +1829,12 @@ function buildDispersiReportHtml(selectedPeriods, includeMap, selectedParams){
       <td style="text-align:right;">${dateCell}</td>
       <td style="text-align:right;">${dispersiFmt(r.concRec.resultNumeric,1)} ${escHtml(r.concRec.unit)}</td>
       <td style="text-align:right;">${dispersiFmt(r.flowRec.resultNumeric,1)} m&sup3;/s</td>
-      <td style="text-align:right;">${dispersiFmt(r.runningHour,0)} j <span style="color:#777;">(${dispersiFmt(r.runningHour!=null?r.runningHour/12:null,0)} j/bln)</span></td>
+      <td style="text-align:right;">${dispersiFmt(r.runningHour!=null?r.runningHour/2:null,0)} j <span style="color:#777;">(${dispersiFmt(r.runningHour!=null?r.runningHour/12:null,0)} j/bln)</span>${r.rhNote?` <span style="color:#8a5c11;" title="${escHtml(r.rhNote)}">*</span>`:""}</td>
       <td style="text-align:right;font-weight:700;">${dispersiFmt(bebanSemesterKg,1)} kg</td></tr>`;
     }).join("");
     bebanSections += `<div style="font-weight:700;font-size:12px;margin:12px 0 5px;color:#0d1f38;">Semester ${escHtml(periode)} <span style="font-weight:400;color:#777;">(${rows.length} data)</span></div>
       <table class="pg-ba-table"><thead><tr><th style="width:22px;">No</th><th>Titik</th><th>Parameter</th><th>Frekuensi Pantau</th><th>Tgl Sampling</th><th style="text-align:right;">Konsentrasi</th><th style="text-align:right;">Laju Alir</th><th style="text-align:right;">Jam Operasi Semester Ini (per bulan)</th><th style="text-align:right;">Beban Semester</th></tr></thead>
-        <tbody>${trs}</tbody></table>`;
+        <tbody>${trs}</tbody></table>${trs.includes('title="RH di hasil uji')?`<div style="font-size:9.5px;color:#8a5c11;margin-top:3px;">* Running Hour pada hasil uji &gt;8.784 jam (kemungkinan jam kumulatif, bukan 1 tahun) — jam operasi diganti log Running Hour bulanan semester tsb, atau dibatasi 8.760 jam/tahun bila log kosong.</div>`:""}`;
   });
   // Total tahunan HANYA kalau S1 & S2 tahun itu SAMA-SAMA ada datanya — bukan hasil ekstrapolasi
   // 1 semester, sesuai permintaan "kalau setahun ya harus complete dulu datanya".
@@ -2226,4 +2390,5 @@ Object.assign(ACTIONS, {
 document.addEventListener("change", e=>{
   if(e.target.id==="dispersiPeriode") dispersiOnPeriodeChange();
   if(e.target.id==="dispersiStability") dispersiOnStabilityChange();
+  if(e.target.id==="dspCalcSel"){ dispersiState.calcStackId = e.target.value; dispersiRenderSidePanels(); }
 });
