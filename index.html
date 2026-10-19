@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202610191200">
+<link rel="stylesheet" href="assets/css/style.css?v=202610191500">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -88,15 +88,25 @@
         </div>
       </div>
       <div class="navgroup" data-navgroup="hasil">
-        <button type="button" class="navgroup-head"><span>Hasil Pemantauan</span><span class="ms-icon navgroup-chevron" data-icon="chevron-down" data-size="13"></span></button>
+        <button type="button" class="navgroup-head"><span>Hasil Pemantauan Emisi</span><span class="ms-icon navgroup-chevron" data-icon="chevron-down" data-size="13"></span></button>
         <div class="navgroup-items">
           <button class="navbtn" data-page="hasildashboard" data-group="hasil" data-label="Dashboard Hasil Emisi" title="Dashboard Hasil Emisi"><span class="navbtn-icon ms-icon" data-icon="trending-up"></span><span class="label">Dashboard Hasil Emisi</span></button>
           <button class="navbtn" data-page="hasildb" data-group="hasil" data-label="Database Hasil Emisi" title="Database Hasil Emisi"><span class="navbtn-icon ms-icon" data-icon="database"></span><span class="label">Database Hasil Emisi</span></button>
           <button class="navbtn" data-page="dispersi" data-group="hasil" data-label="Model Dispersi Emisi" title="Model Dispersi Emisi"><span class="navbtn-icon ms-icon" data-icon="wind"></span><span class="label">Model Dispersi Emisi</span></button>
-          <button class="navbtn" data-page="ambiendashboard" data-group="hasil" data-label="Dashboard Hasil Ambient" title="Dashboard Hasil Ambient"><span class="navbtn-icon ms-icon" data-icon="trending-up"></span><span class="label">Dashboard Hasil Ambient</span></button>
-          <button class="navbtn" data-page="ambiendb" data-group="hasil" data-label="Database Hasil Ambient" title="Database Hasil Ambient"><span class="navbtn-icon ms-icon" data-icon="database"></span><span class="label">Database Hasil Ambient</span></button>
-          <button class="navbtn" data-page="aqiispu" data-group="hasil" data-label="Model AQI/ISPU Ambient" title="Model AQI/ISPU Ambient"><span class="navbtn-icon ms-icon" data-icon="activity"></span><span class="label">Model AQI/ISPU Ambient</span></button>
-          <button class="navbtn" data-page="laporanemf" data-group="hasil" data-label="Laporan EMF &amp; EMP" title="Laporan EMF &amp; EMP"><span class="navbtn-icon ms-icon" data-icon="file-text"></span><span class="label">Laporan EMF &amp; EMP</span></button>
+        </div>
+      </div>
+      <div class="navgroup" data-navgroup="hasilamb">
+        <button type="button" class="navgroup-head"><span>Hasil Pemantauan Ambient</span><span class="ms-icon navgroup-chevron" data-icon="chevron-down" data-size="13"></span></button>
+        <div class="navgroup-items">
+          <button class="navbtn" data-page="ambiendashboard" data-group="hasilamb" data-label="Dashboard Hasil Ambient" title="Dashboard Hasil Ambient"><span class="navbtn-icon ms-icon" data-icon="trending-up"></span><span class="label">Dashboard Hasil Ambient</span></button>
+          <button class="navbtn" data-page="ambiendb" data-group="hasilamb" data-label="Database Hasil Ambient" title="Database Hasil Ambient"><span class="navbtn-icon ms-icon" data-icon="database"></span><span class="label">Database Hasil Ambient</span></button>
+          <button class="navbtn" data-page="aqiispu" data-group="hasilamb" data-label="Model AQI/ISPU Ambient" title="Model AQI/ISPU Ambient"><span class="navbtn-icon ms-icon" data-icon="activity"></span><span class="label">Model AQI/ISPU Ambient</span></button>
+        </div>
+      </div>
+      <div class="navgroup" data-navgroup="lapor">
+        <button type="button" class="navgroup-head"><span>Pelaporan</span><span class="ms-icon navgroup-chevron" data-icon="chevron-down" data-size="13"></span></button>
+        <div class="navgroup-items">
+          <button class="navbtn" data-page="laporanemf" data-group="lapor" data-label="Laporan EMF &amp; EMP" title="Laporan EMF &amp; EMP"><span class="navbtn-icon ms-icon" data-icon="file-text"></span><span class="label">Laporan EMF &amp; EMP</span></button>
         </div>
       </div>
       <div class="navgroup" data-navgroup="ref">
@@ -1222,173 +1232,187 @@
     </div>
 
     <!-- MODEL DISPERSI EMISI -->
-    <div class="page" id="page-dispersi">
-      <div class="stickytop">
-      <div class="pagehead"><div><h2>Model Dispersi Emisi</h2><div class="desc">Peta sebaran (plume) &amp; beban pencemar per titik cerobong — dihitung dari data riil hasil pemantauan, laju alir, running hour, koordinat titik, dan data angin Open-Meteo</div></div>
-        <div class="toolbar">
-          <button class="btn ghost" data-action="dispersiInfoModal" title="Sumber data angin &amp; cara kerja model">&#8505;&#65039; Info Model &amp; Data Angin</button>
-          <button class="btn ghost" data-action="dispersiOpenProfessionalPreview" title="Preview peta kartografis dgn logo PHM, siap cetak">&#128506;&#65039; Preview Peta Profesional</button>
-          <button class="btn ghost" data-action="dispersiOpenExpertMode" title="Animasi timelapse sebaran per jam pada 1 tanggal pilihan">&#127916; Simulasi Transien (Timelapse)</button>
-          <button class="btn primary" data-action="printDispersiReport">Cetak Laporan Beban Emisi (PDF)</button>
-          <button class="btn small ghost" data-action="toggleDispersiStats" id="btnDispersiStatsToggle">&#9650; Ciutkan Ringkasan</button>
-        </div>
-      </div>
-      <div class="card" id="dispersiStats" style="margin-bottom:0;"></div>
-      </div>
-      <div id="dispersiBody">
-        <div class="card" style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-end;">
-          <div>
-            <div class="hint" style="margin:0 0 6px;text-transform:uppercase;letter-spacing:.02em;">Site</div>
-            <div id="dispersiSiteChips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+    <div class="page dsp-page" id="page-dispersi">
+      <section class="hd-hero dsp-hero" aria-label="Model Dispersi Emisi">
+        <div class="hd-hero-top">
+          <div class="hd-hero-title">
+            <div class="hd-eyebrow">Hasil Pemantauan <span aria-hidden="true">/</span> Emisi <span aria-hidden="true">/</span> Pemodelan</div>
+            <h2>Model Dispersi &amp; Beban Emisi</h2>
+            <p>Sebaran plume (Gaussian, Pasquill-Gifford) dan beban pencemar tiap cerobong, dihitung dari hasil uji emisi, laju alir, running hour, koordinat titik, dan data angin Open-Meteo.</p>
           </div>
-          <div class="field" style="margin:0;min-width:230px;">
-            <label>Titik Emisi (filter per titik, tidak harus 1 site utuh)</label>
-            <div class="xsel" id="dispersiTitikXsel">
-              <button type="button" class="xsel-btn" data-action="dispersiToggleTitikPanel"><span id="dispersiTitikBtnLabel">Semua titik</span> <span>&#9662;</span></button>
-              <div class="xsel-panel" id="dispersiTitikPanel" style="display:none;">
-                <input type="text" id="dispersiTitikSearch" placeholder="cari nama titik…">
-                <div class="xsel-toolbar">
-                  <button type="button" class="btn small ghost" data-action="dispersiTitikCheckAllVisible">Centang Semua yang Tampil</button>
-                  <button type="button" class="btn small ghost" data-action="dispersiTitikUncheckAllVisible">Kosongkan yang Tampil</button>
+          <div class="hd-hero-actions">
+            <button type="button" class="hd-btn-outline" data-action="dispersiInfoModal" title="Sumber data angin &amp; cara kerja model">Info Model</button>
+            <button type="button" class="hd-btn-outline" data-action="dispersiOpenProfessionalPreview" title="Preview peta kartografis dgn logo PHM, siap cetak">Peta Profesional</button>
+            <button type="button" class="hd-btn-outline" data-action="dispersiOpenExpertMode" title="Animasi timelapse sebaran per jam pada 1 tanggal pilihan">Timelapse</button>
+            <button type="button" class="hd-btn-solid" data-action="printDispersiReport">Laporan Beban Emisi (PDF)</button>
+          </div>
+        </div>
+        <div class="dsp-hero-steps">
+          <div><b>1</b><span>Pilih site, titik, parameter &amp; periode</span></div>
+          <div><b>2</b><span>Angin Live / Periode / Kustom menentukan arah plume</span></div>
+          <div><b>3</b><span>Baca peta, beban per titik &amp; kepatuhan</span></div>
+        </div>
+      </section>
+      <nav class="hd-secnav" aria-label="Bagian halaman">
+        <button type="button" data-action="hdJump" data-target="dspSecMap">Peta &amp; Angin</button>
+        <button type="button" data-action="hdJump" data-target="dspSecBeban">Analisis Beban Emisi</button>
+        <button type="button" data-action="hdJump" data-target="dspSecTable">Beban per Titik</button>
+        <button type="button" data-action="hdJump" data-target="dspSecCalc">Cara Hitung</button>
+        <button type="button" data-action="hdJump" data-target="dspSecComp">Kepatuhan</button>
+        <button type="button" data-action="hdJump" data-target="dspSecAbout">Tentang Model</button>
+      </nav>
+      <div id="dispersiBody">
+        <div class="card dsp-controls">
+          <div class="dsp-ctrl-row">
+            <div class="dsp-ctrl"><div class="dsp-ctrl-lbl">Site</div><div id="dispersiSiteChips" class="dsp-chips"></div></div>
+            <div class="field dsp-ctrl" style="min-width:240px;">
+              <label>Titik emisi</label>
+              <div class="xsel" id="dispersiTitikXsel">
+                <button type="button" class="xsel-btn" data-action="dispersiToggleTitikPanel"><span id="dispersiTitikBtnLabel">Semua titik</span> <span>&#9662;</span></button>
+                <div class="xsel-panel" id="dispersiTitikPanel" style="display:none;">
+                  <input type="text" id="dispersiTitikSearch" placeholder="cari nama titik…">
+                  <div class="xsel-toolbar">
+                    <button type="button" class="btn small ghost" data-action="dispersiTitikCheckAllVisible">Centang Semua yang Tampil</button>
+                    <button type="button" class="btn small ghost" data-action="dispersiTitikUncheckAllVisible">Kosongkan yang Tampil</button>
+                  </div>
+                  <div class="xsel-list" id="dispersiTitikList"></div>
                 </div>
-                <div class="xsel-list" id="dispersiTitikList"></div>
               </div>
             </div>
-          </div>
-          <div>
-            <div class="hint" style="margin:0 0 6px;text-transform:uppercase;letter-spacing:.02em;">Parameter Pencemar</div>
-            <div id="dispersiParamChips" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
-          </div>
-          <div class="field" style="margin:0;"><label>Periode Data</label><select id="dispersiPeriode" style="min-width:190px;"></select></div>
-          <div class="field" style="margin:0;"><label>Kelas Stabilitas Atmosfer</label>
-            <select id="dispersiStability" style="min-width:210px;">
-              <option value="A">A — Sangat Tidak Stabil</option>
-              <option value="B">B — Tidak Stabil</option>
-              <option value="C">C — Agak Tidak Stabil</option>
-              <option value="D" selected>D — Netral (umum siang berangin)</option>
-              <option value="E">E — Agak Stabil</option>
-              <option value="F">F — Stabil (umum malam tenang)</option>
-            </select>
-          </div>
-          <div>
-            <div class="hint" style="margin:0 0 6px;text-transform:uppercase;letter-spacing:.02em;">Sumber Angin Plume</div>
-            <div style="display:flex;gap:0;border:1.5px solid var(--gray-300);border-radius:16px;overflow:hidden;">
-              <button type="button" class="chip-toggle" id="dispersiLiveBtn" data-action="dispersiSetWindModeLive" style="border-radius:0;border:none;">Live</button>
-              <button type="button" class="chip-toggle" id="dispersiPeriodeBtn" data-action="dispersiSetWindModePeriode" style="border-radius:0;border:none;">Periode (Historis)</button>
-              <button type="button" class="chip-toggle" id="dispersiCustomBtn" data-action="dispersiSetWindModeCustom" style="border-radius:0;border:none;">Kustom (Tanggal Bebas)</button>
+            <div class="field dsp-ctrl"><label>Periode data</label><select id="dispersiPeriode"></select></div>
+            <div class="field dsp-ctrl"><label>Stabilitas atmosfer</label>
+              <select id="dispersiStability">
+                <option value="A">A — Sangat Tidak Stabil</option>
+                <option value="B">B — Tidak Stabil</option>
+                <option value="C">C — Agak Tidak Stabil</option>
+                <option value="D" selected>D — Netral (umum siang berangin)</option>
+                <option value="E">E — Agak Stabil</option>
+                <option value="F">F — Stabil (umum malam tenang)</option>
+              </select>
             </div>
           </div>
-          <div id="dispersiCustomWindRow" style="display:none;align-items:flex-end;gap:8px;">
-            <div class="field" style="margin:0;"><label>Dari Tanggal</label><input type="date" id="dispersiCustomFrom"></div>
-            <div class="field" style="margin:0;"><label>Sampai Tanggal</label><input type="date" id="dispersiCustomTo"></div>
-            <button class="btn small" data-action="dispersiApplyCustomWindRange">Terapkan</button>
+          <div class="dsp-ctrl-row">
+            <div class="dsp-ctrl"><div class="dsp-ctrl-lbl">Parameter pencemar</div><div id="dispersiParamChips" class="dsp-chips"></div></div>
           </div>
-          <div style="margin-left:auto;">
+          <div class="dsp-ctrl-row">
+            <div class="dsp-ctrl"><div class="dsp-ctrl-lbl">Sumber angin plume</div>
+              <div class="dp-seg">
+                <button type="button" class="btn" id="dispersiLiveBtn" data-action="dispersiSetWindModeLive" title="Potret sesaat satu arah angin (kerucut sempit)">Live</button>
+                <button type="button" class="btn" id="dispersiPeriodeBtn" data-action="dispersiSetWindModePeriode" title="Gabungan semua arah angin sepanjang periode sampling, dibobot frekuensinya">Periode (Historis)</button>
+                <button type="button" class="btn" id="dispersiCustomBtn" data-action="dispersiSetWindModeCustom" title="Rentang tanggal bebas">Kustom</button>
+              </div>
+            </div>
+            <div id="dispersiCustomWindRow" class="dsp-ctrl" style="display:none;align-items:flex-end;gap:8px;">
+              <div class="field" style="margin:0;"><label>Dari tanggal</label><input type="date" id="dispersiCustomFrom"></div>
+              <div class="field" style="margin:0;"><label>Sampai tanggal</label><input type="date" id="dispersiCustomTo"></div>
+              <button class="btn small" data-action="dispersiApplyCustomWindRange">Terapkan</button>
+            </div>
+            <span class="spacer"></span>
             <button class="btn" data-action="dispersiRefreshWind">&#8635; Refresh Angin</button>
           </div>
-        </div>
-        <div class="card" style="padding:10px 16px;">
-          <div class="hint" style="margin:0 0 6px;text-transform:uppercase;letter-spacing:.02em;">Jenis Sumber (klik untuk pilih/keluarkan sekaligus per jenis)</div>
-          <div id="dispersiTipeChips" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
-        </div>
-        <div class="hint" style="margin:-8px 0 14px;">
-          <b>Live</b>: potret sesaat satu arah angin (kerucut plume sempit). <b>Periode</b>: gabungan SEMUA arah angin sepanjang periode sampling terpilih (data historis Open-Meteo), dibobot frekuensinya — menghasilkan bentuk kipas melebar seperti sebaran jangka panjang. <b>Kustom</b>: sama seperti Periode, tapi rentang tanggalnya bebas dipilih sendiri (tidak terbatas ke opsi semester/tahun yang tersedia) — beban pencemar &amp; tabel kepatuhan tetap memakai Periode Data di atas (data sampling memang hanya ada per periode itu), hanya pola sebaran &amp; data anginnya yang mengikuti rentang kustom.
+          <div class="dsp-ctrl-row dsp-ctrl-tipe">
+            <div class="dsp-ctrl" style="flex:1;"><div class="dsp-ctrl-lbl">Jenis sumber <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:500;">(klik untuk pilih/keluarkan sekaligus per jenis)</span></div><div id="dispersiTipeChips" class="dsp-chips"></div></div>
+          </div>
         </div>
 
-        <div class="grid" style="grid-template-columns:minmax(0,1.7fr) minmax(320px,1fr);align-items:start;">
-          <div class="card">
-            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-              <h3 style="margin:0;font-size:13.5px;color:var(--navy-800);text-transform:uppercase;letter-spacing:.03em;">Peta Persebaran</h3>
-              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <button class="btn small ghost" data-action="dispersiSelectAllAtSite">Pilih Semua</button>
-                <button class="btn small ghost" data-action="dispersiDeselectAll">Kosongkan</button>
-                <div style="display:flex;border:1.5px solid var(--gray-300);border-radius:14px;overflow:hidden;">
-                  <button type="button" class="chip-toggle" id="dispersiSatBtn" data-action="dispersiSetMapLayerSat" style="border-radius:0;border:none;">Satelit</button>
-                  <button type="button" class="chip-toggle" id="dispersiStreetBtn" data-action="dispersiSetMapLayerStreet" style="border-radius:0;border:none;">Jalan</button>
-                </div>
-                <button class="btn small ghost" data-action="dispersiManualRefreshPlume" title="Hitung ulang plume secara manual">&#8635; Refresh Peta</button>
+        <div id="dispersiStats" class="hd-kpis dsp-kpis"></div>
+
+        <div id="dspSecMap" class="hd-anchor"></div>
+        <div class="dsp-mapgrid">
+          <div class="card dsp-mapcard">
+            <div class="cardhead"><div><h3>Peta Persebaran Plume</h3><div class="hint hd-sub">Klik titik untuk memasukkan/mengeluarkan dari plume gabungan. Plume dihitung ulang otomatis tiap peta di-zoom/geser.</div></div>
+              <div class="dsp-map-tools">
+                <span class="dp-btn-group"><button class="btn small" data-action="dispersiSelectAllAtSite">Pilih Semua</button><button class="btn small" data-action="dispersiDeselectAll">Kosongkan</button></span>
+                <span class="dp-seg"><button type="button" class="btn" id="dispersiSatBtn" data-action="dispersiSetMapLayerSat">Satelit</button><button type="button" class="btn" id="dispersiStreetBtn" data-action="dispersiSetMapLayerStreet">Jalan</button></span>
+                <button class="btn small" data-action="dispersiManualRefreshPlume" title="Hitung ulang plume secara manual">&#8635; Refresh Peta</button>
               </div>
             </div>
-            <div class="hint" style="margin:-4px 0 8px;">Klik titik pada peta untuk memasukkan/keluarkan dari perhitungan plume gabungan. Plume dihitung ulang otomatis tiap peta di-zoom/geser.</div>
-            <div id="dispersiMap" style="width:100%;height:480px;border-radius:8px;overflow:hidden;background:var(--gray-100);"></div>
-            <div id="dispersiPlumeStatus" class="hint" style="margin-top:8px;font-weight:600;"></div>
-            <div id="dispersiParamDesc" class="hint" style="margin-top:4px;"></div>
+            <div id="dispersiMap" class="dsp-map"></div>
+            <div id="dispersiPlumeStatus" class="dsp-plume-status"></div>
+            <div id="dispersiParamDesc" class="hint dsp-param-desc"></div>
             <div id="dispersiLegend"></div>
           </div>
-
-          <div class="card" style="margin-bottom:0;">
-            <h3 style="margin:0 0 8px;font-size:12.5px;color:var(--navy-800);text-transform:uppercase;letter-spacing:.03em;">Data Angin</h3>
-            <div id="dispersiWindPanel"></div>
-            <div style="margin-top:10px;border-top:1px solid var(--gray-200);padding-top:8px;display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;">
-              <div>
-                <div class="hint" style="margin:0 0 4px;text-transform:uppercase;white-space:nowrap;">Wind Rose<span id="dispersiWindRoseLabel" style="text-transform:none;display:block;font-size:9.5px;"></span></div>
-                <div id="dispersiWindRose"></div>
-              </div>
-              <div style="min-width:0;">
-                <div class="hint" style="margin:0 0 4px;text-transform:uppercase;">Tren Kecepatan Angin</div>
-                <div id="dispersiWindTrend"></div>
+          <div class="dsp-side">
+            <div class="card">
+              <div class="cardhead"><div><h3>Data Angin</h3></div></div>
+              <div id="dispersiWindPanel"></div>
+              <div class="dsp-wind-grid">
+                <div><div class="dsp-mini-lbl">Wind rose<span id="dispersiWindRoseLabel"></span></div><div id="dispersiWindRose"></div></div>
+                <div style="min-width:0;"><div class="dsp-mini-lbl">Tren kecepatan angin</div><div id="dispersiWindTrend"></div></div>
               </div>
             </div>
-            <div style="margin-top:10px;border-top:1px solid var(--gray-200);padding-top:8px;">
-              <div class="hint" style="margin:0 0 4px;text-transform:uppercase;">Dampak Kualitas Udara Ambien</div>
+            <div class="card">
+              <div class="cardhead"><div><h3>Dampak Kualitas Udara Ambien</h3><div class="hint hd-sub">Konsentrasi puncak ground-level hasil model dibanding baku mutu ambien.</div></div></div>
               <div id="dispersiAmbientImpact"></div>
             </div>
           </div>
         </div>
 
-        <div class="card">
-          <h3 style="margin:0 0 4px;font-size:12.5px;color:var(--navy-800);text-transform:uppercase;letter-spacing:.03em;">Beban Pencemar per Titik</h3>
-          <div class="hint" style="margin-bottom:8px;">Beban/jam = konsentrasi &times; laju alir tercatat &divide; 1000. Beban/bulan = rata-rata beban/tahun &divide; 12 (jam operasi = running hour 1 tahun terakhir). Tanda <span style="color:var(--amber-500);font-weight:700;">&dagger;</span> = titik belum disampling ulang di periode ini (mis. frekuensi 1x/tahun) — memakai hasil terakhir yang masih berlaku, bukan dikosongkan.</div>
-          <div style="max-height:320px;overflow:auto;">
-            <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
-              <thead><tr style="background:var(--navy-900);color:#dbe6f0;">
-                <th style="text-align:left;padding:6px 8px;">Titik</th><th style="text-align:right;padding:6px 8px;">Konsentrasi</th><th style="text-align:right;padding:6px 8px;">Laju Alir</th><th style="text-align:right;padding:6px 8px;">Jam Operasi</th><th style="text-align:right;padding:6px 8px;">Beban/jam</th><th style="text-align:right;padding:6px 8px;">Beban/bln</th><th style="text-align:right;padding:6px 8px;">Beban/thn</th>
-              </tr></thead>
-              <tbody id="dispersiBebanTable"></tbody>
-            </table>
+        <div id="dspSecBeban" class="hd-anchor"></div>
+        <div class="hd-section-title hd-anchor-divider"><h3>Analisis Beban Emisi</h3><span class="hd-tag" id="dspBebanScope"></span></div>
+        <div id="dspBebanKpis" class="hd-kpis"></div>
+        <div class="hd-row">
+          <div class="card hd-col-wide">
+            <div class="cardhead"><div><h3>Kontribusi Beban per Titik (Pareto)</h3><div class="hint hd-sub">Batang = beban tahunan tiap titik, garis = persentase kumulatif. Titik di kiri garis 80% adalah penyumbang utama yang paling efektif untuk dikendalikan.</div></div>
+              <button class="btn small ghost" data-action="hdZoomChart" data-target="dspParetoWrap" data-title="Kontribusi Beban per Titik">Perbesar</button></div>
+            <div id="dspParetoWrap"></div>
+          </div>
+          <div class="card hd-col-side">
+            <div class="cardhead"><div><h3>Komposisi Beban</h3><div class="hint hd-sub">Pembagian beban titik terpilih menurut jenis sumber.</div></div></div>
+            <div id="dspComposition"></div>
           </div>
         </div>
-
         <div class="card">
-          <h3 style="margin:0 0 4px;font-size:12.5px;color:var(--navy-800);text-transform:uppercase;letter-spacing:.03em;">Laporan Kepatuhan per Sumber Emisi</h3>
-          <div class="hint" style="margin-bottom:10px;">Baku mutu &amp; status kepatuhan diambil langsung dari data hasil pemantauan tiap titik (sudah memperhitungkan kategori kapasitas &amp; jenis bahan bakar) — bukan ambang generik.</div>
-          <div style="max-height:320px;overflow:auto;">
-            <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
-              <thead><tr style="background:var(--navy-900);color:#dbe6f0;">
-                <th style="text-align:left;padding:6px 8px;">Titik</th><th style="text-align:left;padding:6px 8px;">Parameter</th><th style="text-align:right;padding:6px 8px;">Hasil</th><th style="text-align:right;padding:6px 8px;">Baku Mutu</th><th style="text-align:right;padding:6px 8px;">% BM</th><th style="text-align:left;padding:6px 8px;">Status</th>
-              </tr></thead>
-              <tbody id="dispersiComplianceTable"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="grid cols-2">
-          <div class="card">
-            <h3 style="margin:0 0 10px;font-size:12.5px;color:var(--navy-800);text-transform:uppercase;letter-spacing:.03em;">Beban per Jenis Sumber (Semua Site)</h3>
-            <div id="dispersiSummaryTipe"></div>
-          </div>
-          <div class="card">
-            <h3 style="margin:0 0 10px;font-size:12.5px;color:var(--navy-800);text-transform:uppercase;letter-spacing:.03em;">Beban per Site (Semua Site)</h3>
-            <div id="dispersiSummarySite"></div>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3 style="margin:0 0 12px;font-size:12.5px;color:var(--navy-800);text-transform:uppercase;letter-spacing:.03em;">Tren Beban &middot; Titik Terpilih</h3>
+          <div class="cardhead"><div><h3>Tren Beban per Periode</h3><div class="hint hd-sub">Beban per semester titik terpilih, ditumpuk per jenis sumber. Titik yang bukan gilirannya disampling memakai hasil terakhir (carry-forward), dengan jam operasi semester itu sendiri.</div></div>
+            <button class="btn small ghost" data-action="hdZoomChart" data-target="dispersiTrend" data-title="Tren Beban per Periode">Perbesar</button></div>
           <div id="dispersiTrend"></div>
         </div>
+        <div class="card">
+          <div class="cardhead"><div><h3>Inventaris Emisi Multi-Parameter</h3><div class="hint hd-sub">Beban tahunan (ton/tahun) seluruh parameter massa untuk titik terpilih. Klik nama parameter di kepala kolom untuk menampilkannya di peta.</div></div>
+            <button class="btn small ghost" data-action="hdZoomChart" data-target="dspInventory" data-title="Inventaris Emisi">Perbesar</button></div>
+          <div id="dspInventory"></div>
+        </div>
+        <div class="grid cols-2">
+          <div class="card"><div class="cardhead"><div><h3>Beban per Jenis Sumber</h3><div class="hint hd-sub">Semua site, parameter &amp; periode terpilih.</div></div></div><div id="dispersiSummaryTipe"></div></div>
+          <div class="card"><div class="cardhead"><div><h3>Beban per Site</h3><div class="hint hd-sub">Semua site, parameter &amp; periode terpilih.</div></div></div><div id="dispersiSummarySite"></div></div>
+        </div>
 
-        <details class="collapse-section card">
-          <summary style="cursor:pointer;font-weight:700;color:#0b6b66;font-size:13px;">Tentang Model Ini &amp; Sumber Data</summary>
-          <div style="font-size:12.5px;line-height:1.7;color:var(--gray-700);margin-top:10px;">
-            <p><b>Model dispersi:</b> Gaussian plume ground-level (dengan refleksi tanah), koefisien &sigma;y/&sigma;z pendekatan Briggs (rural power-law) per kelas stabilitas Pasquill-Gifford (A&ndash;F) — basis fisika yang sama dipakai screening model AERMOD/ISCST3 sederhana. Kontur digambar sebagai 8 band konsentrasi dengan tepi isoline putih. Mode <b>Periode</b> mensuperposisikan plume dari 16 sektor arah angin, dibobot frekuensi historis — menghasilkan bentuk kipas alami; mode <b>Live</b> memakai satu snapshot arah+kecepatan (kerucut sempit, fisika instan).</p>
-            <p><b>Data angin:</b> Open-Meteo (gratis, tanpa API key) — mode Live dari Forecast API (data saat ini + histori 7 hari terakhir, auto-refresh tiap 5 menit selama halaman ini terbuka), mode Periode dari Archive API (rentang tanggal sesuai Periode Data terpilih, delay arsip &plusmn;5 hari). Titik query = titik tengah seluruh titik emisi site terpilih, BUKAN stasiun BMKG lapangan — untuk kebutuhan presisi operasional, silangkan dengan data angin lapangan/BMKG setempat.</p>
-            <p><b>Beban pencemar:</b> dihitung dari konsentrasi (mg/Nm&sup3;) &times; laju alir gas buang yang sudah tercatat di Database Hasil Emisi (parameter "Laju Alir (v)", m&sup3;/s — diperlakukan setara Nm&sup3;/s, penyederhanaan tanpa koreksi suhu/tekanan penuh). Beban/tahun memakai running hour (1 tahun terakhir) tiap titik; Beban/bulan = Beban/tahun &divide; 12 (rata-rata, karena sampling riil per semester, bukan per bulan kalender).</p>
-            <p><b>Tinggi/diameter cerobong:</b> memakai nilai manual dari Database Titik Pantau kalau sudah diisi; kalau belum, memakai perkiraan standar per jenis sumber (ditandai "~" pada tabel Beban Pencemar) — isi manual untuk akurasi lebih tinggi.</p>
-            <p><b>Titik yang dilewati:</b> titik tanpa koordinat (Lokasi Titik Pantau), atau tanpa data konsentrasi/laju alir pada periode terpilih, otomatis tidak ditampilkan/dihitung — tidak ada data sintetis/dummy di halaman ini.</p>
-            <p style="color:#8a5c11;"><b>Catatan resolusi:</b> raster plume adalah permukaan model matematis (grid dihitung lalu dihaluskan &amp; diupscale) — bukan citra satelit, jadi jangan mengharapkan detail setajam foto walau tile peta dasarnya sendiri tetap tajam saat di-zoom (seperti halaman Lokasi Titik Pantau).</p>
+        <div id="dspSecTable" class="hd-anchor"></div>
+        <div class="card dp-listcard">
+          <div class="dp-listhead"><h3>Beban Pencemar per Titik</h3><span class="hint" style="margin:0;">Laju emisi = konsentrasi &times; laju alir. Beban/tahun = laju emisi &times; jam operasi setahun. &dagger; = memakai hasil sampling terakhir (carry-forward). ~ = tinggi cerobong perkiraan.</span></div>
+          <div class="tablewrap dsp-tablewrap"><table class="dp-table dsp-table">
+            <thead><tr><th>Titik</th><th class="num">Konsentrasi</th><th class="num">Laju alir</th><th class="num">Laju emisi</th><th class="num">Jam operasi/thn</th><th class="num">kg/jam</th><th class="num">kg/bulan</th><th class="num">ton/tahun</th><th>Kontribusi</th></tr></thead>
+            <tbody id="dispersiBebanTable"></tbody>
+          </table></div>
+        </div>
+
+        <div id="dspSecCalc" class="hd-anchor"></div>
+        <div class="card">
+          <div class="cardhead"><div><h3>Cara Menghitung Beban Emisi</h3><div class="hint hd-sub">Contoh perhitungan langkah demi langkah memakai data riil titik terpilih, ditambah penjelasan istilah, asumsi, dan kegunaannya.</div></div></div>
+          <div id="dspCalc"></div>
+        </div>
+
+        <div id="dspSecComp" class="hd-anchor"></div>
+        <div class="card dp-listcard">
+          <div class="dp-listhead"><h3>Kepatuhan Baku Mutu per Sumber</h3><span class="hint" style="margin:0;">Baku mutu &amp; status diambil langsung dari hasil pemantauan tiap titik (sudah memperhitungkan kategori kapasitas &amp; bahan bakar).</span></div>
+          <div class="tablewrap dsp-tablewrap dsp-scroll"><table class="dp-table dsp-table">
+            <thead><tr><th>Titik</th><th>Parameter</th><th class="num">Hasil</th><th class="num">Baku mutu</th><th>% baku mutu</th><th>Status</th></tr></thead>
+            <tbody id="dispersiComplianceTable"></tbody>
+          </table></div>
+        </div>
+
+        <div id="dspSecAbout" class="hd-anchor"></div>
+        <div class="card dsp-about">
+          <div class="cardhead"><div><h3>Tentang Model &amp; Sumber Data</h3></div></div>
+          <div class="dsp-about-grid">
+            <div><b>Model dispersi</b><p>Gaussian plume ground-level dengan refleksi tanah. Koefisien &sigma;y/&sigma;z pendekatan Briggs (rural) per kelas stabilitas Pasquill-Gifford A&ndash;F, basis fisika yang sama dengan screening AERMOD/ISCST3 versi sederhana. Mode Live = satu arah angin; mode Periode/Kustom = superposisi 16 sektor angin historis dibobot frekuensi.</p></div>
+            <div><b>Data angin</b><p>Open-Meteo (gratis, tanpa API key): Live dari Forecast API (data saat ini + 7 hari, auto-refresh 5 menit), Periode/Kustom dari Archive API (delay arsip &plusmn;5 hari). Titik query = centroid titik emisi site terpilih, bukan stasiun BMKG lapangan.</p></div>
+            <div><b>Beban pencemar</b><p>Konsentrasi (mg/Nm&sup3;) &times; laju alir tercatat (m&sup3;/s, diperlakukan setara Nm&sup3;/s) &rarr; g/s &rarr; kg/jam &rarr; &times; jam operasi setahun. Jam operasi dari kolom Running Hour hasil uji (1 tahun terakhir); bila nilainya &gt;8.784 jam (kumulatif, tidak mungkin dalam setahun) dipakai log Running Hour bulanan.</p></div>
+            <div><b>Geometri cerobong</b><p>Tinggi/diameter dari Database Titik Pantau bila diisi; bila belum, perkiraan standar per jenis sumber (ditandai &ldquo;~&rdquo;).</p></div>
+            <div><b>Titik yang dilewati</b><p>Titik tanpa koordinat atau tanpa data konsentrasi/laju alir pada periode terpilih tidak dihitung &mdash; tidak ada data sintetis.</p></div>
+            <div><b>Catatan resolusi</b><p>Raster plume adalah permukaan model matematis yang dihaluskan, bukan citra satelit. Hasil adalah screening, bukan pengganti kajian dispersi regulatory (AERMOD penuh, meteorologi per jam minimal 1 tahun).</p></div>
           </div>
-        </details>
+        </div>
       </div>
     </div>
 
@@ -1942,41 +1966,41 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202610191200"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202610191200"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202610191500"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202610191500"></script>
 
-<script src="assets/data/default-data.js?v=202610191200"></script>
-<script src="assets/data/brand-assets.js?v=202610191200"></script>
-<script src="assets/data/travel-routes.js?v=202610191200"></script>
-<script src="assets/js/00-icons.js?v=202610191200"></script>
-<script src="assets/js/01-state.js?v=202610191200"></script>
-<script src="assets/js/02-nav-util.js?v=202610191200"></script>
-<script src="assets/js/03-period-logic.js?v=202610191200"></script>
-<script src="assets/js/04-dashboard.js?v=202610191200"></script>
-<script src="assets/js/05-master-data.js?v=202610191200"></script>
-<script src="assets/js/06-plan-personil.js?v=202610191200"></script>
-<script src="assets/js/07-rules-planner.js?v=202610191200"></script>
-<script src="assets/js/08-gantt-print.js?v=202610191200"></script>
-<script src="assets/js/09-tracking-map.js?v=202610191200"></script>
-<script src="assets/js/10-running-hour.js?v=202610191200"></script>
-<script src="assets/js/11-berita-acara.js?v=202610191200"></script>
-<script src="assets/js/12-data-page.js?v=202610191200"></script>
-<script src="assets/js/13-hasil-db.js?v=202610191200"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202610191200"></script>
-<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610191200"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202610191200"></script>
-<script src="assets/js/16-actions-init.js?v=202610191200"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202610191200"></script>
-<script src="assets/js/18-model-dispersi.js?v=202610191200"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202610191200"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202610191200"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202610191200"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202610191200"></script>
-<script src="assets/js/23-budget-proyeksi.js?v=202610191200"></script>
-<script src="assets/js/24-personil-ppu.js?v=202610191200"></script>
-<script src="assets/js/25-access-gate.js?v=202610191200"></script>
-<script src="assets/js/26-laboratorium.js?v=202610191200"></script>
-<script src="assets/js/27-laporan-emf.js?v=202610191200"></script>
-<script src="assets/js/28-word-export.js?v=202610191200"></script>
+<script src="assets/data/default-data.js?v=202610191500"></script>
+<script src="assets/data/brand-assets.js?v=202610191500"></script>
+<script src="assets/data/travel-routes.js?v=202610191500"></script>
+<script src="assets/js/00-icons.js?v=202610191500"></script>
+<script src="assets/js/01-state.js?v=202610191500"></script>
+<script src="assets/js/02-nav-util.js?v=202610191500"></script>
+<script src="assets/js/03-period-logic.js?v=202610191500"></script>
+<script src="assets/js/04-dashboard.js?v=202610191500"></script>
+<script src="assets/js/05-master-data.js?v=202610191500"></script>
+<script src="assets/js/06-plan-personil.js?v=202610191500"></script>
+<script src="assets/js/07-rules-planner.js?v=202610191500"></script>
+<script src="assets/js/08-gantt-print.js?v=202610191500"></script>
+<script src="assets/js/09-tracking-map.js?v=202610191500"></script>
+<script src="assets/js/10-running-hour.js?v=202610191500"></script>
+<script src="assets/js/11-berita-acara.js?v=202610191500"></script>
+<script src="assets/js/12-data-page.js?v=202610191500"></script>
+<script src="assets/js/13-hasil-db.js?v=202610191500"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202610191500"></script>
+<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610191500"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202610191500"></script>
+<script src="assets/js/16-actions-init.js?v=202610191500"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202610191500"></script>
+<script src="assets/js/18-model-dispersi.js?v=202610191500"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202610191500"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202610191500"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202610191500"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202610191500"></script>
+<script src="assets/js/23-budget-proyeksi.js?v=202610191500"></script>
+<script src="assets/js/24-personil-ppu.js?v=202610191500"></script>
+<script src="assets/js/25-access-gate.js?v=202610191500"></script>
+<script src="assets/js/26-laboratorium.js?v=202610191500"></script>
+<script src="assets/js/27-laporan-emf.js?v=202610191500"></script>
+<script src="assets/js/28-word-export.js?v=202610191500"></script>
 </body>
 </html>
