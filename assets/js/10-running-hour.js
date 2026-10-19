@@ -232,112 +232,56 @@ function importRhMonthlyXlsx(){
     toast(`${rowsUpdated} titik diperbarui (${monthsWritten} sel bulan).`,"ok");
   });
 }
-function renderTracking(){
-  refreshTrackingBatchSelect();
-  refreshTrackingSiteSelect();
-  const {pts, beforeStatus} = getFilteredTrackingPoints();
-  renderKomSiteTable(beforeStatus);
-  renderSamplingEmisiTable(beforeStatus);
-
-  const docPts = pts.filter(p=>ensureTracking(p.id).samplingStatus==="sampled");
-  if(!docPts.length){
-    document.getElementById("trackingTable").innerHTML = `<tbody><tr><td style="padding:16px;">
-      <div class="hint">Belum ada titik berstatus "Sudah Disampling" utk filter yang dipilih — checklist dokumen (BA, draft SHU, dst) baru muncul di sini setelah statusnya diisi "Sudah Disampling" di tabel <b>Tahap 1 (Sampling di Lapangan)</b> di atas.</div>
-    </td></tr></tbody>`;
-    return;
+// Perubahan status Tracking dipisah jadi fungsi sendiri (bukan di dalam listener) supaya bisa dipakai
+// dari mana saja — tabel Sampling Lapangan, papan status per engine, dan modal detail engine —
+// dengan efek samping yang SAMA (p.status utk S-Curve/Dashboard disinkron dari sini).
+function trkSetSamplingStatus(id, value){
+  const t = ensureTracking(id);
+  t.samplingStatus = value;
+  const p = DB.points.find(x=>x.id===id);
+  if(value==="sampled"){
+    t.actual = true;
+    if(!t.dates.actual) t.dates.actual = todayStr();
+    if(p){ p.actualStart = p.actualStart||t.dates.actual; p.actualEnd = t.dates.actual; p.status = "done"; }
+  } else {
+    // Status Sampling ini SATU-SATUNYA tempat p.status (dipakai S-Curve/Dashboard) disinkron
+    // dari hasil eksekusi lapangan — "Direncanakan Batch Berikutnya" = masih di-plan, cuma
+    // ditunda (Hold) — SAMA seperti titik yang di-exclude manual dgn alasan batch2 (lihat
+    // applyScheduleToPoints). "Tidak Disampling, Sebab Lain" = genuinely gagal periode ini.
+    // "Belum Masuk Periode Sampling" = SAMA seperti deferred (Hold, bukan gagal) — titik ini
+    // memang tidak seharusnya diproses periode ini (biasanya sudah dieliminasi dari batch juga).
+    t.actual = false;
+    if(p){
+      p.actualStart = ""; p.actualEnd = "";
+      p.status = (value==="deferred" || value==="notdue") ? "pending" : value==="other" ? "failed" : "scheduled";
+    }
   }
-  document.getElementById("trackingTable").innerHTML = `
-    <thead><tr><th>Site</th><th>Titik</th>${TRACK_STEPS.map(([key,label])=>`<th>${label}<br><button class="btn small ghost" data-action="bulkTrackColumn" data-key="${key}" style="margin-top:3px;padding:2px 6px;font-size:10px;">Centang Semua</button></th>`).join("")}<th>Status</th></tr></thead>
-    <tbody>${docPts.map(p=>{
-      const t = ensureTracking(p.id);
-      const overall = trackingOverallStatus(t,p);
-      const badge = overall==="done"?"b-green":overall==="overdue"?"b-red":"b-blue";
-      const label = overall==="done"?"Selesai":overall==="overdue"?"Overdue":"On Track";
-      return `<tr><td>${p.site}</td><td>${escHtml(p.nama)}</td>
-        ${TRACK_STEPS.map(([key])=>`<td class="trk-cell${t[key]?" done":""}" style="text-align:center;"><input type="checkbox" data-action="toggleTrack" data-id="${p.id}" data-key="${key}" ${t[key]?"checked":""}></td>`).join("")}
-        <td><span class="badge ${badge}">${label}</span></td>
-      </tr>`;
-    }).join("")}</tbody>`;
 }
-// Tahap 1: eksekusi sampling di lapangan per titik — status, tanggal aktual (kalau sudah
-// disampling), dan catatan (kalau ditunda ke batch berikutnya atau sebab lain seperti maintenance).
-// Dipakai juga sebagai sumber data status pemantauan pada Berita Acara.
-function renderSamplingEmisiTable(pts){
-  const el = document.getElementById("samplingEmisiTable");
-  if(!el) return;
-  if(!pts.length){
-    el.innerHTML = `<tbody><tr><td style="padding:16px;">
-      <div class="hint">Belum ada titik yang tampil di sini utk filter Tim/Batch/Site yang dipilih — halaman ini cuma menampilkan titik yang <b>sudah dijadwalkan lewat Perencanaan Batch</b> (klik "+ Batch Baru", pilih titiknya, lalu buat jadwal). Kalau kamu yakin sudah bikin batch utk tim/periode ini tapi tetap kosong di sini, cek juga filter Batch &amp; Site di atas (mungkin ke-set ke pilihan yang tidak cocok).</div>
-      <button class="btn small ghost" style="margin-top:8px;" data-action="goToPage" data-page="planner">Buka Perencanaan Batch &rarr;</button>
-    </td></tr></tbody>`;
-    return;
-  }
-  el.innerHTML = `
-    <thead><tr><th>Site</th><th>Titik</th><th>Kategori Sumber</th><th>Wajib Pantau</th><th style="width:190px;">Status Sampling</th><th style="width:150px;">Tanggal Sampling</th><th>Catatan</th><th style="width:60px;">Aksi</th></tr></thead>
-    <tbody>${pts.map(p=>{
-      const t = ensureTracking(p.id);
-      const status = t.samplingStatus||"";
-      const isFilled = status || t.dates.actual || t.samplingNote;
-      const notePlaceholder = status==="deferred" ? "mis. Batch 2" : status==="other" ? "mis. Under Maintenance" : status==="notdue" ? "kosongkan = teks otomatis periode lalu" : "";
-      return `<tr>
-        <td>${p.site}</td>
-        <td><b>${escHtml(p.nama)}</b></td>
-        <td class="muted" style="font-size:11px;">${escHtml(p.kategoriSumber||"-")}</td>
-        <td>${wajibBadgeHtml(p)}</td>
-        <td><select data-action="setSamplingStatus" data-id="${p.id}">
-          <option value="">- pilih status -</option>
-          <option value="sampled" ${status==="sampled"?"selected":""}>${SAMPLING_STATUS_LABELS.sampled}</option>
-          <option value="deferred" ${status==="deferred"?"selected":""}>${SAMPLING_STATUS_LABELS.deferred}</option>
-          <option value="other" ${status==="other"?"selected":""}>${SAMPLING_STATUS_LABELS.other}</option>
-          <option value="notdue" ${status==="notdue"?"selected":""}>${SAMPLING_STATUS_LABELS.notdue}</option>
-        </select></td>
-        <td><input type="date" data-action="setSamplingDate" data-id="${p.id}" value="${t.dates.actual||""}" ${status!=="sampled"?"disabled":""} style="width:100%;"></td>
-        <td><input type="text" data-action="setSamplingNote" data-id="${p.id}" value="${escHtml(t.samplingNote||"")}" placeholder="${notePlaceholder}" style="width:100%;" ${status==="sampled"?"disabled":""}></td>
-        <td><button class="btn small danger" data-action="resetSamplingRecord" data-id="${p.id}" title="Kosongkan status, tanggal, dan catatan sampling titik ini" ${isFilled?"":"disabled"}>Reset</button></td>
-      </tr>`;
-    }).join("")}</tbody>`;
+function trkSetSamplingDate(id, value){
+  const t = ensureTracking(id);
+  t.dates.actual = value;
+  const p = DB.points.find(x=>x.id===id);
+  if(p && value){ p.actualStart = p.actualStart||value; p.actualEnd = value; p.status = "done"; }
+}
+// Centang/kosongkan 1 langkah dokumen (BA, draft SHU, dst). dateOverride = tanggal aktual yang
+// diisi manual (mis. dari modal detail); kosong = hari ini saat dicentang.
+function trkSetStep(id, key, checked, dateOverride){
+  const t = ensureTracking(id);
+  t[key] = !!checked;
+  t.dates[key] = checked ? (dateOverride || todayStr()) : "";
+  if(key==="simpelInput" && checked){ const p = DB.points.find(x=>x.id===id); if(p) p.status = "done"; }
 }
 document.addEventListener("change", e=>{
   if(e.target.dataset.action==="toggleTrack"){
-    const id=e.target.dataset.id, key=e.target.dataset.key;
-    const t = DB.tracking[id];
-    t[key] = e.target.checked;
-    t.dates[key] = e.target.checked? todayStr() : "";
-    if(key==="simpelInput" && e.target.checked){ const p=DB.points.find(x=>x.id===id); if(p) p.status="done"; }
+    trkSetStep(e.target.dataset.id, e.target.dataset.key, e.target.checked);
     save(); renderTracking();
   }
   if(e.target.dataset.action==="setSamplingStatus"){
-    const id=e.target.dataset.id;
-    const t = ensureTracking(id);
-    t.samplingStatus = e.target.value;
-    const p = DB.points.find(x=>x.id===id);
-    if(e.target.value==="sampled"){
-      t.actual = true;
-      if(!t.dates.actual) t.dates.actual = todayStr();
-      if(p){ p.actualStart = p.actualStart||t.dates.actual; p.actualEnd = t.dates.actual; p.status = "done"; }
-    } else {
-      // Status Sampling ini SATU-SATUNYA tempat p.status (dipakai S-Curve/Dashboard) disinkron
-      // dari hasil eksekusi lapangan — sebelumnya cuma DB.tracking[id] yang keupdate, p.status
-      // dibiarkan macet di "scheduled" walau sudah ditandai selesai/gagal di sini, jadi S-Curve
-      // tidak pernah menghitungnya. "Direncanakan Batch Berikutnya" = masih di-plan, cuma
-      // ditunda (Hold) — SAMA seperti titik yang di-exclude manual dgn alasan batch2 (lihat
-      // applyScheduleToPoints). "Tidak Disampling, Sebab Lain" = genuinely gagal periode ini.
-      // "Belum Masuk Periode Sampling" = SAMA seperti deferred (Hold, bukan gagal) — titik ini
-      // memang tidak seharusnya diproses periode ini (biasanya sudah dieliminasi dari batch juga).
-      t.actual = false;
-      if(p){
-        p.actualStart = ""; p.actualEnd = "";
-        p.status = (e.target.value==="deferred" || e.target.value==="notdue") ? "pending" : e.target.value==="other" ? "failed" : "scheduled";
-      }
-    }
+    trkSetSamplingStatus(e.target.dataset.id, e.target.value);
     save(); renderTracking();
   }
   if(e.target.dataset.action==="setSamplingDate"){
-    const id=e.target.dataset.id;
-    const t = ensureTracking(id);
-    t.dates.actual = e.target.value;
-    const p = DB.points.find(x=>x.id===id);
-    if(p && e.target.value){ p.actualStart = p.actualStart||e.target.value; p.actualEnd = e.target.value; p.status = "done"; }
+    trkSetSamplingDate(e.target.dataset.id, e.target.value);
     save(); renderTracking();
   }
   if(e.target.dataset.action==="setSamplingNote"){
@@ -349,7 +293,7 @@ document.addEventListener("change", e=>{
 // Export/Import Tracking BA/CoA (Tahap 1 sampling + Tahap 2 dokumen) sebagai CSV — dicocokkan
 // lewat kolom id (harus sama dengan id di Database Titik Pantau), mengikuti pola Export/Import
 // dataset lain di tools ini (Titik Pantau, Personil, dst).
-const TRACKING_XLSX_HEADERS = ["id","nama","site","samplingStatus","samplingDate","samplingNote","ba","baDate","draftSent","draftSentDate","reviewed","reviewedDate","approved","approvedDate","finalReceived","finalReceivedDate","simpelInput","simpelInputDate"];
+const TRACKING_XLSX_HEADERS = ["id","nama","site","samplingStatus","samplingDate","samplingNote","ba","baDate","draftSent","draftSentDate","reviewed","reviewedDate","approved","approvedDate","finalReceived","finalReceivedDate","simpelInput","simpelInputDate","trkNote"];
 function exportTrackingXlsx(){
   const rows = DB.points.filter(p=>DB.tracking[p.id]).map(p=>{
     const t = ensureTracking(p.id);
@@ -361,7 +305,8 @@ function exportTrackingXlsx(){
       reviewed: t.reviewed?1:0, reviewedDate: t.dates.reviewed||"",
       approved: t.approved?1:0, approvedDate: t.dates.approved||"",
       finalReceived: t.finalReceived?1:0, finalReceivedDate: t.dates.finalReceived||"",
-      simpelInput: t.simpelInput?1:0, simpelInputDate: t.dates.simpelInput||""
+      simpelInput: t.simpelInput?1:0, simpelInputDate: t.dates.simpelInput||"",
+      trkNote: t.trkNote||""
     };
   });
   const wb = xlsxWorkbookFromSheets([["Tracking", xlsxSheetFromRows(TRACKING_XLSX_HEADERS, rows)]]);
@@ -379,6 +324,7 @@ function importTrackingXlsx(){
       if(r.samplingStatus!==undefined) t.samplingStatus = r.samplingStatus;
       if(r.samplingDate!==undefined) t.dates.actual = r.samplingDate;
       if(r.samplingNote!==undefined) t.samplingNote = r.samplingNote;
+      if(r.trkNote!==undefined) t.trkNote = r.trkNote;
       ["ba","draftSent","reviewed","approved","finalReceived","simpelInput"].forEach(key=>{
         if(r[key]!==undefined) t[key] = /^1|true|ya$/i.test(String(r[key]));
         if(r[key+"Date"]!==undefined) t.dates[key] = r[key+"Date"];
