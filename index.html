@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202610191500">
+<link rel="stylesheet" href="assets/css/style.css?v=202610191700">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -520,19 +520,35 @@
     </div>
 
     <!-- LABORATORIUM -->
-    <div class="page" id="page-laboratorium">
-      <div class="stickytop">
-      <div class="pagehead"><div><h2>Laboratorium</h2><div class="desc">Registri laboratorium jasa kontraktor (akreditasi KAN &amp; registrasi Laboratorium Lingkungan KLH) yang dipakai utk sampling emisi dan/atau ambien, beserta parameter pengukuran yang dicakup tiap lab.</div></div>
-        <div class="toolbar"><button class="btn primary" data-action="addLaboratorium">+ Tambah Laboratorium</button></div>
+    <div class="page lab-page" id="page-laboratorium">
+      <section class="hd-hero lab-hero" aria-label="Laboratorium">
+        <div class="hd-hero-top">
+          <div class="hd-hero-title">
+            <div class="hd-eyebrow">Setup <span aria-hidden="true">/</span> Mitra Pengujian</div>
+            <h2>Laboratorium</h2>
+            <p>Registri laboratorium jasa (akreditasi KAN ISO/IEC 17025 &amp; registrasi Laboratorium Lingkungan KLH) untuk sampling emisi dan ambien, beserta parameter yang dikerjakan tiap lab dan lab mana yang menganalisisnya.</p>
+          </div>
+          <div class="hd-hero-actions">
+            <button type="button" class="hd-btn-outline" data-action="hdJump" data-target="labSecMatrix">Matriks Parameter</button>
+            <button type="button" class="hd-btn-solid" data-action="addLaboratorium">+ Tambah Laboratorium</button>
+          </div>
+        </div>
+      </section>
+      <div id="labKpis" class="hd-kpis lab-kpis"></div>
+      <div class="card lab-filter">
+        <div class="field"><label>Lingkup</label><select id="labFltScope"><option value="">Semua lingkup</option><option value="emisi">Emisi</option><option value="ambien">Ambien</option></select></div>
+        <div class="field lab-filter-search"><label>Cari laboratorium / parameter</label><div class="search-wrap"><span class="search-ico">&#128269;</span><input type="text" id="labFltSearch" placeholder="nama laboratorium atau parameter..."></div></div>
+        <span class="spacer"></span>
+        <span class="hd-tag" id="labCount"></span>
       </div>
-      <div class="toolbar card" style="padding:12px 14px;">
-        <div class="field"><label>Lingkup</label><select id="labFltScope"><option value="">Semua</option><option value="emisi">Emisi</option><option value="ambien">Ambien</option></select></div>
-        <div class="spacer"></div>
-        <div class="field"><label>Cari Laboratorium</label><div class="search-wrap"><span class="search-ico">&#128269;</span><input type="text" id="labFltSearch" placeholder="nama laboratorium..."></div></div>
+      <div class="hd-section-title"><h3>Laboratorium Mitra</h3><span class="hint" style="margin:0;">Status dokumen, masa berlaku, dan ringkasan parameter per laboratorium.</span></div>
+      <div id="labCards" class="lab-cards"></div>
+      <div id="labSecMatrix" class="hd-anchor"></div>
+      <div class="card lab-mx-card">
+        <div class="cardhead"><div><h3>Matriks Cakupan Parameter</h3><div class="hint hd-sub">Parameter pemantauan (baris) dikerjakan oleh laboratorium mana (kolom), apakah masuk ruang lingkup akreditasi KAN / registrasi KLH yang masih berlaku, dan apakah analisisnya dilakukan di laboratorium lain.</div></div>
+          <button class="btn small ghost" data-action="hdZoomChart" data-target="labMatrix" data-title="Matriks Cakupan Parameter">Perbesar</button></div>
+        <div id="labMatrix"></div>
       </div>
-      </div>
-      <div class="tablewrap"><table id="labTable"></table></div>
-      <div class="hint" id="labCount" style="margin-bottom:16px;"></div>
     </div>
 
     <!-- RULES -->
@@ -1966,41 +1982,41 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202610191500"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202610191500"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202610191700"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202610191700"></script>
 
-<script src="assets/data/default-data.js?v=202610191500"></script>
-<script src="assets/data/brand-assets.js?v=202610191500"></script>
-<script src="assets/data/travel-routes.js?v=202610191500"></script>
-<script src="assets/js/00-icons.js?v=202610191500"></script>
-<script src="assets/js/01-state.js?v=202610191500"></script>
-<script src="assets/js/02-nav-util.js?v=202610191500"></script>
-<script src="assets/js/03-period-logic.js?v=202610191500"></script>
-<script src="assets/js/04-dashboard.js?v=202610191500"></script>
-<script src="assets/js/05-master-data.js?v=202610191500"></script>
-<script src="assets/js/06-plan-personil.js?v=202610191500"></script>
-<script src="assets/js/07-rules-planner.js?v=202610191500"></script>
-<script src="assets/js/08-gantt-print.js?v=202610191500"></script>
-<script src="assets/js/09-tracking-map.js?v=202610191500"></script>
-<script src="assets/js/10-running-hour.js?v=202610191500"></script>
-<script src="assets/js/11-berita-acara.js?v=202610191500"></script>
-<script src="assets/js/12-data-page.js?v=202610191500"></script>
-<script src="assets/js/13-hasil-db.js?v=202610191500"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202610191500"></script>
-<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610191500"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202610191500"></script>
-<script src="assets/js/16-actions-init.js?v=202610191500"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202610191500"></script>
-<script src="assets/js/18-model-dispersi.js?v=202610191500"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202610191500"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202610191500"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202610191500"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202610191500"></script>
-<script src="assets/js/23-budget-proyeksi.js?v=202610191500"></script>
-<script src="assets/js/24-personil-ppu.js?v=202610191500"></script>
-<script src="assets/js/25-access-gate.js?v=202610191500"></script>
-<script src="assets/js/26-laboratorium.js?v=202610191500"></script>
-<script src="assets/js/27-laporan-emf.js?v=202610191500"></script>
-<script src="assets/js/28-word-export.js?v=202610191500"></script>
+<script src="assets/data/default-data.js?v=202610191700"></script>
+<script src="assets/data/brand-assets.js?v=202610191700"></script>
+<script src="assets/data/travel-routes.js?v=202610191700"></script>
+<script src="assets/js/00-icons.js?v=202610191700"></script>
+<script src="assets/js/01-state.js?v=202610191700"></script>
+<script src="assets/js/02-nav-util.js?v=202610191700"></script>
+<script src="assets/js/03-period-logic.js?v=202610191700"></script>
+<script src="assets/js/04-dashboard.js?v=202610191700"></script>
+<script src="assets/js/05-master-data.js?v=202610191700"></script>
+<script src="assets/js/06-plan-personil.js?v=202610191700"></script>
+<script src="assets/js/07-rules-planner.js?v=202610191700"></script>
+<script src="assets/js/08-gantt-print.js?v=202610191700"></script>
+<script src="assets/js/09-tracking-map.js?v=202610191700"></script>
+<script src="assets/js/10-running-hour.js?v=202610191700"></script>
+<script src="assets/js/11-berita-acara.js?v=202610191700"></script>
+<script src="assets/js/12-data-page.js?v=202610191700"></script>
+<script src="assets/js/13-hasil-db.js?v=202610191700"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202610191700"></script>
+<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610191700"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202610191700"></script>
+<script src="assets/js/16-actions-init.js?v=202610191700"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202610191700"></script>
+<script src="assets/js/18-model-dispersi.js?v=202610191700"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202610191700"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202610191700"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202610191700"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202610191700"></script>
+<script src="assets/js/23-budget-proyeksi.js?v=202610191700"></script>
+<script src="assets/js/24-personil-ppu.js?v=202610191700"></script>
+<script src="assets/js/25-access-gate.js?v=202610191700"></script>
+<script src="assets/js/26-laboratorium.js?v=202610191700"></script>
+<script src="assets/js/27-laporan-emf.js?v=202610191700"></script>
+<script src="assets/js/28-word-export.js?v=202610191700"></script>
 </body>
 </html>
