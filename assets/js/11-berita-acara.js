@@ -17,6 +17,9 @@ function fmtHariTanggalIndo(dateStr){
 // site/batch — bukan data krusial yang butuh migrasi berat, cukup default kosong kalau belum ada.
 function ensureBaConfig(){
   if(!DB.baConfig) DB.baConfig = {};
+  // Margin halaman & nomor halaman berlaku utk semua BA (bukan per Tim) — mm, default 18.
+  if(!DB.baConfig.margins) DB.baConfig.margins = {top:18, right:18, bottom:18, left:18};
+  if(DB.baConfig.showPageNo===undefined) DB.baConfig.showPageNo = true;
   ["emisi","ambient"].forEach(team=>{
     if(!DB.baConfig[team]) DB.baConfig[team] = {namaPhm:"", jabatanPhm:"", labPerusahaan:"PT Sucofindo", namaLab:"", jabatanLab:"Ketua Tim Pemantauan Emisi", footerNote:""};
     // Field lama tersimpan sebelum footerNote ditambahkan belum tentu punya properti ini.
@@ -233,6 +236,11 @@ function renderBeritaAcara(){
     document.getElementById("baJabatanLab").value = cfg[team].jabatanLab;
     document.getElementById("baFooterNote").value = cfg[team].footerNote;
   }
+  if(!document.getElementById("baMarTop").dataset.init){
+    Object.keys(BA_MARGIN_IDS).forEach(k=>{ document.getElementById(BA_MARGIN_IDS[k]).value = cfg.margins[k]; });
+    document.getElementById("baShowPageNo").checked = cfg.showPageNo!==false;
+    document.getElementById("baMarTop").dataset.init = "1";
+  }
   const batchId = document.getElementById("baBatch").value;
   const site = document.getElementById("baSite").value;
   const b = DB.batches.find(x=>x.id===batchId);
@@ -253,13 +261,10 @@ function renderBeritaAcara(){
       ? `ENV Site Supervisor site <b>${escHtml(site)}</b>: <b>${escHtml(sup.nama)}</b>${sup.telepon?" &middot; "+escHtml(sup.telepon):""} &mdash; <button type="button" class="btn small ghost" data-action="useEnvSupervisorName" data-site="${escHtml(site)}">Pakai nama ini</button>`
       : site ? `ENV Site Supervisor site <b>${escHtml(site)}</b> belum diisi — isi di menu Personil &rarr; ENV Site Supervisor.` : "";
   }
+  // Ketua Tim Sampling tidak lagi dicantumkan di kepala BA (sudah ada pada blok tanda tangan), jadi
+  // keterangannya di form ikut disembunyikan.
   const ktEl = document.getElementById("baKetuaTimHint");
-  if(ktEl){
-    const kt = ketuaTimInfo(batchId);
-    ktEl.innerHTML = kt
-      ? `Ketua Tim Sampling (dari Perencanaan Batch): <b>${escHtml(kt.nama)}</b> <span class="muted">(${escHtml(kt.role)})</span>`
-      : `Ketua Tim Sampling belum ditunjuk utk batch ini — tunjuk di Perencanaan Batch.`;
-  }
+  if(ktEl) ktEl.style.display = "none";
   const pts = site ? baFilteredPoints(site, team, includeKebauan) : [];
   const titikHeader = team==="emisi" ? "Sumber Emisi (Titik Sampling)" : "Titik Sampling";
   // Tabel editor ringkas (No, Titik+kategori, Status) — kolom Lokasi/Kewajiban sudah terlihat di
@@ -286,17 +291,38 @@ function baFitPaper(){
   wrap.style.height = baZoom==="fit" ? (Math.ceil(paper.offsetHeight*scale)+PAD)+"px" : "";
   wrap.classList.toggle("zoom100", baZoom!=="fit");
 }
+const BA_MM_PX = 96/25.4;
 function baRenderPaper(){
   const paper = document.getElementById("baPaper");
   if(!paper) return;
   const html = buildBeritaAcaraHtml();
+  const m = baMargins();
+  // Padding lembar = margin kertas sungguhan, jadi isi bergeser persis spt hasil cetak/Word.
+  paper.style.padding = `${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm`;
   paper.innerHTML = html || `<div class="ba-paper-empty">Pilih Tim, Batch, dan Site yang sudah punya jadwal &amp; titik untuk melihat pratinjau Berita Acara.</div>`;
+  baMarkPages(paper, m);
   const hint = document.getElementById("baPaperHint");
   const d = html ? baCollectData() : null;
-  if(hint) hint.textContent = d ? `${d.total} titik · ${d.groups.length} kategori · Lapangan ${d.site}` : "";
+  if(hint) hint.textContent = d ? `${d.total} titik · ${d.groups.length} kategori · Lapangan ${d.site} · ±${paper.dataset.pages||1} halaman` : "";
   baFitPaper();
   // Logo/pita dimuat asinkron — ukur ulang tinggi lembar setelah gambar selesai.
-  paper.querySelectorAll("img").forEach(img=>{ if(!img.complete) img.addEventListener("load", baFitPaper, {once:true}); });
+  paper.querySelectorAll("img").forEach(img=>{ if(!img.complete) img.addEventListener("load", ()=>{ baMarkPages(paper, m); baFitPaper(); }, {once:true}); });
+}
+// Penanda perkiraan batas halaman A4 (garis putus-putus + "Hal. n") sesuai margin atas/bawah.
+// Perkiraan saja: pemotongan sebenarnya ditentukan Word/browser per baris tabel.
+function baMarkPages(paper, m){
+  paper.querySelectorAll(".ba-pb").forEach(e=>e.remove());
+  const contentPx = (297-m.top-m.bottom)*BA_MM_PX;
+  const bodyPx = Math.max(0, paper.scrollHeight - (m.top+m.bottom)*BA_MM_PX);
+  const pages = Math.max(1, Math.ceil(bodyPx/contentPx - 0.02));
+  paper.dataset.pages = pages;
+  for(let k=1;k<pages;k++){
+    const y = m.top*BA_MM_PX + k*contentPx;
+    const e = document.createElement("div");
+    e.className = "ba-pb"; e.style.top = y.toFixed(0)+"px";
+    e.innerHTML = `<span>Hal. ${k+1}</span>`;
+    paper.appendChild(e);
+  }
 }
 let baPaperTimer = null;
 function baSchedulePaper(){ clearTimeout(baPaperTimer); baPaperTimer = setTimeout(baRenderPaper, 120); }
@@ -349,6 +375,23 @@ document.getElementById("baIncludeKebauan").addEventListener("change", renderBer
 // Satu sumber data utk SEMUA keluaran Berita Acara (pratinjau layar, cetak/PDF, Word .docx) — dulu
 // tiap keluaran menyusun datanya sendiri dari form, jadi pratinjau & file Word gampang berbeda dari
 // hasil cetak. Mengembalikan null kalau site/titik belum ada.
+// Margin kertas (mm) dari isian halaman, dibatasi 5–50 mm; kalau isian kosong/tidak valid dipakai
+// nilai tersimpan (default 18 mm = margin cetak sebelumnya).
+const BA_MARGIN_IDS = {top:"baMarTop", bottom:"baMarBottom", left:"baMarLeft", right:"baMarRight"};
+function baMargins(){
+  const cfg = ensureBaConfig().margins, out = {};
+  Object.keys(BA_MARGIN_IDS).forEach(k=>{
+    const el = document.getElementById(BA_MARGIN_IDS[k]);
+    let v = el ? parseFloat(el.value) : NaN;
+    if(!isFinite(v)) v = cfg[k];
+    out[k] = Math.min(50, Math.max(5, Math.round(v*2)/2));
+  });
+  return out;
+}
+function baShowPageNo(){
+  const el = document.getElementById("baShowPageNo");
+  return el ? el.checked : ensureBaConfig().showPageNo!==false;
+}
 function baCollectData(){
   const team = document.getElementById("baTeam").value;
   const includeKebauan = document.getElementById("baIncludeKebauan").checked;
@@ -389,6 +432,7 @@ function baCollectData(){
     namaLab: document.getElementById("baNamaLab").value,
     jabatanLab: document.getElementById("baJabatanLab").value,
     ketua: kt,
+    margins: baMargins(), showPageNo: baShowPageNo(),
     titikHeader: team==="emisi" ? "Sumber Emisi (Titik Sampling)" : "Titik Sampling",
     groups
   };
@@ -432,8 +476,7 @@ function buildBeritaAcaraHtml(){
       </div>
       <div class="pg-ba-intro">${d.intro}</div>
       <table class="pg-ba-meta"><tr><td style="width:150px;">Hari / Tanggal</td><td style="width:14px;">:</td><td>${escHtml(d.tanggalPelaksanaan)}</td></tr>
-      <tr><td>Lokasi</td><td>:</td><td>Lapangan ${escHtml(d.site)} PT Pertamina Hulu Mahakam</td></tr>
-      ${d.ketua ? `<tr><td>Ketua Tim Sampling</td><td>:</td><td>${escHtml(d.ketua.nama)} (${escHtml(d.ketua.role)})</td></tr>` : ""}</table>
+      <tr><td>Lokasi</td><td>:</td><td>Lapangan ${escHtml(d.site)} PT Pertamina Hulu Mahakam</td></tr></table>
       <div class="pg-ba-intro">Adapun titik lokasi yang dilakukan pengukuran adalah sebagai berikut:</div>
     </div>
     <table class="pg-ba-page">
@@ -481,7 +524,7 @@ async function printBeritaAcara(){
   // teks kepala/kaki halaman punya jarak aman dari tepi kertas — beberapa printer fisik tidak bisa
   // benar-benar mencetak sampai tepi walau @page margin sudah diset, jadi margin ekstra ini jadi
   // buffer supaya tidak terlihat "kepotong".
-  setPrintOrientation("portrait", 18);
+  setPrintOrientation("portrait", baMargins(), {pageNumber: baShowPageNo()});
   document.getElementById("printGuideArea").innerHTML = html;
   // window.print() dipanggil browser SEGERA setelah baris di atas kalau tidak ditunggu — <img> logo
   // & footer yang baru saja disuntik lewat innerHTML belum tentu selesai di-decode di titik itu
@@ -498,4 +541,25 @@ async function printBeritaAcara(){
   document.title = baExportFilename();
   window.print();
   document.title = originalTitle;
+}
+// Isian margin & nomor halaman: tersimpan di DB.baConfig dan langsung memperbarui pratinjau.
+Object.values(BA_MARGIN_IDS).concat(["baShowPageNo"]).forEach(id=>{
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.addEventListener("input", ()=>{
+    const cfg = ensureBaConfig();
+    cfg.margins = baMargins(); cfg.showPageNo = baShowPageNo();
+    save(); baSchedulePaper();
+  });
+  el.addEventListener("change", ()=>{
+    // Rapikan nilai di kolom setelah selesai mengetik (batas 5–50 mm).
+    const k = Object.keys(BA_MARGIN_IDS).find(x=>BA_MARGIN_IDS[x]===id);
+    if(k) el.value = baMargins()[k];
+  });
+});
+function baResetMargins(){
+  const cfg = ensureBaConfig();
+  cfg.margins = {top:18, right:18, bottom:18, left:18};
+  Object.keys(BA_MARGIN_IDS).forEach(k=>{ document.getElementById(BA_MARGIN_IDS[k]).value = 18; });
+  save(); baRenderPaper();
 }

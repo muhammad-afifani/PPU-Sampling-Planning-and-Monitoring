@@ -523,10 +523,14 @@ function buildPrintGuideHtml(includeGantt){
 // Menyetel orientasi kertas cetak secara dinamis lewat <style> terpisah — aturan @page tidak bisa
 // diberi selector class/parent seperti elemen biasa, jadi cara paling aman adalah menulis ulang
 // isinya tiap kali preferensi orientasi berubah, sebelum window.print() dipanggil.
-function setPrintOrientation(orientation, marginMm){
+// marginMm: angka (sama utk 4 sisi) ATAU {top,right,bottom,left}. opts.pageNumber = true menambah
+// "Halaman n dari N" di kanan bawah (margin box @page, didukung Chrome/Edge terbaru).
+function setPrintOrientation(orientation, marginMm, opts){
   let styleEl = document.getElementById("printOrientationStyle");
   if(!styleEl){ styleEl = document.createElement("style"); styleEl.id = "printOrientationStyle"; document.head.appendChild(styleEl); }
-  styleEl.textContent = `@page{size:A4 ${orientation==="landscape"?"landscape":"portrait"};margin:${marginMm||12}mm;}`;
+  const m = (marginMm && typeof marginMm==="object") ? `${marginMm.top}mm ${marginMm.right}mm ${marginMm.bottom}mm ${marginMm.left}mm` : `${marginMm||12}mm`;
+  const num = (opts && opts.pageNumber) ? `@page{@bottom-right{content:"Halaman " counter(page) " dari " counter(pages);font:8pt Arial,Helvetica,sans-serif;color:#555;}}` : "";
+  styleEl.textContent = `@page{size:A4 ${orientation==="landscape"?"landscape":"portrait"};margin:${m};}${num}`;
 }
 // Tombol "Cetak Panduan Sampling" membuka dialog preferensi dulu (orientasi kertas & sertakan/tidak
 // tabel Gantt ringkas) sebelum benar-benar mencetak, supaya jadwal yang berlangsung sangat lama bisa

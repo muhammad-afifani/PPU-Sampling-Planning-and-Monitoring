@@ -81,6 +81,7 @@ function dxP(runs, o){
   ppr.push(`<w:spacing w:before="${o.before||0}" w:after="${o.after||0}"${o.line?` w:line="${o.line}" w:lineRule="auto"`:""}/>`);
   if(o.ind) ppr.push(`<w:ind w:left="${o.ind}"/>`);
   if(o.jc) ppr.push(`<w:jc w:val="${o.jc}"/>`);
+  if(o.markSz) ppr.push(`<w:rPr><w:sz w:val="${o.markSz}"/><w:szCs w:val="${o.markSz}"/></w:rPr>`);
   return `<w:p><w:pPr>${ppr.join("")}</w:pPr>${Array.isArray(runs)?runs.join(""):(runs||"")}</w:p>`;
 }
 function dxBorder(side, sz, color, val){ return `<w:${side} w:val="${val||"single"}" w:sz="${sz}" w:space="0" w:color="${color}"/>`; }
@@ -127,9 +128,13 @@ function dxPngSize(bytes){
 const DX_NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
 
 /* ---------- Berita Acara → .docx ---------- */
-const DX_PAGE = {w:11906, h:16838, margin:1020};       // A4 potret, margin 18mm (sama dgn cetak)
-const DX_CONTENT_W = DX_PAGE.w - 2*DX_PAGE.margin;      // 9866 twips
+const DX_PAGE = {w:11906, h:16838};                     // A4 potret
+const dxMm = mm=>Math.round(mm*56.6929);                // mm -> twips
+// Satu field Word sederhana (PAGE / NUMPAGES) dgn teks cadangan.
+function dxField(instr, fallback, o){ return `<w:fldSimple w:instr=" ${instr} ">${dxRun(fallback,o)}</w:fldSimple>`; }
 function dxBuildBeritaAcara(d){
+  const M = d.margins || {top:18,right:18,bottom:18,left:18};
+  const DX_CONTENT_W = DX_PAGE.w - dxMm(M.left) - dxMm(M.right);
   const images = {};  // rId -> {name, bytes, px:{w,h}}
   const reg = (rId, name, dataUrl)=>{ const u = dxDataUrlBytes(dataUrl); if(!u) return null; images[rId] = {name, bytes:u.bytes, px:dxPngSize(u.bytes)||{w:400,h:100}}; return images[rId]; };
   const logoL = reg("rIdImg1","logo-skkmigas.png", LOGO_SKKMIGAS_B64);
@@ -143,20 +148,21 @@ function dxBuildBeritaAcara(d){
 
   // Logo kiri (SKK Migas) & kanan (PHM) — tabel tanpa garis
   const lsz = logoL ? sizeByH(logoL) : {cx:1,cy:1}, rsz = logoR ? sizeByH(logoR) : {cx:1,cy:1};
-  body.push(dxTable([DX_CONTENT_W/2, DX_CONTENT_W/2], [dxRow([
-    dxCell(DX_CONTENT_W/2, dxP(logoL?dxImage("rIdImg1",1,"SKK Migas",lsz.cx,lsz.cy):"",{jc:"left"}), {vAlign:"center"}),
-    dxCell(DX_CONTENT_W/2, dxP(logoR?dxImage("rIdImg2",2,"Pertamina Hulu Mahakam",rsz.cx,rsz.cy):"",{jc:"right"}), {vAlign:"center"})
-  ])], {borders:noBorders, cellMar:{top:0,bottom:0,left:100,right:100}}));
-  body.push(dxP("",{after:200}));
+  const half = Math.floor(DX_CONTENT_W/2), half2 = DX_CONTENT_W-half;
+  body.push(dxTable([half, half2], [dxRow([
+    dxCell(half, dxP(logoL?dxImage("rIdImg1",1,"SKK Migas",lsz.cx,lsz.cy):"",{jc:"left"}), {vAlign:"center"}),
+    dxCell(half2, dxP(logoR?dxImage("rIdImg2",2,"Pertamina Hulu Mahakam",rsz.cx,rsz.cy):"",{jc:"right"}), {vAlign:"center"})
+  ])], {borders:noBorders, cellMar:{top:0,bottom:0,left:0,right:0}}));
+  // Satu baris kosong berhuruf kecil (6pt) antara logo dan judul — jarak rapat tapi tetap lega.
+  body.push(dxP("",{markSz:12,keepNext:true}));
 
-  // Judul
-  body.push(dxP(dxRun("BERITA ACARA",{b:true,sz:23}),{jc:"center",after:40,keepNext:true}));
-  body.push(dxP(dxRun(d.judul,{b:true,sz:19}),{jc:"center",after:200,borderBottom:12,keepNext:true}));
+  // Judul & subjudul: satu ukuran huruf (10,5pt, tebal)
+  body.push(dxP(dxRun("BERITA ACARA",{b:true,sz:21}),{jc:"center",after:20,keepNext:true}));
+  body.push(dxP(dxRun(d.judul,{b:true,sz:21}),{jc:"center",after:200,borderBottom:12,keepNext:true}));
   body.push(dxP(dxRun(d.intro,{sz:19}),{after:140,line:276,keepNext:true}));
 
   // Meta (Hari/Tanggal, Lokasi, Ketua Tim)
   const metaRows = [["Hari / Tanggal", d.tanggalPelaksanaan], ["Lokasi", `Lapangan ${d.site} PT Pertamina Hulu Mahakam`]];
-  if(d.ketua) metaRows.push(["Ketua Tim Sampling", `${d.ketua.nama} (${d.ketua.role})`]);
   const mw = [2300, 260, DX_CONTENT_W-2560];
   body.push(dxTable(mw, metaRows.map(([k,v])=>dxRow([
     dxCell(mw[0], dxP(dxRun(k,{sz:19})), {vAlign:"top"}),
@@ -166,7 +172,7 @@ function dxBuildBeritaAcara(d){
   body.push(dxP(dxRun("Adapun titik lokasi yang dilakukan pengukuran adalah sebagai berikut:",{sz:19}),{before:140,after:120,keepNext:true}));
 
   // Tabel titik
-  const W = [520, 1350, 1850, 2340, 1500]; W.push(DX_CONTENT_W - W.reduce((a,b)=>a+b,0));
+  const W = [520, 1350, 1850, 2340, 1500].map(w=>Math.round(w*DX_CONTENT_W/9866)); W.push(DX_CONTENT_W - W.reduce((a,b)=>a+b,0));
   const line = dxBorder("top",4,"999999")+dxBorder("left",4,"999999")+dxBorder("bottom",4,"999999")+dxBorder("right",4,"999999");
   const tblBorders = ["top","left","bottom","right","insideH","insideV"].map(s=>dxBorder(s,4,"999999")).join("");
   const TS = 16;  // 8pt
@@ -188,7 +194,7 @@ function dxBuildBeritaAcara(d){
   body.push(dxP(dxRun("Demikian Berita Acara ini dibuat untuk dipergunakan sebagaimana mestinya.",{sz:19}),{before:360,keepNext:true}));
   body.push(dxP(dxRun(d.tempatTanggal,{sz:19}),{before:100,jc:"right",keepNext:true}));
   body.push(dxP(dxRun("Mengetahui,",{sz:19}),{before:300,jc:"center",keepNext:true}));
-  const sw = [DX_CONTENT_W/2, DX_CONTENT_W/2];
+  const sw = [half, half2];
   const cp = (txt,o)=>dxP(dxRun(txt,Object.assign({sz:19},o||{})),{jc:"center",keepNext:true});
   body.push(dxTable(sw, [
     dxRow([dxCell(sw[0], cp(`PT Pertamina Hulu Mahakam, ${d.site}`)), dxCell(sw[1], cp(d.labPerusahaan))]),
@@ -198,9 +204,11 @@ function dxBuildBeritaAcara(d){
   body.push(dxP("",{}));  // paragraf penutup wajib setelah tabel
 
   const bandSz = band ? {cx:Math.round(DX_CONTENT_W/1440*914400), cy:Math.round(DX_CONTENT_W/1440*914400*band.px.h/band.px.w)} : {cx:1,cy:1};
-  const sect = `<w:sectPr><w:footerReference w:type="default" r:id="rIdFooter1"/><w:pgSz w:w="${DX_PAGE.w}" w:h="${DX_PAGE.h}"/><w:pgMar w:top="${DX_PAGE.margin}" w:right="${DX_PAGE.margin}" w:bottom="1247" w:left="${DX_PAGE.margin}" w:header="567" w:footer="397" w:gutter="0"/></w:sectPr>`;
+  const sect = `<w:sectPr><w:footerReference w:type="default" r:id="rIdFooter1"/><w:pgSz w:w="${DX_PAGE.w}" w:h="${DX_PAGE.h}"/><w:pgMar w:top="${dxMm(M.top)}" w:right="${dxMm(M.right)}" w:bottom="${dxMm(M.bottom)}" w:left="${dxMm(M.left)}" w:header="567" w:footer="340" w:gutter="0"/></w:sectPr>`;
   const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${DX_NS}><w:body>${body.join("")}${sect}</w:body></w:document>`;
-  const footerXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr ${DX_NS}>${dxP(band?dxImage("rIdImg3",3,"Pita footer",bandSz.cx,bandSz.cy):"",{jc:"center"})}</w:ftr>`;
+  // Footer: "Halaman n dari N" (rata kanan) di atas pita merah — tampil di SETIAP halaman.
+  const pageNo = d.showPageNo!==false ? dxP([dxRun("Halaman ",{sz:16,color:"555555"}), dxField("PAGE","1",{sz:16,color:"555555"}), dxRun(" dari ",{sz:16,color:"555555"}), dxField("NUMPAGES","1",{sz:16,color:"555555"})],{jc:"right",after:60}) : "";
+  const footerXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr ${DX_NS}>${pageNo}${dxP(band?dxImage("rIdImg3",3,"Pita footer",bandSz.cx,bandSz.cy):"",{jc:"center"})}</w:ftr>`;
   return {documentXml, footerXml, images};
 }
 function dxPackage(built, title){

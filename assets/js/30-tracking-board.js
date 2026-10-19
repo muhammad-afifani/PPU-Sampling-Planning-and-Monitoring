@@ -361,7 +361,7 @@ function renderSamplingEmisiTable(pts){
 }
 
 Object.assign(ACTIONS, {
-  trkSetTab, trkSetView, trkSetStage, trkNode, trkAdvance, trkSaveDetail, baSetZoom,
+  trkSetTab, trkSetView, trkSetStage, trkNode, trkAdvance, trkSaveDetail, baSetZoom, baResetMargins,
   trkOpenDetail:(t)=>trkOpenDetail(t.dataset.id),
   trkResetFilter:()=>{ trkSelectOptionsReset(); renderTracking(); }
 });
