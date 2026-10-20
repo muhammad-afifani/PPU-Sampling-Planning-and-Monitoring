@@ -292,20 +292,42 @@ document.addEventListener("drop", e=>{
   renderDayDetailModal(b, row);
   renderGantt();
 });
-function refreshGanttBatchSelect(){
-  const view = document.getElementById("ganttView").value;
-  const sel = document.getElementById("ganttBatch");
-  const prevValue = sel.value;
-  let list = view==="overlay"? DB.batches : DB.batches.filter(b=>b.team===view);
-  sel.innerHTML = `<option value="">Semua batch</option>` + list.map(b=>`<option value="${b.id}">${b.name}</option>`).join("");
-  // Rebuild innerHTML mereset seleksi ke opsi pertama ("Semua batch") walau opsi lama masih ada di
-  // daftar baru — dipasang lagi manual di sini kalau masih valid, supaya filter Batch yg sedang
-  // dipilih user TIDAK diam-diam balik ke "Semua batch" tiap kali renderGantt() jalan (mis. abis
-  // drag-drop di Detail Harian, adjust durasi, dll — semua itu render ulang lewat sini).
-  if(list.some(b=>b.id===prevValue)) sel.value = prevValue;
+// Pilihan Tim & Batch bisa lebih dari satu (chip toggle) supaya beberapa batch/tim tampil bersamaan
+// di Jadwal Harian, Gantt WBS, S-Curve, Preview & Transport. ganttBatchIds kosong = semua batch
+// dari tim terpilih. Satu sumber utk semua pemakai lewat ganttSelectedBatches().
+let ganttTeams = new Set(["emisi"]), ganttBatchIds = new Set();
+function ganttSelectedBatches(){
+  let list = DB.batches.filter(b=>ganttTeams.has(b.team));
+  if(ganttBatchIds.size) list = list.filter(b=>ganttBatchIds.has(b.id));
+  return list;
 }
-document.getElementById("ganttView").addEventListener("change", ()=>{ refreshGanttBatchSelect(); renderGantt(); });
-document.getElementById("ganttBatch").addEventListener("change", renderGantt);
+function ganttViewKey(){ return ganttTeams.size>1 ? "overlay" : ([...ganttTeams][0]||"emisi"); }
+// Batch tunggal (utk Finalisasi) — hanya kalau tepat 1 batch dipilih.
+function ganttSingleBatch(){ return ganttBatchIds.size===1 ? DB.batches.find(b=>ganttBatchIds.has(b.id))||null : null; }
+const GANTT_TEAM_META = {emisi:{label:"Emisi", color:"#0ea5a0"}, ambient:{label:"Ambient", color:"#3d78c9"}};
+function refreshGanttBatchSelect(){
+  // Buang batch terpilih yang timnya sudah tidak dipilih / batch yang sudah dihapus.
+  [...ganttBatchIds].forEach(id=>{ const b = DB.batches.find(x=>x.id===id); if(!b || !ganttTeams.has(b.team)) ganttBatchIds.delete(id); });
+  const teamEl = document.getElementById("ganttTeamChips");
+  if(teamEl) teamEl.innerHTML = Object.entries(GANTT_TEAM_META).map(([k,m])=>`<button type="button" class="chip-toggle gn-chip ${ganttTeams.has(k)?"active":""}" aria-pressed="${ganttTeams.has(k)}" data-action="ganttToggleTeam" data-val="${k}"><span class="gn-chip-dot" style="background:${m.color}"></span>Tim ${m.label}</button>`).join("");
+  const list = DB.batches.filter(b=>ganttTeams.has(b.team));
+  const batchEl = document.getElementById("ganttBatchChips");
+  if(batchEl) batchEl.innerHTML = `<button type="button" class="chip-toggle gn-chip ${ganttBatchIds.size?"":"active"}" aria-pressed="${!ganttBatchIds.size}" data-action="ganttToggleBatch" data-val="">Semua batch</button>`
+    + list.map(b=>`<button type="button" class="chip-toggle gn-chip ${ganttBatchIds.has(b.id)?"active":""}" aria-pressed="${ganttBatchIds.has(b.id)}" data-action="ganttToggleBatch" data-val="${b.id}" title="${escHtml(b.name)}"><span class="gn-chip-dot" style="background:${GANTT_TEAM_META[b.team]?GANTT_TEAM_META[b.team].color:"#7f8fa0"}"></span>${escHtml(b.name)}</button>`).join("");
+}
+function ganttToggleTeam(t){
+  const k = t.dataset.val;
+  if(ganttTeams.has(k)){ if(ganttTeams.size===1){ toast("Minimal satu tim harus dipilih.","err"); return; } ganttTeams.delete(k); }
+  else ganttTeams.add(k);
+  renderGantt();
+}
+function ganttToggleBatch(t){
+  const id = t.dataset.val;
+  if(!id) ganttBatchIds.clear();
+  else if(ganttBatchIds.has(id)) ganttBatchIds.delete(id);
+  else ganttBatchIds.add(id);
+  renderGantt();
+}
 document.getElementById("ganttMode").addEventListener("change", renderGantt);
 document.addEventListener("input", e=>{ if(e.target.id==="spSearch") spApplyFilter(); });
 
@@ -360,12 +382,7 @@ function buildPrintGanttGrid(b){
 // dilihat di layar. Memakai data batch yang sudah fix dari halaman Perencanaan Batch/Gantt, jadi
 // tidak menduplikasi logika penjadwalan, hanya menyusun ulang tampilannya supaya pas untuk kertas A4.
 function buildPrintGuideHtml(includeGantt){
-  const view = document.getElementById("ganttView").value;
-  const batchId = document.getElementById("ganttBatch").value;
-  const teamForView = view==="overlay" ? null : view;
-  let batches = teamForView ? DB.batches.filter(b=>b.team===teamForView) : DB.batches.slice();
-  if(batchId) batches = batches.filter(b=>b.id===batchId);
-  batches = batches.filter(b=>(b.schedule||[]).length && (b.items||[]).length);
+  let batches = ganttSelectedBatches().filter(b=>(b.schedule||[]).length && (b.items||[]).length);
   if(!batches.length) return null;
 
   const printedAt = new Date().toLocaleString("id-ID", {dateStyle:"long", timeStyle:"short"});
@@ -698,13 +715,17 @@ function buildDayGridView(rows){
   });
   html += `</tr></thead><tbody>`;
 
-  const showTeamDivider = new Set(rows.map(r=>r.team)).size>1;
+  // Pemisah per batch kalau lebih dari 1 batch tampil (pilihan Batch bisa banyak), atau per tim.
+  const showBatchDivider = new Set(rows.map(r=>r.batch?r.batch.id:r.batchName)).size>1;
+  const showTeamDivider = !showBatchDivider && new Set(rows.map(r=>r.team)).size>1;
   const colspan = totalDays+2;
-  let lastTeam = null;
+  let lastKey = null;
   rows.forEach(r=>{
-    if(showTeamDivider && r.team!==lastTeam){
-      lastTeam = r.team;
-      const label = r.team==="emisi" ? "Tim Emisi" : "Tim Ambient";
+    const divKey = showBatchDivider ? (r.batch?r.batch.id:r.batchName) : r.team;
+    if((showBatchDivider||showTeamDivider) && divKey!==lastKey){
+      lastKey = divKey;
+      const teamLabel = r.team==="emisi" ? "Tim Emisi" : "Tim Ambient";
+      const label = showBatchDivider ? `${teamLabel} &middot; ${escHtml(r.batchName)}` : teamLabel;
       const color = r.team==="emisi" ? "#0ea5a0" : "#3d78c9";
       html += `<tr class="dg-team-divider"><td colspan="${colspan}" style="border-left:4px solid ${color};">${label}</td></tr>`;
     }
@@ -812,8 +833,7 @@ function buildDayGridView(rows){
 // bilang "ini sudah oke, siap dicetak & dibawa" biar kelihatan jelas di layar.
 function renderFinalizeStatus(){
   const el = document.getElementById("ganttFinalizeStatus"); if(!el) return;
-  const batchId = document.getElementById("ganttBatch").value;
-  const b = DB.batches.find(x=>x.id===batchId);
+  const b = ganttSingleBatch();
   if(!b){ el.innerHTML = ""; return; }
   if(b.finalized){
     el.innerHTML = `<div class="section-note" style="border-color:#3fb27f;background:#eafaf1;color:#1f7a4d;margin-top:8px;">&#9989; Jadwal batch "<b>${escHtml(b.name)}</b>" sudah <b>difinalisasi</b> pada ${fmtDateTimeId(b.finalizedAt)}. <button class="btn small ghost" data-action="unfinalizeBatchSchedule" style="margin-left:8px;">Batalkan Finalisasi</button></div>`;
@@ -822,9 +842,8 @@ function renderFinalizeStatus(){
   }
 }
 function finalizeBatchSchedule(){
-  const batchId = document.getElementById("ganttBatch").value;
-  const b = DB.batches.find(x=>x.id===batchId);
-  if(!b){ toast('Pilih 1 batch spesifik dulu di filter "Batch" di atas (bukan "Semua batch").',"err"); return; }
+  const b = ganttSingleBatch();
+  if(!b){ toast('Pilih tepat 1 batch di filter "Batch" di atas untuk difinalisasi.',"err"); return; }
   if(!(b.schedule||[]).length){ toast("Batch ini belum punya jadwal — generate dulu di Perencanaan Batch.","err"); return; }
   b.finalized = true; b.finalizedAt = new Date().toISOString();
   logChange(`Jadwal batch "${b.name}" difinalisasi`);
@@ -833,8 +852,7 @@ function finalizeBatchSchedule(){
   toast(`Jadwal "${b.name}" ditandai final. Siap dicetak lewat "Cetak Panduan Sampling".`,"ok");
 }
 function unfinalizeBatchSchedule(){
-  const batchId = document.getElementById("ganttBatch").value;
-  const b = DB.batches.find(x=>x.id===batchId); if(!b) return;
+  const b = ganttSingleBatch(); if(!b) return;
   b.finalized = false;
   logChange(`Finalisasi jadwal batch "${b.name}" dibatalkan`);
   save();
@@ -1186,26 +1204,25 @@ function renderGanttKpis(batches){
 function renderGantt(){
   refreshGanttBatchSelect();
   renderFinalizeStatus();
-  const view = document.getElementById("ganttView").value;
-  const batchId = document.getElementById("ganttBatch").value;
-  let batches = view==="overlay" ? DB.batches : DB.batches.filter(b=>b.team===view);
-  if(batchId) batches = batches.filter(b=>b.id===batchId);
+  const view = ganttViewKey();
+  const batches = ganttSelectedBatches();
   renderGanttCrewChangeInfo(batches);
   renderGanttKpis(batches);
   const mode = document.getElementById("ganttMode").value;
-  const barLegend = document.getElementById("ganttBarLegend");
-  if(barLegend) barLegend.style.display = mode==="bar" ? "" : "none";
-  if(mode==="bar"){
-    document.getElementById("ganttWrap").innerHTML = buildGanttSVG(batches);
+  const wbsBar = document.getElementById("wbsToolbar");
+  if(wbsBar) wbsBar.style.display = mode==="wbs" ? "" : "none";
+  if(mode==="wbs"){
+    document.getElementById("ganttWrap").innerHTML = wbsRender(batches);
+    wbsAfterRender();
   } else {
     const rows = [];
     batches.forEach(b=>(b.schedule||[]).forEach((r,idx)=>rows.push({...r, team:b.team, batchName:b.name, batch:b, rowIdx:idx})));
-    // Overlay: kelompokkan per tim (Emisi dulu, lalu Ambient) supaya ada pemisah visual yang jelas,
-    // bukan tercampur acak sesuai urutan batch dibuat.
+    // Beberapa tim: kelompokkan per tim (Emisi dulu, lalu Ambient), di dalamnya urut batch — supaya
+    // pemisah batch/tim jelas, bukan tercampur acak sesuai urutan batch dibuat.
     if(view==="overlay") rows.sort((a,c)=> a.team===c.team ? 0 : (a.team==="emisi"?-1:1));
     document.getElementById("ganttWrap").innerHTML = buildDayGridView(rows);
   }
-  document.getElementById("scurveWrap").innerHTML = buildSCurveSVG(batches, DB.points, view==="overlay"?["emisi","ambient"]:[view]);
+  document.getElementById("scurveWrap").innerHTML = buildSCurveSVG(batches, DB.points, [...ganttTeams]);
   renderSitePreview(batches);
   document.getElementById("transportArrangeWrap").innerHTML = buildTransportArrangeHtml(batches);
 }
@@ -1492,79 +1509,6 @@ function handleRowReorder(batchId, fromIdx, toIdx){
   });
 })();
 
-function buildGanttSVG(batches){
-  const rows = [];
-  batches.forEach(b=>{
-    (b.schedule||[]).forEach(r=>{
-      rows.push({batchName:b.name, team:b.team, site:r.site, start:r.start, end:r.end, workDays:r.workDays, bufferDays:r.bufferDays, count:r.count});
-    });
-  });
-  if(!rows.length){
-    document.getElementById("ganttMeta").textContent = "";
-    return "<div class='hint' style='padding:16px;'>Belum ada jadwal untuk ditampilkan. Buka halaman <b>Perencanaan Batch</b>, isi tanggal mulai, lalu klik <b>Buat &amp; Terapkan Jadwal</b>.</div>";
-  }
-
-  const allDates = rows.flatMap(r=>[r.start, r.end]);
-  const minDate = allDates.reduce((a,b)=>a<b?a:b);
-  const maxDate = allDates.reduce((a,b)=>a>b?a:b);
-  const totalDays = daysBetweenInclusive(minDate,maxDate);
-  document.getElementById("ganttMeta").innerHTML = `Periode: <b>${minDate}</b> &rarr; <b>${maxDate}</b> (${totalDays} hari) &nbsp;·&nbsp; ${rows.length} baris site`;
-
-  const dayW = Math.max(30, Math.min(52, Math.floor(2200/totalDays)));
-  const rowH = 58, leftW = 220, topH = 60;
-  const W = leftW + totalDays*dayW + 20;
-  const H = topH + rows.length*rowH + 16;
-
-  let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="font-size:13px;background:var(--surface-card);border:1px solid var(--gray-200);border-radius:10px;font-family:var(--font-ui);">`;
-  // day grid + labels
-  for(let i=0;i<totalDays;i++){
-    const dt = addDays(minDate,i);
-    const x = leftW + i*dayW;
-    const dow = dayOfWeek(dt);
-    const isWeekend = dow===0||dow===6;
-    svg += `<rect x="${x}" y="${topH}" width="${dayW}" height="${H-topH}" fill="${isWeekend?'#f4f7f9':'#fff'}" />`;
-    svg += `<text x="${x+dayW/2}" y="22" text-anchor="middle" fill="var(--gray-500)" font-size="10.5px">${DOW_LABEL[dow].slice(0,3)}</text>`;
-    svg += `<text x="${x+dayW/2}" y="40" text-anchor="middle" fill="var(--gray-900)" font-weight="700" font-size="13px">${dt.slice(8,10)}</text>`;
-    if(dt.slice(8,10)==="01"||i===0) svg += `<text x="${x+4}" y="54" fill="#0ea5a0" font-weight="700" font-size="10.5px">${dt.slice(0,7)}</text>`;
-    svg += `<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="var(--gray-200)"/>`;
-  }
-  svg += `<line x1="${leftW}" y1="${topH}" x2="${W}" y2="${topH}" stroke="var(--gray-300)" stroke-width="1.5"/>`;
-  svg += `<rect x="0" y="0" width="${leftW}" height="${H}" fill="var(--surface-card)"/>`;
-  svg += `<line x1="${leftW}" y1="0" x2="${leftW}" y2="${H}" stroke="var(--gray-300)" stroke-width="1.5"/>`;
-
-  rows.forEach((r,ri)=>{
-    const y = topH + ri*rowH;
-    if(ri%2===1) svg += `<rect x="0" y="${y}" width="${W}" height="${rowH}" fill="var(--gray-100)"/>`;
-    svg += `<text x="14" y="${y+rowH/2-4}" fill="var(--gray-900)" font-weight="700" font-size="14px">${r.site}</text>`;
-    svg += `<text x="14" y="${y+rowH/2+14}" fill="var(--gray-500)" font-size="10.5px">${escSvg(r.batchName)} · ${r.count} titik</text>`;
-    svg += `<line x1="0" y1="${y+rowH}" x2="${W}" y2="${y+rowH}" stroke="var(--gray-200)"/>`;
-
-    for(let i=0;i<totalDays;i++){
-      const dt = addDays(minDate,i);
-      if(isCrewChange(r.site, dt)){
-        svg += `<rect x="${leftW+i*dayW}" y="${y+2}" width="${dayW}" height="${rowH-4}" fill="#e0554f" opacity="0.22"/>`;
-      }
-      if(isBlocked(r.site, dt)){
-        svg += `<rect x="${leftW+i*dayW}" y="${y+2}" width="${dayW}" height="${rowH-4}" fill="var(--gray-500)" opacity="0.22"/>`;
-      }
-    }
-
-    const startOff = daysBetweenInclusive(minDate, r.start)-1;
-    const workLen = r.workDays;
-    const bufLen = r.bufferDays;
-    const barColor = r.team==="emisi" ? "#0ea5a0" : "#3d78c9";
-    const barY = y+12, barH = rowH-24;
-    svg += `<rect x="${leftW+startOff*dayW+2}" y="${barY}" width="${Math.max(0,workLen*dayW-4)}" height="${barH}" rx="6" fill="${barColor}"/>`;
-    if(workLen*dayW>46){
-      svg += `<text x="${leftW+startOff*dayW+10}" y="${barY+barH/2+4}" fill="#fff" font-weight="700" font-size="11.5px">${workLen}h · ${r.count} titik</text>`;
-    }
-    if(bufLen>0){
-      svg += `<rect x="${leftW+(startOff+workLen)*dayW+2}" y="${barY}" width="${Math.max(0,bufLen*dayW-4)}" height="${barH}" rx="6" fill="${barColor}" opacity="0.3" stroke="${barColor}" stroke-width="1.5" stroke-dasharray="3,3"/>`;
-    }
-  });
-  svg += `</svg>`;
-  return svg;
-}
 function escSvg(s){ return escHtml(s); }
 
 // Label/warna/deskripsi status dipakai bareng oleh baris panel "Distribusi Status" DAN judul modal

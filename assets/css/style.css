@@ -2920,3 +2920,110 @@ table.daygrid{background:transparent !important;border-spacing:3px 4px !importan
 
 .ba-layout-grid{margin-top:2px;}
 #page-tracking .cardhead .btn{white-space:nowrap;flex-shrink:0;}
+
+/* =========================================================
+   SCHEDULING TOOLS — pilihan Tim/Batch (multi) & Gantt WBS ala Primavera
+========================================================= */
+.gn-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.gn-chip{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:4px 12px;font-size:12px;}
+.gn-chip-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.gn-lbl-note{text-transform:none;letter-spacing:0;font-weight:500;}
+.gn-batch-field{flex:1 1 420px;}
+.dp-listhead .spacer{flex:1;}
+.gn-export .btn{min-width:56px;}
+.wbs-toolbar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--gray-200);background:color-mix(in srgb, var(--heading) 2%, var(--surface-card));}
+.wbs-tool{display:flex;align-items:center;gap:8px;}
+.wbs-tool-lbl{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gray-500);}
+.wbs-tool .hd-seg-group button{padding:5px 11px;min-height:30px;font-size:12px;}
+.wbs-scroll{overflow:auto;max-height:72vh;border-top:1px solid var(--gray-200);border-bottom:1px solid var(--gray-200);background:var(--surface-card);position:relative;}
+.wbs-grid{display:grid;grid-template-rows:44px auto;}
+.wbs-lhead{position:sticky;top:0;left:0;z-index:4;display:grid;height:44px;background:var(--tbl-head-bg);color:var(--tbl-head-fg,#dbe6f0);border-right:2px solid #0b1a30;}
+.wbs-hc{display:flex;align-items:flex-end;padding:0 8px 7px;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-right:1px solid rgba(255,255,255,.08);}
+.wbs-hc.dur,.wbs-hc.pct{justify-content:flex-end;}
+.wbs-chead{position:sticky;top:0;z-index:3;height:44px;background:var(--tbl-head-bg);}
+.wbs-lbody{position:sticky;left:0;z-index:2;background:var(--surface-card);border-right:2px solid var(--gray-300);box-shadow:4px 0 8px -6px rgba(10,22,40,.25);}
+.wbs-cbody{position:relative;}
+.wbs-svg{display:block;font-family:var(--font-ui);}
+.wbs-h1{fill:#0f1f38;} .wbs-h1t{fill:#dbe6f0;font-size:11px;font-weight:700;} .wbs-hl1{stroke:rgba(255,255,255,.18);}
+.wbs-h2{fill:#16294a;stroke:rgba(255,255,255,.08);} .wbs-h2.we{fill:#1f3558;}
+.wbs-h2t{fill:#e6edf6;font-size:10.5px;font-weight:600;} .wbs-h2d{fill:#8ea2bd;font-size:8.5px;font-weight:700;}
+.wbs-row{display:grid;height:26px;align-items:center;border-bottom:1px solid var(--gray-200);font-size:12px;}
+.wbs-row.hover{background:color-mix(in srgb, var(--teal-500) 10%, var(--surface-card)) !important;}
+.wbs-row.lv0{background:#12294a;color:#fff;font-weight:700;}
+.wbs-row.lv0 .wbs-c{color:#fff;}
+.wbs-row.lv1{background:color-mix(in srgb, #0ea5a0 11%, var(--surface-card));font-weight:700;}
+.wbs-row.lv2{background:color-mix(in srgb, var(--heading) 4%, var(--surface-card));font-weight:600;}
+.wbs-c{padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:100%;display:flex;align-items:center;border-right:1px solid var(--gray-200);min-width:0;color:var(--ms-text);}
+.wbs-row.lv0 .wbs-c{border-right-color:rgba(255,255,255,.1);}
+.wbs-c.code{font-family:var(--font-mono);font-size:11px;color:var(--gray-500);}
+.wbs-row.lv0 .wbs-c.code{color:#a9bdd8;}
+.wbs-c.date{font-size:11.5px;font-variant-numeric:tabular-nums;}
+.wbs-c.num{justify-content:flex-end;font-variant-numeric:tabular-nums;font-size:11.5px;}
+.wbs-c.pct{justify-content:flex-end;gap:6px;font-size:11px;}
+.wbs-c.name{padding-left:4px;gap:0;}
+.wbs-ind{flex:0 0 16px;height:26px;--ln:var(--gray-300);}
+.wbs-ind.v{background:linear-gradient(var(--ln),var(--ln)) center/1px 100% no-repeat;}
+.wbs-ind.t{background:linear-gradient(var(--ln),var(--ln)) center/1px 100% no-repeat,linear-gradient(var(--ln),var(--ln)) right center/50% 1px no-repeat;}
+.wbs-ind.l{background:linear-gradient(var(--ln),var(--ln)) center top/1px 50% no-repeat,linear-gradient(var(--ln),var(--ln)) right center/50% 1px no-repeat;}
+.wbs-row.lv1 .wbs-ind,.wbs-row.lv2 .wbs-ind{--ln:#9aa9bd;}
+.wbs-tog{flex:0 0 16px;width:16px;height:16px;margin-right:6px;border:1px solid var(--gray-300);border-radius:3px;background:var(--surface-card);color:var(--gray-700);font:inherit;font-size:12px;line-height:12px;font-weight:700;padding:0;cursor:pointer;display:grid;place-items:center;}
+.wbs-row.lv0 .wbs-tog{background:#1d3b66;border-color:#3d5a85;color:#fff;}
+.wbs-tog-sp{flex:0 0 22px;}
+.wbs-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;background:transparent;padding:0;font:inherit;color:inherit;text-align:left;}
+.wbs-name.link{cursor:pointer;}
+.wbs-name.link:hover{text-decoration:underline;color:var(--teal-600,#0b6b66);}
+.wbs-sdot{flex:0 0 8px;width:8px;height:8px;border-radius:2px;margin-right:6px;}
+.wbs-tag{margin-left:6px;font-size:10px;font-weight:700;padding:0 6px;border-radius:4px;background:var(--gray-100);color:var(--gray-700);flex-shrink:0;}
+.wbs-tag.ex{background:color-mix(in srgb, #c98a1a 18%, var(--surface-card));color:#8a5c11;}
+.wbs-pbar{width:44px;height:6px;border-radius:3px;background:var(--gray-200);overflow:hidden;}
+.wbs-pbar i{display:block;height:100%;background:#2f9e67;}
+.wbs-row.lv0 .wbs-pbar{background:rgba(255,255,255,.18);}
+.wbs-st{font-size:10.5px;font-weight:700;color:var(--c);}
+.wbs-band.lv0{fill:rgba(18,41,74,.07);} .wbs-band.lv1{fill:rgba(14,165,160,.06);}
+.wbs-we{fill:rgba(100,116,139,.07);}
+.wbs-gl{stroke:var(--gray-200);stroke-width:1;} .wbs-gm{stroke:var(--gray-300);stroke-width:1.2;} .wbs-gh{stroke:var(--gray-200);stroke-width:.6;}
+.wbs-today{stroke:#dc2626;stroke-width:1.6;stroke-dasharray:4 3;}
+.wbs-link{fill:none;stroke:#334155;stroke-width:1.2;}
+.wbs-hlrect{fill:color-mix(in srgb, var(--teal-500) 12%, transparent);}
+.wbs-blbl{font-size:10.5px;fill:var(--gray-700);}
+.wbs-blbl.strong{font-weight:700;fill:var(--heading);}
+:root[data-theme="dark"] .wbs-link{stroke:#b8c6da;}
+:root[data-theme="dark"] .wbs-row.lv0{background:#0b1a30;}
+.wbs-legend{padding:10px 18px 14px;}
+.wbs-legend svg{vertical-align:middle;}
+
+#page-gantt .dp-filter{align-items:flex-start !important;}
+#page-gantt #ganttMode{min-width:230px;}
+
+/* Cetak Jadwal WBS (PDF) — tabel aktivitas + mini-timeline SVG per baris, gaya laporan Primavera:
+   header skala terang (bukan navy layar) supaya hemat tinta & tetap terbaca di kertas. */
+.pg-wbs{font-family:Arial,Helvetica,sans-serif;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.pg-wbs-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.6px solid #12294a;padding-bottom:4px;margin-bottom:6px;}
+.pg-wbs-head h1{font-size:13px;margin:0 0 2px;color:#12294a;letter-spacing:.01em;}
+.pg-wbs-head .sub{font-size:8.5px;color:#374151;margin-top:1px;}
+.pg-wbs-meta{font-size:8px;color:#6b7280;white-space:nowrap;}
+.pg-wbs-table{width:100%;border-collapse:collapse;font-size:7.6px;table-layout:auto;}
+.pg-wbs-table thead{display:table-header-group;}
+.pg-wbs-table tr{page-break-inside:avoid;break-inside:avoid;}
+.pg-wbs-table th{background:#eef2f7;color:#12294a;font-weight:700;font-size:7.4px;text-transform:uppercase;letter-spacing:.03em;border:.6px solid #b8c2d0;padding:2px 4px;text-align:left;vertical-align:middle;position:static;}
+.pg-wbs-table td{border:.5px solid #d6dce5;padding:0 4px;height:16px;vertical-align:middle;white-space:nowrap;}
+.pg-wbs-table td.c{color:#4b5563;font-variant-numeric:tabular-nums;}
+.pg-wbs-table td.nm{max-width:230px;overflow:hidden;text-overflow:ellipsis;}
+.pg-wbs-table .r{text-align:right;}
+.pg-wbs-table th.tl,.pg-wbs-table td.tl{padding:0;width:560px;}
+.pg-wbs-table tr.lv0 td{background:#dfe6f0;font-weight:700;color:#12294a;}
+.pg-wbs-table tr.lv1 td{background:#eef7f6;font-weight:700;}
+.pg-wbs-table tr.lv2 td{background:#f8fafc;font-weight:600;}
+.pg-wbs-table tr.lv0 td.tl,.pg-wbs-table tr.lv1 td.tl,.pg-wbs-table tr.lv2 td.tl{background:#fff;}
+.pg-wbs-svg{display:block;}
+.pg-wbs .wbs-h1{fill:#eef2f7;stroke:#b8c2d0;stroke-width:.5;}
+.pg-wbs .wbs-h1t{fill:#12294a;font-size:8px;font-weight:700;}
+.pg-wbs .wbs-h2{fill:#fff;stroke:#cbd5e1;stroke-width:.5;}
+.pg-wbs .wbs-h2t{fill:#1f2937;font-size:7px;}
+.pg-wbs .wbs-h2d{fill:#64748b;font-size:6px;}
+.pg-wbs-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:7.5px;color:#374151;}
+.pg-wbs-legend span{display:inline-flex;align-items:center;gap:4px;}
+.pg-wbs-legend i{display:inline-block;width:14px;height:6px;border-radius:1px;}
+.pg-wbs .wbs-h2.we{fill:#f3f5f8;} .pg-wbs .wbs-hl1{stroke:#b8c2d0;}
+/* Bar ringkasan batch/tim (#1f2937) tenggelam di latar gelap — terangkan di layar saja (cetak tetap gelap). */
+:root[data-theme="dark"] #page-gantt .wbs-sum *{fill:#cbd5e1;}

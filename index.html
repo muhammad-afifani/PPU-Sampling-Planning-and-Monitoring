@@ -20,7 +20,7 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202610192200">
+<link rel="stylesheet" href="assets/css/style.css?v=202610200900">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -666,27 +666,27 @@
         <div class="toolbar dp-actions"><span class="dp-btn-group"><button class="btn" data-action="refreshGanttPage" title="Muat ulang progress/status titik terbaru dari Tracking BA/CoA — pakai ini kalau progress kelihatan tidak sesuai setelah ubah jadwal">&#128260; Refresh</button><button class="btn" data-action="finalizeBatchSchedule" title="Tandai batch yang sedang dipilih sudah final/siap dicetak (bukan mengunci data) — pilih 1 batch spesifik dulu di filter Batch">Finalisasi Jadwal</button></span><button class="btn primary" data-action="printSamplingGuide" title="Cetak jadwal beserta daftar titik &amp; kolom ceklist untuk batch terpilih. Filter Batch kosong = seluruh batch tim dicetak berurutan, masing-masing mulai di halaman baru.">&#128438; Cetak Panduan Sampling (A4)</button></div>
       </div>
       <div class="toolbar card dp-filter">
-        <div class="field"><label>Tampilkan</label><select id="ganttView"><option value="emisi">Tim Emisi</option><option value="ambient">Tim Ambient</option><option value="overlay">Overlay (keduanya)</option></select></div>
-        <div class="field"><label>Batch</label><select id="ganttBatch"></select></div>
-        <div class="field"><label>Mode Tampilan</label><select id="ganttMode"><option value="calendar" selected>Tabel Harian (Gantt)</option><option value="bar">Gantt Bar (SVG)</option></select></div>
-        <div class="hint dp-filter-note">Cetak Panduan: batch terpilih, atau semua batch tim bila filter Batch kosong. Finalisasi hanya penanda "siap cetak", data tetap bisa diubah.</div>
+        <div class="field"><label>Tim <span class="muted gn-lbl-note">(bisa pilih keduanya)</span></label><div id="ganttTeamChips" class="gn-chips" role="group" aria-label="Pilih tim"></div></div>
+        <div class="field gn-batch-field"><label>Batch <span class="muted gn-lbl-note">(bisa pilih lebih dari satu)</span></label><div id="ganttBatchChips" class="gn-chips" role="group" aria-label="Pilih batch"></div></div>
+        <div class="field"><label>Mode Tampilan</label><select id="ganttMode"><option value="wbs" selected>Gantt WBS (ala Primavera)</option><option value="calendar">Tabel Harian (edit jadwal)</option></select></div>
+        <div class="hint dp-filter-note">Cetak Panduan &amp; Export mengikuti Tim/Batch terpilih. Finalisasi butuh tepat 1 batch dipilih; hanya penanda "siap cetak", data tetap bisa diubah.</div>
       </div>
       </div>
       <div id="ganttFinalizeStatus"></div>
       <div class="dp-kpis" id="ganttKpis"></div>
 
       <div class="card dp-listcard gn-card">
-        <div class="dp-listhead"><h3>Jadwal Harian</h3><span id="ganttMeta" class="hint gn-meta"></span></div>
+        <div class="dp-listhead"><h3>Jadwal Harian</h3><span id="ganttMeta" class="hint gn-meta"></span>
+          <span class="spacer"></span>
+          <span class="dp-btn-group gn-export" title="Export jadwal WBS sesuai Tim/Batch terpilih">
+            <button class="btn small" data-action="wbsExportPdf" title="Cetak / simpan PDF (A4 lanskap), mengikuti baris yang sedang terbuka">PDF</button>
+            <button class="btn small" data-action="wbsExportWord" title="Unduh Word (.docx) A4 lanskap, mengikuti baris yang sedang terbuka">Word</button>
+            <button class="btn small" data-action="wbsExportExcel" title="Unduh Excel (.xlsx) lengkap dengan outline level 1-3 yang bisa dibuka/tutup">Excel</button>
+          </span>
+        </div>
+        <div id="wbsToolbar" class="wbs-toolbar"></div>
         <div id="ganttCrewChangeInfo" class="gn-cc"></div>
         <div id="ganttWrap" class="gn-wrap"></div>
-        <div class="legend gn-legend" id="ganttBarLegend">
-          <span class="item"><span class="sw" style="background:#0ea5a0"></span> Rencana (Emisi)</span>
-          <span class="item"><span class="sw" style="background:#3d78c9"></span> Rencana (Ambient)</span>
-          <span class="item"><span class="sw" style="background:#3fb27f"></span> Aktual selesai</span>
-          <span class="item"><span class="sw" style="background:#e0554f"></span> Gagal / tertunda</span>
-          <span class="item"><span class="sw" style="background:repeating-linear-gradient(45deg,#ccc,#ccc 3px,#eee 3px,#eee 6px)"></span> Buffer</span>
-          <span class="item"><span class="sw" style="background:#e0554f;opacity:.35"></span> Hari crew change</span>
-        </div>
       </div>
 
       <div class="card dp-listcard gn-card">
@@ -2026,43 +2026,45 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202610192200"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202610192200"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202610200900"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202610200900"></script>
 
-<script src="assets/data/default-data.js?v=202610192200"></script>
-<script src="assets/data/brand-assets.js?v=202610192200"></script>
-<script src="assets/data/travel-routes.js?v=202610192200"></script>
-<script src="assets/js/00-icons.js?v=202610192200"></script>
-<script src="assets/js/01-state.js?v=202610192200"></script>
-<script src="assets/js/02-nav-util.js?v=202610192200"></script>
-<script src="assets/js/03-period-logic.js?v=202610192200"></script>
-<script src="assets/js/04-dashboard.js?v=202610192200"></script>
-<script src="assets/js/05-master-data.js?v=202610192200"></script>
-<script src="assets/js/06-plan-personil.js?v=202610192200"></script>
-<script src="assets/js/07-rules-planner.js?v=202610192200"></script>
-<script src="assets/js/08-gantt-print.js?v=202610192200"></script>
-<script src="assets/js/09-tracking-map.js?v=202610192200"></script>
-<script src="assets/js/10-running-hour.js?v=202610192200"></script>
-<script src="assets/js/11-berita-acara.js?v=202610192200"></script>
-<script src="assets/js/12-data-page.js?v=202610192200"></script>
-<script src="assets/js/13-hasil-db.js?v=202610192200"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202610192200"></script>
-<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610192200"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202610192200"></script>
-<script src="assets/js/16-actions-init.js?v=202610192200"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202610192200"></script>
-<script src="assets/js/18-model-dispersi.js?v=202610192200"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202610192200"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202610192200"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202610192200"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202610192200"></script>
-<script src="assets/js/23-budget-proyeksi.js?v=202610192200"></script>
-<script src="assets/js/24-personil-ppu.js?v=202610192200"></script>
-<script src="assets/js/25-access-gate.js?v=202610192200"></script>
-<script src="assets/js/26-laboratorium.js?v=202610192200"></script>
-<script src="assets/js/27-laporan-emf.js?v=202610192200"></script>
-<script src="assets/js/28-word-export.js?v=202610192200"></script>
-<script src="assets/js/29-docx-export.js?v=202610192200"></script>
-<script src="assets/js/30-tracking-board.js?v=202610192200"></script>
+<script src="assets/data/default-data.js?v=202610200900"></script>
+<script src="assets/data/brand-assets.js?v=202610200900"></script>
+<script src="assets/data/travel-routes.js?v=202610200900"></script>
+<script src="assets/js/00-icons.js?v=202610200900"></script>
+<script src="assets/js/01-state.js?v=202610200900"></script>
+<script src="assets/js/02-nav-util.js?v=202610200900"></script>
+<script src="assets/js/03-period-logic.js?v=202610200900"></script>
+<script src="assets/js/04-dashboard.js?v=202610200900"></script>
+<script src="assets/js/05-master-data.js?v=202610200900"></script>
+<script src="assets/js/06-plan-personil.js?v=202610200900"></script>
+<script src="assets/js/07-rules-planner.js?v=202610200900"></script>
+<script src="assets/js/08-gantt-print.js?v=202610200900"></script>
+<script src="assets/js/09-tracking-map.js?v=202610200900"></script>
+<script src="assets/js/10-running-hour.js?v=202610200900"></script>
+<script src="assets/js/11-berita-acara.js?v=202610200900"></script>
+<script src="assets/js/12-data-page.js?v=202610200900"></script>
+<script src="assets/js/13-hasil-db.js?v=202610200900"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202610200900"></script>
+<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610200900"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202610200900"></script>
+<script src="assets/js/16-actions-init.js?v=202610200900"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202610200900"></script>
+<script src="assets/js/18-model-dispersi.js?v=202610200900"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202610200900"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202610200900"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202610200900"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202610200900"></script>
+<script src="assets/js/23-budget-proyeksi.js?v=202610200900"></script>
+<script src="assets/js/24-personil-ppu.js?v=202610200900"></script>
+<script src="assets/js/25-access-gate.js?v=202610200900"></script>
+<script src="assets/js/26-laboratorium.js?v=202610200900"></script>
+<script src="assets/js/27-laporan-emf.js?v=202610200900"></script>
+<script src="assets/js/28-word-export.js?v=202610200900"></script>
+<script src="assets/js/29-docx-export.js?v=202610200900"></script>
+<script src="assets/js/30-tracking-board.js?v=202610200900"></script>
+<script src="assets/js/31-wbs-gantt.js?v=202610200900"></script>
+<script src="assets/js/32-schedule-export.js?v=202610200900"></script>
 </body>
 </html>
