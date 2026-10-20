@@ -310,6 +310,8 @@ function trkSaveDetail(t){
   const p = DB.points.find(x=>x.id===id);
   logChange(`Tracking "${p?p.nama:id}" diperbarui (${trkDoneCount(ensureTracking(id))}/7 langkah)`);
   save(); closeModal(); renderTracking();
+  // Dibuka dari Gantt WBS (Scheduling Tools) — segarkan juga jadwalnya supaya status bar ikut berubah.
+  const gp = document.getElementById("page-gantt"); if(gp && gp.classList.contains("active")) renderGantt();
   toast("Tracking engine disimpan.","ok");
 }
 
