@@ -54,7 +54,7 @@ function wbsNodeLabel(n){ return n.name + (n.type==="site" && wbsGroup!=="batch"
 function wbsStatusText(n){
   if(n.type!=="point") return `${Math.round((wbsNodePct(n)||0)*100)}%`;
   if(n.excluded) return "—";
-  return {done:"Selesai", late:"Terlambat", failed:"Gagal", deferred:"Ditunda", notdue:"Belum periode"}[n.status] || "Rencana";
+  return {done:"Selesai", late:"Terlambat", failed:"Gagal", deferred:"Ditunda", notdue:"Belum periode"}[n.status] || "Terjadwal";
 }
 
 /* ---------- PDF (cetak) ---------- */
@@ -64,7 +64,7 @@ function buildWbsPrintHtml(ctx){
   const range = wbsRange(model, unit);
   const TW = 560, px = TW/range.days;
   const x = d=>wbsDiff(range.start, d)*px;
-  const parts = wbsScaleParts(range, px, unit, 30);
+  const parts = wbsScaleParts(range, px, unit, 50);
   const defs = `<defs><pattern id="wbsHatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="#fff"/><line x1="0" y1="0" x2="0" y2="5" stroke="#94a3b8" stroke-width="2"/></pattern></defs>`;
   const gridLines = parts.grid.map(g=>`<line x1="${g}" y1="0" x2="${g}" y2="16" stroke="#e5e9ef" stroke-width=".6"/>`).join("") + parts.monthStarts.map(g=>`<line x1="${g}" y1="0" x2="${g}" y2="16" stroke="#b8c2d0" stroke-width=".8"/>`).join("");
   const today = todayStr();
@@ -75,11 +75,11 @@ function buildWbsPrintHtml(ctx){
     return `<tr class="lv${n.level}"><td class="c">${escHtml(n.code)}</td><td class="nm" style="padding-left:${4+r.depth*9}px">${escHtml(wbsNodeLabel(n))}</td><td>${wbsFmt(n.start)}</td><td>${wbsFmt(n.end)}</td><td class="r">${escHtml(wbsNodeDur(n).replace(" buffer",""))}</td><td class="r">${escHtml(wbsStatusText(n))}</td><td class="tl">${svg}</td></tr>`;
   }).join("");
   const unitLabel = {day:"harian", week:"mingguan", month:"bulanan"}[unit];
-  const legend = [["Ringkasan batch/tim","#1f2937"],["Kunjungan site","#0b7f7b"],["Jenis sumber","#94a3b8"],["Rencana Emisi",WBS_STATUS.plan_emisi.color],["Rencana Ambient",WBS_STATUS.plan_ambient.color],["Selesai",WBS_STATUS.done.color],["Terlambat",WBS_STATUS.late.color],["Ditunda",WBS_STATUS.deferred.color],["Gagal",WBS_STATUS.failed.color]]
+  const legend = [["Ringkasan batch/tim","#1f2937"],["Kunjungan site","#0b7f7b"],["Jenis sumber","#94a3b8"],["Terjadwal Emisi",WBS_STATUS.plan_emisi.color],["Terjadwal Ambient",WBS_STATUS.plan_ambient.color],["Selesai",WBS_STATUS.done.color],["Terlambat",WBS_STATUS.late.color],["Ditunda",WBS_STATUS.deferred.color],["Gagal",WBS_STATUS.failed.color]]
     .map(([l,c])=>`<span><i style="background:${c}"></i>${l}</span>`).join("");
   return `<div class="pg-wbs">
     <div class="pg-wbs-head"><div><h1>${escHtml(ctx.title)}</h1><div class="sub">${escHtml(ctx.sub)}</div><div class="sub">Periode ${escHtml(ctx.periode)} &middot; skala ${unitLabel}</div></div><div class="pg-wbs-meta">Dicetak ${escHtml(ctx.printedAt)}</div></div>
-    <table class="pg-wbs-table"><thead><tr><th class="c">WBS</th><th>Nama Aktivitas</th><th>Mulai</th><th>Selesai</th><th class="r">Durasi</th><th class="r">Progres</th><th class="tl"><svg width="${TW}" height="30" class="pg-wbs-svg">${defs}${parts.top}${parts.bottom}</svg></th></tr></thead>
+    <table class="pg-wbs-table"><thead><tr><th class="c">WBS</th><th>Nama Aktivitas</th><th>Mulai</th><th>Selesai</th><th class="r">Durasi</th><th class="r">Progres</th><th class="tl"><svg width="${TW}" height="50" class="pg-wbs-svg">${defs}${parts.top}${parts.bottom}</svg></th></tr></thead>
     <tbody>${body}</tbody></table>
     <div class="pg-wbs-legend">${legend}</div>
   </div>`;
@@ -156,7 +156,7 @@ function buildWbsDocx(ctx){
   const tbl = `<w:tbl><w:tblPr><w:tblW w:w="${widths.reduce((a,b)=>a+b,0)}" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="20" w:type="dxa"/><w:left w:w="50" w:type="dxa"/><w:bottom w:w="20" w:type="dxa"/><w:right w:w="50" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${widths.map(w=>`<w:gridCol w:w="${w}"/>`).join("")}</w:tblGrid>${head1}${head2}${body}</w:tbl>`;
   const unitLabel = {day:"harian", week:"mingguan", month:"bulanan"}[unit];
   // Legenda warna: tabel kecil kotak warna + keterangan.
-  const legendItems = [["Ringkasan batch/tim","1F2937"],["Kunjungan site Emisi","0B7F7B"],["Kunjungan site Ambient","2F5FA3"],["Jenis sumber","94A3B8"],["Rencana Emisi","0EA5A0"],["Rencana Ambient","3D78C9"],["Selesai","2F9E67"],["Terlambat","E8590C"],["Ditunda","C98A1A"],["Gagal","C0392B"]];
+  const legendItems = [["Ringkasan batch/tim","1F2937"],["Kunjungan site Emisi","0B7F7B"],["Kunjungan site Ambient","2F5FA3"],["Jenis sumber","94A3B8"],["Terjadwal Emisi","0EA5A0"],["Terjadwal Ambient","3D78C9"],["Selesai","2F9E67"],["Terlambat","E8590C"],["Ditunda","C98A1A"],["Gagal","C0392B"]];
   const lw = [];
   const legendCells = [];
   legendItems.forEach(([l,c])=>{ lw.push(220, 1350); legendCells.push(sxCell(220, dxP("",{markSz:10}), {fill:c, bc:"FFFFFF", padH:0}), sxCell(1350, sxText(l,{sz:12, color:"475569"}), {bc:"FFFFFF"})); });

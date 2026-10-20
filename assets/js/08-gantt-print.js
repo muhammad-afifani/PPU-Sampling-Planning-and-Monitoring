@@ -310,11 +310,65 @@ function refreshGanttBatchSelect(){
   [...ganttBatchIds].forEach(id=>{ const b = DB.batches.find(x=>x.id===id); if(!b || !ganttTeams.has(b.team)) ganttBatchIds.delete(id); });
   const teamEl = document.getElementById("ganttTeamChips");
   if(teamEl) teamEl.innerHTML = Object.entries(GANTT_TEAM_META).map(([k,m])=>`<button type="button" class="chip-toggle gn-chip ${ganttTeams.has(k)?"active":""}" aria-pressed="${ganttTeams.has(k)}" data-action="ganttToggleTeam" data-val="${k}"><span class="gn-chip-dot" style="background:${m.color}"></span>Tim ${m.label}</button>`).join("");
-  const list = DB.batches.filter(b=>ganttTeams.has(b.team));
-  const batchEl = document.getElementById("ganttBatchChips");
-  if(batchEl) batchEl.innerHTML = `<button type="button" class="chip-toggle gn-chip ${ganttBatchIds.size?"":"active"}" aria-pressed="${!ganttBatchIds.size}" data-action="ganttToggleBatch" data-val="">Semua batch</button>`
-    + list.map(b=>`<button type="button" class="chip-toggle gn-chip ${ganttBatchIds.has(b.id)?"active":""}" aria-pressed="${ganttBatchIds.has(b.id)}" data-action="ganttToggleBatch" data-val="${b.id}" title="${escHtml(b.name)}"><span class="gn-chip-dot" style="background:${GANTT_TEAM_META[b.team]?GANTT_TEAM_META[b.team].color:"#7f8fa0"}"></span>${escHtml(b.name)}</button>`).join("");
+  renderGanttBatchPicker();
 }
+/* Pemilih batch: dropdown multi-pilih (popover berisi daftar + pencarian), bukan deretan chip — supaya
+   tetap rapi walau batch-nya puluhan. Yang terpilih diringkas jadi tag (maks 2 + "+N"). */
+let ganttBatchMenuOpen = false, ganttBatchQuery = "";
+function ganttBatchSpan(b){
+  const r = (b.schedule||[]); if(!r.length) return "";
+  const s = r.map(x=>x.start).filter(Boolean).sort(), e = r.map(x=>x.end).filter(Boolean).sort();
+  return s.length && e.length ? `${wbsFmt(s[0])} – ${wbsFmt(e[e.length-1])} · ${r.length} site` : "";
+}
+function ganttBatchListHtml(){
+  const q = ganttBatchQuery.trim().toLowerCase();
+  const list = DB.batches.filter(b=>ganttTeams.has(b.team));
+  const mk = b=>`<button type="button" class="gn-ms-row ${ganttBatchIds.has(b.id)?"on":""}" role="option" aria-selected="${ganttBatchIds.has(b.id)}" data-action="ganttToggleBatch" data-val="${b.id}"><span class="gn-ms-check"></span><span class="gn-chip-dot" style="background:${GANTT_TEAM_META[b.team]?GANTT_TEAM_META[b.team].color:"#7f8fa0"}"></span><span class="gn-ms-name">${escHtml(b.name)}</span><small>${escHtml(ganttBatchSpan(b))}</small></button>`;
+  let html = "";
+  Object.entries(GANTT_TEAM_META).forEach(([k,m])=>{
+    if(!ganttTeams.has(k)) return;
+    const rows = list.filter(b=>b.team===k && (!q || b.name.toLowerCase().includes(q)));
+    if(rows.length) html += `<div class="gn-ms-group">Tim ${m.label} <span>${rows.length}</span></div>` + rows.map(mk).join("");
+  });
+  return html || `<div class="gn-ms-empty">Tidak ada batch yang cocok.</div>`;
+}
+function renderGanttBatchPicker(){
+  const el = document.getElementById("ganttBatchChips"); if(!el) return;
+  const list = DB.batches.filter(b=>ganttTeams.has(b.team));
+  const sel = list.filter(b=>ganttBatchIds.has(b.id));
+  const label = sel.length ? escHtml(sel.map(b=>b.name).join(", ")) : `Semua batch (${list.length})`;
+  const badge = sel.length>1 ? `<span class="gn-ms-count">${sel.length}</span>` : "";
+  const keep = el.querySelector(".gn-ms-list"), top = keep ? keep.scrollTop : 0;
+  el.innerHTML = `<div class="gn-ms${ganttBatchMenuOpen?" open":""}">
+    <button type="button" class="gn-ms-btn" data-action="ganttBatchMenu" aria-haspopup="listbox" aria-expanded="${ganttBatchMenuOpen}"><span class="gn-ms-lbl" title="${label}">${label}</span>${badge}<svg width="10" height="6" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <div class="gn-ms-pop" ${ganttBatchMenuOpen?"":"hidden"}>
+      ${list.length>6?`<input type="search" class="gn-ms-search" id="ganttBatchSearch" placeholder="Cari batch…" value="${escHtml(ganttBatchQuery)}" autocomplete="off">`:""}
+      <div class="gn-ms-acts"><button type="button" data-action="ganttBatchAll">Pilih semua</button><button type="button" data-action="ganttToggleBatch" data-val="">Reset (semua batch)</button></div>
+      <div class="gn-ms-list" role="listbox" aria-multiselectable="true">${ganttBatchListHtml()}</div>
+    </div></div>`;
+  const nl = el.querySelector(".gn-ms-list"); if(nl) nl.scrollTop = top;
+}
+function ganttBatchMenu(){
+  ganttBatchMenuOpen = !ganttBatchMenuOpen;
+  if(!ganttBatchMenuOpen) ganttBatchQuery = "";
+  renderGanttBatchPicker();
+  const inp = document.getElementById("ganttBatchSearch"); if(ganttBatchMenuOpen && inp) inp.focus();
+}
+function ganttBatchAll(){
+  DB.batches.filter(b=>ganttTeams.has(b.team)).forEach(b=>ganttBatchIds.add(b.id));
+  renderGantt();
+}
+document.addEventListener("click", e=>{
+  if(ganttBatchMenuOpen && !e.target.closest(".gn-ms")){ ganttBatchMenuOpen = false; ganttBatchQuery = ""; renderGanttBatchPicker(); }
+});
+document.addEventListener("keydown", e=>{
+  if(e.key==="Escape" && ganttBatchMenuOpen){ ganttBatchMenuOpen = false; ganttBatchQuery = ""; renderGanttBatchPicker(); }
+});
+document.addEventListener("input", e=>{
+  if(e.target.id!=="ganttBatchSearch") return;
+  ganttBatchQuery = e.target.value;
+  const l = document.querySelector("#ganttBatchChips .gn-ms-list"); if(l) l.innerHTML = ganttBatchListHtml();
+});
 function ganttToggleTeam(t){
   const k = t.dataset.val;
   if(ganttTeams.has(k)){ if(ganttTeams.size===1){ toast("Minimal satu tim harus dipilih.","err"); return; } ganttTeams.delete(k); }
