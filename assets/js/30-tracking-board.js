@@ -45,6 +45,17 @@ function trkLastDate(t){
   for(let i=0;i<7;i++){ if(trkStepDone(t,i)){ const d = trkStepDate(t,i); if(d && d>last) last = d; } }
   return last;
 }
+/* Titik non-emisi (ambient/kebisingan/kebauan/getaran) di 1 lokasi punya nama SAMA — kategorinya
+   ditulis dalam kurung di sebelah nama supaya baris-barisnya bisa dibedakan saat review. */
+function trkPointText(p){ return p.kategori==="emisi" ? p.nama : `${p.nama} (${NONEMISI_LABEL[p.kategori]||p.kategori})`; }
+function trkPointNameHtml(p){ return p.kategori==="emisi" ? escHtml(p.nama) : `${escHtml(p.nama)} <span class="trk-cat">(${escHtml(NONEMISI_LABEL[p.kategori]||p.kategori)})</span>`; }
+function trkKatText(p){ return p.kategori==="emisi" ? (p.kategoriSumber||"-") : (NONEMISI_LABEL[p.kategori]||p.kategori); }
+function trkSortPoints(a, b){
+  const ea = a.kategori==="emisi", eb = b.kategori==="emisi";
+  if(ea!==eb) return ea ? -1 : 1;
+  if(ea) return (a.kategoriSumber||"").localeCompare(b.kategoriSumber||"") || a.nama.localeCompare(b.nama);
+  return a.nama.localeCompare(b.nama) || AMBIENT_FAMILY.indexOf(a.kategori)-AMBIENT_FAMILY.indexOf(b.kategori);
+}
 function trkEngines(pts){
   return pts.map(p=>{
     const t = ensureTracking(p.id);
@@ -180,7 +191,7 @@ function trkFlowHtml(list){
   const sites = Object.keys(bySite).sort((a,b)=>a.localeCompare(b));
   const head = `<div class="trk-steps-head" aria-hidden="true">${TRK_FLOW.map(s=>`<span>${escHtml(s.short)}</span>`).join("")}</div>`;
   return sites.map(site=>{
-    const rows = bySite[site].sort((a,b)=>(a.p.kategoriSumber||"").localeCompare(b.p.kategoriSumber||"") || a.p.nama.localeCompare(b.p.nama));
+    const rows = bySite[site].sort((a,b)=>trkSortPoints(a.p,b.p));
     const avg = rows.reduce((a,e)=>a+e.done/7,0)/rows.length;
     const nDone = rows.filter(e=>e.overall==="done").length, nOver = rows.filter(e=>e.overall==="overdue").length;
     return `<details class="card trk-site" open>
@@ -190,8 +201,8 @@ function trkFlowHtml(list){
       <div class="trk-flow">
         <div class="trk-row trk-row-head"><span>Engine</span>${head}<span>Status</span></div>
         ${rows.map(e=>`<div class="trk-row ${e.overall}">
-          <div class="trk-eng"><button type="button" class="trk-eng-name" data-action="trkOpenDetail" data-id="${e.p.id}" title="Buka detail & tanggal">${escHtml(e.p.nama)}</button>
-            <small>${escHtml(e.p.kategoriSumber||"-")}</small>${trkSamplingChip(e)}</div>
+          <div class="trk-eng"><button type="button" class="trk-eng-name" data-action="trkOpenDetail" data-id="${e.p.id}" title="Buka detail & tanggal">${trkPointNameHtml(e.p)}</button>
+            <small>${e.p.kategori==="emisi"?escHtml(e.p.kategoriSumber||"-"):"Pemantauan lingkungan"}</small>${trkSamplingChip(e)}</div>
           ${trkStepperHtml(e, true)}
           <div class="trk-right"><div class="trk-pbar"><i style="width:${(e.done/7*100).toFixed(1)}%"></i></div><div class="trk-right-line"><b>${e.done}/7</b>${trkOverallBadge(e)}</div>${trkNextBtn(e)}</div>
         </div>`).join("")}
@@ -204,11 +215,11 @@ function trkKanbanHtml(list){
   return `<div class="trk-kanban">${cols.map(({s,items})=>`<section class="trk-col" style="--c:${TRK_STAGE_COLORS[s.n]}">
     <header><span class="trk-col-n">${s.n+1}</span><b>${escHtml(s.label)}</b><span class="trk-col-count">${items.length}</span></header>
     <div class="trk-col-next">&rarr; ${escHtml(s.next)}</div>
-    <div class="trk-col-body">${items.length ? items.sort((a,b)=>a.p.site.localeCompare(b.p.site)||a.p.nama.localeCompare(b.p.nama)).map(e=>{
+    <div class="trk-col-body">${items.length ? items.sort((a,b)=>a.p.site.localeCompare(b.p.site)||trkSortPoints(a.p,b.p)).map(e=>{
       const last = trkLastDate(e.t), days = trkDaysSince(last);
       return `<article class="trk-card ${e.overall}">
-        <button type="button" class="trk-card-name" data-action="trkOpenDetail" data-id="${e.p.id}">${escHtml(e.p.nama)}</button>
-        <div class="trk-card-sub"><span class="trk-site-tag">${escHtml(e.p.site)}</span> ${escHtml(e.p.kategoriSumber||"-")}</div>
+        <button type="button" class="trk-card-name" data-action="trkOpenDetail" data-id="${e.p.id}">${trkPointNameHtml(e.p)}</button>
+        <div class="trk-card-sub"><span class="trk-site-tag">${escHtml(e.p.site)}</span> ${e.p.kategori==="emisi"?escHtml(e.p.kategoriSumber||"-"):"Pemantauan lingkungan"}</div>
         ${trkSamplingChip(e)}
         <div class="trk-pips" aria-label="${e.done} dari 7 langkah">${TRK_FLOW.map((x,i)=>`<i class="${trkStepDone(e.t,i)?"on":""}"></i>`).join("")}</div>
         <div class="trk-card-foot"><span>${last?`${trkFmtShort(last)}${days!=null?` &middot; ${days} hr`:""}`:"&nbsp;"}</span>${trkOverallBadge(e)}</div>
@@ -218,14 +229,14 @@ function trkKanbanHtml(list){
   </section>`).join("")}</div>`;
 }
 function trkMatrixHtml(list){
-  const docPts = list.filter(e=>e.t.samplingStatus==="sampled");
+  const docPts = list.filter(e=>e.t.samplingStatus==="sampled").sort((a,b)=>a.p.site.localeCompare(b.p.site)||trkSortPoints(a.p,b.p));
   if(!docPts.length) return `<div class="card">${hdEmpty('Belum ada titik berstatus "Sudah Disampling" untuk filter ini — checklist dokumen baru muncul setelah statusnya diisi di tab <b>Sampling Lapangan</b>.')}</div>`;
   return `<div class="card"><div class="tablewrap"><table id="trackingTable">
     <thead><tr><th>Site</th><th>Titik</th>${TRACK_STEPS.map(([key,label])=>`<th>${label}<br><button class="btn small ghost" data-action="bulkTrackColumn" data-key="${key}" style="margin-top:3px;padding:2px 6px;font-size:10px;">Centang Semua</button></th>`).join("")}<th>Status</th></tr></thead>
     <tbody>${docPts.map(({p,t,overall})=>{
       const badge = overall==="done"?"b-green":overall==="overdue"?"b-red":"b-blue";
       const label = overall==="done"?"Selesai":overall==="overdue"?"Overdue":"On Track";
-      return `<tr><td>${escHtml(p.site)}</td><td>${escHtml(p.nama)}</td>
+      return `<tr><td>${escHtml(p.site)}</td><td>${trkPointNameHtml(p)}</td>
         ${TRACK_STEPS.map(([key])=>`<td class="trk-cell${t[key]?" done":""}" style="text-align:center;"><input type="checkbox" data-action="toggleTrack" data-id="${p.id}" data-key="${key}" ${t[key]?"checked":""}></td>`).join("")}
         <td><span class="badge ${badge}">${label}</span></td></tr>`;
     }).join("")}</tbody></table></div></div>`;
@@ -240,7 +251,7 @@ function trkNode(t){
   const key = TRACK_STEPS[i-1][0], label = TRACK_STEPS[i-1][1];
   if(tr[key]){
     const p = DB.points.find(x=>x.id===id);
-    askConfirm(`Batalkan "${label}" untuk ${p?p.nama:id}?`, ()=>{ trkSetStep(id,key,false); save(); renderTracking(); });
+    askConfirm(`Batalkan "${label}" untuk ${p?trkPointText(p):id}?`, ()=>{ trkSetStep(id,key,false); save(); renderTracking(); });
   } else { trkSetStep(id,key,true); save(); renderTracking(); toast(`${label}: ditandai selesai hari ini.`,"ok"); }
 }
 function trkAdvance(t){
@@ -257,7 +268,7 @@ function trkOpenDetail(id){
   const t = ensureTracking(id);
   const sampled = t.samplingStatus==="sampled";
   openModal(`<div class="trkd">
-    <div class="trkd-head"><div><div class="trkd-eyebrow">${escHtml(p.site)} &middot; ${escHtml(p.kategoriSumber||"-")}</div><h3>${escHtml(p.nama)}</h3></div><div class="trkd-prog"><b>${trkDoneCount(t)}</b>/7</div></div>
+    <div class="trkd-head"><div><div class="trkd-eyebrow">${escHtml(p.site)} &middot; ${escHtml(trkKatText(p))}</div><h3>${trkPointNameHtml(p)}</h3></div><div class="trkd-prog"><b>${trkDoneCount(t)}</b>/7</div></div>
     <section class="trkd-sec"><h4>1 &middot; Sampling di lapangan</h4>
       <div class="trkd-grid">
         <div class="field"><label>Status</label><select id="trkdStatus"><option value="">- belum diisi -</option>${Object.entries(SAMPLING_STATUS_LABELS).map(([k,l])=>`<option value="${k}" ${t.samplingStatus===k?"selected":""}>${escHtml(l)}</option>`).join("")}</select></div>
@@ -308,7 +319,7 @@ function trkSaveDetail(t){
   }
   ensureTracking(id).trkNote = document.getElementById("trkdNote").value.trim();
   const p = DB.points.find(x=>x.id===id);
-  logChange(`Tracking "${p?p.nama:id}" diperbarui (${trkDoneCount(ensureTracking(id))}/7 langkah)`);
+  logChange(`Tracking "${p?trkPointText(p):id}" diperbarui (${trkDoneCount(ensureTracking(id))}/7 langkah)`);
   save(); closeModal(); renderTracking();
   // Dibuka dari Gantt WBS (Scheduling Tools) — segarkan juga jadwalnya supaya status bar ikut berubah.
   const gp = document.getElementById("page-gantt"); if(gp && gp.classList.contains("active")) renderGantt();
@@ -345,8 +356,8 @@ function renderSamplingEmisiTable(pts){
       const notePlaceholder = status==="deferred" ? "mis. Batch 2" : status==="other" ? "mis. Under Maintenance" : status==="notdue" ? "kosongkan = teks otomatis periode lalu" : "";
       return `<tr class="trk-st-row st-${status||"none"}">
         <td>${escHtml(p.site)}</td>
-        <td><b>${escHtml(p.nama)}</b></td>
-        <td class="muted" style="font-size:11px;">${escHtml(p.kategoriSumber||"-")}</td>
+        <td><b>${trkPointNameHtml(p)}</b></td>
+        <td class="muted" style="font-size:11px;">${escHtml(trkKatText(p))}</td>
         <td>${wajibBadgeHtml(p)}</td>
         <td><select class="trk-st-select" data-action="setSamplingStatus" data-id="${p.id}">
           <option value="">- pilih status -</option>
