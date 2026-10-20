@@ -1,5 +1,5 @@
 /* =========================================================
-   GANTT WBS (ala Primavera P6) — Scheduling Tools
+   GANTT WBS (Bar Chart) — Scheduling Tools
    ---------------------------------------------------------
    Struktur berjenjang: [Batch | Tim] › Site (kunjungan) › Jenis sumber › Titik. Datanya SAMA PERSIS
    dgn Tabel Harian: rentang site dari b.schedule, tanggal tiap titik dari dailyAssignmentForRow
@@ -13,7 +13,7 @@ let wbsLevel = 2;            // node level < wbsLevel terbuka (1 = site, 2 = jen
 let wbsOpen = new Map();     // override buka/tutup manual per node id
 let wbsCompact = window.innerWidth < 1600;
 let wbsLastPx = 30;
-const WBS_RH = 26;
+const WBS_HH = 54, WBS_RH = 26;
 const WBS_PX = {day:30, week:9, month:2.6};
 const WBS_COLS = [
   {k:"code", label:"WBS", w:70},
@@ -30,8 +30,8 @@ const WBS_STATUS = {
   deferred:{label:"Ditunda ke batch berikutnya", color:"#c98a1a"},
   notdue:{label:"Belum masuk periode", color:"#9aa5b1"},
   excluded:{label:"Dikeluarkan dari batch", color:"#9aa5b1"},
-  plan_emisi:{label:"Rencana (Emisi)", color:"#0ea5a0"},
-  plan_ambient:{label:"Rencana (Ambient)", color:"#3d78c9"}
+  plan_emisi:{label:"Terjadwal (Emisi)", color:"#0ea5a0"},
+  plan_ambient:{label:"Terjadwal (Ambient)", color:"#3d78c9"}
 };
 const WBS_TEAM_DARK = {emisi:"#0b7f7b", ambient:"#2f5fa3"};
 function wbsDiff(a, b){ return daysBetweenInclusive(a, b) - 1; }   // b - a dalam hari
@@ -42,7 +42,8 @@ function wbsPointStatus(p, b, date, excluded){
   const t = DB.tracking[p.id] || {};
   if(p.status==="done" || t.samplingStatus==="sampled") return "done";
   if(t.samplingStatus==="other" || p.status==="failed") return "failed";
-  if(t.samplingStatus==="deferred") return "deferred";
+  // "Ditunda" hanya utk yg sudah lewat jadwalnya; yg dijadwalkan lagi di tanggal mendatang = rencana biasa.
+  if(t.samplingStatus==="deferred" && !(date && date >= todayStr())) return "deferred";
   if(t.samplingStatus==="notdue") return "notdue";
   if(date && date < todayStr()) return "late";
   return b.team==="emisi" ? "plan_emisi" : "plan_ambient";
@@ -144,7 +145,7 @@ function wbsRange(model, scale){
 /* ---------- Skala waktu (dipakai layar & cetak) ---------- */
 // Mengembalikan isi <svg> header 2 tingkat + daftar garis grid vertikal & kolom akhir pekan.
 function wbsScaleParts(range, px, scale, H){
-  H = H || 44;
+  H = H || 54;
   const half = H/2;
   const x = d=>wbsDiff(range.start, d)*px;
   let top = "", bottom = "", grid = [], weekend = [];
@@ -168,7 +169,7 @@ function wbsScaleParts(range, px, scale, H){
       const d = addDays(range.start,i), dow = dayOfWeek(d), x0 = i*px;
       const we = dow===0||dow===6;
       if(we) weekend.push([x0, px]);
-      bottom += `<rect x="${x0}" y="${half}" width="${px}" height="${half}" class="wbs-h2${we?" we":""}"/><text x="${x0+px/2}" y="${half+11}" text-anchor="middle" class="wbs-h2d">${DOW_SHORT_ID[dow].slice(0,1)}</text><text x="${x0+px/2}" y="${H-4}" text-anchor="middle" class="wbs-h2t">${Number(d.slice(8,10))}</text>`;
+      bottom += `<rect x="${x0}" y="${half}" width="${px}" height="${half}" class="wbs-h2${we?" we":""}"/><text x="${x0+px/2}" y="${half+10}" text-anchor="middle" class="wbs-h2d">${DOW_SHORT_ID[dow].slice(0,1)}</text><text x="${x0+px/2}" y="${H-6}" text-anchor="middle" class="wbs-h2t">${Number(d.slice(8,10))}</text>`;
       grid.push(x0);
     }
   } else if(scale==="week"){
@@ -261,7 +262,7 @@ function wbsRender(batches){
   const CW = Math.ceil(range.days*px);
   const H = rows.length*WBS_RH;
   const x = d=>wbsDiff(range.start, d)*px;
-  const parts = wbsScaleParts(range, px, wbsScale, 44);
+  const parts = wbsScaleParts(range, px, wbsScale, WBS_HH);
   const today = todayStr();
   const tx = (today>=range.start && today<=range.end) ? x(today)+px/2 : null;
   const tmpl = cols.map(c=>c.w+"px").join(" ");
@@ -287,7 +288,7 @@ function wbsRender(batches){
       start:`<div class="wbs-c date">${wbsFmt(n.start)}</div>`,
       end:`<div class="wbs-c date">${wbsFmt(n.end)}</div>`,
       dur:`<div class="wbs-c num">${dur}</div>`,
-      pct:`<div class="wbs-c pct">${n.type==="point" ? (n.excluded?`<span class="muted">—</span>`:`<span class="wbs-st" style="--c:${(WBS_STATUS[n.status]||{}).color}">${n.done?"Selesai":n.status==="late"?"Terlambat":n.status==="failed"?"Gagal":n.status==="deferred"?"Ditunda":"Rencana"}</span>`) : `<span class="wbs-pbar"><i style="width:${pct}%"></i></span><b>${pct}%</b>`}</div>`
+      pct:`<div class="wbs-c pct">${n.type==="point" ? (n.excluded?`<span class="muted">—</span>`:`<span class="wbs-st" style="--c:${(WBS_STATUS[n.status]||{}).color}">${n.done?"Selesai":n.status==="late"?"Terlambat":n.status==="failed"?"Gagal":n.status==="deferred"?"Ditunda":"Terjadwal"}</span>`) : `<span class="wbs-pbar"><i style="width:${pct}%"></i></span><b>${pct}%</b>`}</div>`
     };
     return `<div class="wbs-row lv${n.level} t-${n.type}" data-i="${i}" style="grid-template-columns:${tmpl}">${cols.map(c=>cells[c.k]).join("")}</div>`;
   }).join("");
@@ -312,7 +313,7 @@ function wbsRender(batches){
   const bars = rows.map((r,i)=>wbsBarSvg(r.node, x, i*WBS_RH+WBS_RH/2, px)).join("");
   const defs = `<defs><pattern id="wbsHatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="#fff"/><line x1="0" y1="0" x2="0" y2="5" stroke="#94a3b8" stroke-width="2"/></pattern><marker id="wbsArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L8,4 L0,8 z" fill="#334155"/></marker></defs>`;
   const todaySvg = tx!=null ? `<line x1="${tx}" y1="0" x2="${tx}" y2="${H}" class="wbs-today"/>` : "";
-  const headSvg = `<svg width="${CW}" height="44" class="wbs-svg">${parts.top}${parts.bottom}${tx!=null?`<line x1="${tx}" y1="22" x2="${tx}" y2="44" class="wbs-today"/><circle cx="${tx}" cy="40" r="3" fill="#dc2626"/>`:""}</svg>`;
+  const headSvg = `<svg width="${CW}" height="${WBS_HH}" class="wbs-svg">${parts.top}${parts.bottom}${tx!=null?`<line x1="${tx}" y1="${WBS_HH/2}" x2="${tx}" y2="${WBS_HH}" class="wbs-today"/><circle cx="${tx}" cy="${WBS_HH-4}" r="3" fill="#dc2626"/>`:""}</svg>`;
   const bodySvg = `<svg width="${CW}" height="${H}" class="wbs-svg" id="wbsBodySvg">${defs}${bg}<rect id="wbsHl" x="0" y="-100" width="${CW}" height="${WBS_RH}" class="wbs-hlrect"/>${todaySvg}${links}${bars}</svg>`;
 
   const legend = `<div class="legend gn-legend wbs-legend">
@@ -353,7 +354,7 @@ document.addEventListener("mouseover", e=>{
 });
 function wbsRerender(){ renderGantt(); }
 Object.assign(ACTIONS, {
-  ganttToggleTeam, ganttToggleBatch,
+  ganttToggleTeam, ganttToggleBatch, ganttBatchMenu, ganttBatchAll,
   wbsSetGroup:(t)=>{ wbsGroup = t.dataset.val; wbsOpen.clear(); wbsRerender(); },
   wbsSetScale:(t)=>{ wbsScale = t.dataset.val; wbsRerender(); },
   wbsSetLevel:(t)=>{ wbsLevel = Number(t.dataset.val); wbsOpen.clear(); wbsRerender(); },
