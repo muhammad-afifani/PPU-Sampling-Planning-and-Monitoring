@@ -724,7 +724,7 @@ document.addEventListener("change", e=>{
 });
 
 Object.assign(ACTIONS, {
-  importAmbienXlsx, exportAmbienXlsx, downloadTemplateAmbien, resetAmbienData,
+  importAmbienXlsx:()=>importHasilAnyXlsx(), exportAmbienXlsx:()=>exportAmbienXlsx(), downloadTemplateAmbien:()=>downloadTemplateAmbien(), resetAmbienData,
   ambDbSetCat:(t)=>{ ambDbCat = t.dataset.cat; renderAmbienDb(); },
   ambDashSetCat:(t)=>{ ambDashCat = t.dataset.cat; ambDashFlt = {site:ambDashFlt.site,from:"",to:"",param:""}; ambDashProfileKey=""; renderAmbienDashboard(); },
   ambSetParam:(t)=>{ ambDashFlt.param = t.dataset.val; renderAmbienDashboard(); },
