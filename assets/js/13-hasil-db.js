@@ -17,6 +17,12 @@ function hasilParseResult(raw){
   raw = (raw==null?"":String(raw)).trim();
   if(!raw || /^N\/A/i.test(raw)) return {raw, numeric:null, status:"not_sampled"};
   if(raw==="Surat Pernyataan") return {raw, numeric:null, status:"declaration"};
+  // Notasi pangkat ("3.1 x 10^-3", "3,1 × 10⁻³") — dulu terbaca 3.1 (status other), padahal 0.0031.
+  const sci = raw.match(/^([<>]?)\s*(\d+(?:[.,]\d+)?)\s*[x×X*]\s*10\s*\^?\s*([-–−⁻]?)\s*([\d⁰¹²³⁴⁵⁶⁷⁸⁹]+)$/);
+  if(sci){
+    const sup = "⁰¹²³⁴⁵⁶⁷⁸⁹", exp = Number(sci[4].replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]/g, c=>sup.indexOf(c)))*(sci[3]?-1:1);
+    return {raw, numeric: Number((parseFloat(sci[2].replace(",","."))*Math.pow(10, exp)).toPrecision(6)), status: sci[1]==="<" ? "below_detection" : "measured"};
+  }
   if(raw.startsWith("<")){ const m = raw.match(/[\d.]+/); return {raw, numeric: m?parseFloat(m[0]):null, status:"below_detection"}; }
   if(/^-?\d+(\.\d+)?$/.test(raw)) return {raw, numeric: parseFloat(raw), status:"measured"};
   const m2 = raw.match(/[\d.]+/);
@@ -98,21 +104,8 @@ function hasilBuildRecord(r, idx, engineLookup){
 // diabaikan. Export/Template APP INI SENDIRI cuma memuat kolom yg benar" dipakai (HASIL_XLSX_HEADERS
 // di bawah), supaya tidak menghasilkan file kosong-kosong spt keluhan CSV lama.
 const HASIL_XLSX_HEADERS = ["NAMA CEROBONG (SK NO 2020)","SITE","NAMA SUMBER EMISI","KATEGORI KAPASITAS","JENIS BAHAN BAKAR","PERIODE","PARAMETER","UNIT","RESULT","DATE OF SAMPLING","RUNNING HOUR (1 Tahun kebelakang)","STANDARD PERMEN LH 13 2009","STANDAR PERMEN LH 11 2021","CHCEK PERMEN","CEK BAKU MUTU VS RESULT","Metode","KETERANGAN","REMARKS"];
-function importHasilXlsx(){
-  xlsxImport(wb=>{
-    const ws = wb.Sheets["Hasil Pemantauan"] || wb.Sheets[wb.SheetNames[0]];
-    const rows = xlsxSheetToRows(ws);
-    const engineLookup = {}; DB.points.forEach(p=>{ if(p.kategori==="emisi") engineLookup[p.nama.trim()] = p; });
-    let added = 0;
-    rows.forEach((r,i)=>{
-      const rec = hasilBuildRecord(r, i, engineLookup);
-      if(rec){ DB.hasilPemantauan.push(rec); added++; }
-    });
-    touchDataset("hasilPemantauan"); save();
-    toast(`Import selesai: ${added} baris data hasil pemantauan ditambahkan.`, "ok");
-    renderHasilDb();
-  });
-}
+// importHasilXlsx / exportHasilXlsx / downloadTemplateHasilXlsx ada di 33-hasil-import.js — import
+// sekarang lewat halaman review (auto-isi baku mutu, running hour, identitas titik) sebelum masuk DB.
 function hasilRowForExport(r){
   const REV_STATUS = {ok:"OK", exceed:"Melebihi Baku Mutu", not_applicable:"N/A", not_evaluated:""};
   return {
@@ -125,14 +118,6 @@ function hasilRowForExport(r){
     "CHCEK PERMEN": r.regulasiCek, "CEK BAKU MUTU VS RESULT": REV_STATUS[r.statusBakuMutu] || "",
     "Metode": r.metode, "KETERANGAN": r.keterangan, "REMARKS": r.remarks
   };
-}
-function exportHasilXlsx(){
-  const wb = xlsxWorkbookFromSheets([["Hasil Pemantauan", xlsxSheetFromRows(HASIL_XLSX_HEADERS, DB.hasilPemantauan.map(hasilRowForExport))]]);
-  xlsxDownload(wb, "hasil_pemantauan_export.xlsx");
-}
-function downloadTemplateHasilXlsx(){
-  const wb = xlsxWorkbookFromSheets([["Hasil Pemantauan", xlsxSheetFromRows(HASIL_XLSX_HEADERS, [])]]);
-  xlsxDownload(wb, "template_hasil_pemantauan.xlsx");
 }
 function resetHasilData(){
   askConfirm("Reset Database Hasil Emisi ke data default (kembali ke dataset awal, semua data yang kamu import akan hilang)?", ()=>{
@@ -306,6 +291,7 @@ function renderHasilDb(){
       </tr>`;
     }).join("")}</tbody>`;
   document.getElementById("hasildbCount").textContent = rows.length+" dari "+DB.hasilPemantauan.length+" baris data ditampilkan.";
+  if(typeof renderHasilCompleteness==="function") renderHasilCompleteness();
 }
 ["hdbFltSite","hdbFltPeriode","hdbFltParameter","hdbFltStatus","hdbFltSearch"].forEach(id=>{
   document.addEventListener("input", e=>{ if(e.target.id===id) renderHasilDb(); });

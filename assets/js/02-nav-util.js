@@ -120,6 +120,7 @@ function renderPage(p){
   if(p==="runninghour") renderRunningHour();
   if(p==="hasildashboard") renderHasilDashboard();
   if(p==="hasildb") renderHasilDb();
+  if(p==="coareader") renderCoaReader();
   if(p==="ambiendashboard") renderAmbienDashboard();
   if(p==="ambiendb") renderAmbienDb();
   if(p==="aqiispu") renderAqiIspu();
