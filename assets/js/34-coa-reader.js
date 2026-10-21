@@ -493,7 +493,7 @@ function coaSampleFromExcel(g){
 function coaAddSamples(samples, label){
   coaState.samples = coaState.samples.concat(samples);
   if(label) coaState.files.push({id:coaNewId("f"), name:label, status:"done", msg:`${samples.length} sampel`, method:"excel"});
-  if(document.getElementById("page-coareader") && document.getElementById("page-coareader").classList.contains("active")) renderCoaReader();
+  if(["page-coareader","page-coaamb"].some(id=>{ const el = document.getElementById(id); return el && el.classList.contains("active"); })) renderCoaReader();
 }
 
 /* ---------- Nilai turunan per baris (dihitung ulang tiap render) ---------- */
@@ -569,41 +569,53 @@ function coaIssueCount(s){ if(coaIsAmb(s)) return ambIssueCount(s); return coaSa
 
 /* ---------- Render halaman ---------- */
 const COA_STATUS_BADGE = {ok:["b-green","Memenuhi"], exceed:["b-red","Melebihi BM"], not_applicable:["b-gray","Tanpa BM"], not_evaluated:["b-amber","Belum dievaluasi"]};
+// Dua menu (Import CoA/SHU Emisi & Ambient) memakai state yg sama; tiap halaman hanya menampilkan
+// sampel jenisnya sendiri. Dokumen yg ternyata jenis lain tetap terbaca & ditunjukkan tautannya.
+function coaScopeAmb(){ const a = id=>{ const el = document.getElementById(id); return !!(el && el.classList.contains("active")); }; return a("page-coaamb") || a("page-ambiendb") || a("page-ambiendashboard"); }
+function coaScopeSamples(){ const amb = coaScopeAmb(); return coaState.samples.filter(s=>coaIsAmb(s)===amb); }
 function renderCoaReader(){
-  const root = document.getElementById("coaRoot"); if(!root) return;
+  const amb = coaScopeAmb();
+  const root = document.getElementById(amb ? "coaRootAmb" : "coaRoot"), other = document.getElementById(amb ? "coaRoot" : "coaRootAmb");
+  if(!root) return;
+  if(other) other.innerHTML = "";   // hindari id ganda (coaDrop, coaFileInput, …) di halaman yg tidak aktif
   const pending = coaState.files.filter(f=>f.status!=="done" && f.status!=="error").length;
-  const samples = coaState.samples;
+  const samples = coaScopeSamples();
+  const otherN = coaState.samples.length - samples.length;
   const rowsIncl = samples.reduce((a,s)=>a+coaRowsIncluded(s),0);
   const issues = samples.reduce((a,s)=>a+coaIssueCount(s),0);
   const comp = heCompleteness(currentPeriodStr()), compA = ambCompleteness(currentPeriodStr());
+  const pct = (a,b)=>b ? Math.round(a/b*100) : 0;
   root.innerHTML = `
   <div class="coa-top">
     <section class="card coa-drop-card">
       <div class="coa-drop" id="coaDrop" tabindex="0" role="button" aria-label="Pilih atau tarik file PDF CoA/SHU">
         <div class="coa-drop-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="m9 15 3-3 3 3"/></svg></div>
-        <div><b>Tarik PDF CoA / SHU ke sini, atau klik untuk memilih</b><div class="muted">Bisa banyak file sekaligus. PDF digital dibaca langsung; PDF hasil scan / foto (JPG, PNG) dibaca dengan OCR di browser — tanpa API key, data tidak dikirim ke server mana pun.</div></div>
+        <div><b>Tarik PDF CoA / SHU ${amb?"ambient (udara ambien, kebisingan, kebauan, getaran)":"emisi"} ke sini, atau klik untuk memilih</b><div class="muted">Bisa banyak file sekaligus. PDF digital dibaca langsung; PDF hasil scan / foto (JPG, PNG) dibaca dengan OCR di browser — tanpa API key, data tidak dikirim ke server mana pun.</div></div>
         <input type="file" id="coaFileInput" accept=".pdf,application/pdf,image/*" multiple hidden>
       </div>
       <div class="coa-opts">
-        <div class="coa-opt"><span class="coa-opt-lbl">Nilai emisi yang dipakai</span><div class="hd-seg-group" role="group">
+        ${amb ? "" : `<div class="coa-opt"><span class="coa-opt-lbl">Nilai emisi yang dipakai</span><div class="hd-seg-group" role="group">
           <button type="button" class="${coaState.useValue==="corrected"?"on":""}" data-action="coaSetUse" data-val="corrected" aria-pressed="${coaState.useValue==="corrected"}">Terkoreksi O₂</button>
-          <button type="button" class="${coaState.useValue==="measured"?"on":""}" data-action="coaSetUse" data-val="measured" aria-pressed="${coaState.useValue==="measured"}">Terukur</button></div></div>
+          <button type="button" class="${coaState.useValue==="measured"?"on":""}" data-action="coaSetUse" data-val="measured" aria-pressed="${coaState.useValue==="measured"}">Terukur</button></div></div>`}
         <label class="coa-chk"><input type="checkbox" id="coaForceOcr" ${coaState.forceOcr?"checked":""}> Paksa OCR (kalau teks PDF berantakan)</label>
-        <label class="coa-chk"><input type="checkbox" id="coaReplace" ${coaState.replace?"checked":""}> Ganti data lama (cerobong + periode + parameter sama)</label>
-        <button type="button" class="btn small ghost" data-action="importHasilXlsx" title="Excel juga masuk ke review ini dulu">Import dari Excel…</button>
-        <button type="button" class="btn small ghost" data-action="downloadTemplateHasilXlsx">Template Excel</button>
+        <label class="coa-chk"><input type="checkbox" id="coaReplace" ${coaState.replace?"checked":""}> Ganti data lama (${amb?"titik":"cerobong"} + periode + parameter sama)</label>
+        <button type="button" class="btn small ghost" data-action="${amb?"importAmbienXlsx":"importHasilXlsx"}" title="Excel juga masuk ke review ini dulu">Import dari Excel…</button>
+        <button type="button" class="btn small ghost" data-action="${amb?"downloadTemplateAmbien":"downloadTemplateHasilXlsx"}">Template Excel</button>
       </div>
       ${coaState.files.length ? `<ul class="coa-files">${coaState.files.map(f=>`<li class="st-${f.status}"><span class="coa-fdot"></span><b>${escHtml(f.name)}</b><span class="muted">${escHtml(f.msg||"")}</span>${f.method?`<span class="coa-ftag">${f.method==="ocr"?"OCR":f.method==="excel"?"Excel":f.method==="mixed"?"Teks + OCR":"Teks PDF"}</span>`:""}</li>`).join("")}</ul>` : ""}
     </section>
     <aside class="card coa-side">
-      <div class="hec-eyebrow">Kelengkapan ${escHtml(comp.periode)}</div>
-      <div class="coa-side-kpis"><div><b>${comp.lengkap}</b><span>lengkap</span></div><div class="warn"><b>${comp.sebagian}</b><span>sebagian</span></div><div class="bad"><b>${comp.kosong}</b><span>belum ada</span></div></div>
-      <div class="hec-bar"><i style="width:${comp.reqTotal?Math.round(comp.reqHave/comp.reqTotal*100):0}%"></i></div>
-      <div class="muted coa-side-note">Emisi: ${comp.reqHave}/${comp.reqTotal} parameter wajib dari ${comp.total} titik target sudah masuk. <a href="#" data-action="goToPage" data-page="hasildb">Rincian</a></div>
+      <div class="hec-eyebrow">Kelengkapan ${amb?"ambient":"emisi"} ${escHtml(comp.periode)}</div>
+      ${amb ? `<div class="coa-side-kpis"><div><b>${compA.lengkap}</b><span>lengkap</span></div><div class="warn"><b>${compA.sebagian}</b><span>sebagian</span></div><div class="bad"><b>${compA.kosong}</b><span>belum ada</span></div></div>
+      <div class="hec-bar"><i style="width:${pct(compA.lengkap, compA.total)}%"></i></div>
       <div class="coa-side-amb">${AMB_KINDS.map(k=>`<div><span>${AMB_KIND_LABEL[k]}</span><b>${compA.kinds[k].lengkap}/${compA.kinds[k].total}</b></div>`).join("")}</div>
-      <div class="muted coa-side-note">Ambient: titik lengkap / titik target. <a href="#" data-action="goToPage" data-page="ambiendb">Rincian</a></div>
+      <div class="muted coa-side-note">Titik lengkap / titik target per kategori. <a href="#" data-action="goToPage" data-page="ambiendb">Lihat rinciannya</a></div>`
+      : `<div class="coa-side-kpis"><div><b>${comp.lengkap}</b><span>lengkap</span></div><div class="warn"><b>${comp.sebagian}</b><span>sebagian</span></div><div class="bad"><b>${comp.kosong}</b><span>belum ada</span></div></div>
+      <div class="hec-bar"><i style="width:${pct(comp.reqHave, comp.reqTotal)}%"></i></div>
+      <div class="muted coa-side-note">${comp.reqHave}/${comp.reqTotal} parameter wajib dari ${comp.total} titik target sudah masuk. <a href="#" data-action="goToPage" data-page="hasildb">Lihat rinciannya</a></div>`}
     </aside>
   </div>
+  ${otherN ? `<div class="coa-other card">${otherN} sampel ${amb?"emisi":"ambient"} juga sudah terbaca dari dokumen yang diunggah — direview di menu <a href="#" data-action="goToPage" data-page="${amb?"coareader":"coaamb"}"><b>Import CoA/SHU ${amb?"Emisi":"Ambient"}</b></a>.</div>` : ""}
   ${samples.length ? `
   <div class="coa-bar card">
     <div class="coa-bar-stats"><b>${samples.length}</b> sampel &middot; <b>${rowsIncl}</b> baris akan diimport &middot; <span class="${issues?"coa-bad":"coa-good"}"><b>${issues}</b> perlu dicek</span>${pending?` &middot; <span class="muted">${pending} file masih diproses…</span>`:""}</div>
@@ -613,7 +625,7 @@ function renderCoaReader(){
     <button type="button" class="btn small" data-action="coaDownloadXlsx">Unduh Excel</button>
     <button type="button" class="btn small primary" data-action="coaImport" ${coaState.busy||!rowsIncl?"disabled":""}>Import ke Database (${rowsIncl})</button>
   </div>
-  <div class="coa-samples">${samples.map(coaSampleHtml).join("")}</div>` : `<div class="card coa-empty"><b>Belum ada dokumen.</b> Unggah PDF CoA/SHU <b>emisi</b> (turbin, gas engine, diesel, flare/heater opasitas, H2S fuel gas) maupun <b>ambient</b> (udara ambien, kebisingan, kebauan, getaran) — tools mengenali jenis dokumen &amp; nama titik, menyusun parameter wajib sesuai regulasi titik, dan mengisi baku mutu, running hour &amp; status otomatis.</div>`}
+  <div class="coa-samples">${samples.map(coaSampleHtml).join("")}</div>` : `<div class="card coa-empty"><b>Belum ada dokumen.</b> ${amb ? `Unggah PDF CoA/SHU <b>udara ambien, kebisingan, kebauan, atau getaran</b> — tools mengenali jenis dokumen &amp; nama titik, mengisi baku mutu (PP 22/2021, KepMenLH 48/49/50 1996), menghitung LS/LM/LSM kebisingan &amp; status getaran.` : `Unggah PDF CoA/SHU <b>emisi</b> (turbin, gas engine, diesel, flare/heater opasitas, H2S fuel gas) — tools mengenali nama sumber emisi, menyusun parameter wajib + pendukung sesuai regulasi titik, dan mengisi baku mutu &amp; running hour otomatis.`}</div>`}
   ${coaState.showDoc ? coaDocViewerHtml() : ""}`;
 }
 function coaPointOptions(s){
@@ -691,6 +703,8 @@ async function coaHandleFiles(fileList){
       const raw = coaParsePages(pages, e.name).filter(s=>s.rows.length || s.name);
       const samples = raw.map(coaSampleFromParsed);
       coaState.samples.push(...samples);
+      const otherKind = samples.filter(s=>coaIsAmb(s)!==coaScopeAmb()).length;
+      if(otherKind) toast(`${e.name}: ${otherKind} sampel ${coaScopeAmb()?"emisi":"ambient"} terbaca — direview di menu Import CoA/SHU ${coaScopeAmb()?"Emisi":"Ambient"}.`, "ok");
       const kinds = [...new Set(samples.map(s=>coaIsAmb(s) ? AMB_KIND_LABEL[s.kind] : "Emisi"))].join(", ");
       e.status = "done"; e.msg = samples.length ? `${kinds} · ${samples.length} sampel · ${samples.reduce((a,s)=>a+coaFoundCount(s),0)} nilai terbaca` : "tidak ada data hasil yang dikenali";
       if(!samples.length) e.status = "error";
@@ -751,7 +765,8 @@ function coaRecordFor(s, r){
 function coaDownloadXlsx(){
   const STATUS_TXT = {ok:"OK", exceed:"Melebihi Baku Mutu", not_applicable:"N/A", not_evaluated:""};
   const rows = [];
-  coaState.samples.filter(s=>!coaIsAmb(s)).forEach(s=>s.rows.filter(r=>r.include).forEach(r=>{
+  const scope = coaScopeSamples();
+  scope.filter(s=>!coaIsAmb(s)).forEach(s=>s.rows.filter(r=>r.include).forEach(r=>{
     const rec = coaRecordFor(s, r), d = coaDerive(s, r);
     const o = hasilRowForExport(rec);
     o["CEK BAKU MUTU VS RESULT"] = STATUS_TXT[rec.statusBakuMutu]||"";
@@ -766,7 +781,7 @@ function coaDownloadXlsx(){
   const ambSheets = [];
   AMB_KINDS.forEach(kind=>{
     const recs = [];
-    coaState.samples.filter(s=>s.kind===kind).forEach(s=>ambRecordsFor(s).forEach(x=>{
+    scope.filter(s=>s.kind===kind).forEach(s=>ambRecordsFor(s).forEach(x=>{
       const flags = ambSampleFlags(s).concat(kind==="kebisingan" ? ambNoiseDerive(s).flags : kind==="getaran" ? ambVibDerive(s).flags : ambRowDerive(s, x.row).flags).filter(f=>f.lv!=="info").map(f=>f.t).join("; ");
       recs.push({...x.rec, __x:{"SUMBER DOKUMEN": s.source==="excel" ? "Excel" : [s.fileName, s.page?`hal. ${s.page}`:"", s.lab].filter(Boolean).join(" · "), "CATATAN REVIEW": flags}});
     }));
@@ -778,11 +793,11 @@ function coaDownloadXlsx(){
   toast("Excel review diunduh — file ini bisa diedit lalu diimport lagi lewat Import Excel.","ok");
 }
 function coaImport(){
-  const todo = [];
-  coaState.samples.filter(s=>!coaIsAmb(s)).forEach(s=>s.rows.filter(r=>r.include).forEach(r=>{ const d = coaDerive(s, r); todo.push({s, r, d}); }));
+  const todo = [], scope = coaScopeSamples();
+  scope.filter(s=>!coaIsAmb(s)).forEach(s=>s.rows.filter(r=>r.include).forEach(r=>{ const d = coaDerive(s, r); todo.push({s, r, d}); }));
   const blockers = todo.filter(x=>!x.d.p && !(x.s.source==="excel" && x.s.nameRead) || !x.d.periode || !x.d.val || x.d.res.status==="not_sampled" || /\^\?/.test(x.d.val));
   const ready = todo.filter(x=>!blockers.includes(x));
-  const amb = ambImportPlan(coaState.samples.filter(coaIsAmb));
+  const amb = ambImportPlan(scope.filter(coaIsAmb));
   if(!ready.length && !amb.ready.length){ toast("Belum ada data yang siap diimport — lengkapi titik, tanggal, dan hasil dulu.","err"); return; }
   let replaced = 0;
   ready.forEach(x=>{ const rec = coaRecordFor(x.s, x.r); if(DB.hasilPemantauan.some(h=>(h.engineId && h.engineId===rec.engineId || h.cerobong===rec.cerobong) && h.periode===rec.periode && heCanonParam(h.parameter)===rec.parameter)) replaced++; });
@@ -806,7 +821,7 @@ function coaImport(){
     save(); coaMedCache.clear();
     logChange && logChange(`Import hasil: emisi ${add} baru/${repd} diganti, ambient ${ac.add} baru/${ac.rep} diganti${skip+ac.skip?`, ${skip+ac.skip} dilewati`:""} (review CoA/Excel)`);
     coaState.samples.forEach(s=>{ if(!coaIsAmb(s)) s.rows = s.rows.filter(r=>!doneRows.has(r.id)); else if(s.rows) s.rows = s.rows.filter(r=>!ac.done.has(r.id)); });
-    coaState.samples = coaState.samples.filter(s=>coaIsAmb(s) ? !ac.done.has(s.id) && (s.kind==="kebisingan" || s.kind==="getaran" || s.rows.some(r=>r.include)) : s.rows.some(r=>r.include && (r.found || r.edited)));
+    coaState.samples = coaState.samples.filter(s=>!scope.includes(s) ? true : coaIsAmb(s) ? !ac.done.has(s.id) && (s.kind==="kebisingan" || s.kind==="getaran" || s.rows.some(r=>r.include)) : s.rows.some(r=>r.include && (r.found || r.edited)));
     renderCoaReader();
     toast(`Import selesai: emisi ${add} baru, ${repd} diganti · ambient ${ac.add} baru, ${ac.rep} diganti${skip+ac.skip?` · ${skip+ac.skip} dilewati`:""}.${coaState.samples.length?" Yang belum lengkap tetap di review.":""}`, "ok");
   });
@@ -814,7 +829,7 @@ function coaImport(){
 
 Object.assign(ACTIONS, {
   coaSetUse:(t)=>{ coaState.useValue = t.dataset.val; renderCoaReader(); },
-  coaClear:()=>askConfirm("Kosongkan semua dokumen & baris di review (belum diimport)?", ()=>{ coaState.samples = []; coaState.files = []; coaState.showDoc = null; renderCoaReader(); }),
+  coaClear:()=>askConfirm(`Kosongkan semua sampel ${coaScopeAmb()?"ambient":"emisi"} di review (belum diimport)?`, ()=>{ const sc = coaScopeSamples(); coaState.samples = coaState.samples.filter(s=>!sc.includes(s)); if(!coaState.samples.length) coaState.files = []; coaState.showDoc = null; renderCoaReader(); }),
   coaRemoveSample:(t)=>{ coaState.samples = coaState.samples.filter(s=>s.id!==t.dataset.sid); renderCoaReader(); },
   coaShowDoc:(t)=>{ coaState.showDoc = t.dataset.sid || null; renderCoaReader(); },
   coaZoomDoc:(t)=>{ t.classList.toggle("zoom"); },

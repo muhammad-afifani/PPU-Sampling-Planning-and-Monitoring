@@ -3103,6 +3103,7 @@ table.daygrid{background:transparent !important;border-spacing:3px 4px !importan
 .coa-drop-card{padding:14px;}
 .coa-drop{display:flex;gap:14px;align-items:center;padding:18px;border:2px dashed var(--gray-300);border-radius:12px;cursor:pointer;transition:border-color .15s, background .15s;}
 .coa-drop:hover,.coa-drop.over,.coa-drop:focus-visible{border-color:var(--teal-500);background:rgba(14,165,160,.06);outline:none;}
+.coa-other{padding:10px 14px;margin-bottom:12px;font-size:12.5px;border-left:4px solid var(--teal-500);}
 .coa-drop-ic{color:var(--teal-500);flex-shrink:0;}
 .coa-drop b{font-size:14px;} .coa-drop .muted{font-size:12px;margin-top:3px;max-width:720px;}
 .coa-opts{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-top:12px;}
