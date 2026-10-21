@@ -157,7 +157,6 @@ const LAB_CATALOG_STATIC = [
   ["kebauan","Methyl Mercaptant",/mercapt|merkaptan/],
   ["kebauan","Methyl Sulfide",/methyl sulfide|metil sulfida/],
   ["kebauan","Styrene",/styrene|stiren/],
-  ["kebauan","Kebauan (Odour)",/kebauan|\bbau\b|odou?r/],
   ["getaran","Getaran (Vibration)",/getar|vibra/]
 ];
 function labNormText(s){
