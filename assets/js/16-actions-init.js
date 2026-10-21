@@ -76,7 +76,7 @@ const ACTIONS = {
   exportAll, resetDefault, resetEmpty, downloadTemplatePointsXlsx, downloadTemplatePersonilXlsx,
   checkFullBackupUpdate, checkRepoBackupUpdate, applyFullBackupImport,
   dismissOnboarding, startOnboardingUpdate, replayOnboarding, openAboutModal,
-  importHasilXlsx, exportHasilXlsx, downloadTemplateHasilXlsx, resetHasilData,
+  importHasilXlsx:()=>importHasilXlsx(), exportHasilXlsx:()=>exportHasilXlsx(), downloadTemplateHasilXlsx:()=>downloadTemplateHasilXlsx(), resetHasilData,
   addHasil, editHasil:(t)=>editHasil(t.dataset.id), saveHasil:(t)=>saveHasil(t.dataset.id), deleteHasil:(t)=>deleteHasil(t.dataset.id),
   hdChip:(t)=>{
     const field = t.dataset.field, val = t.dataset.val;
