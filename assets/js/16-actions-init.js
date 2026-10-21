@@ -121,6 +121,10 @@ const ACTIONS = {
     else{ dashScSel.batch.add(val); }
     renderDashboardSCurve();
   },
+  dashScBatchAll:()=>{
+    dashScAvailableBatches(document.getElementById("dashScPeriode").value).forEach(b=>dashScSel.batch.add(b.id));
+    renderDashboardSCurve();
+  },
   hdResetFilters:()=>{
     hdSel.site.clear(); hdSel.sumber.clear(); hdSel.cerobong.clear();
     const p = document.getElementById("hdFltPermen"); if(p) p.value="";

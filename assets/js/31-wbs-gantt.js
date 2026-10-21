@@ -354,7 +354,7 @@ document.addEventListener("mouseover", e=>{
 });
 function wbsRerender(){ renderGantt(); }
 Object.assign(ACTIONS, {
-  ganttToggleTeam, ganttToggleBatch, ganttBatchMenu, ganttBatchAll,
+  ganttToggleTeam, ganttToggleBatch, batchPickerMenu, ganttBatchAll,
   wbsSetGroup:(t)=>{ wbsGroup = t.dataset.val; wbsOpen.clear(); wbsRerender(); },
   wbsSetScale:(t)=>{ wbsScale = t.dataset.val; wbsRerender(); },
   wbsSetLevel:(t)=>{ wbsLevel = Number(t.dataset.val); wbsOpen.clear(); wbsRerender(); },

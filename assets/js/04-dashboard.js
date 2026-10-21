@@ -120,15 +120,13 @@ function refreshDashScSelects(){
   // yang sudah tidak relevan/tidak kelihatan lagi chipnya.
   const batchOptIds = new Set(batchOpts.map(b=>b.id));
   [...dashScSel.batch].forEach(id=>{ if(!batchOptIds.has(id)) dashScSel.batch.delete(id); });
-  // Angka selesai/total di tiap chip batch — populasi sama dgn yang dihitung kurva (buildSCurveSVG).
+  // Angka selesai/total di tiap batch — populasi sama dgn yang dihitung kurva (buildSCurveSVG).
   const batchCount = b=>{
     const ps = DB.points.filter(p=>p.batchId===b.id && p.planStart && p.planEnd && effectiveWajib(p) && !p.tidakBeroperasi);
-    return `<span class="sc-chip-count">${ps.filter(p=>p.status==="done").length}/${ps.length}</span>`;
+    return `${ps.filter(p=>p.status==="done").length}/${ps.length} selesai`;
   };
-  document.getElementById("dashScBatchChips").innerHTML = batchOpts.length
-    ? scChip(dashScSel.batch.size===0, "dashScBatchChip", "", "Semua batch")
-      + batchOpts.map(b=>scChip(dashScSel.batch.has(b.id), "dashScBatchChip", b.id, escHtml(b.name), batchCount(b))).join("")
-    : `<span class="hint" style="margin:0;line-height:32px;">Belum ada batch di periode ini</span>`;
+  if(batchOpts.length) renderBatchPicker("dashScBatchChips", {batches:batchOpts, selected:dashScSel.batch, toggle:"dashScBatchChip", all:"dashScBatchAll", meta:batchCount});
+  else document.getElementById("dashScBatchChips").innerHTML = `<span class="hint" style="margin:0;line-height:32px;">Belum ada batch di periode ini</span>`;
 
   const defaultPeriode = periods.includes(currentPeriodStr()) ? currentPeriodStr() : periods[periods.length-1];
   document.getElementById("dashScResetBtn").style.display =
