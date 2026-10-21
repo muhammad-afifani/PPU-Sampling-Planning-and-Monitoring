@@ -345,6 +345,12 @@ function hdTopEngines(ctx, n){
   ctx.numeric.forEach(r=>{ const cur = latestBy[r.cerobong]; if(!cur || r.periodeOrder>cur.periodeOrder) latestBy[r.cerobong] = r; });
   return Object.values(latestBy).sort((a,b)=> ctx.hasStd ? (b.pctOfStandard||0)-(a.pctOfStandard||0) : b.resultNumeric-a.resultNumeric).slice(0,n).map(r=>r.cerobong);
 }
+// Kelompok baku mutu (nilai standard -> jenis sumber yang memakainya) pada kumpulan rekaman.
+function hdStdGroups(rows){
+  const m = new Map();
+  rows.forEach(r=>{ const g = m.get(r.standard) || {std:r.standard, sumber:[], n:0}; g.n++; if(r.namaSumber && !g.sumber.includes(r.namaSumber)) g.sumber.push(r.namaSumber); m.set(r.standard, g); });
+  return [...m.values()].sort((a,b)=>a.std-b.std);
+}
 function buildHdTrend(ctx){
   const mode = hdTrendResolvedMode(ctx);
   const toggle = hdSeg("hdSetTrendMode", mode, [["site","Per Site"],["engine","Per "+hdUnitNoun(true)],["max","Max per Site"]].concat(ctx.hasStd?[["pct","% Baku Mutu"]]:[]));
@@ -379,17 +385,30 @@ function buildHdTrend(ctx){
     const v = s.values.filter(x=>x!=null);
     if(v.length>=2 && v[0]>0){ const abs = v[v.length-1]-v[0]; if(abs>hiAbs){ hiAbs = abs; hiCh = abs/v[0]*100; hiKey = s.key; } }
   });
-  const ref = mode==="pct" ? 100 : (mode==="engine" && keys.length ? hdMedian(ctx.filtered.filter(r=>keys.includes(r.cerobong)).map(r=>r.standard).filter(v=>v!=null)) : ctx.stdRef);
+  // Baku mutu satu parameter bisa BERBEDA per jenis sumber/Permen (mis. NOx: turbin 320, gas engine 300,
+  // glycol reboiler 400, diesel 1.850). Satu garis "median" menyesatkan bila cakupan campuran, jadi:
+  // satu BM tunggal = garis seperti biasa; beberapa BM = Per Engine menggambar tiap BM sendiri,
+  // Per Site/Max tidak menggambar garis & menawarkan mode % Baku Mutu (100% selalu = BM titik itu).
+  const scopeRows = ctx.filtered.filter(r=>r.standard!=null && (mode==="engine" ? keys.includes(r.cerobong) : keys.includes(r.site)));
+  const stdGroups = hdStdGroups(scopeRows);
+  const multiStd = mode!=="pct" && stdGroups.length>1;
   const dataMax = Math.max(...series.flatMap(s=>s.values.filter(v=>v!=null)));
-  const showRef = ref!=null && ref<=dataMax*4;
-  const yMax = hdNiceMax(Math.max(dataMax, showRef?ref:0)*1.08);
+  let refLines = [];
+  if(mode==="pct") refLines = [{std:100, label:"Baku mutu 100%"}];
+  else if(!multiStd && stdGroups.length===1) refLines = [{std:stdGroups[0].std, label:"Baku mutu "+hdNum(stdGroups[0].std)}];
+  else if(multiStd && mode==="engine") refLines = stdGroups.map(g=>({std:g.std, label:"BM "+hdNum(g.std)}));
+  const visRefs = refLines.filter(r=>r.std<=dataMax*4);
+  const hiddenRefs = refLines.filter(r=>r.std>dataMax*4);
+  const showRef = visRefs.length>0;
+  const bandRef = showRef && visRefs.length===1 && !multiStd ? visRefs[0].std : null;
+  const yMax = hdNiceMax(Math.max(dataMax, ...visRefs.map(r=>r.std))*1.08);
   const W=780, H=320, padL=50, padR=112, padT=22, padB=36;
   const plotW = W-padL-padR, plotH = H-padT-padB;
   const x = i=>padL + (n<=1 ? plotW/2 : i/(n-1)*plotW);
   const y = v=>padT + plotH - v/yMax*plotH;
   let svg = `<svg class="hd-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Trend ${escHtml(ctx.parameter)} per periode">`;
-  if(showRef){
-    svg += `<rect x="${padL}" y="${y(ref).toFixed(1)}" width="${plotW}" height="${(y(ref*0.7)-y(ref)).toFixed(1)}" class="hd-band"/>`;
+  if(bandRef!=null){
+    svg += `<rect x="${padL}" y="${y(bandRef).toFixed(1)}" width="${plotW}" height="${(y(bandRef*0.7)-y(bandRef)).toFixed(1)}" class="hd-band"/>`;
   }
   for(let g=0; g<=4; g++){
     const v = yMax*g/4, yy = y(v);
@@ -398,9 +417,12 @@ function buildHdTrend(ctx){
   }
   ctx.periods.forEach((p,i)=>{ svg += `<text x="${x(i).toFixed(1)}" y="${H-12}" text-anchor="middle" class="hd-axis ${i===n-1?"strong":""}">${p}</text>`; });
   if(showRef){
-    svg += `<line x1="${padL}" y1="${y(ref).toFixed(1)}" x2="${W-padR}" y2="${y(ref).toFixed(1)}" class="hd-ref"/>`;
-    svg += `<text x="${W-padR}" y="${(y(ref)-6).toFixed(1)}" text-anchor="end" class="hd-ref-label">Baku mutu ${hdNum(ref)}${mode==="pct"?"%":""}</text>`;
-    svg += `<text x="${W-padR}" y="${(y(ref*0.7)-6).toFixed(1)}" text-anchor="end" class="hd-warn-label">Early Warning &ge;${hdNum(ref*0.7)}${mode==="pct"?"%":""}</text>`;
+    // label tiap garis BM di kanan plot, dengan jarak min 12px bila BM-nya berdekatan (mis. 300 vs 320)
+    const lab = visRefs.map(r=>({r, ly:y(r.std)-6})).sort((a,b)=>a.ly-b.ly);
+    for(let i=1;i<lab.length;i++) if(lab[i].ly-lab[i-1].ly<12) lab[i].ly = lab[i-1].ly+12;
+    visRefs.forEach(r=>{ svg += `<line x1="${padL}" y1="${y(r.std).toFixed(1)}" x2="${W-padR}" y2="${y(r.std).toFixed(1)}" class="hd-ref"/>`; });
+    lab.forEach(l=>{ svg += `<text x="${W-padR}" y="${l.ly.toFixed(1)}" text-anchor="end" class="hd-ref-label">${l.r.label}</text>`; });
+    if(bandRef!=null) svg += `<text x="${W-padR}" y="${(y(bandRef*0.7)-6).toFixed(1)}" text-anchor="end" class="hd-warn-label">Early Warning &ge;${hdNum(bandRef*0.7)}${mode==="pct"?"%":""}</text>`;
   }
   const ordered = [...series].sort((a,b)=>(a.key===hiKey)-(b.key===hiKey));
   ordered.forEach(s=>{
@@ -428,11 +450,18 @@ function buildHdTrend(ctx){
   });
   svg += `</svg>`;
   const legend = series.map(s=>`<span class="item"><span class="sw" style="background:${s.color}"></span>${escHtml(s.key)}${s.key===hiKey?` <b class="up">&#9650; ${hdNum(hiCh,0)}%</b>`:""}</span>`).join("")
-    + (showRef ? `<span class="item"><span class="sw hd-sw-ref"></span>Baku mutu</span><span class="item"><span class="sw hd-sw-band"></span>Zona Early Warning</span>` : "")
-    + (ref!=null && !showRef ? `<span class="item muted">Baku mutu ${hdNum(ref)} ${escHtml(ctx.unit)} jauh di atas skala data, garis tidak digambar supaya trend tetap terbaca.</span>` : "")
+    + (showRef ? `<span class="item"><span class="sw hd-sw-ref"></span>Baku mutu</span>${bandRef!=null?`<span class="item"><span class="sw hd-sw-band"></span>Zona Early Warning</span>`:""}` : "")
+    + (hiddenRefs.length ? `<span class="item muted">Baku mutu ${hiddenRefs.map(r=>hdNum(r.std)).join(", ")} ${escHtml(ctx.unit)} jauh di atas skala data, garis tidak digambar supaya trend tetap terbaca.</span>` : "")
     + (series.some(s=>{ const idx = s.values.map((v,i)=>v==null?null:i).filter(v=>v!=null); return idx.some((v,k)=>k && v-idx[k-1]>1); }) ? `<span class="item muted">Garis putus-putus: tidak ada data pada periode di antaranya.</span>` : "")
     + (autoNote ? `<span class="item muted">${autoNote}</span>` : "");
-  return {toggle, svg, legend};
+  // Baku mutu beragam: rincian BM per jenis sumber/Permen, supaya jelas garis mana milik siapa.
+  let bmNote = "";
+  if(multiStd){
+    const chips = stdGroups.map(g=>`<span class="hd-bm-chip"><b>${hdNum(g.std)}</b> ${escHtml(ctx.unit)} <small>${escHtml(g.sumber.slice(0,3).join(", "))}${g.sumber.length>3?" +"+(g.sumber.length-3):""}</small></span>`).join("");
+    const how = mode==="engine" ? "Tiap garis merah = baku mutu jenis sumber engine yang tampil." : "Garis baku mutu tidak digambar karena tiap jenis sumber punya baku mutu berbeda.";
+    bmNote = `<div class="hd-bm-note"><div class="hd-bm-head"><b>Baku mutu ${escHtml(ctx.parameter)} berbeda per jenis sumber</b><span>${how}</span></div><div class="hd-bm-chips">${chips}</div>${ctx.hasStd?`<button type="button" class="btn small" data-action="hdSetTrendMode" data-val="pct">Bandingkan sebagai % Baku Mutu</button>`:""}</div>`;
+  }
+  return {toggle, svg, legend: legend + bmNote};
 }
 
 /* ---------------- Distribution ---------------- */
@@ -582,29 +611,36 @@ function buildHdSourceProfile(ctx){
   const names = Object.keys(groups);
   if(!names.length) return hdEmpty(`Tidak ada data pada ${ctx.last}.`);
   const allVals = ctx.lastRows.map(r=>r.resultNumeric).filter(v=>v!=null);
-  const ref = ctx.stdRef;
-  const showRef = ref!=null && allVals.length && ref<=Math.max(...allVals)*4;
-  const axis = Math.max(...allVals, showRef?ref:0, 1)*1.04;
+  // Baku mutu dihitung PER jenis sumber (tiap jenis punya BM sendiri, mis. NOx turbin 320 vs gas engine 300).
+  const refOf = {};
+  names.forEach(n=>{ refOf[n] = hdMedian(groups[n].map(r=>r.standard).filter(v=>v!=null)); });
+  const maxVal = allVals.length ? Math.max(...allVals) : 0;
+  const refVals = [...new Set(names.map(n=>refOf[n]).filter(v=>v!=null && v<=maxVal*4))];
+  const showRef = refVals.length>0;
+  const sameRef = new Set(names.map(n=>refOf[n]).filter(v=>v!=null)).size<=1;
+  const axis = Math.max(...allVals, ...refVals, 1)*1.04;
   const pos = v=>(v/axis*100).toFixed(1)+"%";
   const items = names.map(n=>{
     const vals = groups[n].map(r=>r.resultNumeric).filter(v=>v!=null);
-    return {n, total:new Set(groups[n].map(r=>r.cerobong)).size, vals};
+    return {n, total:new Set(groups[n].map(r=>r.cerobong)).size, vals, ref:refOf[n]};
   }).sort((a,b)=>(b.vals.length?hdMean(b.vals):-1)-(a.vals.length?hdMean(a.vals):-1));
   const html = items.map(it=>{
     if(!it.vals.length) return `<div class="hd-src empty"><div class="hd-src-head"><b>${escHtml(it.n)}</b><span>${it.total} titik &middot; belum dievaluasi</span></div></div>`;
     const lo = Math.min(...it.vals), hi = Math.max(...it.vals), m = hdMean(it.vals);
-    const hiWarn = showRef && hi>=ref*0.7;
+    const itRef = it.ref!=null && it.ref<=axis ? it.ref : null;
+    const hiWarn = itRef!=null && hi>=itRef*0.7;
     return `<div class="hd-src">
-      <div class="hd-src-head"><b>${escHtml(it.n)}</b><span>${it.total} titik${it.vals.length<it.total?` &middot; ${it.vals.length} terukur`:""}</span></div>
+      <div class="hd-src-head"><b>${escHtml(it.n)}</b><span>${it.total} titik${it.vals.length<it.total?` &middot; ${it.vals.length} terukur`:""}${!sameRef && it.ref!=null?` &middot; BM ${hdNum(it.ref)}`:""}</span></div>
       <div class="hd-src-track" role="img" aria-label="${escHtml(it.n)}: min ${hdNum(lo)}, rata-rata ${hdNum(m)}, maks ${hdNum(hi)}">
         <i class="rng" style="left:${pos(lo)};width:calc(${pos(hi)} - ${pos(lo)} + 2px)"></i>
         <i class="mean" style="left:calc(${pos(m)} - 5px)"></i>
-        ${showRef?`<i class="mk warn" style="left:${pos(ref*0.7)}"></i><i class="mk ref" style="left:${pos(ref)}"></i>`:""}
+        ${itRef!=null?`<i class="mk warn" style="left:${pos(itRef*0.7)}"></i><i class="mk ref" style="left:${pos(itRef)}"></i>`:""}
       </div>
       <div class="hd-src-foot"><span>min ${hdNum(lo)}</span><span class="strong">rata-rata ${hdNum(m)}</span><span class="${hiWarn?"warn":""}">maks ${hdNum(hi)}</span></div>
     </div>`;
   }).join("");
-  return `${html}<div class="hd-src-axis"><span>0</span>${showRef?`<span class="warn">${hdNum(ref*0.7)} (70%)</span><span class="ref">${hdNum(ref)} BM</span>`:`<span>${hdNum(axis)}</span>`}</div>
+  const refTxt = !showRef ? `<span>${hdNum(axis)}</span>` : sameRef ? `<span class="warn">${hdNum(refVals[0]*0.7)} (70%)</span><span class="ref">${hdNum(refVals[0])} BM</span>` : `<span class="ref">garis merah = baku mutu tiap jenis sumber (nilainya di samping nama)</span>`;
+  return `${html}<div class="hd-src-axis"><span>0</span>${refTxt}</div>
     <div class="hint">Satuan ${escHtml(ctx.unit)}, periode ${ctx.last}. Titik putih adalah rata-rata.</div>`;
 }
 

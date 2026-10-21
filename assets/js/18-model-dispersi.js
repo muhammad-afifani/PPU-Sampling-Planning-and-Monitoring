@@ -1076,7 +1076,7 @@ function dispersiBebanRowsHtml(stacks, param, sel){
   const totalRow = total>0 ? `<tr class="dsp-total"><td><b>Total titik terpilih</b></td><td></td><td></td><td class="num mono">${dispersiFmt(rows.reduce((a,r)=>a+((r.b&&r.b.Qgs)||0),0),3)} <span class="muted">g/s</span></td><td></td><td class="num mono">${dispersiFmt(rows.reduce((a,r)=>a+((r.b&&r.b.bebanJamKg)||0),0),3)}</td><td class="num mono"><b>${dispersiFmt(rows.reduce((a,r)=>a+((r.b&&r.b.bebanBulanKg)||0),0),1)}</b></td><td class="num mono"><b>${dispersiFmt(total/1000,2)}</b></td><td>100%</td></tr>` : "";
   // Titik tanpa data digabung jadi 1 baris ringkas (dulu 1 baris per titik -> tabel didominasi baris kosong).
   const noData = rows.filter(r=>!r.b);
-  const noDataRow = noData.length ? `<tr class="dsp-nodata"><td colspan="9"><b>${noData.length} titik</b> belum punya data konsentrasi + laju alir ${escHtml(param)} untuk periode ini (dan tidak ada hasil sebelumnya untuk carry-forward): <span class="dsp-nodata-list">${noData.map(r=>`<span>${dspDot(r.s.tipe.color)}${escHtml(r.s.nama)}</span>`).join("")}</span></td></tr>` : "";
+  const noDataRow = noData.length ? `<tr class="dsp-nodata"><td colspan="9"><b>${noData.length} titik</b> belum punya data konsentrasi + laju alir ${escHtml(param)} untuk periode ini (dan tidak ada hasil sebelumnya untuk carry-forward): <span class="dsp-nodata-list">${noData.map(r=>`<span title="${escHtml(dspNoDataReason(r.s, sel))}">${dspDot(r.s.tipe.color)}${escHtml(r.s.nama)}</span>`).join("")}</span></td></tr>` : "";
   return (html + totalRow + noDataRow) || `<tr><td colspan="9" class="muted" style="text-align:center;padding:14px;">Tidak ada titik terpilih.</td></tr>`;
 }
 function dispersiComplianceRowsHtml(stacks, sel){
@@ -1182,18 +1182,59 @@ function dspCompositionHtml(rows){
   const d = ambBuildDonut(seg.map(([k,g])=>[k, Math.round(g.v*1000)/1000, g.color]), dispersiFmt(total, total<10?2:1), "ton/tahun");
   return `${d.svg}<div class="dsp-barlist" style="margin-top:8px;">${seg.map(([k,g])=>`<div class="dsp-comp-row">${dspDot(g.color)}<span class="dsp-comp-name">${escHtml(k)} <small class="muted">${g.n} titik</small></span><b class="mono">${dispersiFmt(g.v/total*100,1)}%</b></div>`).join("")}</div>`;
 }
+// Alasan sebuah titik tidak punya angka beban pada seleksi periode aktif — supaya titik yg tidak
+// punya hasil TIDAK hilang diam-diam dari tabel, tapi tampil dgn catatan apa adanya (tidak wajib
+// pantau / belum pernah disampling / hasil belum diimport / hanya opasitas).
+function dspNoDataReason(stack, sel){
+  const p = DB.points.find(x=>x.id===stack.id) || {};
+  const recs = DB.hasilPemantauan.filter(r=>r.engineId===stack.id);
+  const massRecs = recs.filter(r=>DISPERSI_MASS_PARAMS[r.parameter] && !DISPERSI_MASS_PARAMS[r.parameter].qualitative && r.resultNumeric!=null);
+  const lastNote = p.pemantauanTerakhir ? ` Tercatat terakhir dipantau ${p.pemantauanTerakhir} — import hasilnya agar bebannya ikut terhitung.` : "";
+  if(p.tidakBeroperasi) return "Tidak beroperasi — tidak ada beban.";
+  if(!recs.length){
+    if(p.wajib===false) return `Tidak wajib pantau, tidak pernah disampling — tidak ada beban.${lastNote}`;
+    const frek = p.frekuensiBulan ? ` (tiap ${p.frekuensiBulan} bulan)` : "";
+    return `Wajib pantau${frek}, belum ada hasil sampling di database.${lastNote}`;
+  }
+  if(!massRecs.length){
+    const prm = [...new Set(recs.map(r=>r.parameter))];
+    return prm.length===1 && prm[0]==="Opasitas" ? "Hanya diukur opasitas (Flare) — tidak ada beban massa." : "Belum ada hasil konsentrasi parameter massa.";
+  }
+  const first = massRecs.map(r=>r.periodeOrder).filter(o=>o!=null).sort((a,b)=>a-b)[0];
+  const firstP = (massRecs.find(r=>r.periodeOrder===first)||{}).periode;
+  const target = sel && sel.periods && sel.periods[0];
+  const tOrder = (dispersiPeriodList().find(x=>x.periode===target)||{}).order;
+  if(first!=null && tOrder!=null && first>tOrder) return `Sampling pertama baru ${firstP} — belum ada hasil sebelum periode ini.`;
+  return "Konsentrasi atau laju alir belum lengkap pada hasil sampling yang ada.";
+}
 function dspInventoryHtml(stacks, sel){
   const params = dspMassParams();
-  const rows = stacks.map(s=>({s, vals: params.map(p=>{ const b = dispersiBebanForSelection(s, p, sel); return b && b.bebanTahunTon!=null ? b.bebanTahunTon : null; })})).filter(r=>r.vals.some(v=>v!=null));
-  if(!rows.length) return `<div class="hint">Tidak ada data beban untuk titik terpilih.</div>`;
-  const totals = params.map((p,i)=>rows.some(r=>r.vals[i]!=null) ? rows.reduce((a,r)=>a+(r.vals[i]||0),0) : null);
-  const maxBy = params.map((p,i)=>Math.max(...rows.map(r=>r.vals[i]||0), 1e-9));
-  rows.sort((a,c)=>(c.vals[0]||0)-(a.vals[0]||0));
+  const rows = stacks.map(s=>{
+    const bs = params.map(p=>dispersiBebanForSelection(s, p, sel));
+    const vals = bs.map(b=>b && b.bebanTahunTon!=null ? b.bebanTahunTon : null);
+    const carried = [...new Set(bs.filter(b=>b && b.carriedFrom).map(b=>b.carriedFrom))];
+    return {s, bs, vals, carried, has: vals.some(v=>v!=null)};
+  });
+  if(!rows.length) return `<div class="hint">Tidak ada titik terpilih.</div>`;
+  const withData = rows.filter(r=>r.has);
+  const totals = params.map((p,i)=>withData.some(r=>r.vals[i]!=null) ? withData.reduce((a,r)=>a+(r.vals[i]||0),0) : null);
+  const maxBy = params.map((p,i)=>Math.max(...withData.map(r=>r.vals[i]||0), 1e-9));
+  withData.sort((a,c)=>(c.vals[0]||0)-(a.vals[0]||0));
+  const noData = rows.filter(r=>!r.has).sort((a,c)=>a.s.nama.localeCompare(c.s.nama));
   const head = `<tr><th>Titik</th>${params.map(p=>`<th class="num"><button type="button" class="dsp-colbtn ${p===dispersiState.param?"on":""}" data-action="dispersiSetParam" data-val="${escHtml(p)}">${escHtml(DISPERSI_MASS_PARAMS[p].label)}</button></th>`).join("")}</tr>`;
-  const body = rows.map(r=>`<tr><td><div class="dsp-name">${dspDot(r.s.tipe.color)}<b>${escHtml(r.s.nama)}</b></div></td>${r.vals.map((v,i)=>v==null?`<td class="num muted">—</td>`:`<td class="num mono dsp-heat" style="--h:${(v/maxBy[i]).toFixed(3)};--c:${DSP_PARAM_COLORS[params[i]]||"#3d78c9"}">${dispersiFmt(v, v<1?3:2)}</td>`).join("")}</tr>`).join("");
-  const foot = `<tr class="dsp-total"><td><b>Total (ton/tahun)</b></td>${totals.map(t=>t==null?`<td class="num muted">—</td>`:`<td class="num mono"><b>${dispersiFmt(t, t<1?3:2)}</b></td>`).join("")}</tr>`;
-  return `<div class="tablewrap dsp-tablewrap"><table class="dp-table dsp-table">${`<thead>${head}</thead>`}<tbody>${body}${foot}</tbody></table></div>
-    <div class="hint" style="margin-top:6px;">Intensitas warna sel = besar beban relatif dalam kolom parameter tsb. CO&#8322; dicatat dalam % volume dan dikonversi ke mg/Nm&sup3; (massa molar 44 g/mol) sebelum dihitung bebannya.</div>`;
+  const bodyData = withData.map(r=>{
+    const note = r.carried.length ? `<small class="dsp-inv-note">&dagger; belum disampling di periode ini — memakai hasil sampling ${escHtml(r.carried.join(", "))} &times; jam operasi periode ini</small>` : "";
+    return `<tr><td><div class="dsp-name">${dspDot(r.s.tipe.color)}<div><b>${escHtml(r.s.nama)}</b>${note}</div></div></td>${r.vals.map((v,i)=>{
+      if(v==null) return `<td class="num muted">—</td>`;
+      const dag = r.bs[i].carriedFrom ? `<sup class="dsp-dag" title="Memakai hasil sampling ${escHtml(r.bs[i].carriedFrom)}">&dagger;</sup>` : "";
+      return `<td class="num mono dsp-heat" style="--h:${(v/maxBy[i]).toFixed(3)};--c:${DSP_PARAM_COLORS[params[i]]||"#3d78c9"}">${dispersiFmt(v, v<1?3:2)}${dag}</td>`;
+    }).join("")}</tr>`;
+  }).join("");
+  const bodyNo = noData.map(r=>`<tr class="dsp-inv-empty"><td><div class="dsp-name">${dspDot(r.s.tipe.color)}<div><b>${escHtml(r.s.nama)}</b><small class="dsp-inv-note">${escHtml(dspNoDataReason(r.s, sel))}</small></div></div></td>${params.map(()=>`<td class="num muted">—</td>`).join("")}</tr>`).join("");
+  const foot = withData.length ? `<tr class="dsp-total"><td><b>Total (ton/tahun)</b> <small class="muted">${withData.length} dari ${rows.length} titik</small></td>${totals.map(t=>t==null?`<td class="num muted">—</td>`:`<td class="num mono"><b>${dispersiFmt(t, t<1?3:2)}</b></td>`).join("")}</tr>` : "";
+  const anyCarried = withData.some(r=>r.carried.length);
+  return `<div class="tablewrap dsp-tablewrap"><table class="dp-table dsp-table"><thead>${head}</thead><tbody>${bodyData}${foot}${bodyNo}</tbody></table></div>
+    <div class="hint" style="margin-top:6px;">Intensitas warna sel = besar beban relatif dalam kolom parameter tsb. CO&#8322; dicatat dalam % volume dan dikonversi ke mg/Nm&sup3; (massa molar 44 g/mol) sebelum dihitung bebannya.${anyCarried ? ` <b>&dagger;</b> = titik dengan frekuensi pantau 6 bulan/1/3 tahun yang tidak disampling di periode ini (atau belum bisa disampling) tetap dihitung: konsentrasi &amp; laju alir dari hasil sampling terakhir sebelumnya, jam operasi dari periode ini.` : ""} Titik tanpa angka tetap ditampilkan di bawah total beserta alasannya.</div>`;
 }
 function dspCalcHtml(rows, param, sel){
   const opts = rows.filter(r=>r.b);
