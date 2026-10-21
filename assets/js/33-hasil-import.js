@@ -143,6 +143,11 @@ function heParseDateAny(v){
   if(v instanceof Date) return xlsxDateToIso(v);
   if(typeof v==="number" && v>20000 && v<80000){ const d = new Date(Date.UTC(1899,11,30) + v*86400000); return xlsxDateToIso(d); }
   const s = String(v||"").trim(); if(!s) return "";
+  // Rentang ("August 26 up to August 27, 2026", "26 - 27 Agustus 2026") -> tanggal mulai
+  let r = s.match(/([A-Za-z]{3,10})\.?\s+(\d{1,2})\s*(?:up\s*to|to|until|s\.?\s*\/?\s*d\.?|sampai|hingga|[-–—])\s*(?:[A-Za-z]{3,10}\.?\s+)?\d{1,2}\s*[,.]?\s*(\d{4})/i);
+  if(r && HE_MONTHS[r[1].toLowerCase()]) return heIso(+r[3], HE_MONTHS[r[1].toLowerCase()], +r[2]);
+  r = s.match(/(\d{1,2})\s*(?:up\s*to|to|s\.?\s*\/?\s*d\.?|sampai|hingga|[-–—])\s*\d{1,2}\s+([A-Za-z]{3,10})\.?\s*[,.]?\s*(\d{4})/i);
+  if(r && HE_MONTHS[r[2].toLowerCase()]) return heIso(+r[3], HE_MONTHS[r[2].toLowerCase()], +r[1]);
   let m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return heIso(+m[1],+m[2],+m[3]);
   m = s.match(/(\d{1,2})\s*[\/.\-]\s*(\d{1,2})\s*[\/.\-]\s*(\d{4})/); if(m) return heIso(+m[3],+m[2],+m[1]);
   m = s.match(/(\d{1,2})\s*[-\s.]\s*([A-Za-z]{3,10})\.?[\s,\-.]*(\d{4})/); if(m && HE_MONTHS[m[2].toLowerCase()]) return heIso(+m[3], HE_MONTHS[m[2].toLowerCase()], +m[1]);
@@ -162,8 +167,8 @@ function heDice(a, b){
   A.forEach((n,k)=>{ if(B.has(k)) inter += Math.min(n, B.get(k)); });
   return 2*inter/((a.length-1)+(b.length-1) || 1);
 }
-function heMatchPoint(name){
-  const pts = DB.points.filter(p=>p.kategori==="emisi");
+function heMatchPoint(name, kategori){
+  const pts = DB.points.filter(p=>p.kategori===(kategori||"emisi"));
   const n = heNormName(name), f = heFoldOcr(name);
   if(!n) return {point:null, score:0, candidates:[]};
   const scored = pts.map(p=>{
@@ -424,23 +429,18 @@ function heSheetRows(ws){
   return arr.slice(hi+1).filter(r=>r.some(c=>String(c).trim()!=="")).map(r=>{ const o = {}; heads.forEach((h,i)=>{ if(h) o[h] = r[i]; }); return o; });
 }
 // Import Excel -> sampel review (dikelompokkan per cerobong + tanggal/periode), bukan langsung masuk DB.
-function importHasilXlsx(){
-  xlsxImport(wb=>{
-    const ws = wb.Sheets["Hasil Pemantauan"] || wb.Sheets[wb.SheetNames[0]];
-    const rows = heSheetRows(ws).filter(r=>!/\(contoh/i.test(String(r["REMARKS"]||"")));
-    if(!rows.length){ toast("Tidak ada baris data yang dikenali — pastikan ada header PARAMETER dan RESULT.","err"); return; }
-    const groups = new Map();
-    rows.forEach(r=>{
-      const name = String(r["NAMA CEROBONG (SK NO 2020)"]||"").trim();
-      const date = heParseDateAny(r["DATE OF SAMPLING"]);
-      const periode = String(r["PERIODE"]||"").trim() || hePeriodeOfDate(date);
-      const key = name+"|"+(date||periode);
-      if(!groups.has(key)) groups.set(key, {name, date, periode, rows:[]});
-      groups.get(key).rows.push(r);
-    });
-    const samples = [...groups.values()].map(g=>coaSampleFromExcel(g));
-    coaAddSamples(samples, `Excel (${rows.length} baris)`);
-    showPage("coareader");
-    toast(`${rows.length} baris dari Excel siap direview (${samples.length} sampel). Periksa lalu klik "Import ke Database".`, "ok");
+// Baris sheet "Hasil Pemantauan" (emisi) -> sampel review, dikelompokkan per cerobong + tanggal/periode.
+// Import Excel sendiri (emisi/ambien sekaligus) ada di importHasilAnyXlsx (35-ambien-import.js).
+function heSamplesFromRows(rows){
+  const groups = new Map();
+  rows.forEach(r=>{
+    const name = String(r["NAMA CEROBONG (SK NO 2020)"]||"").trim();
+    const date = heParseDateAny(r["DATE OF SAMPLING"]);
+    const periode = String(r["PERIODE"]||"").trim() || hePeriodeOfDate(date);
+    const key = name+"|"+(date||periode);
+    if(!groups.has(key)) groups.set(key, {name, date, periode, rows:[]});
+    groups.get(key).rows.push(r);
   });
+  return [...groups.values()].map(g=>coaSampleFromExcel(g));
 }
+function importHasilXlsx(){ importHasilAnyXlsx(); }

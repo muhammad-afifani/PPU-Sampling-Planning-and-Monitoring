@@ -292,7 +292,7 @@ function coaFindSampleName(line){
 }
 function coaFindSamplingDate(line){
   if(/receiv|terima|analy|analis/i.test(line)) return "";
-  const m = line.match(/(date\s*of\s*sampl\w*|sampling\s*date|tanggal\s*(?:pengambilan|sampling|sampel)\w*)(.*)$/i);
+  const m = line.match(/(date\s*of\s*(?:sampl\w*|measur\w*)|sampling\s*date|tanggal\s*(?:pengambilan|sampling|sampel|pengukuran)\w*)(.*)$/i);
   return m ? heParseDateAny(m[2]) : "";
 }
 function coaFindRef(line){
@@ -366,6 +366,14 @@ function coaParsePages(pages, fileName){
   let last = null;
   pages.forEach(pg=>{
     const Vs = pg.variants.map(v=>v.map(coaCleanLine).filter(Boolean));
+    // Dokumen ambien/kebisingan/kebauan/getaran -> parser khusus (35-ambien-import.js)
+    const pageKind = ambDetectKind(Vs.map(L=>L.join("\n")).join("\n"));
+    if(pageKind!=="emisi"){
+      const pageText = Vs.map((L,k)=>(k?`\n--- pembacaan OCR ${k+1} ---\n`:"")+L.join("\n")).join("");
+      const raw = ambParsePage(Vs, pageKind, {fileName, page:pg.pageNo, method:pg.method, conf:pg.conf, angle:pg.angle, thumb:pg.thumb, text:pageText, lab, ref:docRef, docDate});
+      if(raw.name || raw.rows.length || (raw.noise && raw.noise.vals.some(v=>v!=null)) || (raw.vib && Object.keys(raw.vib.vals).length)) samples.push(raw);
+      last = null; return;
+    }
     const parsed = Vs.map(L=>coaParseBlock(L, fmt));
     if(fmt==="single" && parsed.some(p=>p.rows.some(x=>HE_PARAMS[x.r.param] && HE_PARAMS[x.r.param].kind==="main" && x.r.values.length>=3))){ fmt = "emisi3"; }
     const text = Vs.map((L,k)=>(k?`\n--- pembacaan OCR ${k+1} ---\n`:"")+L.join("\n")).join("");
@@ -403,7 +411,7 @@ function coaParsePages(pages, fileName){
     P.rows.forEach(({i, r})=>{ const s = sampleAt(i) || last; if(s) addRow(s, r); });
     if(L.length && !pageSamples.length){ /* halaman tanpa data (syarat & ketentuan dll) */ }
   });
-  samples.forEach(s=>{ s.fmt = fmt; });
+  samples.forEach(s=>{ if(!s.kind) s.fmt = fmt; });
   return samples;
 }
 
@@ -413,6 +421,7 @@ let coaSeq = 0;
 function coaNewId(p){ return (p||"s")+(++coaSeq); }
 // Sampel mentah hasil parser -> sampel review (cocokkan titik, susun baris wajib + pendukung)
 function coaSampleFromParsed(raw){
+  if(raw.kind && raw.kind!=="emisi") return ambSampleFromParsed(raw);
   const mt = heMatchPoint(raw.name);
   const s = {id:coaNewId("s"), source: raw.method==="ocr" ? "ocr" : "pdf", fileName:raw.fileName, page:raw.page, method:raw.method, conf:raw.conf, angle:raw.angle, thumb:raw.thumb, text:raw.text,
     nameRead:raw.name, pointId: mt.point ? mt.point.id : "", matchScore:mt.score, candidates:mt.candidates,
@@ -553,7 +562,10 @@ function coaSampleFlags(s){
   if(p && s.fuel){ const a = regKeyFuel(s.fuel) || (/diesel|solar|hsd|oil/i.test(s.fuel)?"minyak":/gas/i.test(s.fuel)?"gas":null), b = regKeyFuel(p.jenisBahanBakar); if(a && b && a!==b) f.push({lv:"warn", t:`Bahan bakar di dokumen "${s.fuel}" ≠ Database Titik Pantau "${p.jenisBahanBakar}"`}); }
   return f;
 }
-function coaIssueCount(s){ return coaSampleFlags(s).filter(x=>x.lv!=="info").length + s.rows.filter(r=>r.include).reduce((a,r)=>a+coaDerive(s,r).flags.filter(x=>x.lv!=="info").length,0); }
+function coaIsAmb(s){ return !!(s.kind && s.kind!=="emisi"); }
+function coaRowsIncluded(s){ return coaIsAmb(s) ? ambRowCount(s) : s.rows.filter(r=>r.include).length; }
+function coaFoundCount(s){ if(s.kind==="kebisingan") return s.noise.vals.filter(v=>v!=="").length; if(s.kind==="getaran") return Object.values(s.vib.vals).filter(v=>v!=="").length; return s.rows.filter(r=>r.found).length; }
+function coaIssueCount(s){ if(coaIsAmb(s)) return ambIssueCount(s); return coaSampleFlags(s).filter(x=>x.lv!=="info").length + s.rows.filter(r=>r.include).reduce((a,r)=>a+coaDerive(s,r).flags.filter(x=>x.lv!=="info").length,0); }
 
 /* ---------- Render halaman ---------- */
 const COA_STATUS_BADGE = {ok:["b-green","Memenuhi"], exceed:["b-red","Melebihi BM"], not_applicable:["b-gray","Tanpa BM"], not_evaluated:["b-amber","Belum dievaluasi"]};
@@ -561,9 +573,9 @@ function renderCoaReader(){
   const root = document.getElementById("coaRoot"); if(!root) return;
   const pending = coaState.files.filter(f=>f.status!=="done" && f.status!=="error").length;
   const samples = coaState.samples;
-  const rowsIncl = samples.reduce((a,s)=>a+s.rows.filter(r=>r.include).length,0);
+  const rowsIncl = samples.reduce((a,s)=>a+coaRowsIncluded(s),0);
   const issues = samples.reduce((a,s)=>a+coaIssueCount(s),0);
-  const comp = heCompleteness(currentPeriodStr());
+  const comp = heCompleteness(currentPeriodStr()), compA = ambCompleteness(currentPeriodStr());
   root.innerHTML = `
   <div class="coa-top">
     <section class="card coa-drop-card">
@@ -587,7 +599,9 @@ function renderCoaReader(){
       <div class="hec-eyebrow">Kelengkapan ${escHtml(comp.periode)}</div>
       <div class="coa-side-kpis"><div><b>${comp.lengkap}</b><span>lengkap</span></div><div class="warn"><b>${comp.sebagian}</b><span>sebagian</span></div><div class="bad"><b>${comp.kosong}</b><span>belum ada</span></div></div>
       <div class="hec-bar"><i style="width:${comp.reqTotal?Math.round(comp.reqHave/comp.reqTotal*100):0}%"></i></div>
-      <div class="muted coa-side-note">${comp.reqHave}/${comp.reqTotal} parameter wajib dari ${comp.total} titik target sudah masuk. <a href="#" data-action="goToPage" data-page="hasildb">Lihat rinciannya</a></div>
+      <div class="muted coa-side-note">Emisi: ${comp.reqHave}/${comp.reqTotal} parameter wajib dari ${comp.total} titik target sudah masuk. <a href="#" data-action="goToPage" data-page="hasildb">Rincian</a></div>
+      <div class="coa-side-amb">${AMB_KINDS.map(k=>`<div><span>${AMB_KIND_LABEL[k]}</span><b>${compA.kinds[k].lengkap}/${compA.kinds[k].total}</b></div>`).join("")}</div>
+      <div class="muted coa-side-note">Ambient: titik lengkap / titik target. <a href="#" data-action="goToPage" data-page="ambiendb">Rincian</a></div>
     </aside>
   </div>
   ${samples.length ? `
@@ -599,17 +613,19 @@ function renderCoaReader(){
     <button type="button" class="btn small" data-action="coaDownloadXlsx">Unduh Excel</button>
     <button type="button" class="btn small primary" data-action="coaImport" ${coaState.busy||!rowsIncl?"disabled":""}>Import ke Database (${rowsIncl})</button>
   </div>
-  <div class="coa-samples">${samples.map(coaSampleHtml).join("")}</div>` : `<div class="card coa-empty"><b>Belum ada dokumen.</b> Unggah PDF CoA/SHU (turbin, gas engine, diesel, flare/heater opasitas, H2S fuel gas) — tools mengenali nama sumber emisi, menyusun parameter wajib + pendukung sesuai regulasi titik, dan mengisi baku mutu &amp; running hour otomatis.</div>`}
+  <div class="coa-samples">${samples.map(coaSampleHtml).join("")}</div>` : `<div class="card coa-empty"><b>Belum ada dokumen.</b> Unggah PDF CoA/SHU <b>emisi</b> (turbin, gas engine, diesel, flare/heater opasitas, H2S fuel gas) maupun <b>ambient</b> (udara ambien, kebisingan, kebauan, getaran) — tools mengenali jenis dokumen &amp; nama titik, menyusun parameter wajib sesuai regulasi titik, dan mengisi baku mutu, running hour &amp; status otomatis.</div>`}
   ${coaState.showDoc ? coaDocViewerHtml() : ""}`;
 }
 function coaPointOptions(s){
-  const pts = DB.points.filter(p=>p.kategori==="emisi").sort((a,b)=>a.site.localeCompare(b.site)||a.nama.localeCompare(b.nama));
+  const kat = coaIsAmb(s) ? ambPointKategori(s.kind) : "emisi";
+  const pts = DB.points.filter(p=>p.kategori===kat).sort((a,b)=>a.site.localeCompare(b.site)||a.nama.localeCompare(b.nama));
   const cand = (s.candidates||[]).filter(c=>c.s>=0.35).map(c=>pts.find(p=>p.id===c.id)).filter(Boolean);
   const bySite = {}; pts.forEach(p=>(bySite[p.site]=bySite[p.site]||[]).push(p));
   return `<option value="">— pilih titik —</option>${cand.length?`<optgroup label="Paling mirip dgn &quot;${escHtml(s.nameRead||"")}&quot;">${cand.map(p=>`<option value="${p.id}" ${p.id===s.pointId?"selected":""}>${escHtml(p.nama)} · ${escHtml(p.site)}</option>`).join("")}</optgroup>`:""}${Object.keys(bySite).map(site=>`<optgroup label="${escHtml(site)}">${bySite[site].map(p=>`<option value="${p.id}" ${p.id===s.pointId && !cand.includes(p)?"selected":""}>${escHtml(p.nama)}</option>`).join("")}</optgroup>`).join("")}`;
 }
 function coaFlagHtml(f){ return `<span class="coa-flag ${f.lv}">${escHtml(f.t)}</span>`; }
 function coaSampleHtml(s){
+  if(coaIsAmb(s)) return ambSampleHtml(s);
   const p = coaPoint(s), periode = coaPeriode(s), sflags = coaSampleFlags(s);
   const issues = coaIssueCount(s);
   if(coaState.onlyIssues && !issues) return "";
@@ -675,7 +691,8 @@ async function coaHandleFiles(fileList){
       const raw = coaParsePages(pages, e.name).filter(s=>s.rows.length || s.name);
       const samples = raw.map(coaSampleFromParsed);
       coaState.samples.push(...samples);
-      e.status = "done"; e.msg = samples.length ? `${samples.length} sampel · ${samples.reduce((a,s)=>a+s.rows.filter(r=>r.found).length,0)} parameter terbaca` : "tidak ada data hasil yang dikenali";
+      const kinds = [...new Set(samples.map(s=>coaIsAmb(s) ? AMB_KIND_LABEL[s.kind] : "Emisi"))].join(", ");
+      e.status = "done"; e.msg = samples.length ? `${kinds} · ${samples.length} sampel · ${samples.reduce((a,s)=>a+coaFoundCount(s),0)} nilai terbaca` : "tidak ada data hasil yang dikenali";
       if(!samples.length) e.status = "error";
     }catch(err){ console.error(err); e.status = "error"; e.msg = err.message || String(err); }
     delete e.file; renderCoaReader();
@@ -693,7 +710,7 @@ document.addEventListener("change", e=>{
   if(t.classList.contains("coa-sel") || t.classList.contains("coa-sin")){
     const s = coaState.samples.find(x=>x.id===t.closest("[data-sid]").dataset.sid); if(!s) return;
     const f = t.dataset.f;
-    if(f==="pointId"){ s.pointId = t.value; s.matchScore = 1; s.rows = s.rows.filter(r=>r.found || r.edited); coaSyncRequiredRows(s); }
+    if(f==="pointId"){ s.pointId = t.value; s.matchScore = 1; s.rows = s.rows.filter(r=>r.found || r.edited || r.value); if(coaIsAmb(s)) ambSyncRows(s); else coaSyncRequiredRows(s); }
     else if(f==="dateOfSampling"){ s.dateOfSampling = t.value; s.periodeManual = ""; }
     else if(f==="periodeManual"){ const v = t.value.trim().toUpperCase().replace(/^S\s*(\d)\s*/, "S$1 "); s.periodeManual = v===hePeriodeOfDate(s.dateOfSampling) ? "" : v; }
     renderCoaReader(); return;
@@ -734,7 +751,7 @@ function coaRecordFor(s, r){
 function coaDownloadXlsx(){
   const STATUS_TXT = {ok:"OK", exceed:"Melebihi Baku Mutu", not_applicable:"N/A", not_evaluated:""};
   const rows = [];
-  coaState.samples.forEach(s=>s.rows.filter(r=>r.include).forEach(r=>{
+  coaState.samples.filter(s=>!coaIsAmb(s)).forEach(s=>s.rows.filter(r=>r.include).forEach(r=>{
     const rec = coaRecordFor(s, r), d = coaDerive(s, r);
     const o = hasilRowForExport(rec);
     o["CEK BAKU MUTU VS RESULT"] = STATUS_TXT[rec.statusBakuMutu]||"";
@@ -745,36 +762,53 @@ function coaDownloadXlsx(){
     if(o["CATATAN REVIEW"]) o.__styles = {"RESULT":{fill:"FEF3C7"}, "CATATAN REVIEW":{color:"B42318"}};
     rows.push(o);
   }));
-  if(!rows.length){ toast("Belum ada baris yang dicentang untuk diunduh.","err"); return; }
-  const blob = heXlsxBlob([heMainSheet(rows, [{h:"SUMBER DOKUMEN", w:30},{h:"TERUKUR / TERKOREKSI", w:18},{h:"BM DI DOKUMEN", w:12},{h:"CATATAN REVIEW", w:50}]), heGuideSheet(), heRefSheet()]);
-  downloadBlob(blob, `review_hasil_emisi_${todayStr()}.xlsx`, blob.type);
+  // Sampel ambien -> sheet format template ambien (bisa diimport ulang)
+  const ambSheets = [];
+  AMB_KINDS.forEach(kind=>{
+    const recs = [];
+    coaState.samples.filter(s=>s.kind===kind).forEach(s=>ambRecordsFor(s).forEach(x=>{
+      const flags = ambSampleFlags(s).concat(kind==="kebisingan" ? ambNoiseDerive(s).flags : kind==="getaran" ? ambVibDerive(s).flags : ambRowDerive(s, x.row).flags).filter(f=>f.lv!=="info").map(f=>f.t).join("; ");
+      recs.push({...x.rec, __x:{"SUMBER DOKUMEN": s.source==="excel" ? "Excel" : [s.fileName, s.page?`hal. ${s.page}`:"", s.lab].filter(Boolean).join(" · "), "CATATAN REVIEW": flags}});
+    }));
+    if(recs.length) ambSheets.push(ambXlsxSheet(kind, ambRowsForExcel(kind, recs), [{h:"SUMBER DOKUMEN", w:30},{h:"CATATAN REVIEW", w:50}]));
+  });
+  if(!rows.length && !ambSheets.length){ toast("Belum ada baris yang dicentang untuk diunduh.","err"); return; }
+  const blob = heXlsxBlob([...(rows.length ? [heMainSheet(rows, [{h:"SUMBER DOKUMEN", w:30},{h:"TERUKUR / TERKOREKSI", w:18},{h:"BM DI DOKUMEN", w:12},{h:"CATATAN REVIEW", w:50}]), heGuideSheet(), heRefSheet()] : []), ...(ambSheets.length ? [...ambSheets, ambGuideSheet(), ambRefSheet()] : [])]);
+  downloadBlob(blob, `review_hasil_${rows.length && ambSheets.length ? "emisi_ambien" : ambSheets.length ? "ambien" : "emisi"}_${todayStr()}.xlsx`, blob.type);
   toast("Excel review diunduh — file ini bisa diedit lalu diimport lagi lewat Import Excel.","ok");
 }
 function coaImport(){
   const todo = [];
-  coaState.samples.forEach(s=>s.rows.filter(r=>r.include).forEach(r=>{ const d = coaDerive(s, r); todo.push({s, r, d}); }));
+  coaState.samples.filter(s=>!coaIsAmb(s)).forEach(s=>s.rows.filter(r=>r.include).forEach(r=>{ const d = coaDerive(s, r); todo.push({s, r, d}); }));
   const blockers = todo.filter(x=>!x.d.p && !(x.s.source==="excel" && x.s.nameRead) || !x.d.periode || !x.d.val || x.d.res.status==="not_sampled" || /\^\?/.test(x.d.val));
   const ready = todo.filter(x=>!blockers.includes(x));
-  if(!ready.length){ toast("Belum ada baris yang siap diimport — lengkapi titik, tanggal, dan hasil dulu.","err"); return; }
+  const amb = ambImportPlan(coaState.samples.filter(coaIsAmb));
+  if(!ready.length && !amb.ready.length){ toast("Belum ada data yang siap diimport — lengkapi titik, tanggal, dan hasil dulu.","err"); return; }
   let replaced = 0;
   ready.forEach(x=>{ const rec = coaRecordFor(x.s, x.r); if(DB.hasilPemantauan.some(h=>(h.engineId && h.engineId===rec.engineId || h.cerobong===rec.cerobong) && h.periode===rec.periode && heCanonParam(h.parameter)===rec.parameter)) replaced++; });
-  const msg = `Import ${ready.length} baris ke Database Hasil Emisi?` + (replaced ? ` ${replaced} baris sudah ada (cerobong + periode + parameter sama) dan akan ${coaState.replace?"DIGANTI":"DILEWATI"}.` : "") + (blockers.length ? ` ${blockers.length} baris belum lengkap (titik/tanggal/hasil kosong) tidak ikut diimport.` : "");
+  const parts = [];
+  if(ready.length) parts.push(`${ready.length} baris emisi`);
+  if(amb.ready.length) parts.push(`${amb.ready.length} data ambient`);
+  const rep = replaced + amb.replaced, blk = blockers.length + amb.blocked;
+  const msg = `Import ${parts.join(" + ")} ke database?` + (rep ? ` ${rep} data sudah ada (titik + periode + parameter sama) dan akan ${coaState.replace?"DIGANTI":"DILEWATI"}.` : "") + (blk ? ` ${blk} baris/sampel belum lengkap (titik/tanggal/hasil kosong) tidak ikut diimport.` : "");
   askConfirm(msg, ()=>{
-    let add = 0, rep = 0, skip = 0;
+    let add = 0, repd = 0, skip = 0;
     const doneRows = new Set();
     ready.forEach(x=>{
       const rec = coaRecordFor(x.s, x.r);
       const ex = DB.hasilPemantauan.find(h=>(h.engineId && h.engineId===rec.engineId || h.cerobong===rec.cerobong) && h.periode===rec.periode && heCanonParam(h.parameter)===rec.parameter);
-      if(ex){ if(coaState.replace){ Object.assign(ex, rec, {id:ex.id}); rep++; } else { skip++; return; } }
+      if(ex){ if(coaState.replace){ Object.assign(ex, rec, {id:ex.id}); repd++; } else { skip++; return; } }
       else { DB.hasilPemantauan.push({id:"HPI_"+uid("x"), ...rec}); add++; }
       doneRows.add(x.r.id);
     });
-    touchDataset("hasilPemantauan"); save(); coaMedCache.clear();
-    logChange && logChange(`Import hasil emisi: ${add} baru, ${rep} diganti${skip?`, ${skip} dilewati`:""} (review CoA/Excel)`);
-    coaState.samples.forEach(s=>{ s.rows = s.rows.filter(r=>!doneRows.has(r.id)); });
-    coaState.samples = coaState.samples.filter(s=>s.rows.some(r=>r.include && (r.found || r.edited)));
+    if(ready.length) touchDataset("hasilPemantauan");
+    const ac = ambCommit(amb);
+    save(); coaMedCache.clear();
+    logChange && logChange(`Import hasil: emisi ${add} baru/${repd} diganti, ambient ${ac.add} baru/${ac.rep} diganti${skip+ac.skip?`, ${skip+ac.skip} dilewati`:""} (review CoA/Excel)`);
+    coaState.samples.forEach(s=>{ if(!coaIsAmb(s)) s.rows = s.rows.filter(r=>!doneRows.has(r.id)); else if(s.rows) s.rows = s.rows.filter(r=>!ac.done.has(r.id)); });
+    coaState.samples = coaState.samples.filter(s=>coaIsAmb(s) ? !ac.done.has(s.id) && (s.kind==="kebisingan" || s.kind==="getaran" || s.rows.some(r=>r.include)) : s.rows.some(r=>r.include && (r.found || r.edited)));
     renderCoaReader();
-    toast(`Import selesai: ${add} baris baru, ${rep} diganti${skip?`, ${skip} dilewati`:""}.${coaState.samples.length?" Baris yang belum lengkap tetap di review.":""}`, "ok");
+    toast(`Import selesai: emisi ${add} baru, ${repd} diganti · ambient ${ac.add} baru, ${ac.rep} diganti${skip+ac.skip?` · ${skip+ac.skip} dilewati`:""}.${coaState.samples.length?" Yang belum lengkap tetap di review.":""}`, "ok");
   });
 }
 

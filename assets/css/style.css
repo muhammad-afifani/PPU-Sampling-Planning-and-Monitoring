@@ -3179,3 +3179,40 @@ table.daygrid{background:transparent !important;border-spacing:3px 4px !importan
 .coa-doc-body img{max-width:100%;box-shadow:0 4px 18px rgba(0,0,0,.15);background:#fff;cursor:zoom-in;}
 .coa-doc-body img.zoom{max-width:none;width:180%;cursor:zoom-out;}
 @media (max-width:1100px){ .coa-top{grid-template-columns:1fr;} .coa-sh-grid{grid-template-columns:1fr 1fr;} .coa-meta{grid-column:1/-1;} }
+
+/* ===== Import CoA ambien (udara ambien / kebisingan / kebauan / getaran) ===== */
+.amb-kind-tag{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(61,120,201,.14);color:#2f5fa3;}
+.amb-kind-tag.k-kebisingan{background:rgba(124,58,237,.13);color:#6d28d9;}
+.amb-kind-tag.k-kebauan{background:rgba(232,163,61,.18);color:#92400e;}
+.amb-kind-tag.k-getaran{background:rgba(224,85,79,.12);color:#b42318;}
+:root[data-theme="dark"] .amb-kind-tag{color:#9cc0f0;} :root[data-theme="dark"] .amb-kind-tag.k-kebisingan{color:#c4b5fd;} :root[data-theme="dark"] .amb-kind-tag.k-kebauan{color:#f5c27a;} :root[data-theme="dark"] .amb-kind-tag.k-getaran{color:#ff9b96;}
+.amb-cuaca{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;padding:10px 14px;border-bottom:1px solid var(--gray-200);}
+.amb-cuaca label{display:flex;flex-direction:column;gap:3px;font-size:10px;color:var(--gray-500);text-transform:uppercase;letter-spacing:.04em;}
+.amb-cuaca input,.amb-noise input,.amb-vib-foot input{height:28px;padding:2px 6px;font-size:12px;border:1px solid var(--gray-300);border-radius:6px;background:var(--surface-card);color:inherit;}
+.amb-noise{padding:12px 14px;display:flex;flex-direction:column;gap:12px;}
+.amb-hours{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:6px;}
+.amb-hours label{display:flex;flex-direction:column;gap:2px;font-size:10.5px;font-weight:700;color:var(--gray-700);}
+.amb-hours label em{font-style:normal;font-weight:500;color:var(--gray-500);}
+.amb-hours label.night{color:#6d28d9;}
+.amb-hours input{width:100%;font-family:var(--font-mono);text-align:center;}
+.amb-hours label.empty input{border-color:var(--red-500);background:rgba(224,85,79,.06);}
+.amb-hours label.bad input{border-color:var(--amber-500);background:rgba(232,163,61,.10);}
+.amb-noise-sum{display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) auto;gap:10px;align-items:end;}
+.amb-noise-sum label{display:flex;flex-direction:column;gap:3px;font-size:10.5px;color:var(--gray-500);text-transform:uppercase;letter-spacing:.04em;}
+.amb-noise-sum label input{font-family:var(--font-mono);font-weight:700;}
+.amb-noise-sum label em{font-style:normal;text-transform:none;letter-spacing:0;font-size:10.5px;}
+.amb-noise-st{display:flex;align-items:center;gap:6px;font-size:12px;padding-bottom:4px;}
+.amb-flags{margin-top:-2px;}
+.amb-vib td{padding:3px 8px;}
+.amb-vib-foot{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:10px 14px;font-size:12.5px;}
+.amb-vib-foot label{display:flex;align-items:center;gap:6px;color:var(--gray-500);}
+.coa-side-amb{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin-top:6px;font-size:11.5px;}
+.coa-side-amb div{display:flex;justify-content:space-between;border-bottom:1px dashed var(--gray-200);padding:2px 0;}
+.amb-comp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px;}
+.amb-comp-k{border:1px solid var(--gray-200);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:5px;}
+.amb-comp-t{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gray-500);}
+.amb-comp-n{font-size:12px;color:var(--gray-700);} .amb-comp-n b{font-size:20px;color:var(--green-500);}
+.amb-comp-s{display:flex;gap:8px;font-size:11px;} .amb-comp-s .w{color:var(--amber-500);} .amb-comp-s .b{color:var(--red-500);} .amb-comp-s .g{color:var(--green-500);}
+@media (max-width:1100px){ .amb-hours{grid-template-columns:repeat(6,minmax(0,1fr));} .amb-noise-sum{grid-template-columns:repeat(2,minmax(0,1fr));} .amb-cuaca{grid-template-columns:repeat(3,minmax(0,1fr));} .amb-comp-grid{grid-template-columns:repeat(2,minmax(0,1fr));} }
+:root[data-theme="dark"] .amb-hours label.night{color:#c4b5fd;}
+.amb-hours label.night input{color:var(--ms-text,inherit);}
