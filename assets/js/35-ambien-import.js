@@ -524,7 +524,8 @@ function importHasilAnyXlsx(){
     const all = emSamples.concat(amb);
     if(!all.length){ toast("Tidak ada data yang dikenali — pakai Template Excel emisi atau ambien.","err"); return; }
     coaAddSamples(all, `Excel (${emSamples.length} sampel emisi, ${amb.length} sampel ambien)`);
-    showPage("coareader");
+    // Buka halaman sesuai isi file; kalau campuran, mulai dari halaman tempat tombol diklik
+    showPage(!emSamples.length ? "coaamb" : !amb.length ? "coareader" : (coaScopeAmb() ? "coaamb" : "coareader"));
     toast(`${all.length} sampel dari Excel siap direview. Periksa lalu klik "Import ke Database".`, "ok");
   });
 }
@@ -565,7 +566,7 @@ function renderAmbienCompleteness(){
     <div class="hec-head"><div><div class="hec-eyebrow">Kelengkapan data</div><h3>Hasil ambient yang wajib masuk &middot; ${escHtml(c.periode)}</h3>
       <div class="hec-sub">Target = titik wajib pantau yang jatuh tempo, titik yang sudah disampling di batch periode ini, atau yang sudah punya data.</div></div>
       <div class="hec-tools"><label class="hec-lbl" for="ambCompPeriode">Periode</label><select id="ambCompPeriode">${opts.map(o=>`<option value="${escHtml(o)}" ${o===c.periode?"selected":""}>${escHtml(o)}${o===currentPeriodStr()?" (aktif)":""}</option>`).join("")}</select>
-      <button type="button" class="btn small primary" data-action="goToPage" data-page="coareader">Baca CoA/SHU (PDF)</button></div></div>
+      <button type="button" class="btn small primary" data-action="goToPage" data-page="coaamb">Baca CoA/SHU (PDF)</button></div></div>
     <div class="amb-comp-grid">${AMB_KINDS.map(k=>{ const x = c.kinds[k]; return `<div class="amb-comp-k k-${k}"><div class="amb-comp-t">${AMB_KIND_LABEL[k]}</div><div class="amb-comp-n"><b>${x.lengkap}</b>/${x.total} lengkap</div><div class="hec-bar"><i style="width:${pct(x.lengkap,x.total)}%"></i></div><div class="amb-comp-s">${x.sebagian?`<span class="w">${x.sebagian} sebagian</span>`:""}${x.kosong?`<span class="b">${x.kosong} belum ada</span>`:""}${!x.sebagian&&!x.kosong?`<span class="g">semua lengkap</span>`:""}</div></div>`; }).join("")}</div>
     ${inc.length ? `<details class="hec-list" ${ambCompOpen?"open":""} id="ambCompDetails"><summary>${inc.length} titik belum lengkap — lihat yang belum masuk</summary><div class="hec-table-wrap"><table class="hec-table"><thead><tr><th>Kategori</th><th>Site</th><th>Titik</th><th>Target karena</th><th>Kelengkapan</th></tr></thead><tbody>
       ${inc.map(x=>`<tr class="st-${x.status}"><td>${AMB_KIND_LABEL[x.kind]}</td><td>${escHtml(x.p.site)}</td><td><b>${escHtml(x.p.nama)}</b></td><td class="muted">${escHtml(x.reason)}</td><td>${x.req.map(r=>`<span class="hec-chip ${x.have.includes(r)?"ok":"miss"}">${x.have.includes(r)?"&#10003;":"&#10007;"} ${escHtml(r)}</span>`).join("")}</td></tr>`).join("")}
