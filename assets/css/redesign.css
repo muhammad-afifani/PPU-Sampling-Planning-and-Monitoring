@@ -196,6 +196,22 @@ nav .navbtn.active{background:var(--ux-lime);color:var(--ux-lime-ink);font-weigh
 nav .navbtn.active:hover{background:var(--ux-lime-600);}
 nav .navbtn.active .navbtn-icon{color:var(--ux-lime-ink);}
 nav .navbtn:focus-visible{outline:2px solid var(--ux-lime);outline-offset:1px;}
+/* Highlight "cair": saat JS aktif (#navMenu.ux-liquid), latar lime item aktif TIDAK lagi digambar
+   oleh .navbtn.active sendiri, melainkan oleh satu pill bersama (.ux-liquid-pill) yang mengalir
+   dari item lama ke item baru — meregang, meninggalkan tetesan, lalu mendarat dgn goyangan kecil.
+   Filter gooey SVG (#uxGoo) hanya dipasang selama perpindahan supaya saat diam tidak ada biaya
+   render tambahan. Tanpa JS, gaya .navbtn.active di atas tetap berlaku seperti biasa. */
+#navMenu.ux-liquid{position:relative;}
+#navMenu.ux-liquid .navbtn{z-index:1;transition:color 280ms var(--ux-ease-std),background-color var(--ux-d2) var(--ux-ease-std),transform var(--ux-d1) var(--ux-ease-out);}
+#navMenu.ux-liquid .navbtn .navbtn-icon{transition:color 280ms var(--ux-ease-std),transform var(--ux-d2) var(--ux-ease-out);}
+#navMenu.ux-liquid .navbtn.active,#navMenu.ux-liquid .navbtn.active:hover{background:transparent;box-shadow:none;animation:none;}
+#navMenu.ux-liquid .navbtn.active:hover .navbtn-icon{transform:translateX(1px);}
+.ux-liquid-layer{position:absolute;left:0;top:0;width:100%;height:0;z-index:0;pointer-events:none;filter:drop-shadow(0 8px 14px rgba(205,244,94,.28));}
+.ux-liquid-layer.ux-goo{filter:url(#uxGoo) drop-shadow(0 8px 14px rgba(205,244,94,.28));}
+.ux-liquid-pill,.ux-liquid-drop{position:absolute;left:0;top:0;background:var(--ux-lime);will-change:transform;}
+.ux-liquid-pill{border-radius:var(--ux-r-md);background:linear-gradient(180deg,#d8f77a,var(--ux-lime) 55%,#c4ee52);transition:opacity var(--ux-d2);}
+.ux-liquid-pill.ux-off{opacity:0;}
+.ux-liquid-drop{width:16px;height:16px;border-radius:50%;opacity:0;}
 .navgroup-empty.hint{color:var(--ux-on-navy-muted);}
 .sidebar.collapsed nav .navbtn{padding:10px 0;}
 
@@ -207,9 +223,14 @@ nav .navbtn:focus-visible{outline:2px solid var(--ux-lime);outline-offset:1px;}
 .theme-toggle:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18);}
 .theme-toggle:active{transform:scale(.96);}
 
-.sidebar-toggle{top:26px;right:-12px;width:24px;height:24px;border-radius:50%;background:var(--ux-surface);color:var(--ux-ink);border:1px solid var(--ux-line);box-shadow:var(--ux-shadow-2);transition:transform var(--ux-d2) var(--ux-ease-out),background var(--ux-d2),box-shadow var(--ux-d2);}
-.sidebar-toggle:hover{background:var(--ux-lime);color:var(--ux-lime-ink);transform:scale(1.08);}
-.sidebar-toggle:active{background:var(--ux-lime-600);transform:scale(.94);}
+/* Tombol ciutkan: lime + cincin warna latar halaman (efek "memotong" tepi sidebar) supaya
+   kontras di tema terang maupun gelap — versi putih sebelumnya tenggelam di latar off-white. */
+.sidebar-toggle{top:24px;right:-15px;width:30px;height:30px;border-radius:50%;background:var(--ux-lime);color:var(--ux-lime-ink);border:3px solid var(--ux-bg);box-shadow:0 6px 16px -4px rgba(15,26,44,.45),0 0 0 1px rgba(15,26,44,.08);transition:transform var(--ux-d2) var(--ux-ease-pop),background var(--ux-d2),box-shadow var(--ux-d2);}
+.sidebar-toggle::after{content:"";position:absolute;inset:-3px;border-radius:50%;box-shadow:0 0 0 0 rgba(205,244,94,.55);animation:uxTogglePing 2.8s var(--ux-ease-out) 1.2s 2;pointer-events:none;}
+.sidebar-toggle svg{stroke-width:2.75;}
+.sidebar-toggle:hover{background:#dcfb84;transform:scale(1.12);box-shadow:0 8px 22px -4px rgba(15,26,44,.5),0 0 0 4px rgba(205,244,94,.25);}
+.sidebar-toggle:active{background:var(--ux-lime-600);transform:scale(.92);}
+.sidebar-toggle:focus-visible{outline:2px solid var(--ux-blue);outline-offset:2px;}
 .sidebar-toggle .ms-icon svg{transition:transform var(--ux-d3) var(--ux-ease-out);}
 
 /* ---------- 4. Main column, topbar, page head ---------- */
@@ -315,6 +336,16 @@ details[open] > :not(summary){animation:uxDropIn var(--ux-d3) var(--ux-ease-out)
 .btn.danger:hover{background:color-mix(in srgb,var(--red-500) 9%,var(--ux-surface));border-color:var(--red-500);}
 .btn.ghost{background:transparent;border-color:transparent;box-shadow:none;color:var(--ux-ink-2);}
 .btn.ghost:hover{background:color-mix(in srgb,var(--ux-ink) 6%,transparent);border-color:transparent;color:var(--ux-ink);}
+/* Ripple cahaya mengikuti titik klik (posisi diisi JS lewat --ux-rx/--ux-ry, animasi lewat WAAPI
+   pada ::after) — tanpa menambah elemen ke dalam tombol. */
+.btn.primary,.ux-period-btn,.hd-btn-solid,.gate-choice-btn,nav .navbtn{position:relative;}
+.btn.primary::after,.hd-btn-solid::after,.gate-choice-btn::after,nav .navbtn::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;
+  background:radial-gradient(circle at var(--ux-rx,50%) var(--ux-ry,50%),rgba(255,255,255,.55) 0,rgba(255,255,255,.18) 28%,transparent 62%);}
+nav .navbtn::after{z-index:2;background:radial-gradient(circle at var(--ux-rx,50%) var(--ux-ry,50%),rgba(255,255,255,.5) 0,rgba(255,255,255,.12) 30%,transparent 65%);}
+/* Kartu/KPI yang memang bisa diklik (punya data-action) terangkat sedikit saat hover. */
+:is(.card,.stat,.hd-kpi,.dp-kpi,.sc-kpi)[data-action]{cursor:pointer;transition:transform var(--ux-d2) var(--ux-ease-out),box-shadow var(--ux-d2),border-color var(--ux-d2);}
+:is(.card,.stat,.hd-kpi,.dp-kpi,.sc-kpi)[data-action]:hover{transform:translateY(-2px);box-shadow:var(--ux-shadow-3);}
+:is(.card,.stat,.hd-kpi,.dp-kpi,.sc-kpi)[data-action]:active{transform:translateY(0) scale(.99);}
 .btn:disabled,.btn[disabled]{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none;}
 .btn.small{border-radius:var(--ux-r-sm);}
 /* Tombol di sidebar navy harus tetap terang walau ber-varian ghost/small (mis. "Keluar"). */
@@ -501,6 +532,7 @@ table.dsm tbody tr:hover td{background:color-mix(in srgb,var(--ux-blue) 6%,var(-
 @keyframes uxDropIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
 @keyframes uxModalIn{from{opacity:0;transform:translateY(12px) scale(.975);}to{opacity:1;transform:none;}}
 @keyframes uxToastIn{from{opacity:0;transform:translateY(14px) scale(.96);}to{opacity:1;transform:none;}}
+@keyframes uxTogglePing{0%{box-shadow:0 0 0 0 rgba(205,244,94,.55);}70%{box-shadow:0 0 0 10px rgba(205,244,94,0);}100%{box-shadow:0 0 0 0 rgba(205,244,94,0);}}
 @keyframes uxNavPop{0%{transform:scale(.96);box-shadow:0 0 0 0 rgba(205,244,94,.0);}55%{transform:scale(1.015);}100%{transform:none;}}
 @keyframes uxChipOn{0%{transform:scale(.9);}60%{transform:scale(1.04);}100%{transform:none;}}
 @keyframes uxTabIn{from{opacity:.4;}to{opacity:1;}}
