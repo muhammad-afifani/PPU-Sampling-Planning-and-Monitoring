@@ -20,12 +20,12 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202610241800">
+<link rel="stylesheet" href="assets/css/style.css?v=202610241900">
 <!-- Lapisan redesign UI (token, shell, komponen, motion) — dimuat SETELAH style.css supaya menimpa
      tampilan saja; semua aturan dibungkus @media screen sehingga hasil cetak tetap memakai style.css. -->
-<link rel="stylesheet" href="assets/css/redesign.css?v=202610241800">
+<link rel="stylesheet" href="assets/css/redesign.css?v=202610241900">
 <!-- Latar animasi header Dashboard (turbin gas, reboiler, flare, engine, alat ambien) — dekorasi murni. -->
-<link rel="stylesheet" href="assets/css/dash-scene.css?v=202610241800">
+<link rel="stylesheet" href="assets/css/dash-scene.css?v=202610241900">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -189,30 +189,33 @@
               </button>
             </div>
           </div>
-          <!-- KPI ringkas mengisi kolom kiri di samping scene (diisi renderDashboard, 04-dashboard.js). -->
-          <div class="dash-stats-row" id="dashStats"></div>
         </div>
         <div class="dscene-box" aria-hidden="true">
           <!-- Tanah & pepohonan (tepi kiri/bawah dipudarkan ke latar halaman) -->
-          <svg class="dscene-svg dscene-ground" viewBox="0 20 680 360">
-            <path class="ds-h1" d="M0 292 C 90 262 170 270 250 280 C 340 292 400 250 500 246 C 580 243 630 258 680 266 L680 380 L0 380 Z"/>
+          <svg class="dscene-svg dscene-ground" viewBox="-760 20 1440 360" preserveAspectRatio="xMaxYMax meet">
+            <path class="ds-h1" d="M-760 300 C -640 286 -520 292 -400 288 C -280 284 -160 296 -60 294 C -20 293 -8 292 0 292 C 90 262 170 270 250 280 C 340 292 400 250 500 246 C 580 243 630 258 680 266 L680 380 L-760 380 Z"/>
+            <rect class="ds-trunk" x="-331" y="274" width="3" height="16"/><circle class="ds-tree2" cx="-329.5" cy="271" r="9"/>
+            <rect class="ds-trunk" x="-141" y="278" width="3" height="18"/><circle class="ds-tree" cx="-139.5" cy="274" r="10"/>
+            <rect class="ds-trunk" x="-126" y="284" width="2.5" height="12"/><circle class="ds-tree2" cx="-125" cy="282" r="7"/>
             <rect class="ds-trunk" x="419" y="244" width="3" height="18"/><circle class="ds-tree" cx="420.5" cy="240" r="10"/>
             <rect class="ds-trunk" x="469" y="236" width="3" height="16"/><circle class="ds-tree2" cx="470.5" cy="233" r="9"/>
             <rect class="ds-trunk" x="619" y="246" width="3" height="16"/><circle class="ds-tree" cx="620.5" cy="242" r="10"/>
             <rect class="ds-trunk" x="633" y="252" width="2.5" height="12"/><circle class="ds-tree2" cx="634" cy="250" r="7"/>
-            <path class="ds-h2" d="M0 318 C 110 300 200 306 300 314 C 420 324 500 296 600 300 C 640 302 664 306 680 310 L680 380 L0 380 Z"/>
-            <rect class="ds-trunk" x="59" y="300" width="3" height="16"/><circle class="ds-tree" cx="60.5" cy="296" r="10"/>
-            <rect class="ds-trunk" x="74" y="304" width="2.5" height="12"/><circle class="ds-tree2" cx="75" cy="302" r="7"/>
+            <path class="ds-h2" d="M-760 322 C -620 312 -480 318 -340 314 C -200 310 -80 322 0 318 C 110 300 200 306 300 314 C 420 324 500 296 600 300 C 640 302 664 306 680 310 L680 380 L-760 380 Z"/>
+            <rect class="ds-trunk" x="-241" y="302" width="3" height="16"/><circle class="ds-tree" cx="-239.5" cy="298" r="10"/>
+            <rect class="ds-trunk" x="179" y="300" width="3" height="16"/><circle class="ds-tree" cx="180.5" cy="296" r="10"/>
+            <rect class="ds-trunk" x="194" y="304" width="2.5" height="12"/><circle class="ds-tree2" cx="195" cy="302" r="7"/>
             <rect class="ds-trunk" x="596" y="284" width="3" height="18"/><circle class="ds-tree2" cx="597.5" cy="280" r="11"/>
-            <path class="ds-h3" d="M0 346 C 150 334 280 340 420 338 C 540 336 620 330 680 334 L680 380 L0 380 Z"/>
+            <path class="ds-h3" d="M-760 348 C -560 340 -360 346 -160 342 C -80 340 -40 347 0 346 C 150 334 280 340 420 338 C 540 336 620 330 680 334 L680 380 L-760 380 Z"/>
           </svg>
           <!-- Langit, unit & asap -->
-          <svg class="dscene-svg" viewBox="0 20 680 360">
+          <svg class="dscene-svg" viewBox="-760 20 1440 360" preserveAspectRatio="xMaxYMax meet">
             <defs><radialGradient id="dsceneGlow"><stop class="ds-gl0" offset="0"/><stop class="ds-gl1" offset="1"/></radialGradient></defs>
             <g><circle class="ds-star" cx="380" cy="40" r="1.6"/><circle class="ds-star" cx="450" cy="30" r="1.2"/><circle class="ds-star" cx="560" cy="38" r="1.5"/><circle class="ds-star" cx="300" cy="34" r="1.1"/><circle class="ds-star" cx="610" cy="110" r="1.2"/></g>
             <circle class="ds-halo" cx="636" cy="58" r="30"/>
             <circle class="ds-sun" cx="636" cy="58" r="19"/>
             <g class="ds-cloud"><circle cx="420" cy="74" r="14"/><circle cx="438" cy="66" r="18"/><circle cx="458" cy="74" r="13"/><rect x="406" y="74" width="66" height="14" rx="7"/></g>
+            <g class="ds-cloud ds-c2"><circle cx="-190" cy="96" r="11"/><circle cx="-176" cy="89" r="14"/><circle cx="-160" cy="96" r="10"/><rect x="-201" y="96" width="52" height="11" rx="5.5"/></g>
             <g class="ds-cloud ds-c2"><circle cx="590" cy="128" r="11"/><circle cx="604" cy="121" r="14"/><circle cx="620" cy="128" r="10"/><rect x="579" y="128" width="52" height="11" rx="5.5"/></g>
 
             <!-- TURBIN GAS: enclosure + filter udara + cerobong exhaust -->
@@ -307,8 +310,8 @@
 
             <!-- Pipe rack penghubung (hanya di scene "Semua") -->
             <g class="ds-rack">
-              <rect class="ds-metal-d" x="402" y="331" width="40" height="3"/>
-              <rect class="ds-metal-d" x="410" y="326" width="2" height="12"/><rect class="ds-metal-d" x="432" y="326" width="2" height="12"/>
+              <rect class="ds-metal-d" x="402" y="331" width="100" height="3"/>
+              <rect class="ds-metal-d" x="412" y="326" width="2" height="12"/><rect class="ds-metal-d" x="450" y="326" width="2" height="12"/><rect class="ds-metal-d" x="488" y="326" width="2" height="12"/>
             </g>
 
             <!-- DIESEL / GAS ENGINE (genset) -->
@@ -415,6 +418,7 @@
           </svg>
         </div>
       </div>
+      <div class="dash-stats-row" id="dashStats"></div>
       <div class="card" style="margin-top:16px;">
         <div class="sc-head">
           <div>
@@ -2323,51 +2327,51 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202610241800"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202610241800"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202610241900"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202610241900"></script>
 
-<script src="assets/data/default-data.js?v=202610241800"></script>
-<script src="assets/data/brand-assets.js?v=202610241800"></script>
-<script src="assets/data/travel-routes.js?v=202610241800"></script>
-<script src="assets/js/00-icons.js?v=202610241800"></script>
-<script src="assets/js/01-state.js?v=202610241800"></script>
-<script src="assets/js/02-nav-util.js?v=202610241800"></script>
-<script src="assets/js/03-period-logic.js?v=202610241800"></script>
-<script src="assets/js/04-dashboard.js?v=202610241800"></script>
-<script src="assets/js/05-master-data.js?v=202610241800"></script>
-<script src="assets/js/06-plan-personil.js?v=202610241800"></script>
-<script src="assets/js/07-rules-planner.js?v=202610241800"></script>
-<script src="assets/js/08-gantt-print.js?v=202610241800"></script>
-<script src="assets/js/09-tracking-map.js?v=202610241800"></script>
-<script src="assets/js/10-running-hour.js?v=202610241800"></script>
-<script src="assets/js/11-berita-acara.js?v=202610241800"></script>
-<script src="assets/js/12-data-page.js?v=202610241800"></script>
-<script src="assets/js/13-hasil-db.js?v=202610241800"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202610241800"></script>
-<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610241800"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202610241800"></script>
-<script src="assets/js/16-actions-init.js?v=202610241800"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202610241800"></script>
-<script src="assets/js/18-model-dispersi.js?v=202610241800"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202610241800"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202610241800"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202610241800"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202610241800"></script>
-<script src="assets/js/23-budget-proyeksi.js?v=202610241800"></script>
-<script src="assets/js/24-personil-ppu.js?v=202610241800"></script>
-<script src="assets/js/24b-ppc-ttd.js?v=202610241800"></script>
-<script src="assets/js/25-access-gate.js?v=202610241800"></script>
-<script src="assets/js/26-laboratorium.js?v=202610241800"></script>
-<script src="assets/js/27-laporan-emf.js?v=202610241800"></script>
-<script src="assets/js/28-word-export.js?v=202610241800"></script>
-<script src="assets/js/29-docx-export.js?v=202610241800"></script>
-<script src="assets/js/30-tracking-board.js?v=202610241800"></script>
-<script src="assets/js/31-wbs-gantt.js?v=202610241800"></script>
-<script src="assets/js/32-schedule-export.js?v=202610241800"></script>
-<script src="assets/js/33-hasil-import.js?v=202610241800"></script>
-<script src="assets/js/34-coa-reader.js?v=202610241800"></script>
-<script src="assets/js/35-ambien-import.js?v=202610241800"></script>
-<script src="assets/js/36-ui-experience.js?v=202610241800"></script>
-<script src="assets/js/37-dash-scene.js?v=202610241800"></script>
+<script src="assets/data/default-data.js?v=202610241900"></script>
+<script src="assets/data/brand-assets.js?v=202610241900"></script>
+<script src="assets/data/travel-routes.js?v=202610241900"></script>
+<script src="assets/js/00-icons.js?v=202610241900"></script>
+<script src="assets/js/01-state.js?v=202610241900"></script>
+<script src="assets/js/02-nav-util.js?v=202610241900"></script>
+<script src="assets/js/03-period-logic.js?v=202610241900"></script>
+<script src="assets/js/04-dashboard.js?v=202610241900"></script>
+<script src="assets/js/05-master-data.js?v=202610241900"></script>
+<script src="assets/js/06-plan-personil.js?v=202610241900"></script>
+<script src="assets/js/07-rules-planner.js?v=202610241900"></script>
+<script src="assets/js/08-gantt-print.js?v=202610241900"></script>
+<script src="assets/js/09-tracking-map.js?v=202610241900"></script>
+<script src="assets/js/10-running-hour.js?v=202610241900"></script>
+<script src="assets/js/11-berita-acara.js?v=202610241900"></script>
+<script src="assets/js/12-data-page.js?v=202610241900"></script>
+<script src="assets/js/13-hasil-db.js?v=202610241900"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202610241900"></script>
+<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610241900"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202610241900"></script>
+<script src="assets/js/16-actions-init.js?v=202610241900"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202610241900"></script>
+<script src="assets/js/18-model-dispersi.js?v=202610241900"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202610241900"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202610241900"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202610241900"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202610241900"></script>
+<script src="assets/js/23-budget-proyeksi.js?v=202610241900"></script>
+<script src="assets/js/24-personil-ppu.js?v=202610241900"></script>
+<script src="assets/js/24b-ppc-ttd.js?v=202610241900"></script>
+<script src="assets/js/25-access-gate.js?v=202610241900"></script>
+<script src="assets/js/26-laboratorium.js?v=202610241900"></script>
+<script src="assets/js/27-laporan-emf.js?v=202610241900"></script>
+<script src="assets/js/28-word-export.js?v=202610241900"></script>
+<script src="assets/js/29-docx-export.js?v=202610241900"></script>
+<script src="assets/js/30-tracking-board.js?v=202610241900"></script>
+<script src="assets/js/31-wbs-gantt.js?v=202610241900"></script>
+<script src="assets/js/32-schedule-export.js?v=202610241900"></script>
+<script src="assets/js/33-hasil-import.js?v=202610241900"></script>
+<script src="assets/js/34-coa-reader.js?v=202610241900"></script>
+<script src="assets/js/35-ambien-import.js?v=202610241900"></script>
+<script src="assets/js/36-ui-experience.js?v=202610241900"></script>
+<script src="assets/js/37-dash-scene.js?v=202610241900"></script>
 </body>
 </html>

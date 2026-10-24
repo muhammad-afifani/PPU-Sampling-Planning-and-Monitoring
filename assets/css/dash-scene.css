@@ -44,25 +44,17 @@
 /* ---------- Layout header ---------- */
 /* Topbar di atas lapisan scene → asap lewat DI BELAKANG tombol topbar, bukan menutupinya. */
 .main > .ux-topbar{position:relative;z-index:3;}
-.pagehead.dscene{position:relative;align-items:stretch;justify-content:space-between;flex-wrap:wrap;gap:12px 24px;margin-bottom:10px;}
-.dscene-text{position:relative;z-index:2;flex:1 1 400px;min-width:0;display:flex;flex-direction:column;justify-content:flex-start;padding-top:6px;}
-.dscene-box{position:relative;z-index:1;flex:1 1 440px;max-width:600px;min-width:0;aspect-ratio:680/360;align-self:flex-end;pointer-events:none;}
-/* KPI Dashboard (#dashStats) tinggal di kolom kiri, di bawah pemilih scene → mengisi ruang di
-   samping ilustrasi. 04-dashboard.js memasang grid-template-columns inline "repeat(n,1fr)" (1 baris
-   penuh); di sini sengaja ditimpa (!important) jadi grid ringkas: 4 kartu = 2×2, 5 kartu = 3 kolom
-   dgn kartu navy pertama setinggi 2 baris. Tanpa dukungan :has() jatuh ke 2 kolom. */
-.dscene .dash-stats-row{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px;margin-top:auto;padding-top:18px;}
-.dscene .dash-stats-row:has(> .stat:nth-child(5)){grid-template-columns:repeat(3,minmax(0,1fr))!important;}
-.dscene .dash-stats-row:has(> .stat:nth-child(5)) > .stat:first-child{grid-row:span 2;}
-.dscene .dash-stats-row .stat{padding:13px 14px 12px;display:flex;flex-direction:column;}
-.dscene .dash-stats-row .stat .num{font-size:22px;margin-top:12px;}
-.dscene .dash-stats-row .stat .lbl{line-height:1.35;}
-.dscene .dash-stats-row:has(> .stat:nth-child(5)) > .stat:first-child .num{font-size:34px;margin-top:auto;}
+/* Banner lebar & pendek: teks di kiri, scene menempel kanan-bawah setinggi header. viewBox SVG
+   melebar ke kiri (-760..680) berisi lanskap yg dipudarkan, jadi animasi terasa selebar header tanpa
+   menambah tinggi. Bagian atas box naik ±20px ke celah di bawah topbar (unit tetap di bawah topbar). */
+.pagehead.dscene{position:relative;display:block;margin-bottom:18px;}
+.dscene-text{position:relative;z-index:2;max-width:560px;min-height:148px;display:flex;flex-direction:column;padding-top:4px;}
+.dscene-box{position:absolute;z-index:1;right:0;bottom:0;width:672px;height:168px;pointer-events:none;}
 .dscene-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;}
 .dscene-ground{
-  -webkit-mask-image:linear-gradient(to right,transparent 0,#000 30%),linear-gradient(to bottom,#000 86%,transparent 100%);
+  -webkit-mask-image:linear-gradient(to right,transparent 0,#000 38%),linear-gradient(to bottom,#000 86%,transparent 100%);
   -webkit-mask-composite:source-in;
-  mask-image:linear-gradient(to right,transparent 0,#000 30%),linear-gradient(to bottom,#000 86%,transparent 100%);
+  mask-image:linear-gradient(to right,transparent 0,#000 38%),linear-gradient(to bottom,#000 86%,transparent 100%);
   mask-composite:intersect;
 }
 /* Kabut tipis yang hanyut pelan di belakang judul & topbar. */
@@ -73,7 +65,7 @@
 .dscene-haze-track ellipse{fill:var(--ds-haze);}
 
 /* ---------- Pemilih scene ---------- */
-.dscene-ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:18px;}
+.dscene-ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:auto;padding-top:14px;}
 .dscene-ctrl-lbl{font-size:10.5px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--ux-muted);}
 .dscene-seg{display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:3px;border-radius:var(--ux-r-md);background:color-mix(in srgb,var(--ux-surface) 78%,transparent);border:1px solid var(--ux-line);box-shadow:var(--ux-shadow-1);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);}
 .dscene-seg button{height:30px;padding:0 9px;border:0;border-radius:8px;background:transparent;color:var(--ux-ink-2);font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background var(--ux-d2),color var(--ux-d2);}
@@ -94,6 +86,10 @@
 .dscene[data-scene="reb"] .ds-g-reb{transform-origin:242px 338px;transform:translateX(228px) scale(1.5);}
 .dscene[data-scene="eng"] .ds-g-eng{transform-origin:350px 338px;transform:translateX(130px) scale(1.7);}
 .dscene[data-scene="flare"] .ds-g-flare{transform:translateX(-40px);}
+/* Scene "Semua": unit disebar ke kiri mengisi banner lebar (flare & alat ambien tetap di kanan). */
+.dscene[data-scene="all"] .ds-g-gtg{transform:translateX(-200px);}
+.dscene[data-scene="all"] .ds-g-reb{transform:translateX(-130px);}
+.dscene[data-scene="all"] :is(.ds-g-eng,.ds-rack){transform:translateX(-60px);}
 
 /* ---------- Warna bentuk ---------- */
 .ds-h1{fill:var(--ds-h1);}.ds-h2{fill:var(--ds-h2);}.ds-h3{fill:var(--ds-h3);}
@@ -175,11 +171,10 @@
 .dscene.is-paused *{animation-play-state:paused!important;}
 
 /* ---------- Responsive ---------- */
-@media (max-width:980px){
-  .dscene-box{flex-basis:100%;max-width:none;}
-  .dscene .dash-stats-row,.dscene .dash-stats-row:has(> .stat:nth-child(5)){grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important;}
-  .dscene .dash-stats-row:has(> .stat:nth-child(5)) > .stat:first-child{grid-row:auto;}
-  .dscene .dash-stats-row:has(> .stat:nth-child(5)) > .stat:first-child .num{font-size:22px;margin-top:12px;}
+/* Header terlalu sempit utk teks + scene berdampingan → scene turun ke bawah teks, lebar penuh. */
+@media (max-width:1260px){
+  .dscene-text{min-height:0;}
+  .dscene-box{position:relative;width:100%;height:auto;aspect-ratio:1440/360;max-height:200px;margin-top:6px;}
 }
 @media (max-width:640px){
   .dscene-haze{display:none;}
