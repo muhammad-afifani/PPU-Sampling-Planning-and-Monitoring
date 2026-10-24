@@ -94,6 +94,14 @@ async function exportAll(){
     const ppuIdbMap = new Map(ppuIdbEntries.map(e=>[e.id, e.dataUrl]));
     data.personilPPU = data.personilPPU.map(p=> p.lampiranId ? {...p, lampiranDataUrl: ppuIdbMap.get(p.lampiranId)||""} : {...p});
   }
+  // TTD PPC (24b-ppc-ttd.js) — data sensitif, jadi OPT-IN (kotak #exportIncludeTtd, default kosong):
+  // file backup JSON pernah ikut di-commit ke repo publik. Disisipkan sbg field top-level sementara
+  // "ppcTtd" {personilId: dataUrl} KHUSUS di file export (tidak pernah masuk DB yang aktif).
+  const ttdBox = document.getElementById("exportIncludeTtd");
+  if(ttdBox && ttdBox.checked && typeof ppcTtdExportMap==="function"){
+    const ttdMap = await ppcTtdExportMap();
+    if(Object.keys(ttdMap).length) data.ppcTtd = ttdMap;
+  }
   // Lampiran Laboratorium (sertifikat KAN, surat registrasi KLH, rujukan gubernur) — 1 record bisa
   // punya SAMPAI 3 lampiran, jadi di-loop lewat LAB_LAMPIRAN_KINDS drpd ditulis 3x manual (sama
   // alasan & pola dgn personilPPU di atas, cuma field lampirannya lebih dari 1).
@@ -327,6 +335,12 @@ async function applyFullBackupImport(){
     }
     data.laboratorium.forEach(l=>{ LAB_LAMPIRAN_KINDS.forEach(kind=>{ delete l[kind.key+"DataUrl"]; }); });
   }
+  // TTD PPC dari file backup (kalau disertakan) ditulis ke IndexedDB perangkat ini; file tanpa TTD
+  // TIDAK menghapus TTD yang sudah ada di perangkat. Field sementara dilepas dari DB.
+  if(data.ppcTtd && typeof ppcTtdImportMap==="function"){
+    try{ await ppcTtdImportMap(data.ppcTtd); }catch(err){ /* gagal menulis TTD tidak boleh menggagalkan restore data utama */ }
+  }
+  delete data.ppcTtd;
   DB = data;
   migrateDB();
   if(!DB.snapshots.length) DB.snapshots = keepSnapshots; else DB.snapshots = keepSnapshots.concat(DB.snapshots).slice(0,8);

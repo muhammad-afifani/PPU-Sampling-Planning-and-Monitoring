@@ -20,12 +20,12 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202610241600">
+<link rel="stylesheet" href="assets/css/style.css?v=202610241700">
 <!-- Lapisan redesign UI (token, shell, komponen, motion) — dimuat SETELAH style.css supaya menimpa
      tampilan saja; semua aturan dibungkus @media screen sehingga hasil cetak tetap memakai style.css. -->
-<link rel="stylesheet" href="assets/css/redesign.css?v=202610241600">
+<link rel="stylesheet" href="assets/css/redesign.css?v=202610241700">
 <!-- Latar animasi header Dashboard (turbin gas, reboiler, flare, engine, alat ambien) — dekorasi murni. -->
-<link rel="stylesheet" href="assets/css/dash-scene.css?v=202610241600">
+<link rel="stylesheet" href="assets/css/dash-scene.css?v=202610241700">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -1059,7 +1059,6 @@
           <div class="ba-left">
             <div class="card">
               <div class="cardhead"><div><h3 id="baPageTitle">Detail Berita Acara</h3></div></div>
-              <div class="hint" id="baKetuaTimHint" style="margin-bottom:10px;"></div>
               <div class="grid cols-2">
                 <div class="field"><label>Hari / Tanggal Pelaksanaan</label><input type="text" id="baTanggalPelaksanaan" placeholder="mis. Rabu, 18 Februari s.d. Jumat 20 Februari 2026"></div>
                 <div class="field"><label>Tempat &amp; Tanggal Penandatanganan</label><input type="text" id="baTempatTanggal" placeholder="mis. Lapangan SPS PHM, 21 Februari 2026"></div>
@@ -1076,7 +1075,12 @@
                   <div class="field"><label>Nama Perusahaan Lab</label><input type="text" id="baNamaLabPerusahaan" placeholder="mis. PT Sucofindo"></div>
                   <div class="field" style="margin-top:8px;"><label>Nama Penandatangan</label><input type="text" id="baNamaLab" placeholder="mis. Rafles Sadrah Ginting"></div>
                   <div class="field" style="margin-top:8px;"><label>Jabatan</label><input type="text" id="baJabatanLab" placeholder="mis. Ketua Tim Pemantauan Emisi"></div>
+                  <div class="hint ba-ttd-hint" id="baKetuaTimHint" style="margin-top:6px;"></div>
                 </div>
+              </div>
+              <div class="ba-ttd-opts">
+                <label class="checkline"><input type="checkbox" id="baTtdAuto" checked> Tempel TTD Ketua Tim Sampling otomatis (dari menu Personil)</label>
+                <label class="checkline"><input type="checkbox" id="baTtdCert" checked> Sertakan halaman Sertifikat Tanda Tangan Elektronik (halaman terakhir)</label>
               </div>
               <div class="field" style="margin-top:10px;"><label>Catatan Kaki Cetak (opsional)</label><textarea id="baFooterNote" rows="2" placeholder="mis. Akan dipantau ketika running hour memenuhi ambang wajib pantau Emergency Engine."></textarea></div>
               <div class="hint" style="margin-top:8px;">Isian penandatangan &amp; catatan kaki tersimpan otomatis per Tim, jadi tidak perlu diketik ulang saat ganti site/batch.</div>
@@ -2216,6 +2220,7 @@
         <p class="hint" style="font-weight:600;color:var(--heading);">Berisi seluruh data: titik pantau, personil, aturan, batch, jadwal (termasuk yang sudah difinalisasi), tracking, running hour, dan hasil pemantauan — seluruh isi aplikasi ini.</p>
         <label class="checkline" style="margin-top:4px;"><input type="checkbox" id="exportIncludePhotos"> Sertakan foto Dokumentasi Sampling</label>
         <div class="hint" style="margin-top:2px;">Foto bisa membuat ukuran file jauh lebih besar. Kosongkan kalau cuma perlu backup data teks (batch/tracking/hasil pemantauan dst) — foto dokumentasi yang SUDAH ADA di perangkat ini tidak akan ikut terhapus saat file hasil export ini nanti di-import lagi (baik di perangkat ini maupun perangkat lain).</div>
+        <label class="checkline" style="margin-top:4px;"><input type="checkbox" id="exportIncludeTtd"> Sertakan Tanda Tangan (TTD) PPC <span class="muted">&mdash; data sensitif, jangan unggah file backup ini ke repo publik</span></label>
         <div class="toolbar" style="margin-top:8px;">
           <button class="btn primary" data-action="exportAll">Export Semua Data (.json)</button>
         </div>
@@ -2317,50 +2322,51 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202610241600"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202610241600"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202610241700"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202610241700"></script>
 
-<script src="assets/data/default-data.js?v=202610241600"></script>
-<script src="assets/data/brand-assets.js?v=202610241600"></script>
-<script src="assets/data/travel-routes.js?v=202610241600"></script>
-<script src="assets/js/00-icons.js?v=202610241600"></script>
-<script src="assets/js/01-state.js?v=202610241600"></script>
-<script src="assets/js/02-nav-util.js?v=202610241600"></script>
-<script src="assets/js/03-period-logic.js?v=202610241600"></script>
-<script src="assets/js/04-dashboard.js?v=202610241600"></script>
-<script src="assets/js/05-master-data.js?v=202610241600"></script>
-<script src="assets/js/06-plan-personil.js?v=202610241600"></script>
-<script src="assets/js/07-rules-planner.js?v=202610241600"></script>
-<script src="assets/js/08-gantt-print.js?v=202610241600"></script>
-<script src="assets/js/09-tracking-map.js?v=202610241600"></script>
-<script src="assets/js/10-running-hour.js?v=202610241600"></script>
-<script src="assets/js/11-berita-acara.js?v=202610241600"></script>
-<script src="assets/js/12-data-page.js?v=202610241600"></script>
-<script src="assets/js/13-hasil-db.js?v=202610241600"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202610241600"></script>
-<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610241600"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202610241600"></script>
-<script src="assets/js/16-actions-init.js?v=202610241600"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202610241600"></script>
-<script src="assets/js/18-model-dispersi.js?v=202610241600"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202610241600"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202610241600"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202610241600"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202610241600"></script>
-<script src="assets/js/23-budget-proyeksi.js?v=202610241600"></script>
-<script src="assets/js/24-personil-ppu.js?v=202610241600"></script>
-<script src="assets/js/25-access-gate.js?v=202610241600"></script>
-<script src="assets/js/26-laboratorium.js?v=202610241600"></script>
-<script src="assets/js/27-laporan-emf.js?v=202610241600"></script>
-<script src="assets/js/28-word-export.js?v=202610241600"></script>
-<script src="assets/js/29-docx-export.js?v=202610241600"></script>
-<script src="assets/js/30-tracking-board.js?v=202610241600"></script>
-<script src="assets/js/31-wbs-gantt.js?v=202610241600"></script>
-<script src="assets/js/32-schedule-export.js?v=202610241600"></script>
-<script src="assets/js/33-hasil-import.js?v=202610241600"></script>
-<script src="assets/js/34-coa-reader.js?v=202610241600"></script>
-<script src="assets/js/35-ambien-import.js?v=202610241600"></script>
-<script src="assets/js/36-ui-experience.js?v=202610241600"></script>
-<script src="assets/js/37-dash-scene.js?v=202610241600"></script>
+<script src="assets/data/default-data.js?v=202610241700"></script>
+<script src="assets/data/brand-assets.js?v=202610241700"></script>
+<script src="assets/data/travel-routes.js?v=202610241700"></script>
+<script src="assets/js/00-icons.js?v=202610241700"></script>
+<script src="assets/js/01-state.js?v=202610241700"></script>
+<script src="assets/js/02-nav-util.js?v=202610241700"></script>
+<script src="assets/js/03-period-logic.js?v=202610241700"></script>
+<script src="assets/js/04-dashboard.js?v=202610241700"></script>
+<script src="assets/js/05-master-data.js?v=202610241700"></script>
+<script src="assets/js/06-plan-personil.js?v=202610241700"></script>
+<script src="assets/js/07-rules-planner.js?v=202610241700"></script>
+<script src="assets/js/08-gantt-print.js?v=202610241700"></script>
+<script src="assets/js/09-tracking-map.js?v=202610241700"></script>
+<script src="assets/js/10-running-hour.js?v=202610241700"></script>
+<script src="assets/js/11-berita-acara.js?v=202610241700"></script>
+<script src="assets/js/12-data-page.js?v=202610241700"></script>
+<script src="assets/js/13-hasil-db.js?v=202610241700"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202610241700"></script>
+<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610241700"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202610241700"></script>
+<script src="assets/js/16-actions-init.js?v=202610241700"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202610241700"></script>
+<script src="assets/js/18-model-dispersi.js?v=202610241700"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202610241700"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202610241700"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202610241700"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202610241700"></script>
+<script src="assets/js/23-budget-proyeksi.js?v=202610241700"></script>
+<script src="assets/js/24-personil-ppu.js?v=202610241700"></script>
+<script src="assets/js/24b-ppc-ttd.js?v=202610241700"></script>
+<script src="assets/js/25-access-gate.js?v=202610241700"></script>
+<script src="assets/js/26-laboratorium.js?v=202610241700"></script>
+<script src="assets/js/27-laporan-emf.js?v=202610241700"></script>
+<script src="assets/js/28-word-export.js?v=202610241700"></script>
+<script src="assets/js/29-docx-export.js?v=202610241700"></script>
+<script src="assets/js/30-tracking-board.js?v=202610241700"></script>
+<script src="assets/js/31-wbs-gantt.js?v=202610241700"></script>
+<script src="assets/js/32-schedule-export.js?v=202610241700"></script>
+<script src="assets/js/33-hasil-import.js?v=202610241700"></script>
+<script src="assets/js/34-coa-reader.js?v=202610241700"></script>
+<script src="assets/js/35-ambien-import.js?v=202610241700"></script>
+<script src="assets/js/36-ui-experience.js?v=202610241700"></script>
+<script src="assets/js/37-dash-scene.js?v=202610241700"></script>
 </body>
 </html>

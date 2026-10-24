@@ -452,7 +452,7 @@ function renderPersonilCards(rows){
         <div class="pz-avatar">${escHtml(pzInitials(p.nama))}</div>
         <div class="pz-id">
           <div class="pz-name" title="${escHtml(p.nama)}">${escHtml(p.nama)}</div>
-          <div class="pz-meta"><span class="pz-role-pill">${escHtml(p.role||"-")}</span>${p.telepon?`<span class="pz-phone">${escHtml(p.telepon)}</span>`:""}</div>
+          <div class="pz-meta"><span class="pz-role-pill">${escHtml(p.role||"-")}</span>${p.telepon?`<span class="pz-phone">${escHtml(p.telepon)}</span>`:""}${typeof ppcTtdBadgeHtml==="function"?ppcTtdBadgeHtml(p):""}</div>
         </div>
         <div class="pz-ring" style="--pct:${pct};--ring-c:${pctC};" title="Kelengkapan ${pct}%"><span>${pct}<small>%</small></span></div>
       </header>
@@ -499,7 +499,7 @@ function renderPersonil(){
   <tbody>${rows.length ? rows.map(p=>{
     const pct = completenessPct(p);
     const assignments = batchesForPersonil(p.id);
-    return `<tr><td class="pz-nama" title="${escHtml(p.nama)}"><b>${escHtml(p.nama)}</b><div class="muted pz-subline">${p.telepon?escHtml(p.telepon):""}</div></td><td class="pz-role">${p.role}</td>
+    return `<tr><td class="pz-nama" title="${escHtml(p.nama)}"><b>${escHtml(p.nama)}</b><div class="muted pz-subline">${p.telepon?escHtml(p.telepon):""}${typeof ppcTtdBadgeHtml==="function"?ppcTtdBadgeHtml(p):""}</div></td><td class="pz-role">${p.role}</td>
       ${PERSONIL_ITEMS.map(it=>{
         const rec = p.items[it]||{};
         if(personilItemNA(p, it)){
@@ -592,6 +592,8 @@ function personilFormHtml(p){
   // personil ini masih memakainya, supaya tidak diam-diam ganti ke opsi pertama pas form dibuka —
   // user perlu pilih manual jadi Emisi atau Ambient (tidak bisa ditebak otomatis dari data lama).
   const roleOptions = PERSONIL_ROLES.includes(p.role) || !p.role ? PERSONIL_ROLES : [p.role, ...PERSONIL_ROLES];
+  // Tanda tangan PPC (24b-ppc-ttd.js): state "belum disimpan" direset tiap form dibuka.
+  const ttdBlock = typeof ppcTtdFormHtml==="function" ? (ppcTtdFormReset(p.id?p:null), ppcTtdFormHtml(p.id?p:null)) : "";
   return `
   <h3>${p.id?"Edit":"Tambah"} Personil</h3>
   <div class="grid cols-2">
@@ -603,6 +605,7 @@ function personilFormHtml(p){
   </div>
   <div class="grid cols-2" style="margin-top:10px;">${itemFields}</div>
   <div class="field" style="margin-top:10px;"><label>Link Dokumentasi (mis. folder Drive/SharePoint berisi PDF KTP/MCU/dst)</label><input type="url" id="p_dokLink" value="${escHtml(p.dokumentasiLink||"")}" placeholder="https://..."></div>
+  ${ttdBlock}
   <div class="actions">
     <button class="btn ghost" data-action="closeModal">Batal</button>
     <button class="btn primary" data-action="savePersonil" data-id="${p.id}">Simpan</button>
@@ -619,13 +622,16 @@ function savePersonil(id){
   });
   const val = {nama: document.getElementById("p_nama").value.trim(), role: document.getElementById("p_role").value, items, dokumentasiLink: document.getElementById("p_dokLink").value.trim(), telepon: document.getElementById("p_telepon").value.trim()};
   if(!val.nama){ toast("Nama wajib diisi.","err"); return; }
-  if(id){ Object.assign(DB.personil.find(p=>p.id===id), val); }
-  else { DB.personil.push({id: uid("PS"), ...val}); }
+  let saved;
+  if(id){ saved = DB.personil.find(p=>p.id===id); Object.assign(saved, val); }
+  else { saved = {id: uid("PS"), ...val}; DB.personil.push(saved); }
+  if(typeof ppcTtdApplyPending==="function") ppcTtdApplyPending(saved);
   touchDataset("personil"); save(); closeModal(); renderPersonil();
 }
 function deletePersonil(id){
   askConfirm("Hapus personil ini?", ()=>{
     DB.personil = DB.personil.filter(p=>p.id!==id);
+    if(typeof ppcTtdForget==="function") ppcTtdForget(id);
     touchDataset("personil"); save(); renderPersonil(); toast("Personil dihapus.");
   });
 }
