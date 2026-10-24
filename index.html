@@ -20,10 +20,12 @@
 })();
 </script>
 <!-- ?v= = cache-busting, lihat catatan lengkap di dekat kumpulan script lokal sebelum penutup body. -->
-<link rel="stylesheet" href="assets/css/style.css?v=202610232200">
+<link rel="stylesheet" href="assets/css/style.css?v=202610241600">
 <!-- Lapisan redesign UI (token, shell, komponen, motion) — dimuat SETELAH style.css supaya menimpa
      tampilan saja; semua aturan dibungkus @media screen sehingga hasil cetak tetap memakai style.css. -->
-<link rel="stylesheet" href="assets/css/redesign.css?v=202610232200">
+<link rel="stylesheet" href="assets/css/redesign.css?v=202610241600">
+<!-- Latar animasi header Dashboard (turbin gas, reboiler, flare, engine, alat ambien) — dekorasi murni. -->
+<link rel="stylesheet" href="assets/css/dash-scene.css?v=202610241600">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -162,16 +164,255 @@
     </header>
     <!-- DASHBOARD -->
     <div class="page" id="page-dashboard">
-      <div class="pagehead"><div><h2>Dashboard</h2><div class="desc">Ringkasan status pemantauan emisi &amp; ambient semester berjalan</div></div></div>
-      <details class="card guide">
-        <summary>Alur Kerja Tools Ini (4 Langkah)</summary>
-        <div class="grid cols-4 guide-body">
-          <div><b>1. Database Titik Pantau</b><div class="hint">Cek/edit daftar sumber emisi &amp; ambient. Sudah terisi data PHM, tinggal disesuaikan kalau ada perubahan.</div></div>
-          <div><b>2. Personil PPC &amp; Observer</b><div class="hint">Input personil PPC Udara &amp; kelengkapan dokumennya (opsional, bisa belakangan).</div></div>
-          <div><b>3. Perencanaan Batch</b><div class="hint">Pilih tim &amp; tanggal, klik satu tombol "Buat &amp; Terapkan Jadwal". Ini langkah utama.</div></div>
-          <div><b>4. Scheduling Tools &amp; Tracking</b><div class="hint">Otomatis terisi setelah langkah 3. Update status di halaman Tracking saat sampling berjalan.</div></div>
+      <!-- Header Dashboard + latar animasi 2D (turbin gas, glycol reboiler, flare, diesel/gas engine,
+           alat ambien & kebisingan). Murni dekorasi — lihat assets/css/dash-scene.css &
+           assets/js/37-dash-scene.js. Pilihan scene & jeda disimpan di localStorage (phmDashScene*). -->
+      <div class="pagehead dscene" id="dashScene" data-scene="all">
+        <div class="dscene-haze" aria-hidden="true"><div class="dscene-haze-track">
+          <svg viewBox="0 0 1000 330" preserveAspectRatio="none"><ellipse cx="140" cy="80" rx="210" ry="46"/><ellipse cx="430" cy="50" rx="250" ry="40"/><ellipse cx="700" cy="106" rx="230" ry="50"/><ellipse cx="930" cy="66" rx="190" ry="38"/></svg>
+          <svg viewBox="0 0 1000 330" preserveAspectRatio="none"><ellipse cx="140" cy="80" rx="210" ry="46"/><ellipse cx="430" cy="50" rx="250" ry="40"/><ellipse cx="700" cy="106" rx="230" ry="50"/><ellipse cx="930" cy="66" rx="190" ry="38"/></svg>
+        </div></div>
+        <div class="dscene-text">
+          <h2>Dashboard</h2>
+          <div class="desc">Ringkasan status pemantauan emisi &amp; ambient semester berjalan</div>
+          <div class="dscene-ctrl">
+            <span class="dscene-ctrl-lbl" id="dsceneLbl">Latar animasi</span>
+            <div class="dscene-seg" role="group" aria-labelledby="dsceneLbl">
+              <button type="button" data-dscene="gtg" aria-pressed="false">Turbin Gas</button>
+              <button type="button" data-dscene="reb" aria-pressed="false">Reboiler</button>
+              <button type="button" data-dscene="flare" aria-pressed="false">Flare</button>
+              <button type="button" data-dscene="eng" aria-pressed="false">Diesel / Gas Engine</button>
+              <button type="button" data-dscene="all" aria-pressed="true">Semua</button>
+              <button type="button" class="dscene-pause" data-dscene-pause aria-pressed="false" aria-label="Jeda animasi latar" title="Jeda animasi latar">
+                <svg class="dscene-ico-pause" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+                <svg class="dscene-ico-play" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5l12 7-12 7z"/></svg>
+              </button>
+            </div>
+          </div>
         </div>
-      </details>
+        <div class="dscene-box" aria-hidden="true">
+          <!-- Tanah & pepohonan (tepi kiri/bawah dipudarkan ke latar halaman) -->
+          <svg class="dscene-svg dscene-ground" viewBox="0 20 680 360">
+            <path class="ds-h1" d="M0 292 C 90 262 170 270 250 280 C 340 292 400 250 500 246 C 580 243 630 258 680 266 L680 380 L0 380 Z"/>
+            <rect class="ds-trunk" x="419" y="244" width="3" height="18"/><circle class="ds-tree" cx="420.5" cy="240" r="10"/>
+            <rect class="ds-trunk" x="469" y="236" width="3" height="16"/><circle class="ds-tree2" cx="470.5" cy="233" r="9"/>
+            <rect class="ds-trunk" x="619" y="246" width="3" height="16"/><circle class="ds-tree" cx="620.5" cy="242" r="10"/>
+            <rect class="ds-trunk" x="633" y="252" width="2.5" height="12"/><circle class="ds-tree2" cx="634" cy="250" r="7"/>
+            <path class="ds-h2" d="M0 318 C 110 300 200 306 300 314 C 420 324 500 296 600 300 C 640 302 664 306 680 310 L680 380 L0 380 Z"/>
+            <rect class="ds-trunk" x="59" y="300" width="3" height="16"/><circle class="ds-tree" cx="60.5" cy="296" r="10"/>
+            <rect class="ds-trunk" x="74" y="304" width="2.5" height="12"/><circle class="ds-tree2" cx="75" cy="302" r="7"/>
+            <rect class="ds-trunk" x="596" y="284" width="3" height="18"/><circle class="ds-tree2" cx="597.5" cy="280" r="11"/>
+            <path class="ds-h3" d="M0 346 C 150 334 280 340 420 338 C 540 336 620 330 680 334 L680 380 L0 380 Z"/>
+          </svg>
+          <!-- Langit, unit & asap -->
+          <svg class="dscene-svg" viewBox="0 20 680 360">
+            <defs><radialGradient id="dsceneGlow"><stop class="ds-gl0" offset="0"/><stop class="ds-gl1" offset="1"/></radialGradient></defs>
+            <g><circle class="ds-star" cx="380" cy="40" r="1.6"/><circle class="ds-star" cx="450" cy="30" r="1.2"/><circle class="ds-star" cx="560" cy="38" r="1.5"/><circle class="ds-star" cx="300" cy="34" r="1.1"/><circle class="ds-star" cx="610" cy="110" r="1.2"/></g>
+            <circle class="ds-halo" cx="636" cy="58" r="30"/>
+            <circle class="ds-sun" cx="636" cy="58" r="19"/>
+            <g class="ds-cloud"><circle cx="420" cy="74" r="14"/><circle cx="438" cy="66" r="18"/><circle cx="458" cy="74" r="13"/><rect x="406" y="74" width="66" height="14" rx="7"/></g>
+            <g class="ds-cloud ds-c2"><circle cx="590" cy="128" r="11"/><circle cx="604" cy="121" r="14"/><circle cx="620" cy="128" r="10"/><rect x="579" y="128" width="52" height="11" rx="5.5"/></g>
+
+            <!-- TURBIN GAS: enclosure + filter udara + cerobong exhaust -->
+            <g class="ds-g-gtg">
+              <ellipse class="ds-gshadow" cx="134" cy="339" rx="50" ry="4"/>
+              <rect class="ds-metal-d" x="88" y="332" width="92" height="6" rx="1"/>
+              <rect class="ds-enc" x="92" y="300" width="84" height="33" rx="2"/>
+              <rect class="ds-seam" x="113" y="301" width="1" height="31"/><rect class="ds-seam" x="134" y="301" width="1" height="31"/><rect class="ds-seam" x="155" y="301" width="1" height="31"/>
+              <rect class="ds-door-l" x="137" y="308" width="13" height="22" rx="1"/>
+              <rect class="ds-louver-d" x="158" y="306" width="14" height="2"/><rect class="ds-louver-d" x="158" y="311" width="14" height="2"/><rect class="ds-louver-d" x="158" y="316" width="14" height="2"/><rect class="ds-louver-d" x="158" y="321" width="14" height="2"/>
+              <circle class="ds-led-g" cx="172" cy="303.5" r="1.4"/>
+              <g transform="translate(103 317)">
+                <circle class="ds-metal-d" r="7.5"/>
+                <g class="ds-fan"><path class="ds-metal-l" d="M0 0 C 2 -2.5 5.5 -3.5 6.5 -1 C 4.5 0.5 2 1 0 0 Z"/><path class="ds-metal-l" d="M0 0 C 2 -2.5 5.5 -3.5 6.5 -1 C 4.5 0.5 2 1 0 0 Z" transform="rotate(120)"/><path class="ds-metal-l" d="M0 0 C 2 -2.5 5.5 -3.5 6.5 -1 C 4.5 0.5 2 1 0 0 Z" transform="rotate(240)"/></g>
+                <circle class="ds-metal" r="1.4"/>
+              </g>
+              <rect class="ds-shade" x="92" y="322" width="84" height="11"/>
+              <rect class="ds-metal-d" x="90" y="298" width="88" height="3" rx="1"/>
+              <rect class="ds-metal" x="94" y="277" width="28" height="21"/>
+              <rect class="ds-metal-d" x="97" y="281" width="22" height="2"/><rect class="ds-metal-d" x="97" y="285.5" width="22" height="2"/><rect class="ds-metal-d" x="97" y="290" width="22" height="2"/>
+              <rect class="ds-shade" x="108" y="277" width="14" height="21"/>
+              <rect class="ds-metal-d" x="92" y="273" width="32" height="5" rx="1"/>
+              <polygon class="ds-stack" points="138,296 166,296 163,72 141,72"/>
+              <polygon class="ds-red" points="141,72 163,72 163.4,102 140.6,102"/>
+              <polygon class="ds-red" points="140.2,134 163.8,134 164.2,160 139.8,160"/>
+              <polygon class="ds-red" points="139.4,192 164.6,192 164.9,216 139.1,216"/>
+              <polygon class="ds-shade" points="152,296 166,296 163,72 152,72"/>
+              <rect class="ds-red-d" x="138" y="64" width="28" height="9" rx="1.5"/>
+              <rect class="ds-red-d" x="135" y="292" width="34" height="7" rx="1"/>
+              <rect class="ds-metal-d" x="131" y="120" width="42" height="1.4"/><rect class="ds-metal-d" x="131" y="128" width="42" height="3"/>
+              <rect class="ds-metal-d" x="132" y="120" width="1.4" height="9"/><rect class="ds-metal-d" x="142" y="120" width="1.2" height="9"/><rect class="ds-metal-d" x="161" y="120" width="1.2" height="9"/><rect class="ds-metal-d" x="171" y="120" width="1.4" height="9"/>
+              <rect class="ds-metal-d" x="129" y="240" width="46" height="1.4"/><rect class="ds-metal-d" x="129" y="248" width="46" height="3"/>
+              <rect class="ds-metal-d" x="130" y="240" width="1.4" height="9"/><rect class="ds-metal-d" x="173" y="240" width="1.4" height="9"/>
+              <g class="ds-plume ds-p-gtg" transform="translate(152 60)">
+                <g class="ds-pf"><circle class="ds-sh" r="12"/><circle class="ds-hl" r="8.5" cx="-3" cy="-3.5"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="10"/><circle class="ds-hl" r="7" cx="-2.5" cy="-3"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="13"/><circle class="ds-hl" r="9.5" cx="-3" cy="-4"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="11"/><circle class="ds-hl" r="8" cx="-3" cy="-3"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="12"/><circle class="ds-hl" r="8.5" cx="-3" cy="-3.5"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="10"/><circle class="ds-hl" r="7" cx="-2.5" cy="-3"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="13"/><circle class="ds-hl" r="9.5" cx="-3" cy="-4"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="11"/><circle class="ds-hl" r="8" cx="-3" cy="-3"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="12"/><circle class="ds-hl" r="8.5" cx="-3" cy="-3.5"/></g>
+              </g>
+            </g>
+
+            <!-- GLYCOL REBOILER: burner + exhaust stack, bejana fire tube, still column + vent -->
+            <g class="ds-g-reb">
+              <ellipse class="ds-gshadow" cx="246" cy="339" rx="52" ry="4"/>
+              <polygon class="ds-metal-d" points="221,330 229,330 231,338 219,338"/>
+              <polygon class="ds-metal-d" points="273,330 281,330 283,338 271,338"/>
+              <rect class="ds-metal-d" x="186" y="306" width="7" height="22" rx="1"/>
+              <rect class="ds-metal" x="193" y="310" width="20" height="14"/>
+              <rect class="ds-metal" x="200" y="216" width="8" height="96"/>
+              <rect class="ds-shade" x="204" y="216" width="4" height="96"/>
+              <rect class="ds-metal-d" x="200" y="216" width="8" height="10"/>
+              <polygon class="ds-metal-d" points="198,216 204,207 210,216"/>
+              <path class="ds-metal-l" d="M212 298 H282 A16 16 0 0 1 282 330 H212 Z"/>
+              <path class="ds-glycol ds-slosh" d="M213 309 C 221 307 229 311 237 309 C 245 307 253 311 261 309 C 269 307 277 311 285 309 C 291 312 296 318 293 324 C 291 328 287 329 282 329 H213 Z"/>
+              <path class="ds-firetube" d="M215 314 H270 A6 6 0 0 1 270 326 H215"/>
+              <rect class="ds-glycol2" x="279" y="311" width="2" height="18"/>
+              <path class="ds-shade" d="M212 322 H293 C 291 327 287 330 282 330 H212 Z"/>
+              <rect class="ds-metal-l" x="232" y="262" width="16" height="36"/>
+              <rect class="ds-metal-d ds-o55" x="233" y="267" width="14" height="8"/>
+              <rect class="ds-shade" x="240" y="262" width="8" height="36"/>
+              <rect class="ds-metal-d" x="229" y="259" width="22" height="4" rx="1"/>
+              <rect class="ds-metal-d" x="248" y="284" width="20" height="2.5"/>
+              <path class="ds-pipe" d="M240 259 V253 Q240 249 244 250 L292 263"/>
+              <g class="ds-plume ds-p-reb" transform="translate(204 204)">
+                <g class="ds-pf"><circle class="ds-sh" r="8"/><circle class="ds-hl" r="5.8" cx="-2" cy="-2.4"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="9.5"/><circle class="ds-hl" r="7" cx="-2.4" cy="-2.8"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="7.5"/><circle class="ds-hl" r="5.4" cx="-2" cy="-2.2"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="9"/><circle class="ds-hl" r="6.5" cx="-2.2" cy="-2.6"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="8"/><circle class="ds-hl" r="5.8" cx="-2" cy="-2.4"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="9.5"/><circle class="ds-hl" r="7" cx="-2.4" cy="-2.8"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="7.5"/><circle class="ds-hl" r="5.4" cx="-2" cy="-2.2"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="9"/><circle class="ds-hl" r="6.5" cx="-2.2" cy="-2.6"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="8"/><circle class="ds-hl" r="5.8" cx="-2" cy="-2.4"/></g>
+              </g>
+              <g class="ds-plume ds-p-vap" transform="translate(292 260)">
+                <g class="ds-pf"><circle class="ds-sh" r="5"/><circle class="ds-hl" r="3.6" cx="-1.2" cy="-1.5"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="6"/><circle class="ds-hl" r="4.3" cx="-1.5" cy="-1.8"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="4.5"/><circle class="ds-hl" r="3.2" cx="-1.2" cy="-1.4"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="5.5"/><circle class="ds-hl" r="4" cx="-1.4" cy="-1.6"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="5"/><circle class="ds-hl" r="3.6" cx="-1.2" cy="-1.5"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="6"/><circle class="ds-hl" r="4.3" cx="-1.5" cy="-1.8"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="4.5"/><circle class="ds-hl" r="3.2" cx="-1.2" cy="-1.4"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="5.5"/><circle class="ds-hl" r="4" cx="-1.4" cy="-1.6"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="5"/><circle class="ds-hl" r="3.6" cx="-1.2" cy="-1.5"/></g>
+              </g>
+            </g>
+
+            <!-- Pipe rack penghubung (hanya di scene "Semua") -->
+            <g class="ds-rack">
+              <rect class="ds-metal-d" x="402" y="331" width="40" height="3"/>
+              <rect class="ds-metal-d" x="410" y="326" width="2" height="12"/><rect class="ds-metal-d" x="432" y="326" width="2" height="12"/>
+            </g>
+
+            <!-- DIESEL / GAS ENGINE (genset) -->
+            <g class="ds-g-eng">
+              <ellipse class="ds-gshadow" cx="350" cy="339" rx="54" ry="4"/>
+              <rect class="ds-metal-d" x="298" y="328" width="104" height="10" rx="1.5"/>
+              <g class="ds-eng-body">
+                <rect class="ds-navy2" x="302" y="280" width="88" height="6" rx="2"/>
+                <rect class="ds-navy" x="304" y="285" width="84" height="44" rx="3"/>
+                <rect class="ds-louver" x="312" y="294" width="26" height="2.5" rx="1"/><rect class="ds-louver" x="312" y="301" width="26" height="2.5" rx="1"/><rect class="ds-louver" x="312" y="308" width="26" height="2.5" rx="1"/><rect class="ds-louver" x="312" y="315" width="26" height="2.5" rx="1"/>
+                <rect class="ds-door" x="345" y="292" width="18" height="31" rx="1.5"/>
+                <rect class="ds-louver" x="370" y="302" width="12" height="2"/><rect class="ds-louver" x="370" y="307" width="12" height="2"/><rect class="ds-louver" x="370" y="312" width="12" height="2"/><rect class="ds-louver" x="370" y="317" width="12" height="2"/>
+                <circle class="ds-led" cx="376" cy="294" r="2.4"/>
+                <rect class="ds-metal" x="316" y="266" width="40" height="13" rx="6.5"/>
+                <rect class="ds-metal-d" x="324" y="266" width="2" height="13"/><rect class="ds-metal-d" x="346" y="266" width="2" height="13"/>
+                <rect class="ds-metal" x="350" y="268" width="14" height="8" rx="2"/>
+                <rect class="ds-metal" x="356" y="226" width="8" height="48"/>
+                <rect class="ds-metal-d" x="354" y="250" width="12" height="2.5"/>
+                <polygon class="ds-metal-d" points="353,227 369,221 369,224.5 353,230"/>
+              </g>
+              <g class="ds-plume ds-p-eng" transform="translate(360 220)">
+                <g class="ds-pf"><circle class="ds-sh" r="7"/><circle class="ds-hl" r="5" cx="-1.8" cy="-2"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="8"/><circle class="ds-hl" r="5.5" cx="-2" cy="-2.2"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="6.5"/><circle class="ds-hl" r="4.5" cx="-1.6" cy="-2"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="7.5"/><circle class="ds-hl" r="5.2" cx="-2" cy="-2"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="7"/><circle class="ds-hl" r="5" cx="-1.8" cy="-2"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="8"/><circle class="ds-hl" r="5.5" cx="-2" cy="-2.2"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="6.5"/><circle class="ds-hl" r="4.5" cx="-1.6" cy="-2"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="7.5"/><circle class="ds-hl" r="5.2" cx="-2" cy="-2"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="7"/><circle class="ds-hl" r="5" cx="-1.8" cy="-2"/></g>
+              </g>
+            </g>
+
+            <!-- FLARE STACK: menara rangka, knock-out drum, nyala api + jelaga -->
+            <g class="ds-g-flare">
+              <ellipse class="ds-gshadow" cx="510" cy="339" rx="58" ry="4"/>
+              <rect class="ds-metal-l" x="440" y="314" width="42" height="16" rx="8"/>
+              <rect class="ds-shade" x="440" y="322" width="42" height="8" rx="4"/>
+              <rect class="ds-metal-d" x="448" y="329" width="3" height="9"/><rect class="ds-metal-d" x="471" y="329" width="3" height="9"/>
+              <rect class="ds-metal-d" x="482" y="320" width="36" height="4"/>
+              <polyline class="ds-lat" points="496,338 514,120"/>
+              <polyline class="ds-lat" points="544,338 526,120"/>
+              <polyline class="ds-lat" points="496,338 540,290 503.7,245 532.6,200 510.7,160 526,120"/>
+              <polyline class="ds-lat" points="544,338 500,290 536.3,245 507.4,200 529.3,160 514,120"/>
+              <polyline class="ds-lat" points="500,290 540,290"/><polyline class="ds-lat" points="503.7,245 536.3,245"/><polyline class="ds-lat" points="507.4,200 532.6,200"/><polyline class="ds-lat" points="510.7,160 529.3,160"/>
+              <polygon class="ds-metal-l" points="516,338 524,338 523,96 517,96"/>
+              <polygon class="ds-red" points="517,96 523,96 523.1,116 516.9,116"/>
+              <polygon class="ds-shade" points="520,338 524,338 523,96 520,96"/>
+              <rect class="ds-red-d" x="514" y="92" width="12" height="5" rx="1"/>
+              <rect class="ds-metal-d" x="507" y="118" width="26" height="2.5"/>
+              <circle class="ds-glow" cx="516" cy="64" r="48"/>
+              <g class="ds-plume ds-p-soot" transform="translate(508 26)">
+                <g class="ds-pf"><circle class="ds-sh" r="9"/><circle class="ds-hl" r="6.5" cx="-2.2" cy="-2.6"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="10.5"/><circle class="ds-hl" r="7.5" cx="-2.5" cy="-3"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="8"/><circle class="ds-hl" r="5.8" cx="-2" cy="-2.4"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="10"/><circle class="ds-hl" r="7" cx="-2.5" cy="-2.8"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="9"/><circle class="ds-hl" r="6.5" cx="-2.2" cy="-2.6"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="10.5"/><circle class="ds-hl" r="7.5" cx="-2.5" cy="-3"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="8"/><circle class="ds-hl" r="5.8" cx="-2" cy="-2.4"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="10"/><circle class="ds-hl" r="7" cx="-2.5" cy="-2.8"/></g>
+                <g class="ds-pf"><circle class="ds-sh" r="9"/><circle class="ds-hl" r="6.5" cx="-2.2" cy="-2.6"/></g>
+              </g>
+              <g transform="translate(520 92)">
+                <path class="ds-flame ds-f1" d="M0 0 C -14 -4 -20 -20 -14 -36 C -12 -44 -18 -52 -16 -64 C -8 -54 -4 -56 -2 -66 C 4 -54 12 -48 10 -34 C 16 -30 14 -12 0 0 Z"/>
+                <path class="ds-flame ds-f2" d="M0 0 C -9 -4 -13 -16 -9 -28 C -8 -36 -12 -42 -10 -50 C -4 -42 0 -44 1 -50 C 6 -40 8 -30 6 -22 C 10 -16 8 -6 0 0 Z"/>
+                <path class="ds-flame ds-f3" d="M0 0 C -5 -3 -7 -10 -5 -18 C -4 -24 -6 -28 -4 -32 C 0 -26 3 -24 3 -18 C 5 -12 4 -4 0 0 Z"/>
+              </g>
+              <g transform="translate(516 40)">
+                <circle class="ds-spark" r="1.4"/><circle class="ds-spark" cx="-5" cy="6" r="1.1"/><circle class="ds-spark" cx="4" cy="2" r="1.2"/>
+                <circle class="ds-spark" cx="-2" cy="10" r="1"/><circle class="ds-spark" cx="6" cy="8" r="1.3"/><circle class="ds-spark" cx="-8" cy="2" r="1"/>
+              </g>
+            </g>
+
+            <!-- ALAT PANTAU AMBIEN (HVAS) & KEBISINGAN (sound level meter) — selalu tampil -->
+            <g class="ds-g-inst">
+              <ellipse class="ds-gshadow" cx="602" cy="339" rx="18" ry="3"/>
+              <ellipse class="ds-gshadow" cx="650" cy="339" rx="12" ry="2.5"/>
+              <g>
+                <circle class="ds-air" cx="580" cy="287" r="1.2"/><circle class="ds-air" cx="578" cy="284" r="1"/><circle class="ds-air" cx="581" cy="282" r="1.1"/>
+                <circle class="ds-air ds-air-r" cx="624" cy="287" r="1.2"/><circle class="ds-air ds-air-r" cx="626" cy="283" r="1"/>
+              </g>
+              <rect class="ds-metal-d" x="592" y="324" width="2.5" height="14"/><rect class="ds-metal-d" x="610" y="324" width="2.5" height="14"/>
+              <rect class="ds-stack" x="589" y="290" width="26" height="36" rx="1"/>
+              <rect class="ds-shade" x="602" y="290" width="13" height="36"/>
+              <rect class="ds-metal-l" x="593" y="296" width="18" height="26" rx="1"/>
+              <rect class="ds-metal-d" x="596" y="305" width="2" height="6" rx="1"/>
+              <circle class="ds-led-g" cx="607" cy="300" r="1.4"/>
+              <rect class="ds-metal-d" x="589" y="289" width="26" height="2.2"/>
+              <polygon class="ds-metal" points="586,289 602,276 618,289"/>
+              <polygon class="ds-shade" points="602,276 618,289 602,289"/>
+              <polyline class="ds-tripod" points="650,312 641,338"/><polyline class="ds-tripod" points="650,312 659,338"/><polyline class="ds-tripod" points="650,312 650,338"/>
+              <rect class="ds-meter" x="643" y="284" width="14" height="29" rx="4"/>
+              <rect class="ds-lcd" x="645" y="288" width="10" height="8" rx="1"/>
+              <g><rect class="ds-lvl" x="646.3" y="290" width="1.6" height="5"/><rect class="ds-lvl" x="649.2" y="290" width="1.6" height="5"/><rect class="ds-lvl" x="652.1" y="290" width="1.6" height="5"/></g>
+              <rect class="ds-metal-d" x="645.5" y="300" width="3.5" height="1.8" rx=".9"/><rect class="ds-metal-d" x="651" y="300" width="3.5" height="1.8" rx=".9"/><rect class="ds-metal-d" x="645.5" y="304" width="9" height="1.8" rx=".9"/>
+              <rect class="ds-metal" x="649" y="272" width="2" height="12"/>
+              <circle class="ds-ball" cx="650" cy="267" r="7"/>
+              <circle class="ds-ball-hl" cx="647.6" cy="264.6" r="2"/>
+              <g>
+                <path class="ds-wave" d="M660 261 Q664 267 660 273"/><path class="ds-wave" d="M660 261 Q664 267 660 273"/><path class="ds-wave" d="M660 261 Q664 267 660 273"/>
+                <path class="ds-wave ds-wave-l" d="M640 261 Q636 267 640 273"/><path class="ds-wave ds-wave-l" d="M640 261 Q636 267 640 273"/>
+              </g>
+            </g>
+          </svg>
+        </div>
+      </div>
       <div class="dash-stats-row" id="dashStats"></div>
       <div class="card" style="margin-top:16px;">
         <div class="sc-head">
@@ -2076,49 +2317,50 @@
      lama padahal kode sudah di-fix & di-merge — HTML biasanya kebaca fresh, tapi CSS/JS-nya sendiri
      ke-cache). Kalau ubah isi salah satu file lokal, bump angka ?v= di SEMUA tag ini sekaligus
      (cari-ganti versi lama -> versi baru) supaya browser user pasti ambil versi terbaru. -->
-<script src="assets/vendor/qrcode-generator.js?v=202610232200"></script>
-<script src="assets/vendor/xlsx.mini.min.js?v=202610232200"></script>
+<script src="assets/vendor/qrcode-generator.js?v=202610241600"></script>
+<script src="assets/vendor/xlsx.mini.min.js?v=202610241600"></script>
 
-<script src="assets/data/default-data.js?v=202610232200"></script>
-<script src="assets/data/brand-assets.js?v=202610232200"></script>
-<script src="assets/data/travel-routes.js?v=202610232200"></script>
-<script src="assets/js/00-icons.js?v=202610232200"></script>
-<script src="assets/js/01-state.js?v=202610232200"></script>
-<script src="assets/js/02-nav-util.js?v=202610232200"></script>
-<script src="assets/js/03-period-logic.js?v=202610232200"></script>
-<script src="assets/js/04-dashboard.js?v=202610232200"></script>
-<script src="assets/js/05-master-data.js?v=202610232200"></script>
-<script src="assets/js/06-plan-personil.js?v=202610232200"></script>
-<script src="assets/js/07-rules-planner.js?v=202610232200"></script>
-<script src="assets/js/08-gantt-print.js?v=202610232200"></script>
-<script src="assets/js/09-tracking-map.js?v=202610232200"></script>
-<script src="assets/js/10-running-hour.js?v=202610232200"></script>
-<script src="assets/js/11-berita-acara.js?v=202610232200"></script>
-<script src="assets/js/12-data-page.js?v=202610232200"></script>
-<script src="assets/js/13-hasil-db.js?v=202610232200"></script>
-<script src="assets/js/14-hasil-dashboard.js?v=202610232200"></script>
-<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610232200"></script>
-<script src="assets/js/15-simulasi-h2s.js?v=202610232200"></script>
-<script src="assets/js/16-actions-init.js?v=202610232200"></script>
-<script src="assets/js/17-dokumentasi-foto.js?v=202610232200"></script>
-<script src="assets/js/18-model-dispersi.js?v=202610232200"></script>
-<script src="assets/js/19-hasil-ambien.js?v=202610232200"></script>
-<script src="assets/js/20-ambien-dashboard.js?v=202610232200"></script>
-<script src="assets/js/21-aqi-ispu.js?v=202610232200"></script>
-<script src="assets/js/22-roadmap-pantau.js?v=202610232200"></script>
-<script src="assets/js/23-budget-proyeksi.js?v=202610232200"></script>
-<script src="assets/js/24-personil-ppu.js?v=202610232200"></script>
-<script src="assets/js/25-access-gate.js?v=202610232200"></script>
-<script src="assets/js/26-laboratorium.js?v=202610232200"></script>
-<script src="assets/js/27-laporan-emf.js?v=202610232200"></script>
-<script src="assets/js/28-word-export.js?v=202610232200"></script>
-<script src="assets/js/29-docx-export.js?v=202610232200"></script>
-<script src="assets/js/30-tracking-board.js?v=202610232200"></script>
-<script src="assets/js/31-wbs-gantt.js?v=202610232200"></script>
-<script src="assets/js/32-schedule-export.js?v=202610232200"></script>
-<script src="assets/js/33-hasil-import.js?v=202610232200"></script>
-<script src="assets/js/34-coa-reader.js?v=202610232200"></script>
-<script src="assets/js/35-ambien-import.js?v=202610232200"></script>
-<script src="assets/js/36-ui-experience.js?v=202610232200"></script>
+<script src="assets/data/default-data.js?v=202610241600"></script>
+<script src="assets/data/brand-assets.js?v=202610241600"></script>
+<script src="assets/data/travel-routes.js?v=202610241600"></script>
+<script src="assets/js/00-icons.js?v=202610241600"></script>
+<script src="assets/js/01-state.js?v=202610241600"></script>
+<script src="assets/js/02-nav-util.js?v=202610241600"></script>
+<script src="assets/js/03-period-logic.js?v=202610241600"></script>
+<script src="assets/js/04-dashboard.js?v=202610241600"></script>
+<script src="assets/js/05-master-data.js?v=202610241600"></script>
+<script src="assets/js/06-plan-personil.js?v=202610241600"></script>
+<script src="assets/js/07-rules-planner.js?v=202610241600"></script>
+<script src="assets/js/08-gantt-print.js?v=202610241600"></script>
+<script src="assets/js/09-tracking-map.js?v=202610241600"></script>
+<script src="assets/js/10-running-hour.js?v=202610241600"></script>
+<script src="assets/js/11-berita-acara.js?v=202610241600"></script>
+<script src="assets/js/12-data-page.js?v=202610241600"></script>
+<script src="assets/js/13-hasil-db.js?v=202610241600"></script>
+<script src="assets/js/14-hasil-dashboard.js?v=202610241600"></script>
+<script src="assets/js/14b-hasil-dashboard-analytics.js?v=202610241600"></script>
+<script src="assets/js/15-simulasi-h2s.js?v=202610241600"></script>
+<script src="assets/js/16-actions-init.js?v=202610241600"></script>
+<script src="assets/js/17-dokumentasi-foto.js?v=202610241600"></script>
+<script src="assets/js/18-model-dispersi.js?v=202610241600"></script>
+<script src="assets/js/19-hasil-ambien.js?v=202610241600"></script>
+<script src="assets/js/20-ambien-dashboard.js?v=202610241600"></script>
+<script src="assets/js/21-aqi-ispu.js?v=202610241600"></script>
+<script src="assets/js/22-roadmap-pantau.js?v=202610241600"></script>
+<script src="assets/js/23-budget-proyeksi.js?v=202610241600"></script>
+<script src="assets/js/24-personil-ppu.js?v=202610241600"></script>
+<script src="assets/js/25-access-gate.js?v=202610241600"></script>
+<script src="assets/js/26-laboratorium.js?v=202610241600"></script>
+<script src="assets/js/27-laporan-emf.js?v=202610241600"></script>
+<script src="assets/js/28-word-export.js?v=202610241600"></script>
+<script src="assets/js/29-docx-export.js?v=202610241600"></script>
+<script src="assets/js/30-tracking-board.js?v=202610241600"></script>
+<script src="assets/js/31-wbs-gantt.js?v=202610241600"></script>
+<script src="assets/js/32-schedule-export.js?v=202610241600"></script>
+<script src="assets/js/33-hasil-import.js?v=202610241600"></script>
+<script src="assets/js/34-coa-reader.js?v=202610241600"></script>
+<script src="assets/js/35-ambien-import.js?v=202610241600"></script>
+<script src="assets/js/36-ui-experience.js?v=202610241600"></script>
+<script src="assets/js/37-dash-scene.js?v=202610241600"></script>
 </body>
 </html>
