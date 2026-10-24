@@ -261,10 +261,16 @@ function renderBeritaAcara(){
       ? `ENV Site Supervisor site <b>${escHtml(site)}</b>: <b>${escHtml(sup.nama)}</b>${sup.telepon?" &middot; "+escHtml(sup.telepon):""} &mdash; <button type="button" class="btn small ghost" data-action="useEnvSupervisorName" data-site="${escHtml(site)}">Pakai nama ini</button>`
       : site ? `ENV Site Supervisor site <b>${escHtml(site)}</b> belum diisi — isi di menu Personil &rarr; ENV Site Supervisor.` : "";
   }
-  // Ketua Tim Sampling tidak lagi dicantumkan di kepala BA (sudah ada pada blok tanda tangan), jadi
-  // keterangannya di form ikut disembunyikan.
-  const ktEl = document.getElementById("baKetuaTimHint");
-  if(ktEl) ktEl.style.display = "none";
+  // Ketua Tim Sampling tidak dicantumkan di kepala BA (sudah ada pada blok tanda tangan). Keterangan
+  // di form sekarang khusus soal TTD-nya: siapa ketuanya, sudah punya TTD atau belum, dan apakah
+  // namanya cocok dgn penandatangan Lab (lihat 24b-ppc-ttd.js).
+  const ttdAutoEl = document.getElementById("baTtdAuto"), ttdCertEl = document.getElementById("baTtdCert");
+  if(ttdAutoEl && !ttdAutoEl.dataset.init){
+    ttdAutoEl.checked = cfg.ttdAuto!==false; ttdCertEl.checked = cfg.ttdCert!==false;
+    ttdAutoEl.dataset.init = "1";
+  }
+  if(ttdCertEl) ttdCertEl.disabled = !(ttdAutoEl && ttdAutoEl.checked);
+  baRefreshTtdHint();
   const pts = site ? baFilteredPoints(site, team, includeKebauan) : [];
   const titikHeader = team==="emisi" ? "Sumber Emisi (Titik Sampling)" : "Titik Sampling";
   // Tabel editor ringkas (No, Titik+kategori, Status) — kolom Lokasi/Kewajiban sudah terlihat di
@@ -419,7 +425,7 @@ function baCollectData(){
     kategori: kat,
     rows: grouped[kat].map(p=>({no: ++n, lokasi: `Lapangan ${site}`, kategori: kat, titik: p.nama, frekuensi: frekuensiTextFor(p), statusHtml: baStatusFor(p, batchId)}))
   }));
-  return {
+  const d = {
     team, includeKebauan, batchId, site, total: pts.length,
     judul: baTitleFor(team, includeKebauan),
     intro: `Dengan ini menyatakan, bahwa telah dilakukan pengukuran ${team==="emisi"?"emisi dari sumber tidak bergerak":"kualitas lingkungan"} dalam rangka Kegiatan Pengendalian Pencemaran ${team==="emisi"?"Udara":"Lingkungan"}, pada:`,
@@ -436,6 +442,50 @@ function baCollectData(){
     titikHeader: team==="emisi" ? "Sumber Emisi (Titik Sampling)" : "Titik Sampling",
     groups
   };
+  // TTD Ketua Tim Sampling (menu Personil → PPC) + sertifikat penandatanganan elektronik. Hanya aktif
+  // kalau status "ok" (ketua PPC punya TTD, fitur dinyalakan, nama penandatangan Lab cocok/kosong);
+  // selain itu d.ttd/d.cert null → keluaran BA PERSIS sama spt sebelum fitur ini ada.
+  d.ttd = null; d.cert = null;
+  if(typeof ppcTtdBaState==="function"){
+    const st = ppcTtdBaState(batchId, d.namaLab);
+    if(st.status==="ok"){
+      if(!d.namaLab.trim()) d.namaLab = st.nama;
+      d.ttd = {url: st.url, nama: st.nama};
+      if(st.opts.cert) d.cert = ppcTtdBuildCert(d, st, d.signedAt = new Date());
+    }
+  }
+  return d;
+}
+// Halaman terakhir: Sertifikat Tanda Tangan Elektronik (hanya kalau TTD Ketua Tim ditempel).
+// Isinya catatan penandatanganan INTERNAL (bukan tanda tangan digital bersertifikat PSrE) — teks
+// penjelasnya sengaja jujur soal itu supaya tidak disalahartikan sbg sertifikat elektronik resmi.
+function baCertHtml(d){
+  const c = d.cert, row = (k,v,cls)=>`<tr><td class="k">${k}</td><td class="c">:</td><td${cls?` class="${cls}"`:""}>${v}</td></tr>`;
+  const hashLines = h=>`${escHtml(h.slice(0,32))}<br>${escHtml(h.slice(32))}`;
+  return `<div class="pg-ba-cert">
+    <div class="pg-ba-cert-title">SERTIFIKAT TANDA TANGAN ELEKTRONIK</div>
+    <div class="pg-ba-cert-sub">${d.judul} &mdash; Lapangan ${escHtml(d.site)}</div>
+    <table class="pg-ba-cert-tbl">
+      ${row("ID Dokumen", escHtml(c.docId), "mono")}
+      ${row("Penandatangan", `${escHtml(c.signerName)}${c.signerRole?`, ${escHtml(c.signerRole)}`:""}`)}
+      ${row("Perusahaan", escHtml(c.company))}
+      ${row("Waktu penandatanganan", escHtml(c.signedAtText))}
+      ${row("Metode", "Gambar tanda tangan terdaftar pada sistem Emission Sampling Planner &amp; Tracker PT Pertamina Hulu Mahakam")}
+      ${row("SHA-256 isi dokumen", hashLines(c.hash), "mono")}
+      ${row("SHA-256 gambar TTD", hashLines(c.imgHash), "mono")}
+    </table>
+    <div class="pg-ba-cert-mid">
+      <div class="pg-ba-cert-sig"><img src="${d.ttd.url}" alt=""><div>Tanda tangan terdaftar</div></div>
+      <div class="pg-ba-cert-qr"><img src="${c.qrPng}" alt="QR verifikasi"><div>QR data verifikasi</div></div>
+    </div>
+    <div class="pg-ba-cert-flow-h">Alur penandatanganan</div>
+    <table class="pg-ba-cert-flow">
+      <tr><th>Penandatangan</th><th>Peran</th><th>Status</th></tr>
+      <tr><td>${escHtml(c.signerName)}</td><td>Ketua Tim Sampling &mdash; ${escHtml(c.company)}</td><td class="done">Telah ditandatangani &middot; ${escHtml(c.signedAtText)}</td></tr>
+      <tr><td>${escHtml(c.next.name||"(nama belum diisi)")}</td><td>${escHtml(c.next.role||`Environment Supervisor ${c.next.site}`)}</td><td class="wait">Menunggu tanda tangan</td></tr>
+    </table>
+    <div class="pg-ba-cert-note">Hash SHA-256 dihitung dari isi Berita Acara (judul, tanggal, daftar titik &amp; status, nama/jabatan penandatangan) dan dari gambar tanda tangan; perubahan sekecil apa pun pada isi menghasilkan hash berbeda. Sertifikat ini adalah catatan penandatanganan elektronik internal dari sistem tersebut di atas dan <b>bukan</b> tanda tangan digital bersertifikat (PSrE/PKI). Untuk kekuatan hukum tanda tangan digital tersertifikasi, tandatangani berkas PDF akhir dengan sertifikat elektronik resmi.</div>
+  </div>`;
 }
 function buildBeritaAcaraHtml(){
   const d = baCollectData();
@@ -497,12 +547,14 @@ function buildBeritaAcaraHtml(){
         <td style="width:50%;">PT Pertamina Hulu Mahakam, ${escHtml(d.site)}</td>
         <td style="width:50%;">${escHtml(d.labPerusahaan)}</td>
       </tr>
-      <tr><td class="sign-space"></td><td class="sign-space"></td></tr>
+      <tr><td class="sign-space"></td>${d.ttd
+        ? `<td class="sign-space has-ttd"><img class="pg-ba-ttd" src="${d.ttd.url}" alt="Tanda tangan ${escHtml(d.ttd.nama)}">${d.cert?`<div class="pg-ba-ttd-stamp">Ditandatangani elektronik &middot; ${escHtml(d.cert.docId)}</div>`:""}</td>`
+        : `<td class="sign-space"></td>`}</tr>
       <tr>
         <td><div class="sign-name">${escHtml(d.namaPhm)}</div><div>${escHtml(d.jabatanPhm)}</div></td>
         <td><div class="sign-name">${escHtml(d.namaLab)}</div><div>${escHtml(d.jabatanLab)}</div></td>
       </tr></table>
-    </div>
+    </div>${d.cert ? baCertHtml(d) : ""}
   </div>`;
 }
 // Nama file usulan dialog "Simpan sebagai PDF" saat print — browser memakai document.title
@@ -555,6 +607,24 @@ Object.values(BA_MARGIN_IDS).concat(["baShowPageNo"]).forEach(id=>{
     // Rapikan nilai di kolom setelah selesai mengetik (batas 5–50 mm).
     const k = Object.keys(BA_MARGIN_IDS).find(x=>BA_MARGIN_IDS[x]===id);
     if(k) el.value = baMargins()[k];
+  });
+});
+// Keterangan TTD di bawah isian Lab — dipanggil tiap render form DAN tiap ketikan di Nama
+// Penandatangan Lab (status cocok/tidak-cocok dgn Ketua Tim berubah seiring ketikan).
+function baRefreshTtdHint(){
+  const el = document.getElementById("baKetuaTimHint");
+  if(!el || typeof ppcTtdBaHintHtml!=="function") return;
+  el.innerHTML = ppcTtdBaHintHtml(document.getElementById("baBatch").value, document.getElementById("baNamaLab").value);
+}
+document.getElementById("baNamaLab").addEventListener("input", baRefreshTtdHint);
+["baTtdAuto","baTtdCert"].forEach(id=>{
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.addEventListener("change", ()=>{
+    const cfg = ensureBaConfig();
+    cfg.ttdAuto = document.getElementById("baTtdAuto").checked;
+    cfg.ttdCert = document.getElementById("baTtdCert").checked;
+    save(); renderBeritaAcara();
   });
 });
 function baResetMargins(){

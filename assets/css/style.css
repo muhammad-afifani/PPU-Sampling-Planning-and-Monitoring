@@ -3228,3 +3228,54 @@ table.daygrid{background:transparent !important;border-spacing:3px 4px !importan
 @media (max-width:1100px){ .amb-hours{grid-template-columns:repeat(6,minmax(0,1fr));} .amb-noise-sum{grid-template-columns:repeat(2,minmax(0,1fr));} .amb-cuaca{grid-template-columns:repeat(3,minmax(0,1fr));} .amb-comp-grid{grid-template-columns:repeat(2,minmax(0,1fr));} }
 :root[data-theme="dark"] .amb-hours label.night{color:#c4b5fd;}
 .amb-hours label.night input{color:var(--ms-text,inherit);}
+
+/* =========================================================
+   TTD PPC — kolom tanda tangan BA, halaman Sertifikat Tanda Tangan Elektronik (cetak/PDF + pratinjau
+   kertas), serta UI form Personil & form BA (lihat 24b-ppc-ttd.js)
+========================================================= */
+.pg-ba-sign .sign-space.has-ttd{height:auto;min-height:64px;vertical-align:middle;padding:2px 4px;}
+.pg-ba-ttd{display:block;margin:0 auto;max-height:58px;max-width:175px;width:auto;height:auto;}
+.pg-ba-ttd-stamp{margin-top:2px;font-size:6.5px;line-height:1.25;color:#666;letter-spacing:.01em;word-break:break-all;}
+.pg-ba-cert{page-break-before:always;break-before:page;font-size:11px;color:#111;padding-top:4px;}
+.pg-ba-cert-title{text-align:center;font-weight:800;font-size:15px;letter-spacing:.04em;}
+.pg-ba-cert-sub{text-align:center;color:#555;font-size:10.5px;margin:4px 0 12px;padding-bottom:10px;border-bottom:1.5px solid #333;}
+.pg-ba-cert-tbl{width:100%;border-collapse:collapse;font-size:10.5px;}
+.pg-ba-cert-tbl td{border:none;border-bottom:1px solid #ddd;padding:5px 3px;vertical-align:top;}
+.pg-ba-cert-tbl td.k{width:150px;font-weight:700;color:#444;}
+.pg-ba-cert-tbl td.c{width:10px;}
+.pg-ba-cert-tbl td.mono{font-family:"Courier New",Consolas,monospace;font-size:10px;word-break:break-all;}
+.pg-ba-cert-mid{display:flex;justify-content:space-around;align-items:flex-end;gap:16px;margin:16px 0 6px;}
+.pg-ba-cert-mid > div{text-align:center;font-size:9px;color:#666;}
+.pg-ba-cert-sig img{display:block;margin:0 auto 4px;max-height:78px;max-width:190px;}
+.pg-ba-cert-qr img{display:block;margin:0 auto 4px;width:112px;height:112px;}
+.pg-ba-cert-flow-h{font-weight:800;margin:14px 0 6px;font-size:11px;}
+.pg-ba-cert-flow{width:100%;border-collapse:collapse;font-size:10px;}
+.pg-ba-cert-flow th,.pg-ba-cert-flow td{border:1px solid #999;padding:5px 7px;text-align:left;vertical-align:top;}
+.pg-ba-cert-flow th{background:#f2f2f2;position:static;color:#111;font-size:10px;text-transform:none;letter-spacing:0;}
+.pg-ba-cert-flow td.done{color:#1c7a4f;font-weight:700;}
+.pg-ba-cert-flow td.wait{color:#9a5a06;font-weight:700;}
+.pg-ba-cert-note{margin-top:14px;font-size:9px;line-height:1.5;color:#555;font-style:italic;}
+
+/* Form BA */
+.ba-ttd-opts{display:flex;flex-direction:column;gap:6px;margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--gray-100);}
+.ba-ttd-hint{line-height:1.55;}
+.ba-ttd-hint .btn{margin-left:4px;vertical-align:middle;}
+.ba-ttd-ok{color:#1c7a4f;font-weight:600;}
+.ba-ttd-warn{color:#9a5a06;font-weight:600;}
+.ba-ttd-thumb{display:block;margin-top:6px;max-height:44px;max-width:150px;padding:4px 8px;border:1px dashed var(--gray-300);border-radius:8px;background:#fff;}
+:root[data-theme="dark"] .ba-ttd-ok{color:#5fd39a;} :root[data-theme="dark"] .ba-ttd-warn{color:#f0b565;}
+
+/* Form Personil */
+.pz-ttd{margin-top:12px;padding:12px 14px;border:1px solid var(--gray-200);border-radius:12px;background:var(--gray-100);}
+.pz-ttd[hidden]{display:none;}
+.pz-ttd-lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--gray-500);margin-bottom:8px;}
+.pz-ttd-row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
+.pz-ttd-preview{width:210px;height:92px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--gray-300);border-radius:10px;font-size:12px;
+  background:conic-gradient(#f1f1f1 25%,#fff 0 50%,#f1f1f1 0 75%,#fff 0) 0 0/14px 14px;}
+.pz-ttd-preview img{max-width:100%;max-height:100%;object-fit:contain;}
+.pz-ttd-ctl{display:flex;flex-direction:column;gap:8px;min-width:0;}
+.pz-ttd-ctl input[type=file]{max-width:100%;font-size:12px;}
+.pz-ttd-chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;font-size:10px;font-weight:700;background:var(--gray-200);color:var(--gray-500);white-space:nowrap;}
+.pz-ttd-chip.has{background:#d7f0e2;color:#1c7a4f;}
+:root[data-theme="dark"] .pz-ttd-chip.has{background:#173a2a;color:#5fd39a;}
+.pz-subline .pz-ttd-chip{margin-left:6px;}

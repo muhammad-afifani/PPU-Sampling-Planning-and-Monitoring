@@ -62,7 +62,8 @@ function dxHtmlToText(html){ const t = document.createElement("textarea"); t.inn
 function dxRun(text, o){
   o = o||{};
   const rpr = [];
-  // Urutan elemen mengikuti skema OOXML (b, i, color, sz, u) — Word ketat soal urutan ini.
+  // Urutan elemen mengikuti skema OOXML (rFonts, b, i, color, sz, u) — Word ketat soal urutan ini.
+  if(o.mono) rpr.push('<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/>');
   if(o.b) rpr.push("<w:b/>");
   if(o.i) rpr.push("<w:i/>");
   if(o.color) rpr.push(`<w:color w:val="${o.color}"/>`);
@@ -77,6 +78,7 @@ function dxP(runs, o){
   const ppr = [];
   if(o.keepNext) ppr.push("<w:keepNext/>");
   if(o.keepLines) ppr.push("<w:keepLines/>");
+  if(o.pageBreakBefore) ppr.push("<w:pageBreakBefore/>");
   if(o.borderBottom) ppr.push(`<w:pBdr><w:bottom w:val="single" w:sz="${o.borderBottom}" w:space="4" w:color="333333"/></w:pBdr>`);
   ppr.push(`<w:spacing w:before="${o.before||0}" w:after="${o.after||0}"${o.line?` w:line="${o.line}" w:lineRule="auto"`:""}/>`);
   if(o.ind) ppr.push(`<w:ind w:left="${o.ind}"/>`);
@@ -132,6 +134,65 @@ const DX_PAGE = {w:11906, h:16838};                     // A4 potret
 const dxMm = mm=>Math.round(mm*56.6929);                // mm -> twips
 // Satu field Word sederhana (PAGE / NUMPAGES) dgn teks cadangan.
 function dxField(instr, fallback, o){ return `<w:fldSimple w:instr=" ${instr} ">${dxRun(fallback,o)}</w:fldSimple>`; }
+// Sel tanda tangan Ketua Tim: gambar TTD (maks 4,6 x 1,75 cm, rasio asli) + cap kecil ID dokumen.
+function dxSignatureCell(sigImg, d){
+  const EMU_CM = 360000, maxW = 4.6*EMU_CM, maxH = 1.75*EMU_CM;
+  const k = Math.min(maxW/sigImg.px.w, maxH/sigImg.px.h);
+  const img = dxP(dxImage("rIdImg4", 4, "Tanda tangan Ketua Tim", Math.round(sigImg.px.w*k), Math.round(sigImg.px.h*k)), {jc:"center", keepNext:true});
+  const stamp = d.cert ? dxP(dxRun(`Ditandatangani elektronik · ${d.cert.docId}`, {sz:11, color:"666666"}), {jc:"center", keepNext:true}) : "";
+  return img + stamp;
+}
+// Halaman terakhir: Sertifikat Tanda Tangan Elektronik (isi sama dgn baCertHtml di 11-berita-acara.js).
+function dxCertificateBody(body, d, sigImg, qrImg, CW, noBorders){
+  const c = d.cert, EMU_CM = 360000, SZ = 18;
+  body.push(dxP(dxRun("SERTIFIKAT TANDA TANGAN ELEKTRONIK",{b:true,sz:26}),{jc:"center",pageBreakBefore:true,after:40}));
+  body.push(dxP(dxRun(`${dxHtmlToText(d.judul)} — Lapangan ${d.site}`,{sz:19,color:"555555"}),{jc:"center",after:200,borderBottom:12}));
+  const kw = [2500, 260, CW-2760];
+  const fields = [
+    ["ID Dokumen", c.docId, true],
+    ["Penandatangan", `${c.signerName}${c.signerRole?`, ${c.signerRole}`:""}`],
+    ["Perusahaan", c.company],
+    ["Waktu penandatanganan", c.signedAtText],
+    ["Metode", "Gambar tanda tangan terdaftar pada sistem Emission Sampling Planner & Tracker PT Pertamina Hulu Mahakam"],
+    ["SHA-256 isi dokumen", c.hash, true],
+    ["SHA-256 gambar TTD", c.imgHash, true]
+  ];
+  const lineB = dxBorder("bottom",4,"DDDDDD");
+  body.push(dxTable(kw, fields.map(([k,v,mono])=>dxRow([
+    dxCell(kw[0], dxP(dxRun(k,{sz:SZ,b:true,color:"444444"})), {vAlign:"top",borders:lineB}),
+    dxCell(kw[1], dxP(dxRun(":",{sz:SZ})), {vAlign:"top",borders:lineB}),
+    dxCell(kw[2], dxP(dxRun(v,{sz:mono?16:SZ,mono})), {vAlign:"top",borders:lineB})
+  ])), {borders:noBorders, cellMar:{top:70,bottom:70,left:40,right:40}}));
+  // TTD terdaftar (kiri) + QR (kanan)
+  const half = Math.floor(CW/2), half2 = CW-half;
+  const sk = Math.min(5.2*EMU_CM/sigImg.px.w, 2.2*EMU_CM/sigImg.px.h), qs = Math.round(3.4*EMU_CM);
+  const cap = t=>dxP(dxRun(t,{sz:15,color:"666666"}),{jc:"center",before:40});
+  body.push(dxP("",{markSz:12}));
+  body.push(dxTable([half,half2],[dxRow([
+    dxCell(half, dxP(dxImage("rIdImg4",5,"Tanda tangan terdaftar",Math.round(sigImg.px.w*sk),Math.round(sigImg.px.h*sk)),{jc:"center"})+cap("Tanda tangan terdaftar"), {vAlign:"bottom"}),
+    dxCell(half2, dxP(dxImage("rIdImg5",6,"QR verifikasi",qs,qs),{jc:"center"})+cap("QR data verifikasi"), {vAlign:"bottom"})
+  ])], {borders:noBorders, cellMar:{top:60,bottom:60,left:60,right:60}}));
+  // Alur penandatanganan
+  body.push(dxP(dxRun("Alur penandatanganan",{b:true,sz:SZ}),{before:200,after:80,keepNext:true}));
+  const fw = [2600, 3300, CW-5900];
+  const gb = ["top","left","bottom","right"].map(s=>dxBorder(s,4,"999999")).join("");
+  const head = ["Penandatangan","Peran","Status"];
+  const flowRows = [
+    dxRow(head.map((h,i)=>dxCell(fw[i], dxP(dxRun(h,{b:true,sz:16})), {borders:gb,fill:"F2F2F2"}))),
+    dxRow([
+      dxCell(fw[0], dxP(dxRun(c.signerName,{sz:16})), {borders:gb}),
+      dxCell(fw[1], dxP(dxRun(`Ketua Tim Sampling — ${c.company}`,{sz:16})), {borders:gb}),
+      dxCell(fw[2], dxP(dxRun(`Telah ditandatangani · ${c.signedAtText}`,{sz:16,color:"1C7A4F",b:true})), {borders:gb})
+    ]),
+    dxRow([
+      dxCell(fw[0], dxP(dxRun(c.next.name||"(nama belum diisi)",{sz:16})), {borders:gb}),
+      dxCell(fw[1], dxP(dxRun(c.next.role||`Environment Supervisor ${c.next.site}`,{sz:16})), {borders:gb}),
+      dxCell(fw[2], dxP(dxRun("Menunggu tanda tangan",{sz:16,color:"9A5A06",b:true})), {borders:gb})
+    ])
+  ];
+  body.push(dxTable(fw, flowRows, {borders:gb, cellMar:{top:60,bottom:60,left:90,right:90}}));
+  body.push(dxP(dxRun("Hash SHA-256 dihitung dari isi Berita Acara (judul, tanggal, daftar titik & status, nama/jabatan penandatangan) dan dari gambar tanda tangan; perubahan sekecil apa pun pada isi menghasilkan hash berbeda. Sertifikat ini adalah catatan penandatanganan elektronik internal dari sistem tersebut di atas dan bukan tanda tangan digital bersertifikat (PSrE/PKI). Untuk kekuatan hukum tanda tangan digital tersertifikasi, tandatangani berkas PDF akhir dengan sertifikat elektronik resmi.",{i:true,sz:15,color:"555555"}),{before:200,line:260}));
+}
 function dxBuildBeritaAcara(d){
   const M = d.margins || {top:18,right:18,bottom:18,left:18};
   const DX_CONTENT_W = DX_PAGE.w - dxMm(M.left) - dxMm(M.right);
@@ -140,6 +201,10 @@ function dxBuildBeritaAcara(d){
   const logoL = reg("rIdImg1","logo-skkmigas.png", LOGO_SKKMIGAS_B64);
   const logoR = reg("rIdImg2","logo-phm.png", LOGO_PHM_B64);
   const band = reg("rIdImg3","footer-band.png", FOOTER_BAND_B64);
+  // TTD Ketua Tim + QR sertifikat (24b-ppc-ttd.js) — hanya ada kalau d.ttd/d.cert terisi; selain itu
+  // XML yang dihasilkan PERSIS sama dgn sebelum fitur ini.
+  const sigImg = d.ttd ? reg("rIdImg4","ttd-ketua-tim.png", d.ttd.url) : null;
+  const qrImg = d.cert ? reg("rIdImg5","qr-sertifikat.png", d.cert.qrPng) : null;
   const EMU_CM = 360000;
   const logoH = 1.55*EMU_CM;  // tinggi logo ≈ 60px cetak
   const sizeByH = im=>({cx:Math.round(logoH*im.px.w/im.px.h), cy:Math.round(logoH)});
@@ -198,9 +263,10 @@ function dxBuildBeritaAcara(d){
   const cp = (txt,o)=>dxP(dxRun(txt,Object.assign({sz:19},o||{})),{jc:"center",keepNext:true});
   body.push(dxTable(sw, [
     dxRow([dxCell(sw[0], cp(`PT Pertamina Hulu Mahakam, ${d.site}`)), dxCell(sw[1], cp(d.labPerusahaan))]),
-    dxRow([dxCell(sw[0], dxP("",{keepNext:true}), {}), dxCell(sw[1], dxP("",{keepNext:true}), {})], {height:1300}),
+    dxRow([dxCell(sw[0], dxP("",{keepNext:true}), {}), dxCell(sw[1], sigImg ? dxSignatureCell(sigImg, d) : dxP("",{keepNext:true}), {})], {height:1300}),
     dxRow([dxCell(sw[0], cp(d.namaPhm,{b:true,u:true})+cp(d.jabatanPhm)), dxCell(sw[1], cp(d.namaLab,{b:true,u:true})+cp(d.jabatanLab))], {})
   ], {borders:noBorders, cellMar:{top:30,bottom:30,left:60,right:60}}));
+  if(d.cert && sigImg && qrImg) dxCertificateBody(body, d, sigImg, qrImg, DX_CONTENT_W, noBorders);
   body.push(dxP("",{}));  // paragraf penutup wajib setelah tabel
 
   const bandSz = band ? {cx:Math.round(DX_CONTENT_W/1440*914400), cy:Math.round(DX_CONTENT_W/1440*914400*band.px.h/band.px.w)} : {cx:1,cy:1};
