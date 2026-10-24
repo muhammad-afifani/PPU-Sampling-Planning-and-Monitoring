@@ -550,3 +550,12 @@ table.dsm tbody tr:hover td{background:color-mix(in srgb,var(--ux-blue) 6%,var(-
 }
 
 } /* end @media screen */
+
+/* Elemen yang DITEMPEL ke <body> oleh 36-ui-experience.js (palet perintah, garis progres scroll,
+   defs filter SVG) berada di luar .app, jadi tidak ikut tersembunyi oleh aturan cetak di style.css
+   (#toastStack, .app, #overlay) — dan karena aturan tampilannya dibungkus @media screen, saat
+   cetak ia muncul tanpa gaya di ujung dokumen. Sengaja DI LUAR blok @media screen di atas. */
+@media print{
+  .ux-cmd,.ux-scroll-progress,.ux-scrim,.ux-liquid-layer,body > svg[aria-hidden="true"]{display:none !important;}
+}
+
