@@ -1,125 +1,292 @@
 /* =========================================================
-   DASHBOARD SCENE — latar animasi 2D di header Dashboard
+   DASHBOARD SCENE — diorama 2.5D area operasi PHM di header Dashboard
    ---------------------------------------------------------
-   Ilustrasi flat (turbin gas, glycol reboiler, flare, diesel/gas engine + HVAS & noise meter)
-   yang asapnya naik & tertiup ke kiri, lewat di belakang judul dan topbar. Aturan main:
-   1. Dekorasi murni — markup di #dashScene (index.html), state scene/jeda di 37-dash-scene.js.
-      Tidak menyentuh data maupun fungsi app lain.
-   2. Semua kelas diberi prefix "ds-"/"dscene" supaya tidak bentrok dgn kelas lama (.red, .stat …).
-   3. Warna lewat token --ds-* yang di-scope ke .dscene; tema gelap ikut :root[data-theme="dark"].
-   4. Dibungkus @media screen (cetak tidak terpengaruh). prefers-reduced-motion → scene diam.
-   5. Animasi CSS saja (transform/opacity), tanpa JS per frame. Unit translate di keyframes =
-      unit viewBox SVG (680×360), bukan px layar.
+   Satu "balok" diorama (gaya isometrik/potongan melintang): darat (pemantauan ambien, SPS tank
+   farm & proses, sumber emisi: turbin gas, glycol reboiler, diesel/gas engine, flare) → rawa
+   (swamp platform) → laut (offshore platform, jack-up rig), lengkap dgn lapisan tanah, air
+   tembus pandang & reservoir minyak. Klik area/hotspot → kamera zoom ke area itu + kartu detail
+   berisi angka titik wajib pantau asli (lihat 37-dash-scene.js). Aturan main:
+   1. Dekorasi + navigasi ringan saja — tidak mengubah data/fungsi app lain. Markup di #dashScene
+      (index.html), digenerate dari bentuk primitif (kotak 3 sisi, silinder) supaya rapi.
+   2. Kelas berprefix "ds-"/"dio-"/"dscene"; material kotak/silinder pakai kelas m* dgn 3 token
+      warna sisi (--t atas, --f depan, --s samping) supaya tema gelap cukup menimpa token.
+   3. Dibungkus @media screen (cetak tidak terpengaruh). prefers-reduced-motion → scene diam,
+      zoom tanpa transisi.
+   4. Unit translate di keyframes & transform kamera = unit viewBox SVG (1600×380), bukan px layar.
 ========================================================= */
 @media screen{
 
 /* ---------- Token ---------- */
 .dscene{
-  --ds-h1:#e7eed4; --ds-h2:#dbe7bc; --ds-h3:#cfe0a1;
-  --ds-tree:#a9d046; --ds-tree2:#8dba2c; --ds-trunk:#8a6a4b;
-  --ds-stack:#fbfbf8; --ds-shade:rgba(15,23,41,.09); --ds-red:#e2453c; --ds-red-d:#b8322b;
-  --ds-metal:#b7bfc8; --ds-metal-l:#dde1e5; --ds-metal-d:#6b7685; --ds-enc:#e4e8e2;
-  --ds-eng:#1c3150; --ds-eng2:#243d61;
-  --ds-glycol:#6f9fcf; --ds-glycol2:#4d7fb2; --ds-meter:#efe6c8;
   --ds-smoke-sh:#c4cad2; --ds-smoke-hl:#dfe3e8; --ds-steam-sh:#e6eaee; --ds-steam-hl:#ffffff;
   --ds-soot1:#20242b; --ds-soot2:#5a616c; --ds-soot3:#a6adb7; --ds-soot-hl1:#383d46; --ds-soot-hl3:#c3c8cf;
   --ds-eng-sh:#5a616c; --ds-eng-hl:#7d848e;
+  --ds-metal:#b7bfc8; --ds-metal-d:#6b7685;
+  --ds-glycol:#6f9fcf; --ds-meter:#efe6c8;
   --ds-cloud:#ffffff; --ds-sun:#ffd25e; --ds-halo:rgba(255,210,94,.22);
-  --ds-haze:#c9d0d8; --ds-haze-op:.5; --ds-gshadow:rgba(15,23,41,.12); --ds-star:0; --ds-glow-op:.55;
+  --ds-haze:#c9d0d8; --ds-haze-op:.45; --ds-star:0; --ds-glow-op:.55;
+
+  --dio-land:#cfe3a3; --dio-beach:#efe0b5; --dio-road:#e8e3d4; --dio-grass:#8cc04a;
+  --dio-soil:#b07b4f; --dio-sand:#e2c792; --dio-rock:#8b6c54; --dio-mud:#7f6b52;
+  --dio-swamp:#98b39a; --dio-swamp-f:#7b9a86; --dio-sea:#7bbfeb; --dio-wg0:#6db3e6; --dio-wg1:#2f73b5;
+  --dio-side-water:#2f6fae; --dio-side-sand:#c4a873; --dio-side-rock:#6c523f;
+  --dio-oil:#1c1d22; --dio-shadow:rgba(15,23,41,.13); --dio-gshadow:rgba(15,23,41,.14);
+  --dio-leaf:#8fc23b; --dio-leaf-hl:#b5dc5c; --dio-trunk:#8a6a4b; --dio-mg1:#4f8f3a; --dio-mg2:#6aa84a; --dio-root:#6b5a43;
+  --dio-tank-rim:#c98a5d; --dio-tank-in:#e9e3d6; --dio-tank-roof:#d8d1c1; --dio-bund:#cfcab9;
+  --dio-win:#9cc7e8; --dio-yellow:#f4c22e; --dio-yellow-d:#d6a213; --dio-lat-k:#2f3540; --dio-derrick:#8d97a4;
+  --dio-helideck:#3d8f5a; --dio-hull:#1f2329;
+  --dio-zoom-bg:linear-gradient(180deg,#e7f0f6 0%,#eef3ee 70%,#f3f4f0 100%);
 }
 :root[data-theme="dark"] .dscene{
-  --ds-h1:#111b2b; --ds-h2:#142134; --ds-h3:#18283e;
-  --ds-tree:#5d7d22; --ds-tree2:#4b6819; --ds-trunk:#4a3a2b;
-  --ds-stack:#c9d0d9; --ds-shade:rgba(0,0,0,.28); --ds-red:#c8473f; --ds-red-d:#9c3029;
-  --ds-metal:#7d8796; --ds-metal-l:#98a1ae; --ds-metal-d:#4b5565; --ds-enc:#8a94a3;
-  --ds-eng:#243d61; --ds-eng2:#2a4670;
-  --ds-glycol:#3b6a9a; --ds-glycol2:#2c5580; --ds-meter:#c9c0a2;
   --ds-smoke-sh:#364256; --ds-smoke-hl:#465369; --ds-steam-sh:#566378; --ds-steam-hl:#6f7c93;
   --ds-soot1:#04060a; --ds-soot2:#262d39; --ds-soot3:#3f495b; --ds-soot-hl1:#12161d; --ds-soot-hl3:#525d70;
   --ds-eng-sh:#1b212b; --ds-eng-hl:#2f3743;
+  --ds-metal:#7d8796; --ds-metal-d:#4b5565;
+  --ds-glycol:#3b6a9a; --ds-meter:#c9c0a2;
   --ds-cloud:#1a2740; --ds-sun:#e8edf5; --ds-halo:rgba(232,237,245,.10);
-  --ds-haze:#25314a; --ds-haze-op:.65; --ds-gshadow:rgba(0,0,0,.45); --ds-star:1; --ds-glow-op:.75;
+  --ds-haze:#25314a; --ds-haze-op:.6; --ds-star:1; --ds-glow-op:.8;
+
+  --dio-land:#2b4630; --dio-beach:#6f6448; --dio-road:#3a4150; --dio-grass:#3c6b2c;
+  --dio-soil:#5b402c; --dio-sand:#7a6847; --dio-rock:#4a3a2e; --dio-mud:#3f3528;
+  --dio-swamp:#2f4a43; --dio-swamp-f:#26403a; --dio-sea:#1f4f80; --dio-wg0:#275d93; --dio-wg1:#143a63;
+  --dio-side-water:#143a63; --dio-side-sand:#5d5036; --dio-side-rock:#33281f;
+  --dio-oil:#050608; --dio-shadow:rgba(0,0,0,.4); --dio-gshadow:rgba(0,0,0,.4);
+  --dio-leaf:#4f7a24; --dio-leaf-hl:#6b9a32; --dio-trunk:#4a3a2b; --dio-mg1:#2f5a26; --dio-mg2:#3f7231; --dio-root:#4a3d2d;
+  --dio-tank-rim:#8c5a3a; --dio-tank-in:#8d8a83; --dio-tank-roof:#77746e; --dio-bund:#4b4f57;
+  --dio-win:#6d97b8; --dio-yellow:#c49a22; --dio-yellow-d:#9c7a14; --dio-lat-k:#9aa3b0; --dio-derrick:#c3ccd9;
+  --dio-helideck:#2c6a43; --dio-hull:#0b0d10;
+  --dio-zoom-bg:linear-gradient(180deg,#101a2b 0%,#0d1422 70%,#0a0e16 100%);
 }
+
+/* Material 3 sisi (atas/depan/samping) */
+.dio-svg .t{fill:var(--t);}.dio-svg .f{fill:var(--f);}.dio-svg .s{fill:var(--s);}
+.mW{--t:#ffffff;--f:#eef0ec;--s:#d3d8d2;}
+.mWs{--t:#ffffff;--f:#f7f7f3;--s:#d9dcd6;}
+.mS{--t:#eef1f3;--f:#d5dbe0;--s:#b4bcc5;}
+.mD{--t:#8e99a6;--f:#6b7685;--s:#535d6b;}
+.mY{--t:#ffd95a;--f:#f4c22e;--s:#d6a213;}
+.mN{--t:#2f4b77;--f:#1c3150;--s:#13233c;}
+.mG{--t:#f1f3ee;--f:#e0e5dc;--s:#c7cec3;}
+.mC{--t:#e6e3db;--f:#d0ccc2;--s:#b7b2a6;}
+.mR,.mRs{--t:#f2776c;--f:#e2453c;--s:#b8322b;}
+.mRd{--t:#c43a31;--f:#a92f27;--s:#8a241d;}
+.mT{--t:#d6905f;--f:#b8673b;--s:#8f4a28;}
+.mO{--t:#ffb15e;--f:#f5902c;--s:#cf6f13;}
+.mB{--t:#7cb5ec;--f:#3f86d6;--s:#2a62a3;}
+:root[data-theme="dark"] .dscene .mW{--t:#c9d0d9;--f:#aeb7c3;--s:#8f99a6;}
+:root[data-theme="dark"] .dscene .mWs{--t:#d4d9e0;--f:#bcc3cc;--s:#9aa2ad;}
+:root[data-theme="dark"] .dscene .mS{--t:#a9b2bd;--f:#8d97a4;--s:#717b88;}
+:root[data-theme="dark"] .dscene .mD{--t:#6b7685;--f:#525c6b;--s:#3e4755;}
+:root[data-theme="dark"] .dscene .mY{--t:#d8b43e;--f:#c49a22;--s:#9c7a14;}
+:root[data-theme="dark"] .dscene .mN{--t:#35527f;--f:#243d61;--s:#182b47;}
+:root[data-theme="dark"] .dscene .mG{--t:#a7b0a4;--f:#8e9890;--s:#747e77;}
+:root[data-theme="dark"] .dscene .mC{--t:#7b7f86;--f:#646870;--s:#4e525a;}
+:root[data-theme="dark"] .dscene :is(.mR,.mRs){--t:#d0574d;--f:#b83c33;--s:#922d26;}
+:root[data-theme="dark"] .dscene .mRd{--t:#9c3029;--f:#842820;--s:#6a1f19;}
+:root[data-theme="dark"] .dscene .mT{--t:#a86e48;--f:#8c4f2e;--s:#6b3a20;}
+:root[data-theme="dark"] .dscene .mO{--t:#d58a3f;--f:#c0711f;--s:#99590f;}
+:root[data-theme="dark"] .dscene .mB{--t:#4f86c2;--f:#2f68a8;--s:#204c80;}
 
 /* ---------- Layout header ---------- */
 /* Topbar di atas lapisan scene → asap lewat DI BELAKANG tombol topbar, bukan menutupinya. */
 .main > .ux-topbar{position:relative;z-index:3;}
-/* Banner lebar & pendek: teks di kiri, scene menempel kanan-bawah setinggi header. viewBox SVG
-   melebar ke kiri (-760..680) berisi lanskap yg dipudarkan, jadi animasi terasa selebar header tanpa
-   menambah tinggi. Bagian atas box naik ±20px ke celah di bawah topbar (unit tetap di bawah topbar). */
-.pagehead.dscene{position:relative;display:block;margin-bottom:18px;}
-.dscene-text{position:relative;z-index:2;max-width:560px;min-height:148px;display:flex;flex-direction:column;padding-top:4px;}
-.dscene-box{position:absolute;z-index:1;right:0;bottom:0;width:672px;height:168px;pointer-events:none;}
-.dscene-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;}
-.dscene-ground{
-  -webkit-mask-image:linear-gradient(to right,transparent 0,#000 38%),linear-gradient(to bottom,#000 86%,transparent 100%);
-  -webkit-mask-composite:source-in;
-  mask-image:linear-gradient(to right,transparent 0,#000 38%),linear-gradient(to bottom,#000 86%,transparent 100%);
-  mask-composite:intersect;
+.pagehead.dscene{position:relative;display:block;margin-bottom:14px;container:dscene / inline-size;}
+.dscene-text{position:relative;z-index:3;padding:2px 0 10px;transition:opacity var(--ux-d3) var(--ux-ease-out),transform var(--ux-d3) var(--ux-ease-out);}
+.dscene-hint{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;font-weight:550;color:var(--ux-muted);}
+.dscene-hint svg{flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.dio{position:relative;z-index:1;}
+.dio-stage{position:relative;width:100%;aspect-ratio:1600/380;border-radius:18px;transition:background var(--ux-d4) var(--ux-ease-out),box-shadow var(--ux-d4) var(--ux-ease-out);}
+.dio-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;}
+.dio-cam{transform-box:view-box;transform-origin:0 0;transition:transform 900ms cubic-bezier(.22,1,.36,1);}
+/* Judul menumpang di langit kiri diorama bila banner cukup lebar (unit tinggi mulai x≈690). */
+@container dscene (min-width:900px){
+  .dscene-text{position:absolute;left:0;top:0;max-width:360px;pointer-events:none;}
+  .dscene.is-zoom .dscene-text{opacity:0;transform:translateY(-6px);}
+}
+@container dscene (min-width:1040px){
+  .dscene-text{max-width:470px;}
 }
 /* Kabut tipis yang hanyut pelan di belakang judul & topbar. */
-.dscene-haze{position:absolute;left:0;right:0;top:-110px;height:330px;overflow:hidden;pointer-events:none;z-index:0;opacity:var(--ds-haze-op);
+.dscene-haze{position:absolute;left:0;right:0;top:-110px;height:300px;overflow:hidden;pointer-events:none;z-index:0;opacity:var(--ds-haze-op);
   -webkit-mask-image:linear-gradient(to bottom,#000 55%,transparent);mask-image:linear-gradient(to bottom,#000 55%,transparent);}
 .dscene-haze-track{display:flex;width:200%;height:100%;filter:blur(20px);animation:dsHaze 70s linear infinite;}
 .dscene-haze-track svg{flex:0 0 50%;width:50%;height:100%;}
 .dscene-haze-track ellipse{fill:var(--ds-haze);}
 
-/* ---------- Pemilih scene ---------- */
-.dscene-ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:auto;padding-top:14px;}
-.dscene-ctrl-lbl{font-size:10.5px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--ux-muted);}
-.dscene-seg{display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:3px;border-radius:var(--ux-r-md);background:color-mix(in srgb,var(--ux-surface) 78%,transparent);border:1px solid var(--ux-line);box-shadow:var(--ux-shadow-1);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);}
-.dscene-seg button{height:30px;padding:0 9px;border:0;border-radius:8px;background:transparent;color:var(--ux-ink-2);font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background var(--ux-d2),color var(--ux-d2);}
-.dscene-seg button:hover{color:var(--ux-ink);background:var(--ux-surface-2);}
-.dscene-seg button[aria-pressed="true"]:not(.dscene-pause){background:var(--ux-select-bg);color:var(--ux-select-fg);}
-.dscene-seg .dscene-pause{width:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;}
-.dscene-pause svg{fill:currentColor;}
-.dscene-pause .dscene-ico-play,.dscene.is-paused .dscene-pause .dscene-ico-pause{display:none;}
-.dscene.is-paused .dscene-pause .dscene-ico-play{display:block;}
+/* Diorama di luar layar (scroll ke bawah) → semua animasi dijeda, hemat CPU (37-dash-scene.js). */
+.dscene.is-offscreen *,.dscene.is-offscreen *::before{animation-play-state:paused!important;}
 
-/* ---------- Visibilitas & posisi per scene ---------- */
-.ds-g-gtg,.ds-g-reb,.ds-g-eng,.ds-g-flare,.ds-rack{display:none;}
-.dscene[data-scene="all"] :is(.ds-g-gtg,.ds-g-reb,.ds-g-eng,.ds-g-flare,.ds-rack),
-.dscene[data-scene="gtg"] .ds-g-gtg,.dscene[data-scene="reb"] .ds-g-reb,
-.dscene[data-scene="eng"] .ds-g-eng,.dscene[data-scene="flare"] .ds-g-flare{display:inline;animation:dsFadeIn .7s var(--ux-ease-out);}
-/* Scene tunggal: unit digeser ke tengah-kanan & diperbesar (origin = titik dasar unit, unit viewBox). */
-.dscene[data-scene="gtg"] .ds-g-gtg{transform-origin:134px 338px;transform:translateX(336px) scale(1.08);}
-.dscene[data-scene="reb"] .ds-g-reb{transform-origin:242px 338px;transform:translateX(228px) scale(1.5);}
-.dscene[data-scene="eng"] .ds-g-eng{transform-origin:350px 338px;transform:translateX(130px) scale(1.7);}
-.dscene[data-scene="flare"] .ds-g-flare{transform:translateX(-40px);}
-/* Scene "Semua": unit disebar ke kiri mengisi banner lebar (flare & alat ambien tetap di kanan). */
-.dscene[data-scene="all"] .ds-g-gtg{transform:translateX(-200px);}
-.dscene[data-scene="all"] .ds-g-reb{transform:translateX(-130px);}
-.dscene[data-scene="all"] :is(.ds-g-eng,.ds-rack){transform:translateX(-60px);}
+/* ---------- Mode zoom ---------- */
+.dscene.is-zoom .dio-stage{overflow:hidden;background:var(--dio-zoom-bg);box-shadow:inset 0 0 0 1px var(--ux-line),var(--ux-shadow-2);}
+.dio-area{cursor:pointer;transition:opacity 500ms var(--ux-ease-out);}
+.dscene.is-zoom .dio-area:not(.is-active){opacity:.5;}
+.dio-hit{fill:rgba(205,244,94,.14);stroke:var(--ux-lime-600,#b6e03c);stroke-width:1.6;stroke-dasharray:6 5;opacity:0;transition:opacity var(--ux-d2);}
+:root[data-theme="dark"] .dio-hit{fill:rgba(205,244,94,.07);}
+.dio-area.is-hl .dio-hit{opacity:1;}
+.dscene.is-zoom .dio-hit{opacity:0!important;}
 
-/* ---------- Warna bentuk ---------- */
-.ds-h1{fill:var(--ds-h1);}.ds-h2{fill:var(--ds-h2);}.ds-h3{fill:var(--ds-h3);}
-.ds-tree{fill:var(--ds-tree);}.ds-tree2{fill:var(--ds-tree2);}.ds-trunk{fill:var(--ds-trunk);}
-.ds-stack{fill:var(--ds-stack);}.ds-shade{fill:var(--ds-shade);}.ds-red{fill:var(--ds-red);}.ds-red-d{fill:var(--ds-red-d);}
-.ds-metal{fill:var(--ds-metal);}.ds-metal-l{fill:var(--ds-metal-l);}.ds-metal-d{fill:var(--ds-metal-d);}.ds-o55{opacity:.55;}
-.ds-enc{fill:var(--ds-enc);}.ds-seam{fill:rgba(15,23,41,.1);}.ds-louver-d{fill:rgba(15,23,41,.16);}
-.ds-door-l{fill:rgba(15,23,41,.05);stroke:rgba(15,23,41,.18);stroke-width:.8;}
-.ds-navy{fill:var(--ds-eng);}.ds-navy2{fill:var(--ds-eng2);}
-.ds-louver{fill:rgba(255,255,255,.2);}.ds-door{fill:rgba(255,255,255,.07);stroke:rgba(255,255,255,.22);stroke-width:.8;}
-.ds-gshadow{fill:var(--ds-gshadow);}
-.ds-lat{fill:none;stroke:var(--ds-metal-d);stroke-width:1.6;stroke-linejoin:round;}
-.ds-pipe{fill:none;stroke:var(--ds-metal);stroke-width:2.6;stroke-linecap:round;}
-.ds-glycol{fill:var(--ds-glycol);}.ds-glycol2{fill:var(--ds-glycol2);}
-.ds-meter{fill:var(--ds-meter);}.ds-lcd{fill:#a9cf9c;}.ds-ball{fill:#1f232a;}.ds-ball-hl{fill:rgba(255,255,255,.18);}
-.ds-tripod{fill:none;stroke:var(--ds-metal-d);stroke-width:1.6;stroke-linecap:round;}
+/* ---------- Hotspot (tombol HTML di atas SVG → bisa Tab/Enter) ---------- */
+.dio-hots{position:absolute;inset:0;pointer-events:none;z-index:2;}
+.dio-hot{position:absolute;left:var(--x);top:var(--y);width:36px;height:36px;margin:-18px 0 0 -18px;padding:0;border:0;border-radius:50%;background:transparent;cursor:pointer;pointer-events:auto;display:grid;place-items:center;transition:opacity var(--ux-d3),transform var(--ux-d3) var(--ux-ease-pop);}
+.dio-hot::before{content:"";position:absolute;inset:7px;border-radius:50%;border:2px solid var(--ux-lime);opacity:.0;animation:dioPing 2.6s var(--ux-ease-out) infinite;}
+.dio-hot:nth-child(2n)::before{animation-delay:-.9s;}.dio-hot:nth-child(3n)::before{animation-delay:-1.7s;}
+.dio-hot-dot{width:12px;height:12px;border-radius:50%;background:var(--ux-lime);box-shadow:0 0 0 2.5px var(--ux-navy),0 4px 10px -2px rgba(9,15,28,.5);transition:transform var(--ux-d2) var(--ux-ease-pop);}
+.dio-hot:hover .dio-hot-dot,.dio-hot:focus-visible .dio-hot-dot,.dio-hot.is-hl .dio-hot-dot{transform:scale(1.25);}
+.dio-hot:focus-visible{outline:2px solid var(--ux-blue);outline-offset:0;}
+.dio-hot-label{position:absolute;left:50%;bottom:calc(100% - 2px);transform:translate(-50%,4px);white-space:nowrap;padding:5px 9px;border-radius:8px;background:var(--ux-navy);color:#fff;font-size:11.5px;font-weight:650;letter-spacing:.01em;box-shadow:var(--ux-shadow-2);opacity:0;pointer-events:none;transition:opacity var(--ux-d2),transform var(--ux-d2) var(--ux-ease-out);}
+:root[data-theme="dark"] .dio-hot-label{background:var(--ux-lime);color:var(--ux-lime-ink);}
+.dio-hot:hover .dio-hot-label,.dio-hot:focus-visible .dio-hot-label,.dio-hot.is-hl .dio-hot-label{opacity:1;transform:translate(-50%,0);}
+/* Hotspot di tepi kiri/kanan: label menempel ke dalam supaya tidak terpotong. */
+.dio-hot--l .dio-hot-label{left:4px;transform:translate(0,4px);}
+.dio-hot--r .dio-hot-label{left:auto;right:4px;transform:translate(0,4px);}
+.dio-hot--l:is(:hover,:focus-visible,.is-hl) .dio-hot-label,.dio-hot--r:is(:hover,:focus-visible,.is-hl) .dio-hot-label{transform:translate(0,0);}
+.dscene.is-zoom .dio-hot{opacity:0;pointer-events:none;transform:scale(.6);}
+
+/* ---------- Kartu detail ---------- */
+.dio-card{position:absolute;top:50%;left:12px;z-index:4;width:292px;max-width:calc(100% - 24px);max-height:calc(100% - 16px);overflow:auto;box-sizing:border-box;padding:11px 14px 12px;border-radius:16px;border:1px solid var(--ux-line);background:color-mix(in srgb,var(--ux-surface) 92%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:var(--ux-shadow-3);transform:translateY(-50%);animation:dioCardIn 420ms var(--ux-ease-out);}
+.dio-card[hidden]{display:none;}
+.dscene.card-right .dio-card{left:auto;right:12px;}
+.dio-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.dio-card-eyebrow{display:inline-flex;align-items:center;gap:6px;min-width:0;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ux-muted);}
+.dio-card-eyebrow::before{flex:0 0 auto;}
+.dio-card-eyebrow::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ux-lime);box-shadow:0 0 0 2px color-mix(in srgb,var(--ux-lime) 35%,transparent);}
+.dio-card-tools{display:inline-flex;align-items:center;gap:4px;flex:0 0 auto;}
+.dio-card-btn{width:28px;height:28px;display:inline-grid;place-items:center;padding:0;border:1px solid var(--ux-line);border-radius:8px;background:var(--ux-surface);color:var(--ux-ink-2);cursor:pointer;transition:background var(--ux-d2),color var(--ux-d2);}
+.dio-card-btn:hover{background:var(--ux-surface-2);color:var(--ux-ink);}
+.dio-card-btn svg{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
+.dio-card-title{margin:5px 0 3px;font-size:16px;line-height:1.25;font-weight:700;letter-spacing:-.015em;color:var(--ux-ink);}
+.dio-card-desc{margin:0;font-size:12px;line-height:1.45;color:var(--ux-muted);}
+.dio-card-stats{margin-top:9px;}
+.dio-stat-main{display:flex;align-items:baseline;gap:8px;}
+.dio-stat-main b{font-size:24px;line-height:1;font-weight:750;letter-spacing:-.03em;color:var(--ux-ink);font-variant-numeric:tabular-nums;}
+.dio-stat-main span{font-size:12px;color:var(--ux-muted);}
+.dio-bar{height:6px;margin:7px 0 7px;border-radius:6px;background:var(--ux-line);overflow:hidden;}
+.dio-bar i{display:block;height:100%;border-radius:6px;background:#2fa36b;transition:width 700ms var(--ux-ease-out);}
+.dio-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.dio-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;font-size:11.5px;font-weight:600;background:var(--ux-surface-2);color:var(--ux-ink-2);border:1px solid var(--ux-line);}
+.dio-chip b{font-variant-numeric:tabular-nums;}
+.dio-chip.ok{color:#146c43;background:#e6f4ec;border-color:#c7e6d4;}
+.dio-chip.wait{color:#8a4a03;background:#fdf1e1;border-color:#f3d9b0;}
+.dio-chip.bad{color:#b42318;background:#fdecea;border-color:#f6cdc8;}
+:root[data-theme="dark"] .dio-chip.ok{color:#5fd39a;background:rgba(95,211,154,.1);border-color:rgba(95,211,154,.25);}
+:root[data-theme="dark"] .dio-chip.wait{color:#f5b860;background:rgba(245,184,96,.1);border-color:rgba(245,184,96,.25);}
+:root[data-theme="dark"] .dio-chip.bad{color:#ff8a80;background:rgba(255,138,128,.1);border-color:rgba(255,138,128,.25);}
+.dio-note{margin:0;font-size:12px;color:var(--ux-muted);}
+.dio-card-pos{margin-right:2px;font-size:11px;font-weight:600;color:var(--ux-muted);font-variant-numeric:tabular-nums;}
+/* Banner sempit: kartu turun ke bawah diorama (tidak menutupi unit). */
+@container dscene (max-width:899px){
+  .dio-card,.dscene.card-right .dio-card{position:relative;top:auto;left:auto;right:auto;transform:none;width:auto;max-width:none;max-height:none;margin-top:10px;}
+}
+
+/* ---------- Ponsel: diorama digeser horizontal ---------- */
+@container dscene (max-width:639px){
+  .dio-scroll{overflow-x:auto;overflow-y:hidden;padding-top:40px;margin-top:-40px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+  .dio-scroll::-webkit-scrollbar{display:none;}
+  .dio-stage{width:780px;}
+  .dscene-haze{display:none;}
+}
+
+/* ---------- Warna lanskap & balok ---------- */
+.dio-shadow{fill:var(--dio-shadow);}
+.dio-land{fill:var(--dio-land);}.dio-beach{fill:var(--dio-beach);}.dio-road{fill:var(--dio-road);}
+.dio-grass-lip{fill:var(--dio-grass);}
+.dio-soil{fill:var(--dio-soil);}.dio-sand{fill:var(--dio-sand);}.dio-rock{fill:var(--dio-rock);}.dio-mud{fill:var(--dio-mud);}
+.dio-side-water{fill:var(--dio-side-water);opacity:.92;}.dio-side-sand{fill:var(--dio-side-sand);}.dio-side-rock{fill:var(--dio-side-rock);}
+.dio-strata{fill:none;stroke:rgba(0,0,0,.12);stroke-width:1;}
+.dio-pebbles{fill:rgba(0,0,0,.13);}
+.dio-oil{fill:var(--dio-oil);}.dio-oil-hl{fill:none;stroke:rgba(255,255,255,.32);stroke-width:1.2;stroke-linecap:round;}
+.dio-swampwater{fill:var(--dio-swamp);opacity:.92;}.dio-swampwater-f{fill:var(--dio-swamp-f);opacity:.85;}
+.dio-sea{fill:var(--dio-sea);opacity:.88;}
+.dio-water-f{fill:url(#dioWaterG);opacity:.82;}
+.dio-wg0{stop-color:var(--dio-wg0);}.dio-wg1{stop-color:var(--dio-wg1);}
+.dio-tufts path{fill:none;stroke:var(--dio-grass);stroke-width:1.2;stroke-linecap:round;stroke-linejoin:round;}
+.dio-gpipe{fill:none;stroke:var(--ds-metal);stroke-width:2.2;stroke-linecap:round;}
+.dio-gpipe2{stroke:var(--dio-yellow);stroke-width:1.8;}
+.dio-gpipe-red{stroke:#e2453c;stroke-width:2;}
+.dio-gshadow{fill:var(--dio-gshadow);}
+.dio-dark{fill:var(--ds-metal-d);}
+.dio-trunk{fill:var(--dio-trunk);}.dio-leaf{fill:var(--dio-leaf);}.dio-leaf-hl{fill:var(--dio-leaf-hl);}
+.dio-mg1{fill:var(--dio-mg1);}.dio-mg2{fill:var(--dio-mg2);}
+.dio-root{fill:none;stroke:var(--dio-root);stroke-width:1.4;stroke-linecap:round;}
+.dio-win{fill:var(--dio-win);}
+.dio-door,.dio-door-l{fill:rgba(15,23,41,.05);stroke:rgba(15,23,41,.2);stroke-width:.8;}
+.dio-seam{fill:rgba(15,23,41,.1);}.dio-louver-d{fill:rgba(15,23,41,.18);}
+.dio-fanblade{fill:#dde1e5;}.dio-hub{fill:#b7bfc8;}
+.dio-roof-f{fill:var(--ds-metal);}.dio-roof-s{fill:#9aa3ad;}
+:root[data-theme="dark"] .dio-roof-s{fill:#5d6776;}
+.dio-cap{fill:var(--ds-metal-d);}
+.dio-cutaway{fill:#1f2a38;}
+.dio-bund{fill:rgba(0,0,0,.05);stroke:var(--dio-bund);stroke-width:2;}
+.dio-tank-rim{fill:var(--dio-tank-rim);}.dio-tank-in{fill:var(--dio-tank-in);}.dio-tank-roof{fill:var(--dio-tank-roof);}
+.dio-tank-band{fill:none;stroke:rgba(0,0,0,.14);stroke-width:1.2;}
+.dio-roofcap{fill:none;stroke:var(--ds-metal);stroke-width:2;}
+.dio-walk{fill:var(--dio-yellow);}.dio-rail{stroke:var(--dio-yellow-d);stroke-width:1.2;}
+.dio-pile{fill:var(--dio-yellow-d);}.dio-pile-b{opacity:.75;}
+.dio-pile-uw{fill:var(--dio-yellow-d);opacity:.55;}
+.dio-leg{fill:var(--dio-yellow);}.dio-leg-b{fill:var(--dio-yellow-d);}
+.dio-brace{stroke:var(--dio-yellow-d);stroke-width:2;stroke-linecap:round;}.dio-brace-b{opacity:.7;}
+.dio-leg-uw{fill:var(--dio-yellow-d);opacity:.6;}.dio-brace-uw{stroke:var(--dio-yellow-d);stroke-width:1.8;opacity:.5;}
+.dio-post{fill:var(--dio-yellow-d);}
+.dio-pipe-y{fill:none;stroke:var(--ds-metal);stroke-width:1.6;}
+.dio-lat-k{stroke:var(--dio-lat-k);stroke-width:1.3;stroke-linecap:round;}
+.dio-lat-uw{stroke:var(--dio-lat-k);stroke-width:1.2;opacity:.45;}
+.dio-lat-w{stroke:var(--dio-derrick);stroke-width:1.4;stroke-linecap:round;}
+.dio-lat-back .ds-lat{opacity:.45;}
+.dio-legtop{fill:#f5902c;}
+.dio-spud{fill:var(--dio-lat-k);opacity:.5;}
+.dio-helideck{fill:var(--dio-helideck);}
+.dio-heli-ring{fill:none;stroke:#ffd95a;stroke-width:1.4;}
+.dio-heli-h{fill:#fff;font:800 7px/1 Inter,system-ui,sans-serif;}
+.dio-boom{fill:none;stroke:var(--dio-yellow);stroke-width:2.4;stroke-linecap:round;}
+.dio-boom-r{stroke:#e2453c;}
+.dio-boom-hook{fill:none;stroke:var(--ds-metal-d);stroke-width:1;}
+.dio-lifeboat{fill:#f5902c;}
+.dio-hull-dark{fill:var(--dio-hull);}.dio-hull-red{fill:#e2453c;}
+.dio-mast{stroke:var(--ds-metal-d);stroke-width:1.4;}
+.dio-dish{fill:#eef1f3;stroke:var(--ds-metal-d);stroke-width:.8;}
+.dio-beacon{fill:#e2453c;animation:dsBlink 1.4s steps(1) infinite;}
+.dio-drill{fill:none;stroke:var(--dio-lat-k);stroke-width:1.4;stroke-dasharray:4 3;animation:dioDrill 1.2s linear infinite;}
+.dio-drillbit{fill:#ffcf4a;}
+.dio-wave{fill:none;stroke:rgba(255,255,255,.75);stroke-width:1.4;stroke-linecap:round;animation:dioWave 4.5s ease-in-out infinite;}
+.dio-wave:nth-child(2n){animation-delay:-1.5s;}.dio-wave:nth-child(3n){animation-delay:-3s;}
+:root[data-theme="dark"] .dio-wave{stroke:rgba(200,225,255,.35);}
+.dio-ripple{fill:none;stroke:rgba(255,255,255,.55);stroke-width:1;transform-box:fill-box;transform-origin:center;animation:dioRipple 3.6s ease-out infinite;}
+.dio-ripple:nth-child(2){animation-delay:-1.2s;}.dio-ripple:nth-child(3){animation-delay:-2.4s;}
+.dio-boat{animation:dioBob 3.2s ease-in-out infinite alternate;}
+.dio-crewboat{animation:dioCruise 14s ease-in-out infinite alternate;}
+.dio-bird{fill:none;stroke:var(--ds-metal-d);stroke-width:1.3;stroke-linecap:round;transform-box:fill-box;transform-origin:center;animation:dioFlap .5s ease-in-out infinite alternate;}
+.dio-bird2{animation-delay:-.25s;}
+.dio-birds{animation:dioBirds 22s linear infinite;}
+/* Helikopter melayang di dekat offshore platform */
+.dio-heli{animation:dioHeli 16s ease-in-out infinite;}
+.dio-heli-cab{fill:#e2453c;}.dio-heli-glass{fill:#bfe3ff;}
+.dio-heli-tail{fill:none;stroke:#e2453c;stroke-width:2.2;stroke-linecap:round;}
+.dio-heli-tailrotor{fill:none;stroke:#3a4048;stroke-width:1.4;stroke-linecap:round;transform-box:fill-box;transform-origin:center;animation:dioRotor .18s linear infinite;}
+.dio-heli-skid{fill:none;stroke:#3a4048;stroke-width:1.4;stroke-linecap:round;}
+.dio-heli-mast{fill:#3a4048;}
+.dio-heli-rotor{fill:#3a4048;opacity:.75;transform-box:fill-box;transform-origin:center;animation:dioRotor .16s linear infinite;}
+:root[data-theme="dark"] :is(.dio-heli-skid,.dio-heli-tailrotor){stroke:#9aa3b0;}
+:root[data-theme="dark"] :is(.dio-heli-mast,.dio-heli-rotor){fill:#9aa3b0;}
+
+/* ---------- Unit (diwarisi dari versi sebelumnya) ---------- */
 .ds-sun{fill:var(--ds-sun);}
 .ds-cloud{fill:var(--ds-cloud);animation:dsDrift 26s ease-in-out infinite alternate;}
 .ds-cloud.ds-c2{animation-duration:34s;animation-delay:-9s;}
 .ds-halo{fill:var(--ds-halo);transform-box:fill-box;transform-origin:center;animation:dsHalo 5s ease-in-out infinite;}
 .ds-star{fill:#e8edf5;opacity:calc(var(--ds-star) * .8);transform-box:fill-box;transform-origin:center;animation:dsTwinkle 3s ease-in-out infinite;}
 .ds-star:nth-child(2n){animation-delay:-1.2s;}.ds-star:nth-child(3n){animation-delay:-2.1s;}
-
-/* ---------- Gerak unit ---------- */
+.ds-lat{fill:none;stroke:var(--ds-metal-d);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;}
+.ds-pipe{fill:none;stroke:var(--ds-metal);stroke-width:2.6;stroke-linecap:round;}
+.ds-glycol{fill:var(--ds-glycol);}
+.ds-meter{fill:var(--ds-meter);}.ds-lcd{fill:#a9cf9c;}.ds-ball{fill:#1f232a;}.ds-ball-hl{fill:rgba(255,255,255,.18);}
+.ds-tripod{fill:none;stroke:var(--ds-metal-d);stroke-width:1.6;stroke-linecap:round;}
+.ds-louver{fill:rgba(255,255,255,.2);}.ds-door{fill:rgba(255,255,255,.07);stroke:rgba(255,255,255,.22);stroke-width:.8;}
 .ds-led{fill:#cdf45e;animation:dsBlink 1.6s steps(1) infinite;}
 .ds-led-g{fill:#3fb27f;animation:dsBlink 2s steps(1) infinite;}
 .ds-eng-body{animation:dsVib .14s linear infinite;}
 .ds-fan{transform-box:fill-box;transform-origin:center;animation:dsSpin .7s linear infinite;}
 .ds-slosh{transform-box:fill-box;transform-origin:50% 100%;animation:dsSlosh 3.2s ease-in-out infinite;}
-.ds-firetube{fill:none;stroke-width:3.4;stroke-linecap:round;animation:dsHeat 1.6s ease-in-out infinite;}
+.ds-firetube{fill:none;stroke-width:3;stroke-linecap:round;animation:dsHeat 1.6s ease-in-out infinite;}
 .ds-air{fill:var(--ds-metal-d);opacity:0;animation:dsAir 2.2s linear infinite;}
 .ds-air:nth-child(2){animation-delay:-.7s;}.ds-air:nth-child(3){animation-delay:-1.4s;}.ds-air:nth-child(5){animation-delay:-1.1s;}
 .ds-air-r{animation-name:dsAirR;}
@@ -128,13 +295,12 @@
 .ds-wave{fill:none;stroke:var(--ds-metal-d);stroke-width:1.3;stroke-linecap:round;opacity:0;transform-box:fill-box;transform-origin:0 50%;animation:dsWave 1.8s ease-out infinite;}
 .ds-wave:nth-child(2){animation-delay:-.6s;}.ds-wave:nth-child(3){animation-delay:-1.2s;}.ds-wave:nth-child(5){animation-delay:-.9s;}
 .ds-wave-l{transform-origin:100% 50%;animation-name:dsWaveL;}
-
-/* Flare */
 .ds-flame{transform-box:fill-box;transform-origin:50% 100%;}
 .ds-f1{fill:#f0761c;animation:dsFlick 1.1s ease-in-out infinite alternate;}
 .ds-f2{fill:#ffb12b;animation:dsFlick .72s ease-in-out infinite alternate-reverse;}
 .ds-f3{fill:#fff2b0;animation:dsFlick .5s ease-in-out infinite alternate;}
 .ds-glow{fill:url(#dsceneGlow);transform-box:fill-box;transform-origin:center;animation:dsGlow 2.4s ease-in-out infinite;}
+.ds-glow-s{animation-duration:3s;}
 .ds-gl0{stop-color:#ffb12b;stop-opacity:var(--ds-glow-op);}.ds-gl1{stop-color:#ff7a1a;stop-opacity:0;}
 .ds-spark{fill:#ffcf4a;opacity:0;transform-box:fill-box;transform-origin:center;animation:dsSparkA 1.8s ease-out infinite;}
 .ds-spark:nth-child(2n){animation-name:dsSparkB;animation-duration:2.2s;}
@@ -151,34 +317,27 @@
 .ds-pf:nth-child(7){animation-delay:calc(var(--ds-d) * -.666);}
 .ds-pf:nth-child(8){animation-delay:calc(var(--ds-d) * -.777);}
 .ds-pf:nth-child(9){animation-delay:calc(var(--ds-d) * -.888);}
-/* Turbin gas — gas buang abu-abu muda, kolom tinggi */
 .ds-p-gtg{--ds-d:8s;}.ds-p-gtg .ds-pf{animation-name:dsGtgA;}.ds-p-gtg .ds-pf:nth-child(2n){animation-name:dsGtgB;}
 .ds-p-gtg .ds-sh{fill:var(--ds-smoke-sh);}.ds-p-gtg .ds-hl{fill:var(--ds-smoke-hl);}
-/* Reboiler — gas buang burner + uap tipis dari vent still column */
 .ds-p-reb{--ds-d:6.4s;}.ds-p-reb .ds-pf{animation-name:dsRebA;}.ds-p-reb .ds-pf:nth-child(2n){animation-name:dsRebB;}
 .ds-p-reb .ds-sh{fill:var(--ds-smoke-sh);}.ds-p-reb .ds-hl{fill:var(--ds-smoke-hl);}
 .ds-p-vap{--ds-d:5s;}.ds-p-vap .ds-pf{animation-name:dsVapA;}.ds-p-vap .ds-pf:nth-child(2n){animation-name:dsVapB;}
 .ds-p-vap .ds-sh{fill:var(--ds-steam-sh);}.ds-p-vap .ds-hl{fill:var(--ds-steam-hl);}
-/* Diesel / gas engine — kepulan gelap pendek & cepat */
+.ds-p-vap2{--ds-d:4.4s;opacity:.7;}
 .ds-p-eng{--ds-d:3.6s;}.ds-p-eng .ds-pf{animation-name:dsEngA;}.ds-p-eng .ds-pf:nth-child(2n){animation-name:dsEngB;}
 .ds-p-eng .ds-sh{fill:var(--ds-eng-sh);}.ds-p-eng .ds-hl{fill:var(--ds-eng-hl);}
-/* Flare — jelaga hitam yang memudar jadi abu-abu */
+.ds-p-eng2{--ds-d:4.2s;opacity:.7;}
 .ds-p-soot{--ds-d:5.6s;}.ds-p-soot .ds-pf{animation-name:dsSootA;}.ds-p-soot .ds-pf:nth-child(2n){animation-name:dsSootB;}
 .ds-p-soot .ds-sh{animation:dsSoot var(--ds-d) linear infinite;animation-delay:inherit;}
 .ds-p-soot .ds-hl{animation:dsSootHl var(--ds-d) linear infinite;animation-delay:inherit;}
+.ds-p-soot2{--ds-d:5s;opacity:.7;}
 
-/* ---------- Jeda (tombol) ---------- */
-.dscene.is-paused *{animation-play-state:paused!important;}
-
-/* ---------- Responsive ---------- */
-/* Header terlalu sempit utk teks + scene berdampingan → scene turun ke bawah teks, lebar penuh. */
-@media (max-width:1260px){
-  .dscene-text{min-height:0;}
-  .dscene-box{position:relative;width:100%;height:auto;aspect-ratio:1440/360;max-height:200px;margin-top:6px;}
-}
-@media (max-width:640px){
-  .dscene-haze{display:none;}
-}
+/* ---------- KPI Dashboard ringkas (satu baris tipis di bawah diorama) ---------- */
+/* Angka di kiri, label di kanan (label tetap teks yg sama dari renderDashboard, 04-dashboard.js). */
+#page-dashboard .dash-stats-row{gap:10px;}
+#page-dashboard .dash-stats-row .stat{flex-direction:row;align-items:center;gap:12px;min-height:58px;padding:10px 14px !important;}
+#page-dashboard .dash-stats-row .stat .num{order:0;flex:0 0 auto;margin:0 !important;font-size:22px;}
+#page-dashboard .dash-stats-row .stat .lbl{order:1;margin:0 !important;font-size:10px !important;line-height:1.35;}
 
 /* ---------- Keyframes ---------- */
 @keyframes dsGtgA{0%{transform:translate(0,0) scale(.3);opacity:0}6%{opacity:.95}35%{transform:translate(-26px,-80px) scale(1.25)}65%{transform:translate(-110px,-150px) scale(2.1);opacity:.7}100%{transform:translate(-250px,-215px) scale(3.1);opacity:0}}
@@ -211,14 +370,24 @@
 @keyframes dsHalo{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.15);opacity:.55}}
 @keyframes dsTwinkle{0%,100%{transform:scale(1)}50%{transform:scale(.4)}}
 @keyframes dsHaze{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-@keyframes dsFadeIn{from{opacity:0}to{opacity:1}}
+@keyframes dioPing{0%{transform:scale(.6);opacity:.9}80%,100%{transform:scale(1.9);opacity:0}}
+@keyframes dioCardIn{from{opacity:0;margin-top:8px}to{opacity:1;margin-top:0}}
+@keyframes dioWave{0%,100%{transform:translateX(0);opacity:.25}50%{transform:translateX(-8px);opacity:.9}}
+@keyframes dioRipple{0%{transform:scale(.4);opacity:.8}100%{transform:scale(1.6);opacity:0}}
+@keyframes dioBob{from{transform:translateY(0)}to{transform:translateY(1.6px)}}
+@keyframes dioCruise{from{transform:translateX(0)}to{transform:translateX(36px)}}
+@keyframes dioFlap{from{transform:scaleY(1)}to{transform:scaleY(.35)}}
+@keyframes dioBirds{0%{transform:translate(60px,8px)}100%{transform:translate(-260px,-10px)}}
+@keyframes dioHeli{0%,100%{transform:translate(0,0)}25%{transform:translate(-36px,5px)}50%{transform:translate(-12px,-4px)}75%{transform:translate(26px,3px)}}
+@keyframes dioRotor{0%,100%{transform:scaleX(1)}50%{transform:scaleX(.25)}}
+@keyframes dioDrill{to{stroke-dashoffset:-14}}
 
-/* ---------- Reduced motion: scene tampil diam (tanpa asap), tombol jeda disembunyikan ----------
+/* ---------- Reduced motion: scene diam (tanpa asap), zoom tanpa transisi ----------
    Lebih spesifik dari aturan global di redesign.css (.app *) yg memaksa durasi 1ms. */
 @media (prefers-reduced-motion: reduce){
-  .app .dscene .dscene-box *,.app .dscene .dscene-haze-track{animation:none!important;}
-  .app .dscene .ds-plume,.app .dscene .ds-spark,.app .dscene .ds-wave,.app .dscene .ds-air{display:none;}
-  .dscene-seg .dscene-pause{display:none;}
+  .app .dscene .dio-svg *,.app .dscene .dscene-haze-track,.app .dscene .dio-hot::before{animation:none!important;}
+  .app .dscene :is(.ds-plume,.ds-spark,.ds-wave,.ds-air,.dio-ripple){display:none;}
+  .app .dscene .dio-cam{transition:none!important;}
 }
 
 } /* end @media screen */
